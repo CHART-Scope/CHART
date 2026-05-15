@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+**/node_modules/
+
+# environment
+.env
+.env.*
+
+# build outputs
+dist/
+build/
+coverage/
+**/dist/
+**/build/
+**/coverage/
+*.tsbuildinfo
+
+# local docs and notes
+docs/
+data/
+
+# OS files
+.DS_Store
