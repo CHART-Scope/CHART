@@ -1,188 +1,162 @@
-# CHART DDD Onboarding Guide
+# CHART Backend Module Guide
 
-**Audience:** engineers joining CHART Sprint 3 work  
-**Purpose:** give the repo a clear development shape before more backend code is added.
+## Purpose
 
-## Why this is useful
+This is a simple guide for how to grow the CHART backend.
 
-The wallet guide is useful for CHART because it gives:
+Current choices:
 
-- a consistent folder vocabulary
-- a clear rule for where business logic should live
-- a way to separate domain behavior from transport and providers
-- a predictable reading order for new contributors
+- API framework: `Fastify`
+- first backend modules: `auth` and `data-ingestion`
 
-We should use the pattern, not copy the wallet implementation.
+## Main idea
 
-## What to keep
+The structure is a pattern, not a rigid rule.
 
-Use the same four-layer structure inside each CHART module:
+The point is:
 
-| Layer | Responsibility | Typical contents | Rule |
-| --- | --- | --- | --- |
-| `contracts/` | bounded-context language | API types, ids, errors, domain primitives | no database or framework code |
-| `core/` | business meaning | command handlers, entities, value objects, policies, events | use cases live here |
-| `infra/` | concrete adapters | Postgres repositories, auth/session adapters, external data clients | talks to real systems |
-| `interface/` | transport edge | Express route handlers, request decoding, response mapping | thin edge only |
+- keep business logic separate from route handlers
+- keep database and source adapters separate from business logic
+- start small, then split further only when needed
 
-## What not to copy
+## Start simple
 
-Do **not** copy wallet-specific things like:
-
-- Cognito trigger structure
-- OTP challenge orchestration
-- provider-specific runtime wiring
-- auth flows that only make sense for mobile sign-in
-
-CHART needs the same structure, but different bounded contexts.
-
-## CHART bounded contexts
-
-For Sprint 3, the useful bounded contexts are:
-
-| Context | Purpose |
-| --- | --- |
-| `user-management` | users, roles, geography scope |
-| `planning-workspace` | shared planning context for `U1` and `U2` |
-| `dashboard` | region overview and read models for indicators |
-| `data-ingestion` | climate, health, population, and geography inputs |
-
-## First module to build
-
-Start with:
-
-1. `user-management`
-2. `planning-workspace`
-
-These are the base for everything else.
-
-## Suggested repo shape
+A module can start like this:
 
 ```txt
-apps/api/src/modules/
-  user-management/
-    contracts/
-    core/
-    infra/
-    interface/
-  planning-workspace/
-    contracts/
-    core/
-    infra/
-    interface/
-  dashboard/
-    contracts/
-    core/
-    infra/
-    interface/
-  data-ingestion/
-    contracts/
-    core/
-    infra/
-    interface/
+module/
+  types.ts
+  service.ts
+  routes.ts
 ```
 
-## CHART mental model
+That is enough for an early module.
 
-For CHART, the equivalent takeaway is:
+Later, if the module grows, it can become:
 
-**The API owns the transport contract, the module owns the business meaning, and infra owns storage or provider integration.**
+```txt
+module/
+  contracts/
+  core/
+  infra/
+  interface/
+```
 
-## User-management module
+## What the larger structure means
 
-This should answer:
-
-- who is the user
-- what role do they have
-- what geography can they access
-- what planning workspace can they belong to
-
-### Suggested language
-
-| Area | Example concepts |
+| Folder | Purpose |
 | --- | --- |
-| `contracts/` | `UserId`, `Role`, `GeographyScope`, `WorkspaceId`, `AccessError` |
-| `core/` | `assignRole`, `assignGeographyScope`, `attachUserToWorkspace`, `getCurrentUserContext` |
-| `infra/` | Postgres repositories, auth/session lookup |
-| `interface/` | `GET /me`, `GET /workspaces/current/members` |
+| `contracts/` | types, ids, errors, request/response shapes |
+| `core/` | business logic and use cases |
+| `infra/` | database adapters and external source adapters |
+| `interface/` | Fastify routes and request/response mapping |
 
-## Planning-workspace module
+You do **not** need to start with all four folders if the module is still small.
 
-This should answer:
+## First CHART backend modules
 
-- what planning context is active
-- which geography is selected
-- which users are collaborating
-- which planning cycle or period is in view
+### `auth`
 
-### Suggested language
+Responsibility:
 
-| Area | Example concepts |
-| --- | --- |
-| `contracts/` | `PlanningWorkspace`, `WorkspaceMember`, `ActiveGeography`, `PlanningCycle` |
-| `core/` | `createWorkspace`, `selectActiveGeography`, `addMember`, `getWorkspaceContext` |
-| `infra/` | Postgres repositories |
-| `interface/` | `GET /workspaces/current`, `POST /workspaces/current/select-geography`, `POST /workspaces/current/members` |
+- identify the current user
+- resolve role
+- resolve geography scope
+- return current session context
 
-## Read order for CHART contributors
+Good first files:
 
-Read in this order:
+```txt
+auth/
+  types.ts
+  service.ts
+  routes.ts
+```
 
-| Order | Read |
-| --- | --- |
-| 1 | `packages/shared/src/domain/` |
-| 2 | `apps/api/src/modules/*/contracts/` |
-| 3 | `apps/api/src/modules/*/core/` |
-| 4 | `apps/api/src/modules/*/infra/` |
-| 5 | `apps/api/src/modules/*/interface/` |
-| 6 | `apps/web/src/modules/` |
+Likely later split:
 
-That keeps domain meaning ahead of transport and UI.
+```txt
+auth/
+  contracts/
+  core/
+  infra/
+  interface/
+```
 
-## Good first API contract
+### `data-ingestion`
 
-For the first backend slice, keep it small:
+Responsibility:
+
+- load or sync climate data
+- load or sync health data
+- load geography and population data
+- record source metadata and provenance
+
+Good first files:
+
+```txt
+data-ingestion/
+  types.ts
+  service.ts
+  routes.ts
+```
+
+If it grows, split into source-specific adapters later.
+
+## Fastify fit
+
+Use Fastify as the HTTP edge.
+
+That means:
+
+- `routes.ts` defines endpoints
+- route handlers stay thin
+- handlers call module services
+- services hold the real logic
+
+## First useful routes
+
+### `auth`
 
 | Route | Purpose |
 | --- | --- |
 | `GET /me` | current user, role, geography scope |
-| `GET /workspaces/current` | current planning workspace |
-| `GET /workspaces/current/members` | current workspace members |
-| `POST /workspaces/current/members` | add a workspace member |
-| `POST /workspaces/current/select-geography` | set active geography |
 
-## Rule of thumb
+### `data-ingestion`
+
+| Route | Purpose |
+| --- | --- |
+| `GET /sources` | list configured sources |
+| `GET /sources/:id` | source metadata |
+| `POST /sources/:id/sync` | trigger a sync or load |
+
+## Working rule
 
 If you are changing:
 
-| Change | Look first in |
+| Change | Start here |
 | --- | --- |
-| business behavior | `core/` |
-| error vocabulary or shared types | `contracts/` |
-| database or provider integration | `infra/` |
-| HTTP request/response mapping | `interface/` |
+| route shape | `routes.ts` or `interface/` |
+| business behavior | `service.ts` or `core/` |
+| source/database implementation | `infra/` |
+| types and errors | `types.ts` or `contracts/` |
 
-## What this means for CHART now
+## Build order
 
-The immediate next step is not more generic architecture notes.
+1. `auth`
+2. `data-ingestion`
+3. `planning-workspace`
+4. `dashboard`
+5. `planning`
+6. `budget-justification`
 
-The immediate next step is:
+## Rule of thumb
 
-1. create `user-management` module folders
-2. define contracts
-3. define minimal API contract
-4. define core handlers
-5. add infra stubs
-6. wire thin interface handlers
+Start with:
 
-## Final takeaway
+- few modules
+- few files
+- clear names
+- thin routes
 
-Use the wallet guide as a **development pattern**.
-
-For CHART:
-
-- keep the layered module structure
-- keep domain language explicit
-- keep interfaces thin
-- keep infra replaceable
-- start with `user-management` and `planning-workspace`
+Only add more structure when the code starts to pull apart naturally.
