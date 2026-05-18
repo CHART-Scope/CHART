@@ -28,6 +28,7 @@ module/
   types.ts
   service.ts
   routes.ts
+  routes.test.ts
 ```
 
 That is enough for an early module.
@@ -71,6 +72,7 @@ auth/
   types.ts
   service.ts
   routes.ts
+  routes.test.ts
 ```
 
 Likely later split:
@@ -99,6 +101,7 @@ data-ingestion/
   types.ts
   service.ts
   routes.ts
+  routes.test.ts
 ```
 
 If it grows, split into source-specific adapters later.
@@ -113,6 +116,7 @@ That means:
 - route handlers stay thin
 - handlers call module services
 - services hold the real logic
+- route tests can use `Fastify.inject()`
 
 ## First useful routes
 
@@ -140,6 +144,17 @@ If you are changing:
 | business behavior | `service.ts` or `core/` |
 | source/database implementation | `infra/` |
 | types and errors | `types.ts` or `contracts/` |
+
+## Tests
+
+Keep tests close to module behavior.
+
+For now, simple route-level tests are enough:
+
+- `routes.test.ts` for endpoint behavior
+- later `service.test.ts` if module logic grows
+
+The important part is that tests describe expected behavior, not framework detail.
 
 ## Build order
 
