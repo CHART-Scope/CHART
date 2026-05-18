@@ -45,12 +45,12 @@ module/
 
 ## What the larger structure means
 
-| Folder | Purpose |
-| --- | --- |
-| `contracts/` | types, ids, errors, request/response shapes |
-| `core/` | business logic and use cases |
-| `infra/` | database adapters and external source adapters |
-| `interface/` | Fastify routes and request/response mapping |
+| Folder       | Purpose                                        |
+| ------------ | ---------------------------------------------- |
+| `contracts/` | types, ids, errors, request/response shapes    |
+| `core/`      | business logic and use cases                   |
+| `infra/`     | database adapters and external source adapters |
+| `interface/` | Fastify routes and request/response mapping    |
 
 You do **not** need to start with all four folders if the module is still small.
 
@@ -122,28 +122,28 @@ That means:
 
 ### `auth`
 
-| Route | Purpose |
-| --- | --- |
+| Route     | Purpose                             |
+| --------- | ----------------------------------- |
 | `GET /me` | current user, role, geography scope |
 
 ### `data-ingestion`
 
-| Route | Purpose |
-| --- | --- |
-| `GET /sources` | list configured sources |
-| `GET /sources/:id` | source metadata |
-| `POST /sources/:id/sync` | trigger a sync or load |
+| Route                    | Purpose                 |
+| ------------------------ | ----------------------- |
+| `GET /sources`           | list configured sources |
+| `GET /sources/:id`       | source metadata         |
+| `POST /sources/:id/sync` | trigger a sync or load  |
 
 ## Working rule
 
 If you are changing:
 
-| Change | Start here |
-| --- | --- |
-| route shape | `routes.ts` or `interface/` |
-| business behavior | `service.ts` or `core/` |
-| source/database implementation | `infra/` |
-| types and errors | `types.ts` or `contracts/` |
+| Change                         | Start here                  |
+| ------------------------------ | --------------------------- |
+| route shape                    | `routes.ts` or `interface/` |
+| business behavior              | `service.ts` or `core/`     |
+| source/database implementation | `infra/`                    |
+| types and errors               | `types.ts` or `contracts/`  |
 
 ## Tests
 
