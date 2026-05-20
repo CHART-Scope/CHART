@@ -62,7 +62,9 @@ export function PublicLandingPage() {
 
             <div className="path-card secure-path">
               <div className="path-header">
-                <span className="path-badge path-badge-secure">Login required</span>
+                <span className="path-badge path-badge-secure">
+                  Login required
+                </span>
                 <h2>Government workspace</h2>
               </div>
               <p>Planning tools for shared government work.</p>
@@ -102,7 +104,11 @@ export function PublicLandingPage() {
 
           <div className="resource-nav">
             {resourceSections.map((section) => (
-              <a key={section.id} className="resource-nav-card" href={`#${section.id}`}>
+              <a
+                key={section.id}
+                className="resource-nav-card"
+                href={`#${section.id}`}
+              >
                 <span>{section.eyebrow}</span>
                 <strong>{section.title}</strong>
               </a>
@@ -111,7 +117,11 @@ export function PublicLandingPage() {
 
           <div className="resource-sections">
             {resourceSections.map((section) => (
-              <article className="resource-section-card" id={section.id} key={section.id}>
+              <article
+                className="resource-section-card"
+                id={section.id}
+                key={section.id}
+              >
                 <div className="resource-section-header">
                   <div>
                     <span className="eyebrow">{section.eyebrow}</span>

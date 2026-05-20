@@ -1,0 +1,19 @@
+{
+  "name": "chart",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace @chart/web run dev --",
+    "build:web": "npm --workspace @chart/web run build",
+    "dev:api": "npm --workspace @chart/api run dev",
+    "build:api": "npm --workspace @chart/api run build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3"
+  }
+}

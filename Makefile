@@ -1,4 +1,4 @@
-.PHONY: install web web-build web-preview web-typecheck
+.PHONY: install web web-build web-preview web-typecheck api api-build api-test format format-check
 
 install:
 	npm install
@@ -14,3 +14,18 @@ web-preview:
 
 web-typecheck:
 	npm --workspace @chart/web run typecheck
+
+api:
+	npm run dev:api
+
+api-build:
+	npm run build:api
+
+api-test:
+	npm --workspace @chart/api run test
+
+format:
+	npm run format
+
+format-check:
+	npm run format:check

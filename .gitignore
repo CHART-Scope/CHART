@@ -16,7 +16,7 @@ coverage/
 *.tsbuildinfo
 
 # local docs and notes
-docs/
+# docs/
 data/
 
 # OS files
