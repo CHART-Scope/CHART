@@ -1,0 +1,15 @@
+services:
+  chart-postgres:
+    image: postgres:16-alpine
+    container_name: chart-postgres
+    environment:
+      POSTGRES_DB: chart_cms
+      POSTGRES_USER: chart
+      POSTGRES_PASSWORD: chart
+    ports:
+      - "5432:5432"
+    volumes:
+      - chart-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  chart-postgres-data:

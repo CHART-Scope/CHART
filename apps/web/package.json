@@ -4,20 +4,29 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "dev": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../../node_modules/@next/swc-wasm-nodejs next dev --webpack --hostname 127.0.0.1 --port 3100",
+    "build": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../../node_modules/@next/swc-wasm-nodejs next build --webpack --experimental-build-mode compile",
+    "start": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../../node_modules/@next/swc-wasm-nodejs next start --hostname ${HOSTNAME:-127.0.0.1} --port ${PORT:-3100}",
+    "seed": "payload run src/lib/seedChartContent.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "@payloadcms/db-postgres": "^3.63.0",
+    "@payloadcms/next": "^3.63.0",
+    "leaflet": "^1.9.4",
+    "next": "^16.2.2",
+    "payload": "^3.63.0",
+    "pg": "^8.16.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
-    "@types/react": "^18.2.66",
-    "@types/react-dom": "^18.2.22",
-    "@vitejs/plugin-react": "^4.2.1",
-    "typescript": "^5.4.5",
-    "vite": "^5.2.0"
+    "@next/swc-wasm-nodejs": "16.2.6",
+    "@types/leaflet": "^1.9.21",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "typescript": "^5.9.3"
   }
 }

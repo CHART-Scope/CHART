@@ -1,0 +1,26 @@
+{
+  "name": "chart",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace @chart/web run dev",
+    "build:web": "npm --workspace @chart/web run build",
+    "start:web": "npm --workspace @chart/web run start",
+    "seed:web": "npm --workspace @chart/web run seed",
+    "import:airtable:solutions": "node apps/web/scripts/importAirtableSolutions.mjs",
+    "typecheck:web": "npm --workspace @chart/web run typecheck",
+    "dev:api": "npm --workspace @chart/api run dev",
+    "build:api": "npm --workspace @chart/api run build",
+    "start:api": "npm --workspace @chart/api run start",
+    "test:api": "npm --workspace @chart/api run test",
+    "typecheck:api": "npm --workspace @chart/api run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3"
+  }
+}
