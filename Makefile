@@ -1,16 +1,46 @@
-.PHONY: install web web-build web-preview web-typecheck
+NPM := $(shell command -v npm || command -v /opt/homebrew/bin/npm || command -v /usr/local/bin/npm)
+export PATH := $(dir $(NPM)):$(PATH)
+
+.PHONY: install web web-build web-start web-seed web-typecheck api api-build api-start api-test api-typecheck airtable-import format format-check
 
 install:
-	npm install
+	$(NPM) install
 
 web:
-	npm run dev:web -- --host 127.0.0.1 --port 5173
+	$(NPM) run dev:web
 
 web-build:
-	npm run build:web
+	$(NPM) run build:web
 
-web-preview:
-	npm --workspace @chart/web run preview -- --host 127.0.0.1 --port 4173
+web-start:
+	$(NPM) run start:web
+
+web-seed:
+	$(NPM) run seed:web
 
 web-typecheck:
-	npm --workspace @chart/web run typecheck
+	$(NPM) run typecheck:web
+
+api:
+	$(NPM) run dev:api
+
+api-build:
+	$(NPM) run build:api
+
+api-start:
+	$(NPM) run start:api
+
+api-test:
+	$(NPM) run test:api
+
+api-typecheck:
+	$(NPM) run typecheck:api
+
+airtable-import:
+	$(NPM) run import:airtable:solutions
+
+format:
+	$(NPM) run format
+
+format-check:
+	$(NPM) run format:check

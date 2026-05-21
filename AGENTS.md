@@ -2,23 +2,34 @@
 
 ## Purpose
 
-This file defines the working rules for the whole CHART project.
+This guide keeps generated code consistent across the whole CHART repo.
 
-Use it to keep generated code:
+Generated code should be:
 
 - consistent
 - small
 - testable
 - easy to refactor
 
-## Stack
+## Project Shape
 
-- Backend: `Fastify + TypeScript`
-- Frontend: `React + Vite`
-- Database: `Postgres`
-- Formatter: `Prettier`
+CHART is a monorepo. Do not treat the root as a Next app.
 
-## Project priorities
+- `apps/web`: Next/Payload web app.
+- `apps/api`: Fastify backend API.
+- `data/`: local generated seed/import outputs, ignored by git.
+- `docs/`: local planning notes, ignored by git.
+
+Future Python or data-processing services should be added as separate apps or services, not inside `apps/web`.
+
+## Current Stack
+
+- Web: Next, React, Payload CMS.
+- API: Fastify, TypeScript.
+- Database: Postgres.
+- Formatting: Prettier.
+
+## Project Priorities
 
 Build in this order:
 
@@ -29,7 +40,7 @@ Build in this order:
 5. `planning`
 6. `budget-justification`
 
-## General coding rules
+## General Rules
 
 - Prefer simple code over abstract code.
 - Prefer small files over large multi-purpose files.
@@ -39,78 +50,11 @@ Build in this order:
 - Keep business logic out of UI components.
 - Do not add dependencies unless there is a clear reason.
 - Do not invent new folder patterns unless needed.
-- Refactor only when there is actual code pressure, not in advance.
+- Refactor only when there is actual code pressure.
 
-## Naming conventions
+## Backend Module Shape
 
-### Files
-
-- Use `kebab-case` for folders.
-- Use `camelCase.ts` for backend utility or service files when file names match function purpose.
-- Use `PascalCase.tsx` for React components.
-- Use explicit suffixes when useful:
-  - `types.ts`
-  - `service.ts`
-  - `routes.ts`
-  - `routes.test.ts`
-
-### Types
-
-- Use `PascalCase` for type names.
-- Use clear domain names:
-  - `CurrentUser`
-  - `SourceMetadata`
-  - `PlanningWorkspace`
-- Use string unions for small closed sets.
-
-### Functions
-
-- Use `camelCase`.
-- Use verbs for behavior:
-  - `getCurrentUser`
-  - `listSources`
-  - `queueSourceSync`
-  - `registerAuthRoutes`
-- Avoid vague names like:
-  - `handleData`
-  - `processThing`
-  - `doStuff`
-
-### Constants
-
-- Use `camelCase` for local constants.
-- Use `UPPER_SNAKE_CASE` only for true constants shared across a module or app.
-
-## Function writing rules
-
-- Keep functions short and direct.
-- Pass explicit inputs.
-- Return explicit outputs.
-- Avoid hidden mutation unless the purpose is obvious.
-- Prefer early returns over deep nesting.
-- If a function needs a long comment to explain itself, simplify the function first.
-
-Good:
-
-```ts
-export function getSourceById(sourceId: string): SourceMetadata | undefined {
-  return sources.find((source) => source.id === sourceId);
-}
-```
-
-Avoid:
-
-```ts
-export function processData(input: any) {
-  // many unrelated branches and side effects
-}
-```
-
-## Backend structure
-
-Start simple.
-
-Use this module shape first:
+Start simple:
 
 ```txt
 module/
@@ -120,123 +64,36 @@ module/
   routes.test.ts
 ```
 
-Only split further if the module grows.
+Use `routes.ts` for HTTP endpoints and `service.ts` for behavior. If a module grows, split it later into clearer subfolders.
 
-Possible later shape:
+Every new API route should have a route-level test using `Fastify.inject()`.
 
-```txt
-module/
-  contracts/
-  core/
-  infra/
-  interface/
-```
+## Backend Route Rules
 
-## Backend route rules
-
-- Use Fastify route registration functions:
-  - `registerAuthRoutes`
-  - `registerDataIngestionRoutes`
 - Route files define endpoints only.
-- Route handlers should:
-  - read params/body
-  - call a service function
-  - map result to HTTP response
+- Route handlers should read params/body, call service functions, and map results to HTTP responses.
 - Route handlers should not contain business workflows.
 - Keep error responses explicit and stable.
 
-Example pattern:
+## Frontend Module Shape
 
-```ts
-app.get("/:sourceId", async (request, reply) => {
-  const params = request.params as { sourceId: string };
-  const source = getSourceById(params.sourceId);
+Keep feature UI under `apps/web/src/modules/`.
 
-  if (!source) {
-    reply.code(404);
-    return { error: "SOURCE_NOT_FOUND" };
-  }
+- Use `PascalCase.tsx` for React components.
+- Keep shared shell/layout code under `apps/web/src/app/`.
+- Keep static copy and seed-like UI data close to the module using it.
+- Use simple props/state first; avoid state libraries until shared state is actually needed.
 
-  return source;
-});
-```
+## Naming
 
-## Backend service rules
+- Folders: `kebab-case`.
+- Backend files: `types.ts`, `service.ts`, `routes.ts`, `routes.test.ts`.
+- React components: `PascalCase.tsx`.
+- Functions: `camelCase` with clear verbs, such as `getCurrentUser` or `listSources`.
+- Types: `PascalCase`.
+- Constants: `camelCase`, unless the value is a true cross-module constant.
 
-- Put module behavior in `service.ts`.
-- Keep services framework-light.
-- Services may use in-memory data first, then move to database adapters later.
-- When service complexity grows, split by behavior:
-  - `getCurrentUser.ts`
-  - `queueSourceSync.ts`
-
-## Frontend structure
-
-- Keep frontend code under `apps/web/src/`.
-- Prefer feature folders under `apps/web/src/modules/`.
-- Keep shared app shell code under `apps/web/src/app/`.
-- Put static content or seed-like UI data close to the module using it.
-
-## Frontend component rules
-
-- Use `PascalCase` component names.
-- One file should usually export one main component.
-- Keep components presentational unless they clearly own page behavior.
-- Break large pages into sections when readability drops.
-- Prefer mapping arrays into small UI blocks instead of duplicating markup.
-- Keep copy concise.
-
-Good component naming:
-
-- `PublicLandingPage`
-- `ResourceSectionCard`
-- `AccessSummary`
-
-## Frontend state rules
-
-- Keep state local until sharing is necessary.
-- Do not introduce state libraries early.
-- Prefer props and simple React state first.
-- Add heavier structure only when multiple modules truly depend on shared state.
-
-## Types and data rules
-
-- Prefer explicit TypeScript types over `any`.
-- Model domain data first, UI formatting second.
-- Keep API response shapes stable once introduced.
-- Seed data is acceptable early if clearly named and easy to replace later.
-
-## Testing rules
-
-- Every new backend route should have a `routes.test.ts`.
-- Use `Fastify.inject()` for route-level tests.
-- Keep tests focused on observable behavior.
-- Add service-level tests when logic gets heavier.
-- Prefer a few good tests over many shallow tests.
-
-Current useful test levels:
-
-- route tests for API behavior
-- later service tests for business rules
-
-## Formatting and validation
-
-Before finishing backend work, run:
-
-```bash
-make format
-make api-test
-make api-build
-```
-
-Before finishing frontend work, run:
-
-```bash
-make format
-make web-build
-```
-
-## Product rules
+## Product Rules
 
 - Public content stays accessible without login.
 - Authenticated features should be scoped to role and geography.
@@ -244,9 +101,24 @@ make web-build
 - Prefer simple seeded data before adding real integrations.
 - Keep the first user flow understandable before making it comprehensive.
 
-## Architecture references
+## Validation
 
-Read when needed:
+Before finishing backend work:
 
-- `CHART-HIGH-LEVEL-MODULE-DESIGN.md`
-- `CHART-DDD-ONBOARDING.md`
+```bash
+make api-test
+make api-build
+```
+
+Before finishing frontend work:
+
+```bash
+make web-build
+make web-typecheck
+```
+
+Before finishing broad repo work:
+
+```bash
+make format-check
+```

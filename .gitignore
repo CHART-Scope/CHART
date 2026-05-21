@@ -5,6 +5,8 @@ node_modules/
 # environment
 .env
 .env.*
+!.env.example
+!**/.env.example
 
 # build outputs
 dist/
@@ -22,10 +24,12 @@ out/
 # generated local app artifacts
 apps/web/payload-types.ts
 apps/web/public/imported-airtable/
+apps/web/chart-cms.db
 
 # local docs and notes
 docs/
 data/
+.local/
 
 # OS files
 .DS_Store
