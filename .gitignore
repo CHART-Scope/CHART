@@ -22,9 +22,9 @@ out/
 *.tsbuildinfo
 
 # generated local app artifacts
-apps/web/payload-types.ts
-apps/web/public/imported-airtable/
-apps/web/chart-cms.db
+web/payload-types.ts
+web/public/imported-airtable/
+web/chart-cms.db
 
 # local docs and notes
 docs/

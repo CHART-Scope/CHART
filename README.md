@@ -2,8 +2,8 @@
 
 CHART is a climate-health planning platform. This repository is a monorepo:
 
-- `apps/web`: Next/Payload web app for the public site, CMS workflow, dashboard, and map UI.
-- `apps/api`: Fastify API for backend modules such as auth, role/geography context, and data ingestion.
+- `web`: Next/Payload web app for the public site, CMS workflow, dashboard, and map UI.
+- `api`: Fastify API for backend modules such as auth, role/geography context, and data ingestion.
 - `docker-compose.yml`: local Postgres for Payload/CMS development.
 - `data/`: ignored local seed/import outputs.
 - `docs/`: ignored local planning notes.
@@ -35,6 +35,6 @@ make format-check
 
 Keep each app isolated:
 
-- Web/UI code stays in `apps/web`.
-- Backend API code stays in `apps/api`.
+- Web/UI code stays in `web`.
+- Backend API code stays in `api`.
 - Future Python or data services should be added as separate apps/services, not mixed into the Next app.

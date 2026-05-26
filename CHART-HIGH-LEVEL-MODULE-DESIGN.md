@@ -30,7 +30,7 @@ flowchart LR
     U3["U3 District officer"]
     U4["U4 Admin"]
 
-    subgraph Web["apps/web"]
+    subgraph Web["web"]
         WebPublic["public-content<br/>landing<br/>resource sections"]
         WebAuth["auth shell<br/>session check<br/>route guard"]
         WebWorkspace["planning-workspace UI<br/>active geography<br/>planning cycle"]
@@ -39,7 +39,7 @@ flowchart LR
         WebBudget["budget UI<br/>funding case"]
     end
 
-    subgraph API["apps/api"]
+    subgraph API["api"]
         subgraph UserManagement["user-management"]
             UMContracts["contracts<br/>UserRole<br/>GeographyScope"]
             UMCore["core<br/>getCurrentUserContext<br/>assignRole<br/>attachUserToWorkspace"]

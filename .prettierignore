@@ -9,7 +9,7 @@ node_modules/
 
 data/
 docs/
-apps/web/public/imported-airtable/
-apps/web/payload-types.ts
+web/public/imported-airtable/
+web/payload-types.ts
 
 package-lock.json
