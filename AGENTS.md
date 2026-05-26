@@ -15,12 +15,12 @@ Generated code should be:
 
 CHART is a monorepo. Do not treat the root as a Next app.
 
-- `apps/web`: Next/Payload web app.
-- `apps/api`: Fastify backend API.
+- `web`: Next/Payload web app.
+- `api`: Fastify backend API.
 - `data/`: local generated seed/import outputs, ignored by git.
 - `docs/`: local planning notes, ignored by git.
 
-Future Python or data-processing services should be added as separate apps or services, not inside `apps/web`.
+Future Python or data-processing services should be added as separate apps or services, not inside `web`.
 
 ## Current Stack
 
@@ -77,10 +77,10 @@ Every new API route should have a route-level test using `Fastify.inject()`.
 
 ## Frontend Module Shape
 
-Keep feature UI under `apps/web/src/modules/`.
+Keep feature UI under `web/src/modules/`.
 
 - Use `PascalCase.tsx` for React components.
-- Keep shared shell/layout code under `apps/web/src/app/`.
+- Keep shared shell/layout code under `web/src/app/`.
 - Keep static copy and seed-like UI data close to the module using it.
 - Use simple props/state first; avoid state libraries until shared state is actually needed.
 

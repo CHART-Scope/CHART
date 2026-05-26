@@ -7,7 +7,7 @@ const explicitTableId = process.env.AIRTABLE_TABLE_ID;
 const token = process.env.AIRTABLE_TOKEN;
 const outputDir = process.env.AIRTABLE_OUTPUT_DIR ?? "data/airtable";
 const publicAssetDir =
-  process.env.AIRTABLE_PUBLIC_ASSET_DIR ?? "apps/web/public/imported-airtable";
+  process.env.AIRTABLE_PUBLIC_ASSET_DIR ?? "web/public/imported-airtable";
 
 if (!token) {
   throw new Error("AIRTABLE_TOKEN is required.");
