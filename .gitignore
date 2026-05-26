@@ -10,10 +10,18 @@ node_modules/
 dist/
 build/
 coverage/
+.next/
+out/
 **/dist/
 **/build/
 **/coverage/
+**/.next/
+**/out/
 *.tsbuildinfo
+
+# generated local app artifacts
+apps/web/payload-types.ts
+apps/web/public/imported-airtable/
 
 # local docs and notes
 docs/
