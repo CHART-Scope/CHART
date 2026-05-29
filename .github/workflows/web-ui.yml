@@ -1,0 +1,72 @@
+name: Web UI
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/web-ui.yml"
+      - ".prettierignore"
+      - ".prettierrc"
+      - "Makefile"
+      - "package.json"
+      - "package-lock.json"
+      - "web/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/web-ui.yml"
+      - ".prettierignore"
+      - ".prettierrc"
+      - "Makefile"
+      - "package.json"
+      - "package-lock.json"
+      - "web/**"
+  workflow_dispatch:
+
+concurrency:
+  group: chart-web-ui-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate web UI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check web formatting
+        run: npx prettier --check web package.json package-lock.json
+
+      - name: Typecheck web
+        run: npm run typecheck:web
+
+      - name: Build web
+        run: npm run build:web
+
+  deploy-demo:
+    name: Deploy web demo
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Deploy web app on EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.AWS_DEMO_HOST }}
+          username: ${{ secrets.AWS_DEMO_USER }}
+          key: ${{ secrets.AWS_DEMO_SSH_KEY }}
+          script: |
+            BRANCH="${{ github.ref_name }}" bash /opt/chart-ops/deploy.sh

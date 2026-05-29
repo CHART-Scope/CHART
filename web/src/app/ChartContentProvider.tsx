@@ -21,11 +21,12 @@ import {
   dashboardZones,
 } from "../content/dashboard";
 import {
-  datasetSources,
+  landingGovernmentQuestions,
   landingNavLinks,
+  landingPriorityExamples,
+  landingPriorityStatement,
   landingResourceSections,
-  landingSummarySteps,
-  licenseLayers,
+  landingWorkflowSteps,
 } from "../content/landing";
 import {
   createCmsContentRepository,
@@ -35,10 +36,11 @@ import {
 
 type ChartContentValue = {
   landingNavLinks: typeof landingNavLinks;
-  landingSummarySteps: typeof landingSummarySteps;
+  landingPriorityStatement: typeof landingPriorityStatement;
+  landingPriorityExamples: typeof landingPriorityExamples;
+  landingGovernmentQuestions: typeof landingGovernmentQuestions;
+  landingWorkflowSteps: typeof landingWorkflowSteps;
   landingResourceSections: typeof landingResourceSections;
-  licenseLayers: typeof licenseLayers;
-  datasetSources: typeof datasetSources;
   dashboardFilters: typeof dashboardFilters;
   dashboardMetrics: typeof dashboardMetrics;
   dashboardActions: typeof dashboardActions;
@@ -99,10 +101,11 @@ export function ChartContentProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ChartContentValue>(
     () => ({
       landingNavLinks,
-      landingSummarySteps,
+      landingPriorityStatement,
+      landingPriorityExamples,
+      landingGovernmentQuestions,
+      landingWorkflowSteps,
       landingResourceSections,
-      licenseLayers,
-      datasetSources,
       dashboardFilters,
       dashboardMetrics,
       dashboardActions,

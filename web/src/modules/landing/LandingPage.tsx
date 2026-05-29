@@ -6,13 +6,31 @@ type LandingPageProps = {
   onNavigate: (route: ChartRoute) => void;
 };
 
+type ToolkitPreview = "risk" | "vra" | "solutions";
+
+const partnerLogos = [
+  { name: "Scope Impact", label: "SCOPE", className: "scope" },
+  { name: "PATH", label: "PATH", className: "path" },
+  {
+    name: "Clinton Health Access Initiative",
+    label: "Clinton Health Access Initiative",
+    className: "chai",
+  },
+  {
+    name: "County Government of Kajiado",
+    label: "County Government of Kajiado",
+    className: "kajiado",
+  },
+];
+
 export function LandingPage({ onNavigate }: LandingPageProps) {
   const {
-    datasetSources,
+    landingGovernmentQuestions,
     landingNavLinks,
+    landingPriorityExamples,
+    landingPriorityStatement,
     landingResourceSections,
-    landingSummarySteps,
-    licenseLayers,
+    landingWorkflowSteps,
   } = useChartContent();
 
   return (
@@ -23,11 +41,10 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           type="button"
           onClick={() => onNavigate("landing")}
         >
-          <span className="landing-brand-mark">CH</span>
-          <span>CHART</span>
+          CHART
         </button>
 
-        <nav className="landing-links">
+        <nav className="landing-links" aria-label="CHART public sections">
           {landingNavLinks.map((item) => (
             <a className="landing-link" href={item.href} key={item.href}>
               {item.label}
@@ -35,231 +52,302 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           ))}
         </nav>
 
-        <div className="landing-actions">
-          <button
-            className="button ghost-button"
-            type="button"
-            onClick={() => onNavigate("cms")}
-          >
-            Open CMS
-          </button>
-          <button
-            className="button primary-button"
-            type="button"
-            onClick={() => onNavigate("dashboard")}
-          >
-            Open workspace
-          </button>
-        </div>
+        <button
+          className="button primary-button nav-sign-in"
+          type="button"
+          onClick={() => onNavigate("dashboard")}
+        >
+          Sign in
+        </button>
       </header>
 
       <main>
         <section className="landing-hero">
           <div className="hero-copy-card">
-            <span className="section-kicker">Climate and health adaptation</span>
-            <h1>
-              Public resources first. <em>Shared planning</em> behind login.
-            </h1>
+            <h1>CHART</h1>
+            <p className="hero-subtitle">
+              Climate x Health Adaptation and Resilience Tool
+            </p>
             <p>
-              CHART is a public toolkit for climate-health methods, vulnerability
-              resources and solution references. Government teams move into a private
-              workspace only when they need collaborative planning, priority mapping and
-              a funding-ready action case.
+              CHART helps <strong>district, county, and state officials</strong>{" "}
+              understand climate-related health risks, identify where support is most
+              needed, and choose practical actions for stronger health systems.
             </p>
             <div className="hero-button-row">
-              <a className="button primary-button" href="#models">
-                Browse public resources
+              <a className="button ghost-button" href="#contact">
+                Contact us
               </a>
               <button
-                className="button green-button"
+                className="button primary-button"
                 type="button"
                 onClick={() => onNavigate("dashboard")}
               >
-                Go to planning workspace
+                Request a demo
               </button>
             </div>
-            <div className="hero-stat-row">
-              <div>
-                <b>3</b>
-                <span>Public libraries</span>
-              </div>
-              <div>
-                <b>1</b>
-                <span>Shared workspace</span>
-              </div>
-              <div>
-                <b>4</b>
-                <span>License layers</span>
-              </div>
-            </div>
           </div>
 
-          <div className="hero-visual-card">
-            <div className="hero-window">
-              <div className="hero-window-bar">
-                <span />
-                <span />
-                <span />
-              </div>
-              <div className="hero-window-grid">
-                <div className="hero-metric">
-                  <label>Priority zones</label>
-                  <strong>12</strong>
-                </div>
-                <div className="hero-metric">
-                  <label>Heat-exposed population</label>
-                  <strong>76K</strong>
-                </div>
-                <div className="hero-chart-card">
-                  <h3>Composite risk</h3>
-                  <div className="hero-chart-bars">
-                    <span style={{ height: "48%" }} />
-                    <span style={{ height: "68%" }} />
-                    <span style={{ height: "84%" }} />
-                    <span style={{ height: "58%" }} />
-                    <span style={{ height: "32%" }} />
+          <DashboardLaptopPreview />
+        </section>
+
+        <section
+          className="priority-decision-section"
+          aria-labelledby="priority-decision-title"
+        >
+          <div className="priority-statement-card">
+            <span className="section-kicker">When resources are limited</span>
+            <h2 id="priority-decision-title">Decide what to prioritize first</h2>
+            <blockquote>{landingPriorityStatement}</blockquote>
+          </div>
+
+          <div className="priority-comparison-card">
+            <div className="priority-card-head">
+              <span>Example planning view</span>
+              <strong>Priority signal</strong>
+            </div>
+            <div className="priority-hazard-list">
+              {landingPriorityExamples.map((item) => (
+                <div
+                  className={`priority-hazard-row ${
+                    item.isPriority ? "is-priority" : ""
+                  }`}
+                  key={item.hazard}
+                >
+                  <div className="priority-hazard-copy">
+                    <strong>{item.hazard}</strong>
+                    <span>{item.signal}</span>
+                  </div>
+                  <div className="priority-score-bar" aria-hidden="true">
+                    <span style={{ width: `${item.score}%` }} />
+                  </div>
+                  <div className="priority-impact-copy">
+                    <span>{item.impact}</span>
+                    {item.isPriority ? <b>Prioritize first</b> : null}
                   </div>
                 </div>
-              </div>
-            </div>
-            <div className="floating-info-card">
-              <span className="small-kicker">Priority district</span>
-              <strong>Gwalior South</strong>
-              <div className="mini-metrics">
-                <span>Heat 91</span>
-                <span>Water 83</span>
-              </div>
-            </div>
-            <div className="floating-info-card left">
-              <span className="small-kicker">Action candidate</span>
-              <strong>HeatCare Kit</strong>
-              <div className="mini-progress">
-                <span />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="access-band">
-          <article className="access-card public">
-            <span className="section-kicker">Public layer</span>
-            <h2>Read, download and adapt resources freely</h2>
-            <p>
-              The public site is for models, VRA resources, solution references and
-              licensing guidance. No login needed.
-            </p>
-          </article>
-          <article className="access-card private">
-            <span className="section-kicker">Private workspace</span>
-            <h2>Invite U1 and U2 into the same planning context</h2>
-            <p>
-              The authenticated workspace adds geography-scoped dashboards,
-              collaborative planning and a funding justification layer.
-            </p>
-          </article>
-        </section>
-
-        <section className="summary-grid">
-          {landingSummarySteps.map((step) => (
-            <article className="summary-card" key={step.number}>
-              <span className="summary-number">{step.number}</span>
-              <h3>{step.title}</h3>
-              <p>{step.text}</p>
-            </article>
-          ))}
-        </section>
-
-        {landingResourceSections.map((section) => (
-          <section className="resource-section" id={section.id} key={section.id}>
-            <div className="resource-section-head">
-              <div>
-                <span className="section-kicker">{section.eyebrow}</span>
-                <h2>{section.title}</h2>
-                <p>{section.description}</p>
-              </div>
-            </div>
-            <div className="resource-card-grid">
-              {section.items.map((item) => (
-                <article className="resource-card" key={item.title}>
-                  <span className="resource-tag">{item.tag}</span>
-                  <h3>{item.title}</h3>
-                  <p>{item.description}</p>
-                  <div className="resource-meta">{item.meta}</div>
-                </article>
               ))}
             </div>
-          </section>
-        ))}
+          </div>
+        </section>
 
-        <section className="license-section" id="license">
-          <div className="resource-section-head">
-            <div>
-              <span className="section-kicker">License and data</span>
-              <h2>Four layers with different reuse rules</h2>
-              <p>
-                Most of CHART is open. External data is not CHART’s to relicense, so the
-                platform keeps the code, schemas, docs and provider data visibly
-                separate.
-              </p>
-            </div>
+        <section className="government-overview" id="overview">
+          <div className="overview-copy">
+            <span className="section-kicker">For government planning teams</span>
+            <h2>What CHART answers first</h2>
+            <p>
+              CHART is designed for the first practical questions a government team
+              asks: What climate hazards are relevant here? Who may be affected? Where
+              are services more vulnerable? What actions can we plan and justify?
+            </p>
           </div>
 
-          <div className="license-layer-grid">
-            {licenseLayers.map((layer) => (
-              <article className={`license-card ${layer.accentClass}`} key={layer.name}>
-                <h3>{layer.name}</h3>
-                <strong>{layer.license}</strong>
-                <p>{layer.description}</p>
+          <div className="government-question-grid">
+            {landingGovernmentQuestions.map((item) => (
+              <article className="government-question-card" key={item.question}>
+                <h3>{item.question}</h3>
+                <p>{item.answer}</p>
               </article>
             ))}
           </div>
+        </section>
 
-          <div className="dataset-table">
-            <div className="dataset-table-head">
-              <span>Dataset</span>
-              <span>Use</span>
-              <span>Redistribution</span>
-              <span>Source</span>
-            </div>
-            {datasetSources.map((source) => (
-              <div className="dataset-table-row" key={source.name}>
-                <strong>{source.name}</strong>
-                <span>{source.use}</span>
-                <span>{source.redistribution}</span>
-                <a href="#license">{source.linkLabel}</a>
-              </div>
+        <section className="workflow-section" id="workflow">
+          <div className="workflow-head">
+            <span className="section-kicker">One connected workflow</span>
+            <h2>From risk to action</h2>
+            <p>
+              CHART does not treat climate risk, vulnerability, and solutions as
+              separate products. It connects them so officials can move from evidence to
+              a clear planning discussion.
+            </p>
+          </div>
+
+          <div className="workflow-step-grid">
+            {landingWorkflowSteps.map((item) => (
+              <article className="workflow-step-card" key={item.step}>
+                <span>{item.step}</span>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
+              </article>
             ))}
           </div>
         </section>
 
-        <section className="cta-band">
-          <div>
-            <span className="section-kicker">Two paths, one product</span>
-            <h2>Stay on the public site or move into the workspace</h2>
+        <section className="toolkit-section" id="toolkit">
+          <div className="toolkit-section-head">
+            <h2>How CHART guides planning</h2>
             <p>
-              The public toolkit remains useful on its own. When teams are ready to plan
-              together, the workspace adds scoped dashboards, action flows and content
-              operations.
+              The sections below are steps in the same workflow: understand risk, review
+              vulnerability, then identify solutions that can support planning and
+              budget conversations.
             </p>
           </div>
-          <div className="hero-button-row">
-            <button
-              className="button primary-button"
-              type="button"
-              onClick={() => onNavigate("dashboard")}
-            >
-              Open dashboard
-            </button>
-            <button
-              className="button ghost-button"
-              type="button"
-              onClick={() => onNavigate("cms")}
-            >
-              Open CMS
-            </button>
+
+          <div className="toolkit-list">
+            {landingResourceSections.map((section) => (
+              <article className="toolkit-row" id={section.id} key={section.id}>
+                <ToolkitPreviewCard preview={section.preview} />
+                <div className="toolkit-copy">
+                  <h3>{section.title}</h3>
+                  <p>{section.description}</p>
+                  <a className="button primary-button" href={`#${section.id}`}>
+                    {section.ctaLabel}
+                  </a>
+                </div>
+              </article>
+            ))}
           </div>
         </section>
+
+        <section className="partner-section" id="contact">
+          <div className="partner-cta">
+            <h2>Sign in and start planning collaboratively</h2>
+            <p>
+              <strong>
+                Are you a local government or organization interested in implementing
+                CHART?
+              </strong>
+              Get in touch to explore how CHART can support your climate and health
+              planning efforts.
+            </p>
+            <div className="hero-button-row">
+              <a className="button ghost-button" href="mailto:hello@scopeimpact.fi">
+                Contact us
+              </a>
+              <button
+                className="button primary-button"
+                type="button"
+                onClick={() => onNavigate("dashboard")}
+              >
+                Request a demo
+              </button>
+            </div>
+          </div>
+
+          <div className="partner-logo-block">
+            <h3>Co-created by:</h3>
+            <div className="partner-logo-grid">
+              {partnerLogos.map((partner) => (
+                <div
+                  className={`partner-logo ${partner.className}`}
+                  key={partner.name}
+                  aria-label={partner.name}
+                >
+                  <span>{partner.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <footer className="landing-footer">
+            <span>CHART platform code is licensed under AGPL-3.0.</span>
+            <a
+              href="https://github.com/CHART-Scope/CHART"
+              rel="noreferrer"
+              target="_blank"
+            >
+              View on GitHub
+            </a>
+          </footer>
+        </section>
       </main>
+    </div>
+  );
+}
+
+function DashboardLaptopPreview() {
+  return (
+    <div className="laptop-preview" aria-label="CHART dashboard demo preview">
+      <div className="laptop-screen">
+        <div className="demo-sidebar">
+          <span>CHART</span>
+          <small>My dashboard</small>
+          <small>My plans</small>
+          <small>CHART toolkit</small>
+        </div>
+        <div className="demo-dashboard">
+          <div className="demo-topbar">
+            <strong>My dashboard</strong>
+            <span>Welcome, Rahul</span>
+          </div>
+          <div className="demo-metric-grid">
+            <div>
+              <small>Max temperature</small>
+              <strong>48°C</strong>
+            </div>
+            <div>
+              <small>Extreme heat days</small>
+              <strong>103</strong>
+            </div>
+            <div>
+              <small>Affected population</small>
+              <strong>76K</strong>
+            </div>
+          </div>
+          <div className="demo-chart">
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
+        <span className="demo-play-button" />
+      </div>
+      <div className="laptop-base" />
+    </div>
+  );
+}
+
+function ToolkitPreviewCard({ preview }: { preview: ToolkitPreview }) {
+  if (preview === "risk") {
+    return (
+      <div className="toolkit-preview risk-preview" aria-hidden="true">
+        <h4>Implications of extreme heat on infant mortality</h4>
+        <div className="risk-chart">
+          <span className="risk-band" />
+          <span className="risk-line" />
+          <span className="risk-axis x" />
+          <span className="risk-axis y" />
+        </div>
+      </div>
+    );
+  }
+
+  if (preview === "vra") {
+    return (
+      <div className="toolkit-preview vra-preview" aria-hidden="true">
+        <h4>Health facility infrastructure vulnerability assessment</h4>
+        <div className="vra-pill-row">
+          <span>Lower risk</span>
+          <span>Medium risk</span>
+          <span>Higher risk</span>
+        </div>
+        <div className="vra-question">
+          <strong>Does the facility retain services during shocks?</strong>
+          <span>Yes</span>
+          <span>Sometimes</span>
+          <span>No</span>
+        </div>
+        <div className="vra-input" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="toolkit-preview solutions-preview" aria-hidden="true">
+      {[
+        "Gender-responsive heat action plans",
+        "Heat-responsive building codes",
+        "Urban greening",
+        "Reflective roofs",
+        "Early warning systems",
+        "Heat health awareness",
+      ].map((title) => (
+        <div className="solution-tile" key={title}>
+          <span />
+          <strong>{title}</strong>
+          <small>Policy initiative</small>
+        </div>
+      ))}
     </div>
   );
 }
