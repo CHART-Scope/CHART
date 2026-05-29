@@ -69,4 +69,16 @@ jobs:
           username: ${{ secrets.AWS_DEMO_USER }}
           key: ${{ secrets.AWS_DEMO_SSH_KEY }}
           script: |
-            BRANCH="${{ github.ref_name }}" bash /opt/chart-ops/deploy.sh
+            set -euo pipefail
+
+            APP_DIR="${APP_DIR:-/opt/chart}"
+            BRANCH="${{ github.ref_name }}"
+
+            if [ -d "$APP_DIR/.git" ]; then
+              git -C "$APP_DIR" fetch origin "$BRANCH"
+              git -C "$APP_DIR" checkout -B "$BRANCH" "origin/$BRANCH"
+              git -C "$APP_DIR" reset --hard "origin/$BRANCH"
+              git -C "$APP_DIR" clean -fd
+            fi
+
+            BRANCH="$BRANCH" bash /opt/chart-ops/deploy.sh
