@@ -76,7 +76,7 @@ jobs:
 
             if [ -d "$APP_DIR/.git" ]; then
               git -C "$APP_DIR" fetch origin "$BRANCH"
-              git -C "$APP_DIR" checkout -B "$BRANCH" "origin/$BRANCH"
+              git -C "$APP_DIR" checkout -f -B "$BRANCH" "origin/$BRANCH"
               git -C "$APP_DIR" reset --hard "origin/$BRANCH"
               git -C "$APP_DIR" clean -fd
             fi
