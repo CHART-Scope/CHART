@@ -1,0 +1,94 @@
+name: API
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/api.yml"
+      - ".github/pull_request_template.md"
+      - ".prettierrc.json"
+      - "Makefile"
+      - "api/**"
+      - "docker-compose.yml"
+      - "infra/**"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/api.yml"
+      - ".github/pull_request_template.md"
+      - ".prettierrc.json"
+      - "Makefile"
+      - "api/**"
+      - "docker-compose.yml"
+      - "infra/**"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+concurrency:
+  group: chart-api-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate API
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: chart_app
+          POSTGRES_USER: chart
+          POSTGRES_PASSWORD: chart
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chart -d chart_app"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://chart:chart@127.0.0.1:5432/chart_app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check API formatting
+        run: npx prettier --check api docker-compose.yml infra package.json package-lock.json
+
+      - name: Check migration history
+        run: npm run db:check:api
+
+      - name: Verify schema and migrations are in sync
+        run: |
+          npm run db:generate:api
+          if [ -n "$(git status --porcelain api/drizzle)" ]; then
+            git status --short api/drizzle
+            exit 1
+          fi
+
+      - name: Typecheck API
+        run: npm run typecheck:api
+
+      - name: Test API
+        run: npm run test:api
+
+      - name: Apply API migrations
+        run: npm run db:migrate:api
+
+      - name: Build API
+        run: npm run build:api
