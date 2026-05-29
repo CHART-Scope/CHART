@@ -81,6 +81,11 @@ jobs:
             exit 1
           fi
 
+      - name: Verify OpenAPI contract is in sync
+        run: |
+          npm run openapi:generate:api
+          test -s api/openapi.yaml
+
       - name: Typecheck API
         run: npm run typecheck:api
 

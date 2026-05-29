@@ -1,7 +1,7 @@
 NPM := $(shell command -v npm || command -v /opt/homebrew/bin/npm || command -v /usr/local/bin/npm)
 export PATH := $(dir $(NPM)):$(PATH)
 
-.PHONY: install web web-build web-start web-seed web-typecheck api api-build api-start api-test api-typecheck api-db-generate api-db-migrate api-db-check api-db-seed identity identity-down airtable-import format format-check
+.PHONY: install web web-build web-start web-seed web-typecheck api api-build api-start api-test api-typecheck api-db-generate api-db-migrate api-db-check api-db-seed api-openapi-generate identity identity-down airtable-import format format-check
 
 install:
 	$(NPM) install
@@ -47,6 +47,9 @@ api-db-check:
 
 api-db-seed:
 	$(NPM) run db:seed:api
+
+api-openapi-generate:
+	$(NPM) run openapi:generate:api
 
 identity:
 	docker compose up -d chart-postgres chart-keycloak

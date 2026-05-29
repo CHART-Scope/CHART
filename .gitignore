@@ -22,6 +22,7 @@ out/
 *.tsbuildinfo
 
 # generated local app artifacts
+api/openapi.yaml
 web/payload-types.ts
 web/public/imported-airtable/
 web/chart-cms.db
