@@ -1,0 +1,199 @@
+{
+  "realm": "chart",
+  "enabled": true,
+  "displayName": "CHART",
+  "roles": {
+    "realm": [
+      {
+        "name": "offline_access"
+      },
+      {
+        "name": "uma_authorization"
+      }
+    ],
+    "client": {
+      "chart-api": [
+        {
+          "name": "u1_health_lead",
+          "description": "State or county health lead"
+        },
+        {
+          "name": "u2_cross_sector_lead",
+          "description": "State or county cross-sector lead"
+        },
+        {
+          "name": "u3_district_health_officer",
+          "description": "District or sub-county health officer"
+        },
+        {
+          "name": "u4_district_cross_sector_officer",
+          "description": "District or sub-county cross-sector officer"
+        },
+        {
+          "name": "u5_public_visitor",
+          "description": "Public visitor or partner"
+        },
+        {
+          "name": "chart_admin",
+          "description": "CHART administrator"
+        }
+      ]
+    }
+  },
+  "groups": [
+    {
+      "name": "india",
+      "attributes": {
+        "country_code": ["IN"],
+        "geo_level": ["country"]
+      },
+      "subGroups": [
+        {
+          "name": "madhya-pradesh",
+          "attributes": {
+            "country_code": ["IN"],
+            "geo_level": ["geo_level_1"],
+            "level_label": ["state"]
+          },
+          "subGroups": [
+            {
+              "name": "gwalior",
+              "attributes": {
+                "country_code": ["IN"],
+                "geo_level": ["geo_level_2"],
+                "level_label": ["district"]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "kenya",
+      "attributes": {
+        "country_code": ["KE"],
+        "geo_level": ["country"]
+      },
+      "subGroups": [
+        {
+          "name": "kajiado",
+          "attributes": {
+            "country_code": ["KE"],
+            "geo_level": ["geo_level_1"],
+            "level_label": ["county"]
+          },
+          "subGroups": [
+            {
+              "name": "loitokitok",
+              "attributes": {
+                "country_code": ["KE"],
+                "geo_level": ["geo_level_2"],
+                "level_label": ["sub-county"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "chart-web",
+      "name": "CHART web",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "http://localhost:3100/*",
+        "http://127.0.0.1:3100/*",
+        "http://16.16.56.56/*"
+      ],
+      "webOrigins": ["+"],
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "chart-api",
+      "name": "CHART API",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true
+    }
+  ],
+  "users": [
+    {
+      "username": "u1-health-india",
+      "enabled": true,
+      "email": "u1-health-india@example.org",
+      "firstName": "U1",
+      "lastName": "Health India",
+      "groups": ["/india/madhya-pradesh"],
+      "clientRoles": {
+        "chart-api": ["u1_health_lead"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "u2-sector-kenya",
+      "enabled": true,
+      "email": "u2-sector-kenya@example.org",
+      "firstName": "U2",
+      "lastName": "Sector Kenya",
+      "groups": ["/kenya/kajiado"],
+      "clientRoles": {
+        "chart-api": ["u2_cross_sector_lead"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "u3-health-gwalior",
+      "enabled": true,
+      "email": "u3-health-gwalior@example.org",
+      "firstName": "U3",
+      "lastName": "Health Gwalior",
+      "groups": ["/india/madhya-pradesh/gwalior"],
+      "clientRoles": {
+        "chart-api": ["u3_district_health_officer"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}
