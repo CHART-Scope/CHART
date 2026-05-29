@@ -185,6 +185,63 @@ button {
   line-height: 1.65;
 }
 
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background:
+    radial-gradient(circle at 20% 16%, rgba(46, 148, 73, 0.18), transparent 28%),
+    radial-gradient(circle at 82% 10%, rgba(37, 99, 235, 0.1), transparent 30%),
+    var(--surface-alt);
+}
+
+.auth-card {
+  display: grid;
+  gap: 1.25rem;
+  width: min(100%, 36rem);
+  border: 1px solid rgba(31, 110, 54, 0.16);
+  border-radius: 1.5rem;
+  padding: clamp(1.5rem, 4vw, 2.4rem);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-lg);
+}
+
+.auth-card h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--green-deep);
+}
+
+.auth-card p {
+  margin: 0.9rem 0 0;
+  color: var(--ink-soft);
+  line-height: 1.65;
+}
+
+.auth-summary-card {
+  display: grid;
+  gap: 0.3rem;
+  border: 1px solid var(--green-soft);
+  border-radius: 1rem;
+  padding: 1rem;
+  background: var(--green-active);
+}
+
+.auth-summary-card span {
+  color: var(--ink-soft);
+}
+
+.auth-error {
+  border: 1px solid var(--red);
+  border-radius: 1rem;
+  padding: 0.9rem 1rem;
+  background: var(--red-tint);
+  color: #7f1d1d;
+}
+
 .landing-shell {
   min-height: 100vh;
   background:
@@ -891,6 +948,38 @@ button {
   display: flex;
   gap: 0.85rem;
   flex-wrap: wrap;
+}
+
+.signed-in-pill {
+  display: inline-grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.08rem 0.8rem;
+  align-items: center;
+  min-width: min(100%, 24rem);
+  padding: 0.55rem 0.75rem;
+  border-radius: 1rem;
+  border: 1px solid var(--green-soft);
+  background: var(--green-active);
+}
+
+.signed-in-pill span {
+  font-weight: 700;
+  color: var(--green-deep);
+}
+
+.signed-in-pill small {
+  color: var(--ink-soft);
+}
+
+.signed-in-pill button {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  border: 1px solid var(--green-soft);
+  border-radius: 999px;
+  padding: 0.42rem 0.7rem;
+  background: #fff;
+  color: var(--green-dark);
+  font-weight: 700;
 }
 
 .filter-pill {
