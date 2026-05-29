@@ -31,6 +31,26 @@ test("GET /auth/me returns the current role and geography context", async () => 
   await app.close();
 });
 
+test("GET /auth/me allows the local web origin", async () => {
+  const app = buildApp();
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/auth/me",
+    headers: {
+      origin: "http://127.0.0.1:3100",
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(
+    response.headers["access-control-allow-origin"],
+    "http://127.0.0.1:3100",
+  );
+
+  await app.close();
+});
+
 test("GET /auth/me rejects an active geography outside the user's token scopes", async () => {
   const app = buildApp();
 

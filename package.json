@@ -22,6 +22,7 @@
     "db:migrate:api": "npm --workspace @chart/api run db:migrate",
     "db:check:api": "npm --workspace @chart/api run db:check",
     "db:seed:api": "npm --workspace @chart/api run db:seed",
+    "openapi:generate:api": "npm --workspace @chart/api run openapi:generate",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

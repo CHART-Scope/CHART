@@ -33,6 +33,7 @@ make api-db-generate
 make api-db-migrate
 make api-db-check
 make api-db-seed
+make api-openapi-generate
 make api-test
 make api-build
 make format-check

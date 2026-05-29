@@ -1,34 +1,79 @@
 import type { FastifyInstance } from "fastify";
 
 import { getSourceById, listSources, queueSourceSync } from "./service.js";
+import {
+  errorResponseSchema,
+  sourceIdParamsSchema,
+  sourceMetadataSchema,
+  sourceSyncResultSchema,
+} from "./types.js";
+
+export const listSourcesRouteSchema = {
+  tags: ["data-ingestion"],
+  summary: "List configured data sources",
+  response: {
+    200: {
+      type: "array",
+      items: sourceMetadataSchema,
+    },
+  },
+} as const;
+
+export const getSourceRouteSchema = {
+  tags: ["data-ingestion"],
+  summary: "Get one configured data source",
+  params: sourceIdParamsSchema,
+  response: {
+    200: sourceMetadataSchema,
+    404: errorResponseSchema,
+  },
+} as const;
+
+export const queueSourceSyncRouteSchema = {
+  tags: ["data-ingestion"],
+  summary: "Queue a data source sync",
+  params: sourceIdParamsSchema,
+  response: {
+    202: sourceSyncResultSchema,
+    404: errorResponseSchema,
+  },
+} as const;
 
 export async function registerDataIngestionRoutes(app: FastifyInstance) {
-  app.get("/", async () => {
+  app.get("/", { schema: listSourcesRouteSchema }, async () => {
     return listSources();
   });
 
-  app.get("/:sourceId", async (request, reply) => {
-    const params = request.params as { sourceId: string };
-    const source = getSourceById(params.sourceId);
+  app.get<{ Params: { sourceId: string } }>(
+    "/:sourceId",
+    { schema: getSourceRouteSchema },
+    async (request, reply) => {
+      const params = request.params;
+      const source = getSourceById(params.sourceId);
 
-    if (!source) {
-      reply.code(404);
-      return { error: "SOURCE_NOT_FOUND" };
-    }
+      if (!source) {
+        reply.code(404);
+        return { error: "SOURCE_NOT_FOUND" };
+      }
 
-    return source;
-  });
+      return source;
+    },
+  );
 
-  app.post("/:sourceId/sync", async (request, reply) => {
-    const params = request.params as { sourceId: string };
-    const source = getSourceById(params.sourceId);
+  app.post<{ Params: { sourceId: string } }>(
+    "/:sourceId/sync",
+    { schema: queueSourceSyncRouteSchema },
+    async (request, reply) => {
+      const params = request.params;
+      const source = getSourceById(params.sourceId);
 
-    if (!source) {
-      reply.code(404);
-      return { error: "SOURCE_NOT_FOUND" };
-    }
+      if (!source) {
+        reply.code(404);
+        return { error: "SOURCE_NOT_FOUND" };
+      }
 
-    reply.code(202);
-    return queueSourceSync(params.sourceId);
-  });
+      reply.code(202);
+      return queueSourceSync(params.sourceId);
+    },
+  );
 }

@@ -12,7 +12,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
-    "db:seed": "tsx src/db/seed.ts"
+    "db:seed": "tsx src/db/seed.ts",
+    "openapi:generate": "tsx src/openapi.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
@@ -23,6 +24,7 @@
   "devDependencies": {
     "@types/node": "^22.15.19",
     "drizzle-kit": "^0.31.10",
+    "prettier": "^3.8.3",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   }
