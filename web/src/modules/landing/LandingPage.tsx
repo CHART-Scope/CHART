@@ -1,6 +1,6 @@
 import { useChartContent } from "../../app/ChartContentProvider";
 
-export type ChartRoute = "landing" | "dashboard" | "cms";
+export type ChartRoute = "landing" | "dashboard" | "cms" | "signin";
 
 type LandingPageProps = {
   onNavigate: (route: ChartRoute) => void;
@@ -55,7 +55,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         <button
           className="button primary-button nav-sign-in"
           type="button"
-          onClick={() => onNavigate("dashboard")}
+          onClick={() => onNavigate("signin")}
         >
           Sign in
         </button>
@@ -80,7 +80,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <button
                 className="button primary-button"
                 type="button"
-                onClick={() => onNavigate("dashboard")}
+                onClick={() => onNavigate("signin")}
               >
                 Request a demo
               </button>
@@ -217,7 +217,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <button
                 className="button primary-button"
                 type="button"
-                onClick={() => onNavigate("dashboard")}
+                onClick={() => onNavigate("signin")}
               >
                 Request a demo
               </button>

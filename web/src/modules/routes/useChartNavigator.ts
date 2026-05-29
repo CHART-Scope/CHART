@@ -13,6 +13,11 @@ export function useChartNavigator() {
       return;
     }
 
+    if (route === "signin") {
+      router.push("/signin");
+      return;
+    }
+
     router.push(`/${route}`);
   };
 }

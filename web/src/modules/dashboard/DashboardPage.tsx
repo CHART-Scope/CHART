@@ -3,11 +3,14 @@
 import { useState } from "react";
 
 import { useChartContent } from "../../app/ChartContentProvider";
+import type { CurrentUserContext } from "../auth/authClient";
 import { WorkspaceShell } from "../shell/WorkspaceShell";
 import { OpenStreetMapPanel } from "./OpenStreetMapPanel";
 
 type DashboardPageProps = {
   onNavigate: (route: "landing" | "dashboard" | "cms") => void;
+  currentUser: CurrentUserContext;
+  onSignOut: () => void;
 };
 
 type MapLayer = "heat" | "flood" | "population" | "composite";
@@ -27,7 +30,11 @@ function collaboratorStack(collaborators: string[]) {
   );
 }
 
-export function DashboardPage({ onNavigate }: DashboardPageProps) {
+export function DashboardPage({
+  onNavigate,
+  currentUser,
+  onSignOut,
+}: DashboardPageProps) {
   const {
     dashboardActions,
     dashboardBoundary,
@@ -61,6 +68,16 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
         </div>
 
         <div className="filter-row">
+          <div className="signed-in-pill">
+            <span>{currentUser.username}</span>
+            <small>
+              {currentUser.roles[0]?.replaceAll("_", " ") ?? "CHART user"} ·{" "}
+              {currentUser.activeGeographyId ?? currentUser.geographyScopes[0]}
+            </small>
+            <button type="button" onClick={onSignOut}>
+              Sign out
+            </button>
+          </div>
           <label className="filter-pill">
             Geography
             <select defaultValue={dashboardFilters.geographyOptions[0]}>
