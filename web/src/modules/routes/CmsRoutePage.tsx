@@ -7,5 +7,9 @@ import { useChartNavigator } from "./useChartNavigator";
 export function CmsRoutePage() {
   const navigate = useChartNavigator();
 
-  return <RequireAuth>{() => <CmsPage onNavigate={navigate} />}</RequireAuth>;
+  return (
+    <RequireAuth>
+      {(_session, signOut) => <CmsPage onNavigate={navigate} onSignOut={signOut} />}
+    </RequireAuth>
+  );
 }
