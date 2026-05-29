@@ -18,6 +18,10 @@
     "start:api": "npm --workspace @chart/api run start",
     "test:api": "npm --workspace @chart/api run test",
     "typecheck:api": "npm --workspace @chart/api run typecheck",
+    "db:generate:api": "npm --workspace @chart/api run db:generate",
+    "db:migrate:api": "npm --workspace @chart/api run db:migrate",
+    "db:check:api": "npm --workspace @chart/api run db:check",
+    "db:seed:api": "npm --workspace @chart/api run db:seed",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
