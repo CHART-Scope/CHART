@@ -14,6 +14,7 @@ import { WorkspaceShell } from "../shell/WorkspaceShell";
 
 type CmsPageProps = {
   onNavigate: (route: "landing" | "dashboard" | "cms") => void;
+  onSignOut: () => void;
 };
 
 type CmsSection = "pipeline" | "content" | "submissions" | "editor";
@@ -141,7 +142,7 @@ function solutionMetaLine(item: CmsItem) {
     .join(" · ");
 }
 
-export function CmsPage({ onNavigate }: CmsPageProps) {
+export function CmsPage({ onNavigate, onSignOut }: CmsPageProps) {
   const { cmsItems, cmsSubmissions, createCmsItem, saveCmsItem } = useChartContent();
   const [section, setSection] = useState<CmsSection>("pipeline");
   const [pipelineMode, setPipelineMode] = useState<PipelineMode>("kanban");
@@ -227,6 +228,7 @@ export function CmsPage({ onNavigate }: CmsPageProps) {
       activeRoute="cms"
       crumb="CHART Toolkit / Content studio"
       onNavigate={onNavigate}
+      onSignOut={onSignOut}
       pageTitle="Content studio"
     >
       <section className="page-header-block">

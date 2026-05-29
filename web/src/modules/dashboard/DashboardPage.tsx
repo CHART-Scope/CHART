@@ -56,6 +56,7 @@ export function DashboardPage({
       pageTitle="Planning workspace"
       crumb="CHART Toolkit / Shared dashboard"
       onNavigate={onNavigate}
+      onSignOut={onSignOut}
     >
       <section className="page-header-block">
         <div>
@@ -74,9 +75,6 @@ export function DashboardPage({
               {currentUser.roles[0]?.replaceAll("_", " ") ?? "CHART user"} ·{" "}
               {currentUser.activeGeographyId ?? currentUser.geographyScopes[0]}
             </small>
-            <button type="button" onClick={onSignOut}>
-              Sign out
-            </button>
           </div>
           <label className="filter-pill">
             Geography

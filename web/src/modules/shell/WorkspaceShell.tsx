@@ -5,6 +5,7 @@ type WorkspaceShellProps = {
   pageTitle: string;
   crumb: string;
   onNavigate: (route: "landing" | "dashboard" | "cms") => void;
+  onSignOut?: () => void;
   children: ReactNode;
 };
 
@@ -13,6 +14,7 @@ export function WorkspaceShell({
   pageTitle,
   crumb,
   onNavigate,
+  onSignOut,
   children,
 }: WorkspaceShellProps) {
   const today = new Intl.DateTimeFormat("en-GB", {
@@ -64,6 +66,11 @@ export function WorkspaceShell({
         <div className="workspace-sidebar-foot">
           Shared planning for climate-health teams. Public resources stay open; scoped
           planning stays inside the workspace.
+          {onSignOut ? (
+            <button className="workspace-signout" type="button" onClick={onSignOut}>
+              Sign out
+            </button>
+          ) : null}
         </div>
       </aside>
 
@@ -75,6 +82,11 @@ export function WorkspaceShell({
           </div>
           <div className="workspace-topbar-right">
             <div className="workspace-date">{today}</div>
+            {onSignOut ? (
+              <button className="topbar-signout" type="button" onClick={onSignOut}>
+                Sign out
+              </button>
+            ) : null}
             <div className="workspace-avatar">AB</div>
           </div>
         </header>
