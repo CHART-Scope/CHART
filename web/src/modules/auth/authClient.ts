@@ -26,7 +26,7 @@ export type AuthSession = {
 };
 
 const authStorageKey = "chart.auth.session";
-const pkceStorageKey = "chart.auth.pkce";
+const legacyPkceStorageKey = "chart.auth.pkce";
 
 export function getStoredAuthSession(): AuthSession | null {
   if (typeof window === "undefined") {
@@ -53,43 +53,30 @@ export function storeAuthSession(session: AuthSession) {
 
 export function clearAuthSession() {
   window.localStorage.removeItem(authStorageKey);
-  window.localStorage.removeItem(pkceStorageKey);
-  window.sessionStorage.removeItem(pkceStorageKey);
+  window.localStorage.removeItem(legacyPkceStorageKey);
+  window.sessionStorage.removeItem(legacyPkceStorageKey);
 }
 
 export async function startKeycloakSignIn() {
   clearAuthSession();
-
-  const verifier = createRandomString();
-  const challenge = await createCodeChallenge(verifier);
-  const state = createRandomString();
-
-  window.localStorage.setItem(pkceStorageKey, JSON.stringify({ verifier, state }));
-  window.location.assign(buildKeycloakAuthorizeUrl(challenge, state));
+  window.location.assign("/auth/signin");
 }
 
 export async function completeKeycloakSignIn(search: string) {
   const params = new URLSearchParams(search);
   const code = params.get("code");
   const state = params.get("state");
-  const savedPkce = readSavedPkce();
 
-  if (!code || !state || !savedPkce || savedPkce.state !== state) {
+  if (!code || !state) {
     throw new Error("The sign-in response could not be verified.");
   }
 
-  const tokenResponse = await fetch(buildKeycloakTokenUrl(), {
+  const tokenResponse = await fetch("/api/auth/keycloak-exchange", {
     method: "POST",
     headers: {
-      "content-type": "application/x-www-form-urlencoded",
+      "content-type": "application/json",
     },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: getKeycloakClientId(),
-      code,
-      redirect_uri: getRedirectUri(),
-      code_verifier: savedPkce.verifier,
-    }),
+    body: JSON.stringify({ code, state }),
   });
 
   if (!tokenResponse.ok) {
@@ -115,7 +102,7 @@ export async function completeKeycloakSignIn(search: string) {
   };
 
   storeAuthSession(session);
-  window.localStorage.removeItem(pkceStorageKey);
+  window.localStorage.removeItem(legacyPkceStorageKey);
 
   return session;
 }
@@ -146,21 +133,6 @@ async function fetchCurrentUser(accessToken?: string) {
   return (await response.json()) as CurrentUserContext;
 }
 
-function readSavedPkce(): { verifier: string; state: string } | null {
-  const rawPkce = window.localStorage.getItem(pkceStorageKey);
-
-  if (!rawPkce) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(rawPkce) as { verifier: string; state: string };
-  } catch {
-    window.localStorage.removeItem(pkceStorageKey);
-    return null;
-  }
-}
-
 function getApiBaseUrl() {
   return process.env.NEXT_PUBLIC_CHART_API_URL ?? "http://127.0.0.1:3200";
 }
@@ -175,32 +147,6 @@ function getKeycloakRealm() {
 
 function getKeycloakClientId() {
   return process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID ?? "chart-web";
-}
-
-function getRedirectUri() {
-  return `${window.location.origin}/auth/callback`;
-}
-
-function buildKeycloakAuthorizeUrl(challenge: string, state: string) {
-  const url = new URL(
-    `${getKeycloakBaseUrl()}/realms/${getKeycloakRealm()}/protocol/openid-connect/auth`,
-  );
-
-  url.search = new URLSearchParams({
-    client_id: getKeycloakClientId(),
-    redirect_uri: getRedirectUri(),
-    response_type: "code",
-    scope: "openid profile email",
-    code_challenge: challenge,
-    code_challenge_method: "S256",
-    state,
-  }).toString();
-
-  return url.toString();
-}
-
-function buildKeycloakTokenUrl() {
-  return `${getKeycloakBaseUrl()}/realms/${getKeycloakRealm()}/protocol/openid-connect/token`;
 }
 
 function buildKeycloakLogoutUrl(idToken?: string) {
@@ -220,24 +166,4 @@ function buildKeycloakLogoutUrl(idToken?: string) {
   url.search = params.toString();
 
   return url.toString();
-}
-
-function createRandomString() {
-  const bytes = new Uint8Array(32);
-  window.crypto.getRandomValues(bytes);
-
-  return base64UrlEncode(bytes);
-}
-
-async function createCodeChallenge(verifier: string) {
-  const data = new TextEncoder().encode(verifier);
-  const digest = await window.crypto.subtle.digest("SHA-256", data);
-
-  return base64UrlEncode(new Uint8Array(digest));
-}
-
-function base64UrlEncode(bytes: Uint8Array) {
-  const text = String.fromCharCode(...bytes);
-
-  return window.btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
