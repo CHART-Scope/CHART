@@ -38,6 +38,18 @@ Seed sign-in users are available through Keycloak at `http://127.0.0.1:8080`:
 - `u3-health-gwalior` / `password`
 - `u4-sector-loitokitok` / `password`
 
+## EC2 demo routing
+
+The EC2 deployment exposes one public port:
+
+- `http://<host>/`: CHART web app
+- `http://<host>/identity`: Keycloak sign-in
+- `http://<host>/api`: Next/Payload API
+- `http://<host>/chart-api`: Fastify API
+
+Keycloak and the API still run on their container ports internally, but only the
+reverse proxy publishes port `80`.
+
 ## Useful commands
 
 ```bash

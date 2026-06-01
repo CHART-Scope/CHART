@@ -40,9 +40,14 @@ export function buildApiDocsHtml() {
     <div id="swagger-ui"></div>
     <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
     <script>
+      const currentPath = window.location.pathname.replace(/\\/$/, "");
+      const openApiUrl = currentPath && currentPath !== "/api"
+        ? currentPath + "/openapi.json"
+        : "/openapi.json";
+
       window.ui = SwaggerUIBundle({
         dom_id: "#swagger-ui",
-        url: "/openapi.json",
+        url: openApiUrl,
         deepLinking: true,
         displayRequestDuration: true,
         persistAuthorization: true,
