@@ -5,7 +5,7 @@ import postgres from "postgres";
 import { countryGeoConfig, geographies } from "./schema.js";
 
 const databaseUrl =
-  process.env.DATABASE_URL ?? "postgres://chart:chart@127.0.0.1:5432/chart_app";
+  process.env.DATABASE_URL ?? "postgres://chart:chart@127.0.0.1:5432/chart";
 
 const client = postgres(databaseUrl, { max: 1 });
 const db = drizzle(client);

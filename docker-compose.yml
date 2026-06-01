@@ -3,16 +3,15 @@ services:
     image: postgres:16-alpine
     container_name: chart-postgres
     environment:
-      POSTGRES_DB: chart_app
+      POSTGRES_DB: chart
       POSTGRES_USER: chart
       POSTGRES_PASSWORD: chart
     ports:
       - "5432:5432"
     volumes:
       - chart-postgres-data:/var/lib/postgresql/data
-      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U chart -d chart_app"]
+      test: ["CMD-SHELL", "pg_isready -U chart -d chart"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,7 +27,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://chart-postgres:5432/chart_keycloak
+      KC_DB_URL: jdbc:postgresql://chart-postgres:5432/chart
       KC_DB_USERNAME: chart
       KC_DB_PASSWORD: chart
       KC_HTTP_ENABLED: "true"
@@ -37,6 +36,7 @@ services:
       - "8080:8080"
     volumes:
       - ./infra/keycloak/chart-realm.json:/opt/keycloak/data/import/chart-realm.json:ro
+      - ./infra/keycloak/themes/chart:/opt/keycloak/themes/chart:ro
 
 volumes:
   chart-postgres-data:

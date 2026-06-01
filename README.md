@@ -4,7 +4,7 @@ CHART is a climate-health planning platform. This repository is a monorepo:
 
 - `web`: Next/Payload web app for the public site, CMS workflow, dashboard, and map UI.
 - `api`: Fastify API for backend modules such as auth, role/geography context, and data ingestion.
-- `docker-compose.yml`: local Postgres and Keycloak for demo/development infrastructure.
+- `docker-compose.yml`: local Postgres and Keycloak for development infrastructure.
 - `data/`: ignored local seed/import outputs.
 - `docs/`: ignored local planning notes.
 
@@ -14,13 +14,29 @@ The root package is only a workspace controller. It is not the web app and shoul
 
 ```bash
 make install
-docker compose up -d chart-postgres
+docker compose up -d chart-postgres chart-keycloak
 make api-db-migrate
 make api-db-seed
+make api
 make web
 ```
 
 Open `http://127.0.0.1:3100`.
+
+API docs are available at `http://127.0.0.1:3200/api`.
+Orval can consume `http://127.0.0.1:3200/openapi.json` or
+`http://127.0.0.1:3200/openapi.yaml`.
+
+Local Postgres uses one database, `chart`. Drizzle manages only the CHART app
+tables from `api/src/db/schema.ts`; Payload and Keycloak manage their own tables in
+the same database.
+
+Seed sign-in users are available through Keycloak at `http://127.0.0.1:8080`:
+
+- `u1-health-india` / `password`
+- `u2-sector-kenya` / `password`
+- `u3-health-gwalior` / `password`
+- `u4-sector-loitokitok` / `password`
 
 ## Useful commands
 
