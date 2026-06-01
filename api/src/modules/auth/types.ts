@@ -17,8 +17,6 @@ export const geographyLevels = [
 export type ChartRole = (typeof chartRoles)[number];
 export type GeographyLevel = (typeof geographyLevels)[number];
 
-export type AuthMode = "demo" | "keycloak";
-
 export interface CurrentUserContext {
   userId: string;
   username: string;
@@ -50,7 +48,6 @@ export interface KeycloakTokenClaims {
 }
 
 export interface AuthConfig {
-  mode: AuthMode;
   issuerUrl?: string;
   clientId: string;
   jwksUrl?: string;

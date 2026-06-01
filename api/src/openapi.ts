@@ -53,15 +53,46 @@ export function buildOpenApiDocument() {
       "/health": {
         get: {
           tags: ["system"],
+          operationId: "getHealth",
           summary: "Check API health",
           responses: {
             "200": response("API is available", healthResponseSchema),
           },
         },
       },
+      "/api": {
+        get: {
+          tags: ["system"],
+          operationId: "getApiDocs",
+          summary: "Open the interactive Swagger API documentation",
+          responses: {
+            "200": {
+              description: "Swagger UI page",
+              content: {
+                "text/html": {
+                  schema: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/openapi.json": {
+        get: {
+          tags: ["system"],
+          operationId: "getOpenApiJson",
+          summary: "Get the current OpenAPI contract as JSON",
+          responses: {
+            "200": response("OpenAPI contract as JSON", {
+              type: "object",
+            }),
+          },
+        },
+      },
       "/openapi.yaml": {
         get: {
           tags: ["system"],
+          operationId: "getOpenApiYaml",
           summary: "Get the current OpenAPI contract",
           responses: {
             "200": {
@@ -78,7 +109,9 @@ export function buildOpenApiDocument() {
       "/auth/me": {
         get: {
           tags: getCurrentUserRouteSchema.tags,
+          operationId: "getCurrentUser",
           summary: getCurrentUserRouteSchema.summary,
+          security: bearerAuth(),
           parameters: [
             {
               name: "activeGeography",
@@ -107,7 +140,9 @@ export function buildOpenApiDocument() {
       "/auth/geography-access": {
         get: {
           tags: getGeographyAccessRouteSchema.tags,
+          operationId: "checkGeographyAccess",
           summary: getGeographyAccessRouteSchema.summary,
+          security: bearerAuth(),
           parameters: [
             {
               name: "geography",
@@ -137,6 +172,7 @@ export function buildOpenApiDocument() {
       "/sources": {
         get: {
           tags: listSourcesRouteSchema.tags,
+          operationId: "listSources",
           summary: listSourcesRouteSchema.summary,
           responses: {
             "200": response(
@@ -149,6 +185,7 @@ export function buildOpenApiDocument() {
       "/sources/{sourceId}": {
         get: {
           tags: getSourceRouteSchema.tags,
+          operationId: "getSource",
           summary: getSourceRouteSchema.summary,
           parameters: [
             pathParameter("sourceId", sourceIdParamsSchema.properties.sourceId),
@@ -162,6 +199,7 @@ export function buildOpenApiDocument() {
       "/sources/{sourceId}/sync": {
         post: {
           tags: queueSourceSyncRouteSchema.tags,
+          operationId: "queueSourceSync",
           summary: queueSourceSyncRouteSchema.summary,
           parameters: [
             pathParameter("sourceId", sourceIdParamsSchema.properties.sourceId),
@@ -180,6 +218,13 @@ export function buildOpenApiDocument() {
       },
     },
     components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
       schemas: {
         CurrentUserContext: currentUserContextSchema,
         GeographyAccessResponse: geographyAccessResponseSchema,
@@ -225,6 +270,10 @@ function pathParameter(name: string, schema: unknown) {
   };
 }
 
+function bearerAuth() {
+  return [{ bearerAuth: [] }];
+}
+
 function formatYamlScalar(value: unknown) {
   if (typeof value === "string") {
     return JSON.stringify(value);
@@ -251,6 +300,14 @@ function toYaml(value: unknown, indentLevel = 0): string {
 
     return value
       .map((item) => {
+        if (Array.isArray(item) && item.length === 0) {
+          return `${indent}- []`;
+        }
+
+        if (isPlainObject(item) && Object.keys(item).length === 0) {
+          return `${indent}- {}`;
+        }
+
         if (isPlainObject(item) || Array.isArray(item)) {
           return `${indent}-\n${toYaml(item, indentLevel + 1)}`;
         }
@@ -269,6 +326,14 @@ function toYaml(value: unknown, indentLevel = 0): string {
 
     return entries
       .map(([key, itemValue]) => {
+        if (Array.isArray(itemValue) && itemValue.length === 0) {
+          return `${indent}${key}: []`;
+        }
+
+        if (isPlainObject(itemValue) && Object.keys(itemValue).length === 0) {
+          return `${indent}${key}: {}`;
+        }
+
         if (isPlainObject(itemValue) || Array.isArray(itemValue)) {
           return `${indent}${key}:\n${toYaml(itemValue, indentLevel + 1)}`;
         }

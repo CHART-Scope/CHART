@@ -1,8 +1,9 @@
 import Fastify from "fastify";
 
+import { buildApiDocsHtml } from "./apiDocs.js";
 import { registerAuthRoutes } from "./modules/auth/routes.js";
 import { registerDataIngestionRoutes } from "./modules/data-ingestion/routes.js";
-import { buildOpenApiYaml } from "./openapi.js";
+import { buildOpenApiDocument, buildOpenApiYaml } from "./openapi.js";
 
 const allowedCorsOrigins = new Set(
   (process.env.CHART_CORS_ORIGINS ?? "http://127.0.0.1:3100,http://localhost:3100")
@@ -37,6 +38,20 @@ export function buildApp() {
 
   app.get("/health", async () => {
     return { status: "ok" };
+  });
+
+  app.get("/api", async (_request, reply) => {
+    reply.type("text/html");
+    return buildApiDocsHtml();
+  });
+
+  app.get("/api/", async (_request, reply) => {
+    reply.type("text/html");
+    return buildApiDocsHtml();
+  });
+
+  app.get("/openapi.json", async () => {
+    return buildOpenApiDocument();
   });
 
   app.get("/openapi.yaml", async (_request, reply) => {

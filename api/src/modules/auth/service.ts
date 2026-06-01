@@ -41,24 +41,13 @@ export class AuthError extends Error {
   }
 }
 
-const demoCurrentUser: CurrentUserContext = {
-  userId: "user-u1-demo",
-  username: "Demo Health Officer",
-  email: "demo.health@example.org",
-  roles: ["u1_health_lead"],
-  geographyScopes: ["/india/madhya-pradesh"],
-  activeGeographyId: "/india/madhya-pradesh",
-  geographyLevel: "geo_level_1",
-};
-
 export function getAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig {
-  const mode = env.CHART_AUTH_MODE === "keycloak" ? "keycloak" : "demo";
+  const issuerUrl = env.KEYCLOAK_ISSUER_URL ?? "http://127.0.0.1:8080/realms/chart";
 
   return {
-    mode,
-    issuerUrl: env.KEYCLOAK_ISSUER_URL,
+    issuerUrl,
     clientId: env.KEYCLOAK_CLIENT_ID ?? "chart-api",
-    jwksUrl: env.KEYCLOAK_JWKS_URL,
+    jwksUrl: env.KEYCLOAK_JWKS_URL ?? `${issuerUrl}/protocol/openid-connect/certs`,
     clockSkewSeconds: Number(env.KEYCLOAK_CLOCK_SKEW_SECONDS ?? 30),
   };
 }
@@ -67,10 +56,6 @@ export async function getCurrentUserContext(
   input: AuthRequestInput = {},
   config = getAuthConfig(),
 ): Promise<CurrentUserContext> {
-  if (config.mode === "demo") {
-    return applyActiveGeography(demoCurrentUser, input.activeGeographyId);
-  }
-
   const token = readBearerToken(input.authorization);
   const claims = await verifyKeycloakToken(token, config);
   const context = mapKeycloakClaimsToCurrentUserContext(claims, config.clientId);
