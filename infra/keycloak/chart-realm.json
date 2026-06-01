@@ -2,6 +2,7 @@
   "realm": "chart",
   "enabled": true,
   "displayName": "CHART",
+  "loginTheme": "chart",
   "roles": {
     "realm": [
       {
@@ -112,6 +113,9 @@
         "http://16.16.56.56/*"
       ],
       "webOrigins": ["+"],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:3100##http://localhost:3100/*##http://127.0.0.1:3100##http://127.0.0.1:3100/*##http://16.16.56.56##http://16.16.56.56/*"
+      },
       "protocolMappers": [
         {
           "name": "groups",
@@ -186,6 +190,24 @@
       "groups": ["/india/madhya-pradesh/gwalior"],
       "clientRoles": {
         "chart-api": ["u3_district_health_officer"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "u4-sector-loitokitok",
+      "enabled": true,
+      "email": "u4-sector-loitokitok@example.org",
+      "firstName": "U4",
+      "lastName": "Sector Loitokitok",
+      "groups": ["/kenya/kajiado/loitokitok"],
+      "clientRoles": {
+        "chart-api": ["u4_district_cross_sector_officer"]
       },
       "credentials": [
         {

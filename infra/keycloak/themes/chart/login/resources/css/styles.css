@@ -1,0 +1,66 @@
+:root {
+  --chart-blue: #2563eb;
+  --chart-green: #2e9449;
+  --chart-green-dark: #16431f;
+  --chart-green-soft: #e8f3ea;
+  --chart-ink: #111827;
+}
+
+.login-pf body {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(46, 148, 73, 0.28), transparent 30%),
+    radial-gradient(circle at 82% 8%, rgba(37, 99, 235, 0.12), transparent 28%),
+    linear-gradient(135deg, #f7fbf7 0%, #eef7f0 48%, #f8fbff 100%) !important;
+}
+
+.login-pf-page {
+  color: var(--chart-ink);
+}
+
+#kc-header-wrapper {
+  color: var(--chart-green-dark);
+  font-size: clamp(2.7rem, 7vw, 4.5rem);
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  text-shadow: none;
+}
+
+.login-pf-page .card-pf {
+  border: 1px solid rgba(46, 148, 73, 0.18);
+  border-top: 0.45rem solid var(--chart-green);
+  border-radius: 1.4rem;
+  box-shadow: 0 24px 60px rgba(17, 24, 39, 0.12);
+}
+
+#kc-page-title {
+  color: var(--chart-green-dark);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+
+.pf-v5-c-form-control,
+.pf-c-form-control {
+  border-color: rgba(46, 148, 73, 0.35);
+}
+
+.pf-v5-c-form-control:focus,
+.pf-c-form-control:focus {
+  border-color: var(--chart-green);
+  box-shadow: 0 0 0 0.18rem rgba(46, 148, 73, 0.16);
+}
+
+.pf-v5-c-button.pf-m-primary,
+.pf-c-button.pf-m-primary,
+#kc-login {
+  background: var(--chart-green);
+  border-color: var(--chart-green);
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.pf-v5-c-button.pf-m-primary:hover,
+.pf-c-button.pf-m-primary:hover,
+#kc-login:hover {
+  background: var(--chart-green-dark);
+  border-color: var(--chart-green-dark);
+}

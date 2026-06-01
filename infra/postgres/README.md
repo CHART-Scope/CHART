@@ -1,19 +1,17 @@
 # CHART Postgres
 
-CHART uses one Postgres service for local/demo infrastructure.
+CHART uses one Postgres service and one database for local and deployed infrastructure.
 
-Databases:
+Database:
 
-- `chart_cms`: Payload CMS content tables.
-- `chart_keycloak`: Keycloak internal identity tables.
-- `chart_app`: CHART-owned application tables.
+- `chart`: shared runtime database.
 
-The `chart_app` database owns geography, workspace, access, and solution repository
-metadata. Keycloak only stores identity, roles, groups, and sessions.
+CHART-owned app tables are defined in `api/src/db/schema.ts` and managed through
+Drizzle migrations. Payload CMS and Keycloak also connect to the same `chart`
+database and manage their own internal tables.
 
-Initial SQL files are mounted into `/docker-entrypoint-initdb.d` and run only when the
-Postgres volume is first created. These files only create supporting databases.
-CHART app tables are managed by Drizzle migrations from `api/src/db/schema.ts`.
+Keycloak remains the identity system. CHART remains the policy system for app-level
+geography, workspace, source, and solution repository metadata.
 
 Schema workflow:
 

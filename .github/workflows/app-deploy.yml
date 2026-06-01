@@ -1,0 +1,53 @@
+name: App Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/app-deploy.yml"
+      - "api/**"
+      - "docker-compose.yml"
+      - "infra/**"
+      - "package.json"
+      - "package-lock.json"
+      - "web/**"
+  workflow_dispatch:
+
+concurrency:
+  group: chart-app-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy app
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy app on EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.AWS_APP_HOST }}
+          username: ${{ secrets.AWS_APP_USER }}
+          key: ${{ secrets.AWS_APP_SSH_KEY }}
+          script: |
+            set -euo pipefail
+
+            APP_DIR="${APP_DIR:-/opt/chart}"
+            BRANCH="${{ github.ref_name }}"
+
+            if [ -d "$APP_DIR/.git" ]; then
+              git -C "$APP_DIR" reset --hard
+              git -C "$APP_DIR" clean -fd
+              git -C "$APP_DIR" fetch origin "$BRANCH"
+              git -C "$APP_DIR" checkout -B "$BRANCH" "origin/$BRANCH"
+              git -C "$APP_DIR" reset --hard "origin/$BRANCH"
+              git -C "$APP_DIR" clean -fd
+            else
+              mkdir -p "$(dirname "$APP_DIR")"
+              git clone --branch "$BRANCH" https://github.com/CHART-Scope/CHART.git "$APP_DIR"
+            fi
+
+            PUBLIC_HOST="${{ secrets.AWS_APP_HOST }}" bash "$APP_DIR/infra/aws/deploy-app.sh"

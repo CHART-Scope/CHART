@@ -13,7 +13,7 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const chartWebOrigin = process.env.CHART_WEB_ORIGIN ?? "http://127.0.0.1:3100";
 const postgresConnectionString =
-  process.env.DATABASE_URL ?? "postgres://chart:chart@127.0.0.1:5432/chart_cms";
+  process.env.DATABASE_URL ?? "postgres://chart:chart@127.0.0.1:5432/chart";
 
 export default buildConfig({
   secret: process.env.PAYLOAD_SECRET ?? "chart-dev-secret",

@@ -15,20 +15,20 @@ Admin console:
 - Password: `admin`
 - Realm: `chart`
 
-Demo users:
+Seed users:
 
 - `u1-health-india` / `password`
 - `u2-sector-kenya` / `password`
 - `u3-health-gwalior` / `password`
+- `u4-sector-loitokitok` / `password`
 
 ## Model
 
-Postgres is shared platform infrastructure:
+Postgres is shared platform infrastructure. Local and deployed environments use one
+database:
 
-- `chart_cms` is used by Payload CMS.
-- `chart_keycloak` is used by Keycloak internal tables.
-- `chart_app` is used by CHART-owned app tables such as geography metadata and
-  workspace access.
+- `chart`: Payload CMS tables, Keycloak internal tables, and CHART-owned Drizzle
+  tables.
 
 Roles are Keycloak client roles on `chart-api`:
 
@@ -49,3 +49,6 @@ Geography scope is represented by hierarchical Keycloak groups:
 The API reads `roles` and `groups` from the access token and builds the current user
 context. The app database owns geography metadata, display labels, boundaries, solution
 repository metadata, and future workspace access rules through Drizzle migrations.
+
+The CHART login theme lives in `infra/keycloak/themes/chart` and is mounted into the
+local and deployed Keycloak container.
