@@ -21,16 +21,12 @@ export type CurrentUserContext = {
 export type AuthSession = {
   user: CurrentUserContext;
   accessToken?: string;
+  idToken?: string;
   refreshToken?: string;
-  mode: "demo" | "keycloak";
 };
 
 const authStorageKey = "chart.auth.session";
 const pkceStorageKey = "chart.auth.pkce";
-
-export function getConfiguredAuthMode() {
-  return process.env.NEXT_PUBLIC_CHART_AUTH_MODE === "keycloak" ? "keycloak" : "demo";
-}
 
 export function getStoredAuthSession(): AuthSession | null {
   if (typeof window === "undefined") {
@@ -57,23 +53,18 @@ export function storeAuthSession(session: AuthSession) {
 
 export function clearAuthSession() {
   window.localStorage.removeItem(authStorageKey);
-}
-
-export async function signInWithDemoApi() {
-  const user = await fetchCurrentUser();
-  const session: AuthSession = { user, mode: "demo" };
-
-  storeAuthSession(session);
-
-  return session;
+  window.localStorage.removeItem(pkceStorageKey);
+  window.sessionStorage.removeItem(pkceStorageKey);
 }
 
 export async function startKeycloakSignIn() {
+  clearAuthSession();
+
   const verifier = createRandomString();
   const challenge = await createCodeChallenge(verifier);
   const state = createRandomString();
 
-  window.sessionStorage.setItem(pkceStorageKey, JSON.stringify({ verifier, state }));
+  window.localStorage.setItem(pkceStorageKey, JSON.stringify({ verifier, state }));
   window.location.assign(buildKeycloakAuthorizeUrl(challenge, state));
 }
 
@@ -102,30 +93,39 @@ export async function completeKeycloakSignIn(search: string) {
   });
 
   if (!tokenResponse.ok) {
-    throw new Error("Keycloak did not return a valid token.");
+    throw new Error("CHART sign-in did not return a valid token.");
   }
 
   const tokens = (await tokenResponse.json()) as {
     access_token?: string;
+    id_token?: string;
     refresh_token?: string;
   };
 
   if (!tokens.access_token) {
-    throw new Error("Keycloak response is missing an access token.");
+    throw new Error("CHART sign-in response is missing an access token.");
   }
 
   const user = await fetchCurrentUser(tokens.access_token);
   const session: AuthSession = {
     user,
     accessToken: tokens.access_token,
+    idToken: tokens.id_token,
     refreshToken: tokens.refresh_token,
-    mode: "keycloak",
   };
 
   storeAuthSession(session);
-  window.sessionStorage.removeItem(pkceStorageKey);
+  window.localStorage.removeItem(pkceStorageKey);
 
   return session;
+}
+
+export function signOutOfKeycloak() {
+  const session = getStoredAuthSession();
+  const logoutUrl = buildKeycloakLogoutUrl(session?.idToken);
+
+  clearAuthSession();
+  window.location.assign(logoutUrl);
 }
 
 async function fetchCurrentUser(accessToken?: string) {
@@ -138,14 +138,16 @@ async function fetchCurrentUser(accessToken?: string) {
   });
 
   if (!response.ok) {
-    throw new Error("The API could not resolve the current CHART user.");
+    throw new Error(
+      `The API could not resolve the current CHART user: ${response.status} ${await response.text()}`,
+    );
   }
 
   return (await response.json()) as CurrentUserContext;
 }
 
 function readSavedPkce(): { verifier: string; state: string } | null {
-  const rawPkce = window.sessionStorage.getItem(pkceStorageKey);
+  const rawPkce = window.localStorage.getItem(pkceStorageKey);
 
   if (!rawPkce) {
     return null;
@@ -154,7 +156,7 @@ function readSavedPkce(): { verifier: string; state: string } | null {
   try {
     return JSON.parse(rawPkce) as { verifier: string; state: string };
   } catch {
-    window.sessionStorage.removeItem(pkceStorageKey);
+    window.localStorage.removeItem(pkceStorageKey);
     return null;
   }
 }
@@ -199,6 +201,25 @@ function buildKeycloakAuthorizeUrl(challenge: string, state: string) {
 
 function buildKeycloakTokenUrl() {
   return `${getKeycloakBaseUrl()}/realms/${getKeycloakRealm()}/protocol/openid-connect/token`;
+}
+
+function buildKeycloakLogoutUrl(idToken?: string) {
+  const url = new URL(
+    `${getKeycloakBaseUrl()}/realms/${getKeycloakRealm()}/protocol/openid-connect/logout`,
+  );
+
+  const params = new URLSearchParams({
+    client_id: getKeycloakClientId(),
+    post_logout_redirect_uri: `${window.location.origin}/`,
+  });
+
+  if (idToken) {
+    params.set("id_token_hint", idToken);
+  }
+
+  url.search = params.toString();
+
+  return url.toString();
 }
 
 function createRandomString() {

@@ -1,6 +1,6 @@
 import { useChartContent } from "../../app/ChartContentProvider";
 
-export type ChartRoute = "landing" | "dashboard" | "cms" | "signin";
+export type ChartRoute = "landing" | "dashboard" | "cms" | "auth";
 
 type LandingPageProps = {
   onNavigate: (route: ChartRoute) => void;
@@ -55,7 +55,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         <button
           className="button primary-button nav-sign-in"
           type="button"
-          onClick={() => onNavigate("signin")}
+          onClick={() => onNavigate("auth")}
         >
           Sign in
         </button>
@@ -80,9 +80,9 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <button
                 className="button primary-button"
                 type="button"
-                onClick={() => onNavigate("signin")}
+                onClick={() => onNavigate("auth")}
               >
-                Request a demo
+                Request access
               </button>
             </div>
           </div>
@@ -217,9 +217,9 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <button
                 className="button primary-button"
                 type="button"
-                onClick={() => onNavigate("signin")}
+                onClick={() => onNavigate("auth")}
               >
-                Request a demo
+                Request access
               </button>
             </div>
           </div>
@@ -257,20 +257,20 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
 
 function DashboardLaptopPreview() {
   return (
-    <div className="laptop-preview" aria-label="CHART dashboard demo preview">
+    <div className="laptop-preview" aria-label="CHART dashboard preview">
       <div className="laptop-screen">
-        <div className="demo-sidebar">
+        <div className="preview-sidebar">
           <span>CHART</span>
           <small>My dashboard</small>
           <small>My plans</small>
           <small>CHART toolkit</small>
         </div>
-        <div className="demo-dashboard">
-          <div className="demo-topbar">
+        <div className="preview-dashboard">
+          <div className="preview-topbar">
             <strong>My dashboard</strong>
             <span>Welcome, Rahul</span>
           </div>
-          <div className="demo-metric-grid">
+          <div className="preview-metric-grid">
             <div>
               <small>Max temperature</small>
               <strong>48°C</strong>
@@ -284,13 +284,13 @@ function DashboardLaptopPreview() {
               <strong>76K</strong>
             </div>
           </div>
-          <div className="demo-chart">
+          <div className="preview-chart">
             <span />
             <span />
             <span />
           </div>
         </div>
-        <span className="demo-play-button" />
+        <span className="preview-play-button" />
       </div>
       <div className="laptop-base" />
     </div>

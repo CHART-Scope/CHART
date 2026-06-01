@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
+import { startKeycloakSignIn } from "../auth/authClient";
 import type { ChartRoute } from "../landing/LandingPage";
 
 export function useChartNavigator() {
@@ -13,8 +14,8 @@ export function useChartNavigator() {
       return;
     }
 
-    if (route === "signin") {
-      router.push("/signin");
+    if (route === "auth") {
+      void startKeycloakSignIn();
       return;
     }
 

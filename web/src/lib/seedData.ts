@@ -95,7 +95,7 @@ export const seedSubmissions: ChartSubmissionItem[] = [
     origin: "Belagavi, Karnataka · 3rd contribution",
     title: "HeatCare Kit: household-level protection for at-risk groups",
     description:
-      "Low-cost kit and demonstration protocol — ORS, thermometer, cooling cloth and behavioural guide distributed via ASHA networks during heat alerts.",
+      "Low-cost kit and implementation protocol — ORS, thermometer, cooling cloth and behavioural guide distributed via ASHA networks during heat alerts.",
     tags: ["Heat", "Household", "MNCH"],
     received: "14 May 2026",
     state: "imported",
