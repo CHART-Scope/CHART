@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next dev --webpack --hostname 127.0.0.1 --port 3100",
-    "build": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next build --webpack --experimental-build-mode compile",
+    "build": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next build --webpack --experimental-build-mode compile && NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next build --webpack --experimental-build-mode generate-env",
     "start": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next start --hostname ${HOSTNAME:-127.0.0.1} --port ${PORT:-3100}",
     "seed": "payload run src/lib/seedChartContent.ts",
     "typecheck": "tsc --noEmit"

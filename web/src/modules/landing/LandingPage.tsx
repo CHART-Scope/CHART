@@ -52,13 +52,9 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           ))}
         </nav>
 
-        <button
-          className="button primary-button nav-sign-in"
-          type="button"
-          onClick={() => onNavigate("auth")}
-        >
+        <a className="button primary-button nav-sign-in" href="/auth/signin">
           Sign in
-        </button>
+        </a>
       </header>
 
       <main>
@@ -77,13 +73,9 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <a className="button ghost-button" href="#contact">
                 Contact us
               </a>
-              <button
-                className="button primary-button"
-                type="button"
-                onClick={() => onNavigate("auth")}
-              >
+              <a className="button primary-button" href="/auth/signin">
                 Request access
-              </button>
+              </a>
             </div>
           </div>
 
@@ -214,13 +206,9 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <a className="button ghost-button" href="mailto:hello@scopeimpact.fi">
                 Contact us
               </a>
-              <button
-                className="button primary-button"
-                type="button"
-                onClick={() => onNavigate("auth")}
-              >
+              <a className="button primary-button" href="/auth/signin">
                 Request access
-              </button>
+              </a>
             </div>
           </div>
 

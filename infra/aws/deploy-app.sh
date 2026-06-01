@@ -256,6 +256,7 @@ docker run -d \
   --env-file "$ENV_FILE" \
   -e HOSTNAME=0.0.0.0 \
   -e PORT=3100 \
+  -e KEYCLOAK_SERVER_URL="http://$KEYCLOAK_CONTAINER:8080/identity" \
   "$WEB_IMAGE" >/dev/null
 
 docker run -d \
