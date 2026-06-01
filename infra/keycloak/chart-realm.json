@@ -2,6 +2,7 @@
   "realm": "chart",
   "enabled": true,
   "displayName": "CHART",
+  "sslRequired": "none",
   "loginTheme": "chart",
   "roles": {
     "realm": [
