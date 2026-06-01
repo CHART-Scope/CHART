@@ -201,7 +201,8 @@ docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh config credentials 
   --password "$KEYCLOAK_ADMIN_PASSWORD" >/dev/null
 
 docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh update realms/chart \
-  -s loginTheme=chart >/dev/null
+  -s loginTheme=chart \
+  -s sslRequired=none >/dev/null
 
 WEB_CLIENT_UUID="$(
   docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh get clients \
