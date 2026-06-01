@@ -18,7 +18,7 @@ test("GET /api returns the interactive Swagger API page", async () => {
   assert.equal(response.statusCode, 200);
   assert.match(String(response.headers["content-type"]), /text\/html/);
   assert.match(response.body, /SwaggerUIBundle/);
-  assert.match(response.body, /\/openapi\.json/);
+  assert.match(response.body, /currentPath \+ "\/openapi\.json"/);
 
   await app.close();
 });
@@ -37,6 +37,7 @@ test("GET /openapi.json returns the current API contract as JSON", async () => {
   const body = response.json();
   assert.equal(body.openapi, "3.0.3");
   assert.equal(body.info.title, "CHART API");
+  assert.deepEqual(body.servers, [{ url: "." }]);
   assert.ok(body.paths["/auth/me"]);
   assert.equal(body.paths["/auth/me"].get.operationId, "getCurrentUser");
   assert.deepEqual(body.paths["/auth/me"].get.security, [{ bearerAuth: [] }]);

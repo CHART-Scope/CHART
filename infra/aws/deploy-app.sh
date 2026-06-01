@@ -10,11 +10,13 @@ DB_CONTAINER="${DB_CONTAINER:-chart-postgres}"
 KEYCLOAK_CONTAINER="${KEYCLOAK_CONTAINER:-chart-keycloak}"
 API_CONTAINER="${API_CONTAINER:-chart-api}"
 WEB_CONTAINER="${WEB_CONTAINER:-chart-web}"
+PROXY_CONTAINER="${PROXY_CONTAINER:-chart-proxy}"
 
 DB_NAME="${DB_NAME:-chart}"
 DB_USER="${DB_USER:-chart}"
 API_IMAGE="${API_IMAGE:-chart-api:latest}"
 WEB_IMAGE="${WEB_IMAGE:-chart-web:latest}"
+PROXY_CONFIG_FILE="${PROXY_CONFIG_FILE:-$ENV_DIR/nginx.conf}"
 
 random_secret() {
   if command -v openssl >/dev/null 2>&1; then
@@ -73,23 +75,87 @@ POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 KEYCLOAK_ADMIN_PASSWORD=$KEYCLOAK_ADMIN_PASSWORD
 PAYLOAD_SECRET=$PAYLOAD_SECRET
 DATABASE_URL=postgres://$DB_USER:$POSTGRES_PASSWORD@$DB_CONTAINER:5432/$DB_NAME
-KEYCLOAK_ISSUER_URL=http://$PUBLIC_HOST:8080/realms/chart
+KEYCLOAK_ISSUER_URL=http://$PUBLIC_HOST/identity/realms/chart
 KEYCLOAK_CLIENT_ID=chart-api
-KEYCLOAK_JWKS_URL=http://$KEYCLOAK_CONTAINER:8080/realms/chart/protocol/openid-connect/certs
+KEYCLOAK_JWKS_URL=http://$KEYCLOAK_CONTAINER:8080/identity/realms/chart/protocol/openid-connect/certs
 KEYCLOAK_CLOCK_SKEW_SECONDS=30
-CHART_CORS_ORIGINS=http://$PUBLIC_HOST,http://$PUBLIC_HOST:3100
+CHART_CORS_ORIGINS=http://$PUBLIC_HOST
 CHART_CMS_SERVER_URL=http://$PUBLIC_HOST
 CHART_WEB_ORIGIN=http://$PUBLIC_HOST
-NEXT_PUBLIC_CHART_API_URL=http://$PUBLIC_HOST:3200
-NEXT_PUBLIC_KEYCLOAK_URL=http://$PUBLIC_HOST:8080
+NEXT_PUBLIC_CHART_API_URL=http://$PUBLIC_HOST/chart-api
+NEXT_PUBLIC_KEYCLOAK_URL=http://$PUBLIC_HOST/identity
 NEXT_PUBLIC_KEYCLOAK_REALM=chart
 NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=chart-web
 EOF
 chmod 600 "$ENV_FILE"
 
+cat >"$PROXY_CONFIG_FILE" <<EOF
+events {}
+
+http {
+  server {
+    listen 80;
+    client_max_body_size 25m;
+
+    location = /identity {
+      return 302 /identity/;
+    }
+
+    location /identity/ {
+      proxy_pass http://$KEYCLOAK_CONTAINER:8080;
+      proxy_set_header Host \$host;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host \$host;
+      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location = /chart-api {
+      proxy_pass http://$API_CONTAINER:3200/api;
+      proxy_set_header Host \$host;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host \$host;
+      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location = /chart-api/ {
+      proxy_pass http://$API_CONTAINER:3200/api;
+      proxy_set_header Host \$host;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host \$host;
+      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /chart-api/ {
+      proxy_pass http://$API_CONTAINER:3200/;
+      proxy_set_header Host \$host;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host \$host;
+      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location / {
+      proxy_pass http://$WEB_CONTAINER:3100;
+      proxy_http_version 1.1;
+      proxy_set_header Host \$host;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host \$host;
+      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header X-Forwarded-Proto \$scheme;
+      proxy_set_header Upgrade \$http_upgrade;
+      proxy_set_header Connection "upgrade";
+    }
+  }
+}
+EOF
+chmod 600 "$PROXY_CONFIG_FILE"
+
 docker network create "$NETWORK" >/dev/null 2>&1 || true
 
-docker rm -f "$WEB_CONTAINER" "$API_CONTAINER" "$KEYCLOAK_CONTAINER" "$DB_CONTAINER" \
+docker rm -f "$PROXY_CONTAINER" "$WEB_CONTAINER" "$API_CONTAINER" "$KEYCLOAK_CONTAINER" "$DB_CONTAINER" \
   >/dev/null 2>&1 || true
 
 docker run -d \
@@ -109,7 +175,7 @@ docker run -d \
   --name "$KEYCLOAK_CONTAINER" \
   --network "$NETWORK" \
   --restart unless-stopped \
-  -p 8080:8080 \
+  -p 127.0.0.1:8080:8080 \
   -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
   -e KC_BOOTSTRAP_ADMIN_PASSWORD="$KEYCLOAK_ADMIN_PASSWORD" \
   -e KC_DB=postgres \
@@ -117,17 +183,19 @@ docker run -d \
   -e KC_DB_USERNAME="$DB_USER" \
   -e KC_DB_PASSWORD="$POSTGRES_PASSWORD" \
   -e KC_HTTP_ENABLED=true \
-  -e KC_HOSTNAME="http://$PUBLIC_HOST:8080" \
+  -e KC_HTTP_RELATIVE_PATH=/identity \
+  -e KC_HOSTNAME="http://$PUBLIC_HOST/identity" \
   -e KC_HOSTNAME_STRICT=false \
+  -e KC_PROXY_HEADERS=xforwarded \
   -v "$APP_DIR/infra/keycloak/chart-realm.json:/opt/keycloak/data/import/chart-realm.json:ro" \
   -v "$APP_DIR/infra/keycloak/themes/chart:/opt/keycloak/themes/chart:ro" \
   quay.io/keycloak/keycloak:26.6.1 \
   start-dev --import-realm >/dev/null
 
-wait_for_command "Keycloak" curl -fsS "http://127.0.0.1:8080/realms/chart"
+wait_for_command "Keycloak" curl -fsS "http://127.0.0.1:8080/identity/realms/chart"
 
 docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh config credentials \
-  --server http://localhost:8080 \
+  --server http://localhost:8080/identity \
   --realm master \
   --user admin \
   --password "$KEYCLOAK_ADMIN_PASSWORD" >/dev/null
@@ -170,14 +238,14 @@ docker run -d \
   --env-file "$ENV_FILE" \
   -e HOST=0.0.0.0 \
   -e PORT=3200 \
-  -p 3200:3200 \
+  -p 127.0.0.1:3200:3200 \
   "$API_IMAGE" >/dev/null
 
 wait_for_command "CHART API" curl -fsS "http://127.0.0.1:3200/health"
 
 docker build -f "$APP_DIR/web/Dockerfile" -t "$WEB_IMAGE" "$APP_DIR" \
-  --build-arg NEXT_PUBLIC_CHART_API_URL="http://$PUBLIC_HOST:3200" \
-  --build-arg NEXT_PUBLIC_KEYCLOAK_URL="http://$PUBLIC_HOST:8080" \
+  --build-arg NEXT_PUBLIC_CHART_API_URL="http://$PUBLIC_HOST/chart-api" \
+  --build-arg NEXT_PUBLIC_KEYCLOAK_URL="http://$PUBLIC_HOST/identity" \
   --build-arg NEXT_PUBLIC_KEYCLOAK_REALM=chart \
   --build-arg NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=chart-web
 
@@ -188,11 +256,20 @@ docker run -d \
   --env-file "$ENV_FILE" \
   -e HOSTNAME=0.0.0.0 \
   -e PORT=3100 \
-  -p 80:3100 \
   "$WEB_IMAGE" >/dev/null
 
+docker run -d \
+  --name "$PROXY_CONTAINER" \
+  --network "$NETWORK" \
+  --restart unless-stopped \
+  -p 80:80 \
+  -v "$PROXY_CONFIG_FILE:/etc/nginx/nginx.conf:ro" \
+  nginx:1.27-alpine >/dev/null
+
 wait_for_command "CHART web" curl -fsS "http://127.0.0.1/"
+wait_for_command "CHART API through proxy" curl -fsS "http://127.0.0.1/chart-api/health"
+wait_for_command "Keycloak through proxy" curl -fsS "http://127.0.0.1/identity/realms/chart"
 
 echo "CHART is running at http://$PUBLIC_HOST"
-echo "CHART API is running at http://$PUBLIC_HOST:3200"
-echo "CHART sign-in is running at http://$PUBLIC_HOST:8080"
+echo "CHART API is running at http://$PUBLIC_HOST/chart-api"
+echo "CHART sign-in is running at http://$PUBLIC_HOST/identity"

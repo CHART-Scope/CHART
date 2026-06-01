@@ -41,6 +41,7 @@ export function buildOpenApiDocument() {
       version: "0.1.0",
       description: "Current contract for CHART backend modules.",
     },
+    servers: [{ url: "." }],
     tags: [
       { name: "system", description: "System health and API contract routes" },
       { name: "auth", description: "Current user role and geography context" },
