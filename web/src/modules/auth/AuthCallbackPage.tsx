@@ -1,21 +1,28 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { completeKeycloakSignIn } from "./authClient";
 
 export function AuthCallbackPage() {
   const router = useRouter();
+  const hasStartedRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (hasStartedRef.current) {
+      return;
+    }
+
+    hasStartedRef.current = true;
+
     async function completeSignIn() {
       try {
         await completeKeycloakSignIn(window.location.search);
         router.replace("/dashboard");
       } catch {
-        setError("The Keycloak sign-in response could not be completed.");
+        setError("The CHART sign-in response could not be completed.");
       }
     }
 
@@ -31,15 +38,6 @@ export function AuthCallbackPage() {
           {error ??
             "Please wait while CHART verifies your user role and geography scope."}
         </p>
-        {error ? (
-          <button
-            className="button primary-button"
-            type="button"
-            onClick={() => router.push("/signin")}
-          >
-            Try again
-          </button>
-        ) : null}
       </section>
     </main>
   );

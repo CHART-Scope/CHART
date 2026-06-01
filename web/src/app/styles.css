@@ -1952,7 +1952,7 @@ button {
   box-shadow: 0 22px 46px rgba(0, 0, 0, 0.18);
 }
 
-.demo-sidebar {
+.preview-sidebar {
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
@@ -1962,31 +1962,31 @@ button {
   font-size: 0.46rem;
 }
 
-.demo-sidebar span {
+.preview-sidebar span {
   font-size: 0.62rem;
   font-weight: 800;
 }
 
-.demo-dashboard {
+.preview-dashboard {
   padding: 1rem;
   color: #111;
 }
 
-.demo-topbar {
+.preview-topbar {
   display: flex;
   justify-content: space-between;
   margin-bottom: 1rem;
   font-size: 0.62rem;
 }
 
-.demo-metric-grid {
+.preview-metric-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.5rem;
   margin-bottom: 0.9rem;
 }
 
-.demo-metric-grid div {
+.preview-metric-grid div {
   min-height: 3.8rem;
   padding: 0.55rem;
   border: 1px solid #d8d8d8;
@@ -1994,18 +1994,18 @@ button {
   background: #fff;
 }
 
-.demo-metric-grid small {
+.preview-metric-grid small {
   display: block;
   margin-bottom: 0.32rem;
   color: #555;
   font-size: 0.48rem;
 }
 
-.demo-metric-grid strong {
+.preview-metric-grid strong {
   font-size: 1.2rem;
 }
 
-.demo-chart {
+.preview-chart {
   position: relative;
   height: 8rem;
   border: 1px solid #d8d8d8;
@@ -2017,7 +2017,7 @@ button {
     #fff;
 }
 
-.demo-chart span {
+.preview-chart span {
   position: absolute;
   left: 1rem;
   right: 1rem;
@@ -2026,25 +2026,25 @@ button {
   transform-origin: left center;
 }
 
-.demo-chart span:nth-child(1) {
+.preview-chart span:nth-child(1) {
   top: 4.8rem;
   background: #d94848;
   transform: rotate(-9deg);
 }
 
-.demo-chart span:nth-child(2) {
+.preview-chart span:nth-child(2) {
   top: 4.2rem;
   background: #8d66bb;
   transform: rotate(4deg);
 }
 
-.demo-chart span:nth-child(3) {
+.preview-chart span:nth-child(3) {
   top: 5.4rem;
   background: #2e9449;
   transform: rotate(-2deg);
 }
 
-.demo-play-button {
+.preview-play-button {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -2056,7 +2056,7 @@ button {
   transform: translate(-50%, -50%);
 }
 
-.demo-play-button::before {
+.preview-play-button::before {
   content: "";
   position: absolute;
   top: 50%;
@@ -2847,7 +2847,7 @@ button {
     grid-template-columns: 3rem 1fr;
   }
 
-  .demo-metric-grid {
+  .preview-metric-grid {
     grid-template-columns: 1fr;
   }
 
