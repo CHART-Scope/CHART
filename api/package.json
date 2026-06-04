@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc --project tsconfig.json",
     "start": "node dist/server.js",
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test": "node --import tsx --test $(find src -name '*.test.ts' -print)",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
