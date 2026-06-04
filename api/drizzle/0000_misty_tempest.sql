@@ -1,19 +1,19 @@
-CREATE TYPE "public"."geography_level" AS ENUM('country', 'geo_level_1', 'geo_level_2', 'geo_level_3');--> statement-breakpoint
 CREATE TABLE "country_geo_config" (
 	"country_code" text NOT NULL,
-	"level_key" "geography_level" NOT NULL,
+	"level_key" text NOT NULL,
 	"level_label" text NOT NULL,
 	"enabled" boolean DEFAULT true NOT NULL,
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "country_geo_config_country_code_level_key_pk" PRIMARY KEY("country_code","level_key")
+	CONSTRAINT "country_geo_config_country_code_level_key_pk" PRIMARY KEY("country_code","level_key"),
+	CONSTRAINT "country_geo_config_level_key_check" CHECK ("country_geo_config"."level_key" in ('country', 'geo_level_1', 'geo_level_2', 'geo_level_3'))
 );
 --> statement-breakpoint
 CREATE TABLE "geographies" (
 	"id" text PRIMARY KEY NOT NULL,
 	"country_code" text NOT NULL,
-	"level" "geography_level" NOT NULL,
+	"level" text NOT NULL,
 	"level_label" text NOT NULL,
 	"name" text NOT NULL,
 	"parent_id" text,
@@ -22,7 +22,8 @@ CREATE TABLE "geographies" (
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "geographies_path_check" CHECK ("geographies"."path" like '/%')
+	CONSTRAINT "geographies_path_check" CHECK ("geographies"."path" like '/%'),
+	CONSTRAINT "geographies_level_check" CHECK ("geographies"."level" in ('country', 'geo_level_1', 'geo_level_2', 'geo_level_3'))
 );
 --> statement-breakpoint
 CREATE TABLE "geography_boundaries" (
@@ -40,12 +41,10 @@ CREATE TABLE "geography_boundaries" (
 CREATE TABLE "solution_repository_assets" (
 	"id" text PRIMARY KEY NOT NULL,
 	"solution_id" text NOT NULL,
-	"airtable_attachment_id" text,
 	"kind" text DEFAULT 'document' NOT NULL,
 	"filename" text NOT NULL,
 	"mime_type" text,
 	"size_bytes" integer,
-	"temporary_source_url" text,
 	"storage_url" text,
 	"attribution" text,
 	"sort_order" integer DEFAULT 0 NOT NULL,
@@ -61,7 +60,6 @@ CREATE TABLE "solution_repository_item_taxonomies" (
 --> statement-breakpoint
 CREATE TABLE "solution_repository_items" (
 	"id" text PRIMARY KEY NOT NULL,
-	"airtable_record_id" text,
 	"slug" text NOT NULL,
 	"name" text NOT NULL,
 	"summary" text,
@@ -72,9 +70,6 @@ CREATE TABLE "solution_repository_items" (
 	"time_to_implement" text,
 	"evidence_level" text,
 	"status" text DEFAULT 'imported' NOT NULL,
-	"source_url" text,
-	"source_updated_at" timestamp with time zone,
-	"raw_fields" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -84,7 +79,6 @@ CREATE TABLE "solution_repository_links" (
 	"solution_id" text NOT NULL,
 	"label" text NOT NULL,
 	"url" text NOT NULL,
-	"source_field" text,
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -94,7 +88,6 @@ CREATE TABLE "solution_repository_taxonomies" (
 	"id" text PRIMARY KEY NOT NULL,
 	"type" text NOT NULL,
 	"label" text NOT NULL,
-	"source" text DEFAULT 'airtable' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -150,10 +143,8 @@ CREATE INDEX "geographies_parent_idx" ON "geographies" USING btree ("parent_id",
 CREATE INDEX "geography_boundaries_geography_idx" ON "geography_boundaries" USING btree ("geography_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "geography_boundaries_geography_type_unique" ON "geography_boundaries" USING btree ("geography_id","boundary_type");--> statement-breakpoint
 CREATE INDEX "solution_repository_assets_solution_idx" ON "solution_repository_assets" USING btree ("solution_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "solution_repository_assets_airtable_attachment_unique" ON "solution_repository_assets" USING btree ("airtable_attachment_id");--> statement-breakpoint
 CREATE INDEX "solution_repository_item_taxonomies_taxonomy_idx" ON "solution_repository_item_taxonomies" USING btree ("taxonomy_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "solution_repository_items_slug_unique" ON "solution_repository_items" USING btree ("slug");--> statement-breakpoint
-CREATE UNIQUE INDEX "solution_repository_items_airtable_record_unique" ON "solution_repository_items" USING btree ("airtable_record_id");--> statement-breakpoint
 CREATE INDEX "solution_repository_items_status_idx" ON "solution_repository_items" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "solution_repository_links_solution_idx" ON "solution_repository_links" USING btree ("solution_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "solution_repository_taxonomies_type_label_unique" ON "solution_repository_taxonomies" USING btree ("type","label");--> statement-breakpoint
