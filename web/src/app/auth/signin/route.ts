@@ -37,7 +37,7 @@ function buildKeycloakAuthorizeUrl(input: {
   state: string;
 }) {
   const url = new URL(
-    `${getKeycloakBaseUrl()}/realms/${getKeycloakRealm()}/protocol/openid-connect/auth`,
+    `${getKeycloakBrowserBaseUrl(input.origin)}/realms/${getKeycloakRealm()}/protocol/openid-connect/auth`,
   );
 
   url.search = new URLSearchParams({
@@ -53,16 +53,26 @@ function buildKeycloakAuthorizeUrl(input: {
   return url;
 }
 
-function getKeycloakBaseUrl() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_URL ?? "http://127.0.0.1:8080";
+function getKeycloakBrowserBaseUrl(origin: string) {
+  return trimTrailingSlash(
+    process.env.KEYCLOAK_BROWSER_URL ??
+      process.env.NEXT_PUBLIC_KEYCLOAK_URL ??
+      `${origin}/identity`,
+  );
 }
 
 function getKeycloakRealm() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_REALM ?? "chart";
+  return (
+    process.env.KEYCLOAK_REALM ?? process.env.NEXT_PUBLIC_KEYCLOAK_REALM ?? "chart"
+  );
 }
 
 function getKeycloakClientId() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID ?? "chart-web";
+  return (
+    process.env.KEYCLOAK_WEB_CLIENT_ID ??
+    process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID ??
+    "chart-web"
+  );
 }
 
 function getRequestOrigin(request: NextRequest) {
@@ -97,4 +107,8 @@ function base64UrlEncode(bytes: Buffer) {
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
+}
+
+function trimTrailingSlash(value: string) {
+  return value.replace(/\/$/, "");
 }

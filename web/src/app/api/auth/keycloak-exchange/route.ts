@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "AUTH_CALLBACK_INVALID" }, { status: 400 });
   }
 
-  const tokenResponse = await fetch(buildKeycloakTokenUrl(), {
+  const tokenResponse = await fetch(buildKeycloakTokenUrl(request), {
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded",
@@ -72,24 +72,31 @@ function readPkceCookie(value?: string) {
   return { state, verifier };
 }
 
-function buildKeycloakTokenUrl() {
-  return `${getKeycloakServerBaseUrl()}/realms/${getKeycloakRealm()}/protocol/openid-connect/token`;
+function buildKeycloakTokenUrl(request: NextRequest) {
+  return `${getKeycloakServerBaseUrl(request)}/realms/${getKeycloakRealm()}/protocol/openid-connect/token`;
 }
 
-function getKeycloakServerBaseUrl() {
-  return process.env.KEYCLOAK_SERVER_URL ?? getKeycloakBaseUrl();
-}
-
-function getKeycloakBaseUrl() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_URL ?? "http://127.0.0.1:8080";
+function getKeycloakServerBaseUrl(request: NextRequest) {
+  return trimTrailingSlash(
+    process.env.KEYCLOAK_SERVER_URL ??
+      process.env.KEYCLOAK_BROWSER_URL ??
+      process.env.NEXT_PUBLIC_KEYCLOAK_URL ??
+      `${getRequestOrigin(request)}/identity`,
+  );
 }
 
 function getKeycloakRealm() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_REALM ?? "chart";
+  return (
+    process.env.KEYCLOAK_REALM ?? process.env.NEXT_PUBLIC_KEYCLOAK_REALM ?? "chart"
+  );
 }
 
 function getKeycloakClientId() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID ?? "chart-web";
+  return (
+    process.env.KEYCLOAK_WEB_CLIENT_ID ??
+    process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID ??
+    "chart-web"
+  );
 }
 
 function getRequestOrigin(request: NextRequest) {
@@ -101,4 +108,8 @@ function getRequestOrigin(request: NextRequest) {
   }
 
   return new URL(request.url).origin;
+}
+
+function trimTrailingSlash(value: string) {
+  return value.replace(/\/$/, "");
 }

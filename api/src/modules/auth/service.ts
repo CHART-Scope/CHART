@@ -42,7 +42,7 @@ export class AuthError extends Error {
 }
 
 export function getAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig {
-  const issuerUrl = env.KEYCLOAK_ISSUER_URL ?? "http://127.0.0.1:8080/realms/chart";
+  const issuerUrl = env.KEYCLOAK_ISSUER_URL ?? "";
 
   return {
     issuerUrl,

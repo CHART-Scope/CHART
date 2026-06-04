@@ -108,15 +108,12 @@ export async function completeKeycloakSignIn(search: string) {
 }
 
 export function signOutOfKeycloak() {
-  const session = getStoredAuthSession();
-  const logoutUrl = buildKeycloakLogoutUrl(session?.idToken);
-
   clearAuthSession();
-  window.location.assign(logoutUrl);
+  window.location.assign("/auth/signout");
 }
 
 async function fetchCurrentUser(accessToken?: string) {
-  const response = await fetch(`${getApiBaseUrl()}/auth/me`, {
+  const response = await fetch("/api/chart/auth/me", {
     headers: accessToken
       ? {
           authorization: `Bearer ${accessToken}`,
@@ -131,39 +128,4 @@ async function fetchCurrentUser(accessToken?: string) {
   }
 
   return (await response.json()) as CurrentUserContext;
-}
-
-function getApiBaseUrl() {
-  return process.env.NEXT_PUBLIC_CHART_API_URL ?? "http://127.0.0.1:3200";
-}
-
-function getKeycloakBaseUrl() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_URL ?? "http://127.0.0.1:8080";
-}
-
-function getKeycloakRealm() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_REALM ?? "chart";
-}
-
-function getKeycloakClientId() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID ?? "chart-web";
-}
-
-function buildKeycloakLogoutUrl(idToken?: string) {
-  const url = new URL(
-    `${getKeycloakBaseUrl()}/realms/${getKeycloakRealm()}/protocol/openid-connect/logout`,
-  );
-
-  const params = new URLSearchParams({
-    client_id: getKeycloakClientId(),
-    post_logout_redirect_uri: `${window.location.origin}/`,
-  });
-
-  if (idToken) {
-    params.set("id_token_hint", idToken);
-  }
-
-  url.search = params.toString();
-
-  return url.toString();
 }
