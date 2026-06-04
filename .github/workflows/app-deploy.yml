@@ -3,7 +3,7 @@ name: App Deploy
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
       - ".github/workflows/app-deploy.yml"
       - "api/**"
@@ -13,9 +13,15 @@ on:
       - "package-lock.json"
       - "web/**"
   workflow_dispatch:
+    inputs:
+      force_content_seed:
+        description: "Re-run the CMS solution/content seed even if content already exists."
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
-  group: chart-app-deploy-${{ github.ref }}
+  group: chart-app-deploy-dev
   cancel-in-progress: true
 
 permissions:
@@ -36,7 +42,7 @@ jobs:
             set -euo pipefail
 
             APP_DIR="${APP_DIR:-/opt/chart}"
-            BRANCH="${{ github.ref_name }}"
+            BRANCH="dev"
 
             if [ -d "$APP_DIR/.git" ]; then
               git -C "$APP_DIR" reset --hard
@@ -50,4 +56,4 @@ jobs:
               git clone --branch "$BRANCH" https://github.com/CHART-Scope/CHART.git "$APP_DIR"
             fi
 
-            PUBLIC_HOST="${{ secrets.AWS_APP_HOST }}" bash "$APP_DIR/infra/aws/deploy-app.sh"
+            CHART_FORCE_CONTENT_SEED="${{ inputs.force_content_seed || false }}" PUBLIC_HOST="${{ secrets.AWS_APP_HOST }}" bash "$APP_DIR/infra/aws/deploy-app.sh"

@@ -69,6 +69,7 @@ fi
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(random_secret)}"
 KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-$(random_secret)}"
 PAYLOAD_SECRET="${PAYLOAD_SECRET:-$(random_secret)}"
+CHART_FORCE_CONTENT_SEED="${CHART_FORCE_CONTENT_SEED:-false}"
 
 cat >"$ENV_FILE" <<EOF
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
@@ -79,14 +80,16 @@ KEYCLOAK_ISSUER_URL=http://$PUBLIC_HOST/identity/realms/chart
 KEYCLOAK_CLIENT_ID=chart-api
 KEYCLOAK_JWKS_URL=http://$KEYCLOAK_CONTAINER:8080/identity/realms/chart/protocol/openid-connect/certs
 KEYCLOAK_CLOCK_SKEW_SECONDS=30
+KEYCLOAK_SERVER_URL=http://$KEYCLOAK_CONTAINER:8080/identity
+KEYCLOAK_BROWSER_URL=http://$PUBLIC_HOST/identity
+KEYCLOAK_REALM=chart
+KEYCLOAK_WEB_CLIENT_ID=chart-web
+CHART_API_INTERNAL_URL=http://$API_CONTAINER:3200
 CHART_CORS_ORIGINS=http://$PUBLIC_HOST
 CHART_CMS_SERVER_URL=http://$PUBLIC_HOST
 CHART_WEB_ORIGIN=http://$PUBLIC_HOST
-NEXT_PUBLIC_CHART_API_URL=http://$PUBLIC_HOST/chart-api
-NEXT_PUBLIC_KEYCLOAK_URL=http://$PUBLIC_HOST/identity
-NEXT_PUBLIC_KEYCLOAK_REALM=chart
-NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=chart-web
 EOF
+
 chmod 600 "$ENV_FILE"
 
 cat >"$PROXY_CONFIG_FILE" <<EOF
@@ -244,11 +247,15 @@ docker run -d \
 
 wait_for_command "CHART API" curl -fsS "http://127.0.0.1:3200/health"
 
-docker build -f "$APP_DIR/web/Dockerfile" -t "$WEB_IMAGE" "$APP_DIR" \
-  --build-arg NEXT_PUBLIC_CHART_API_URL="http://$PUBLIC_HOST/chart-api" \
-  --build-arg NEXT_PUBLIC_KEYCLOAK_URL="http://$PUBLIC_HOST/identity" \
-  --build-arg NEXT_PUBLIC_KEYCLOAK_REALM=chart \
-  --build-arg NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=chart-web
+docker build -f "$APP_DIR/web/Dockerfile" -t "$WEB_IMAGE" "$APP_DIR"
+
+docker run --rm \
+  --network "$NETWORK" \
+  --env-file "$ENV_FILE" \
+  -e NODE_ENV=development \
+  -e CHART_FORCE_CONTENT_SEED="$CHART_FORCE_CONTENT_SEED" \
+  -v chart-payload-uploads:/repo/web/public/uploads \
+  "$WEB_IMAGE" npm run seed:web
 
 docker run -d \
   --name "$WEB_CONTAINER" \
@@ -257,7 +264,7 @@ docker run -d \
   --env-file "$ENV_FILE" \
   -e HOSTNAME=0.0.0.0 \
   -e PORT=3100 \
-  -e KEYCLOAK_SERVER_URL="http://$KEYCLOAK_CONTAINER:8080/identity" \
+  -v chart-payload-uploads:/repo/web/public/uploads \
   "$WEB_IMAGE" >/dev/null
 
 docker run -d \
