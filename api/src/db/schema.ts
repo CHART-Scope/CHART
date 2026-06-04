@@ -1,12 +1,10 @@
-import { sql } from "drizzle-orm";
+import { sql, type SQLWrapper } from "drizzle-orm";
 import {
   check,
   foreignKey,
   index,
   boolean,
   integer,
-  jsonb,
-  pgEnum,
   pgTable,
   primaryKey,
   text,
@@ -14,12 +12,22 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-export const geographyLevel = pgEnum("geography_level", [
+const geographyLevelValues = [
   "country",
   "geo_level_1",
   "geo_level_2",
   "geo_level_3",
-]);
+] as const;
+
+export type GeographyLevelValue = (typeof geographyLevelValues)[number];
+
+function geographyLevel(columnName: string) {
+  return text(columnName).$type<GeographyLevelValue>();
+}
+
+function geographyLevelCheck(column: SQLWrapper) {
+  return sql`${column} in ('country', 'geo_level_1', 'geo_level_2', 'geo_level_3')`;
+}
 
 function timestamps() {
   return {
@@ -42,6 +50,7 @@ export const countryGeoConfig = pgTable(
     primaryKey({
       columns: [table.countryCode, table.levelKey],
     }),
+    check("country_geo_config_level_key_check", geographyLevelCheck(table.levelKey)),
   ],
 );
 
@@ -73,6 +82,7 @@ export const geographies = pgTable(
     ),
     index("geographies_parent_idx").on(table.parentId, table.sortOrder),
     check("geographies_path_check", sql`${table.path} like '/%'`),
+    check("geographies_level_check", geographyLevelCheck(table.level)),
   ],
 );
 
@@ -177,12 +187,11 @@ export const workspaceGeographyScopes = pgTable(
   ],
 );
 
-// Airtable multi-select values can change, so repository facets stay data-driven.
+// Repository facets stay data-driven because source options can change.
 export const solutionRepositoryItems = pgTable(
   "solution_repository_items",
   {
     id: text("id").primaryKey(),
-    airtableRecordId: text("airtable_record_id"),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     summary: text("summary"),
@@ -193,18 +202,10 @@ export const solutionRepositoryItems = pgTable(
     timeToImplement: text("time_to_implement"),
     evidenceLevel: text("evidence_level"),
     status: text("status").default("imported").notNull(),
-    sourceUrl: text("source_url"),
-    sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
-    rawFields: jsonb("raw_fields")
-      .default(sql`'{}'::jsonb`)
-      .notNull(),
     ...timestamps(),
   },
   (table) => [
     uniqueIndex("solution_repository_items_slug_unique").on(table.slug),
-    uniqueIndex("solution_repository_items_airtable_record_unique").on(
-      table.airtableRecordId,
-    ),
     index("solution_repository_items_status_idx").on(table.status),
   ],
 );
@@ -215,7 +216,6 @@ export const solutionRepositoryTaxonomies = pgTable(
     id: text("id").primaryKey(),
     type: text("type").notNull(),
     label: text("label").notNull(),
-    source: text("source").default("airtable").notNull(),
     ...timestamps(),
   },
   (table) => [
@@ -254,7 +254,6 @@ export const solutionRepositoryLinks = pgTable(
       .references(() => solutionRepositoryItems.id, { onDelete: "cascade" }),
     label: text("label").notNull(),
     url: text("url").notNull(),
-    sourceField: text("source_field"),
     sortOrder: integer("sort_order").default(0).notNull(),
     ...timestamps(),
   },
@@ -268,21 +267,14 @@ export const solutionRepositoryAssets = pgTable(
     solutionId: text("solution_id")
       .notNull()
       .references(() => solutionRepositoryItems.id, { onDelete: "cascade" }),
-    airtableAttachmentId: text("airtable_attachment_id"),
     kind: text("kind").default("document").notNull(),
     filename: text("filename").notNull(),
     mimeType: text("mime_type"),
     sizeBytes: integer("size_bytes"),
-    temporarySourceUrl: text("temporary_source_url"),
     storageUrl: text("storage_url"),
     attribution: text("attribution"),
     sortOrder: integer("sort_order").default(0).notNull(),
     ...timestamps(),
   },
-  (table) => [
-    index("solution_repository_assets_solution_idx").on(table.solutionId),
-    uniqueIndex("solution_repository_assets_airtable_attachment_unique").on(
-      table.airtableAttachmentId,
-    ),
-  ],
+  (table) => [index("solution_repository_assets_solution_idx").on(table.solutionId)],
 );
