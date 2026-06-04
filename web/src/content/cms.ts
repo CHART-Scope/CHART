@@ -1,7 +1,13 @@
+import type {
+  CostValue,
+  HazardValue,
+  SolutionTypeValue,
+} from "../lib/solutionRepositoryOptions";
+
 export type CmsStatus = "draft" | "review" | "scheduled" | "published";
-export type CmsType = "solution" | "model" | "vra" | "landing";
 
 export type CmsAsset = {
+  id?: string | number;
   url?: string;
   filename?: string;
   type?: string;
@@ -14,25 +20,16 @@ export type CmsLink = {
 };
 
 export type CmsSolutionMetadata = {
-  solutionType?: string;
-  solutionGroup?: string;
-  climateHazards: string[];
-  healthDomains: string[];
-  resiliencePhases: string[];
-  costOfImplementation?: string;
-  implementationEffort?: string;
+  solutionTypes: SolutionTypeValue[];
+  climateHazards: HazardValue[];
+  costOfImplementation?: CostValue;
   usefulLinks: CmsLink[];
   caseStudies: CmsAsset[];
   image?: CmsAsset;
-  organizationName?: string;
-  contactInformation?: string;
-  externalSource?: string;
-  externalId?: string;
 };
 
 export type CmsItem = {
   id: string;
-  type: CmsType;
   title: string;
   tag: string;
   status: CmsStatus;
@@ -57,9 +54,8 @@ export type SubmissionItem = {
 };
 
 const emptySolution: CmsSolutionMetadata = {
+  solutionTypes: [],
   climateHazards: [],
-  healthDomains: [],
-  resiliencePhases: [],
   usefulLinks: [],
   caseStudies: [],
 };
@@ -67,7 +63,6 @@ const emptySolution: CmsSolutionMetadata = {
 export const cmsItems: CmsItem[] = [
   {
     id: "s-heatcare",
-    type: "solution",
     title: "HeatCare Kit: household-level protection for at-risk groups",
     tag: "Household kit",
     status: "review",
@@ -82,7 +77,6 @@ export const cmsItems: CmsItem[] = [
   },
   {
     id: "s-coolroof",
-    type: "solution",
     title: "Cool-roof retrofit guide for PHCs",
     tag: "Infrastructure",
     status: "scheduled",
@@ -97,7 +91,6 @@ export const cmsItems: CmsItem[] = [
   },
   {
     id: "s-training",
-    type: "solution",
     title: "Climate Ready training: facilitator pack v3",
     tag: "Training",
     status: "published",
@@ -112,7 +105,6 @@ export const cmsItems: CmsItem[] = [
   },
   {
     id: "m-heatmnch",
-    type: "model",
     title: "Heat-MNCH risk index v1.4",
     tag: "Model · MNCH",
     status: "published",
@@ -127,7 +119,6 @@ export const cmsItems: CmsItem[] = [
   },
   {
     id: "v-workforce",
-    type: "vra",
     title: "Health workforce indicator catalogue v2.2",
     tag: "VRA · Indicators",
     status: "review",
@@ -141,7 +132,6 @@ export const cmsItems: CmsItem[] = [
   },
   {
     id: "l-hero",
-    type: "landing",
     title: "Landing hero — monsoon-season copy",
     tag: "Hero block",
     status: "scheduled",

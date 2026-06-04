@@ -11,7 +11,6 @@
     "build:web": "npm --workspace @chart/web run build",
     "start:web": "npm --workspace @chart/web run start",
     "seed:web": "npm --workspace @chart/web run seed",
-    "import:airtable:solutions": "node web/scripts/importAirtableSolutions.mjs",
     "typecheck:web": "npm --workspace @chart/web run typecheck",
     "dev:api": "npm --workspace @chart/api run dev",
     "build:api": "npm --workspace @chart/api run build",

@@ -1,154 +1,138 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { getPayload } from "payload";
 
 import config from "@payload-config";
 
-import { type ChartCmsAsset } from "./chartContent";
-import { seedContentItems, seedSubmissions } from "./seedData";
+import { seedContentItems, seedSubmissions as seedSubmissionItems } from "./seedData";
+import {
+  type CostValue,
+  type SolutionTypeValue,
+  costOptions,
+  hazardOptions,
+  normalizeOptionValue,
+  normalizeOptionValues,
+  solutionTypeOptions,
+} from "./solutionRepositoryOptions";
 
-type AirtableSolutionRecord = {
-  airtableId: string;
-  createdTime?: string;
-  name: string;
-  description?: string;
-  image?: ChartCmsAsset;
-  hazards?: string[];
-  solutionTypes?: string[];
-  costOfImplementation?: string;
-  usefulLinks?: string;
-  caseStudies?: ChartCmsAsset[];
-  fields?: Record<string, unknown>;
+type PayloadClient = Awaited<ReturnType<typeof getPayload>>;
+
+type SolutionSeedAsset = {
+  filename?: string;
+  type?: string;
+  size?: number;
+  url?: string;
 };
 
-function findAirtableSolutionsPath() {
-  const candidates = [
-    path.resolve(process.cwd(), "../../data/airtable/solutions.normalized.json"),
-    path.resolve(process.cwd(), "data/airtable/solutions.normalized.json"),
-  ];
+type SolutionSeedItem = {
+  slug: string;
+  title: string;
+  description: string;
+  climateHazards: string[];
+  solutionTypes: string[];
+  costOfImplementation?: string;
+  usefulLinks?: string[];
+  caseStudies?: SolutionSeedAsset[];
+  image?: SolutionSeedAsset;
+};
 
-  return candidates.find((candidate) => existsSync(candidate));
+type SolutionSeedFile = {
+  version: number;
+  items: SolutionSeedItem[];
+};
+
+function readSolutionSeed(): SolutionSeedItem[] {
+  const sourcePath = path.resolve(
+    process.cwd(),
+    "src/content/solutionRepositorySeed.json",
+  );
+  const parsed = JSON.parse(readFileSync(sourcePath, "utf8")) as SolutionSeedFile;
+
+  if (!Array.isArray(parsed.items)) {
+    throw new Error("Solution repository seed must contain an items array.");
+  }
+
+  return parsed.items;
 }
 
-function firstString(values?: unknown) {
-  if (Array.isArray(values)) {
-    return values.find((value): value is string => typeof value === "string");
+function createSummary(description = "") {
+  const summary = description.replace(/\s+/g, " ").trim();
+
+  if (summary.length <= 180) {
+    return summary;
   }
 
-  return typeof values === "string" ? values : undefined;
+  return `${summary.slice(0, 177).trim()}...`;
 }
 
-function asStringArray(value: unknown) {
-  if (!value) {
-    return [];
-  }
-
-  if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === "string");
-  }
-
-  return typeof value === "string" ? [value] : [];
+function normalizeUsefulLinks(values?: string[]) {
+  return (
+    values?.filter(Boolean).map((url) => ({
+      label: url
+        .replace(/^https?:\/\//, "")
+        .replace(/^www\./, "")
+        .split("/")[0],
+      url,
+    })) ?? []
+  );
 }
 
-function asUsefulLinks(value?: string) {
-  if (!value) {
-    return [];
-  }
-
-  return value
-    .split(/\s+/)
-    .filter((part) => part.startsWith("http"))
-    .map((url) => ({ url }));
+function normalizeCaseStudies(values?: SolutionSeedAsset[]) {
+  return (
+    values
+      ?.filter((asset) => asset.filename || asset.url)
+      .map((asset) => ({
+        title: asset.filename,
+        filename: asset.filename,
+        url: asset.url,
+        type: asset.type,
+        size: asset.size,
+      })) ?? []
+  );
 }
 
-function createSummary(description?: string) {
-  if (!description) {
-    return "Solution repository item ready for review.";
-  }
-
-  const flattened = description.replace(/\s+/g, " ").trim();
-
-  if (flattened.length <= 220) {
-    return flattened;
-  }
-
-  return `${flattened.slice(0, 217).trim()}...`;
+function normalizeSeedCost(value?: string): CostValue | undefined {
+  return normalizeOptionValue(value, costOptions) as CostValue | undefined;
 }
 
-function readAirtableSolutions(): AirtableSolutionRecord[] {
-  const sourcePath = findAirtableSolutionsPath();
-
-  if (!sourcePath) {
-    return [];
-  }
-
-  return JSON.parse(readFileSync(sourcePath, "utf8")) as AirtableSolutionRecord[];
-}
-
-async function upsertAirtableSolution(
-  payload: Awaited<ReturnType<typeof getPayload>>,
-  item: AirtableSolutionRecord,
-) {
-  const fields = item.fields ?? {};
-  const picture = Array.isArray(fields.Picture) ? fields.Picture[0] : undefined;
-  const image =
-    item.image ??
-    (picture && typeof picture === "object" ? (picture as ChartCmsAsset) : undefined);
-  const solutionType =
-    firstString(fields["Solution type"]) ?? firstString(item.solutionTypes);
-  const solutionGroup = firstString(fields["Solution group copy"]);
-  const implementationEffort = firstString(fields["Implementation effort"]);
-  const healthDomains = asStringArray(fields["Health domains"]);
-  const resiliencePhases = asStringArray(fields["Resilience Phase"]);
-  const organizationName = firstString(fields["Organization / individual name"]);
-  const contactInformation = firstString(fields["Contact information"]);
+async function findContentItemByTitle(payload: PayloadClient, title: string) {
   const existing = await payload.find({
     collection: "content-items",
-    where: {
-      and: [
-        { externalSource: { equals: "airtable" } },
-        { externalId: { equals: item.airtableId } },
-      ],
-    },
+    where: { title: { equals: title } },
     limit: 1,
     overrideAccess: true,
   });
-  const data = {
-    type: "solution" as const,
-    title: item.name,
-    tag: solutionType ?? "Solution",
-    workflowState: "review" as const,
-    owner: organizationName ?? "Solution repository",
-    summary: createSummary(item.description),
-    body: item.description ?? "",
-    externalSource: "airtable",
-    externalId: item.airtableId,
-    sourceTable: "Initial prototype solutions",
-    externalImage: image,
-    solutionType,
-    solutionGroup,
-    climateHazards: (item.hazards ?? []).map((value) => ({ value })),
-    healthDomains: healthDomains.map((value) => ({ value })),
-    resiliencePhases: resiliencePhases.map((value) => ({ value })),
-    costOfImplementation: item.costOfImplementation,
-    implementationEffort,
-    usefulLinks: asUsefulLinks(item.usefulLinks),
-    caseStudies: (item.caseStudies ?? []).map((asset) => ({
-      title: asset.filename,
-      filename: asset.filename,
-      url: asset.url,
-      type: asset.type,
-      size: asset.size,
-    })),
-    organizationName,
-    contactInformation,
-  };
 
-  if (existing.docs[0]) {
+  return existing.docs[0];
+}
+
+async function upsertSolutionSeedItem(payload: PayloadClient, item: SolutionSeedItem) {
+  const solutionTypes = normalizeOptionValues(item.solutionTypes, solutionTypeOptions);
+  const climateHazards = normalizeOptionValues(item.climateHazards, hazardOptions);
+  const costOfImplementation = normalizeSeedCost(item.costOfImplementation);
+  const image = item.image?.url ? item.image : undefined;
+  const data = {
+    title: item.title,
+    tag: solutionTypes[0] ?? solutionTypeOptions[0].value,
+    workflowState: "review" as const,
+    owner: "Solution repository",
+    summary: createSummary(item.description),
+    body: item.description,
+    externalImage: image,
+    solutionTypes,
+    climateHazards,
+    costOfImplementation,
+    usefulLinks: normalizeUsefulLinks(item.usefulLinks),
+    caseStudies: normalizeCaseStudies(item.caseStudies),
+  };
+  const existing = await findContentItemByTitle(payload, item.title);
+
+  if (existing) {
     await payload.update({
       collection: "content-items",
-      id: existing.docs[0].id,
+      draft: true,
+      id: existing.id,
       data,
       overrideAccess: true,
     });
@@ -157,73 +141,94 @@ async function upsertAirtableSolution(
 
   await payload.create({
     collection: "content-items",
+    draft: true,
     data,
     overrideAccess: true,
   });
 }
 
-async function seedChartContent() {
-  const payload = await getPayload({ config });
-  const airtableSolutions = readAirtableSolutions();
+async function seedDefaultContentItems(payload: PayloadClient) {
+  for (const item of seedContentItems) {
+    const existing = await findContentItemByTitle(payload, item.title);
 
-  const contentItems = await payload.find({
-    collection: "content-items",
-    limit: 1,
-    overrideAccess: true,
-  });
-
-  if (airtableSolutions.length > 0) {
-    for (const item of airtableSolutions) {
-      await upsertAirtableSolution(payload, item);
+    if (existing) {
+      continue;
     }
-  }
 
-  if (contentItems.totalDocs === 0) {
-    for (const item of seedContentItems) {
-      await payload.create({
-        collection: "content-items",
-        data: {
-          title: item.title,
-          summary: item.summary,
-          body: item.body,
-          type: item.type,
-          tag: item.tag,
-          workflowState: item.status,
-          owner: item.owner,
-          scheduledDate: item.scheduledDate,
-          sourceTable: "Seed content",
-        },
-        overrideAccess: true,
-      });
-    }
+    await payload.create({
+      collection: "content-items",
+      draft: true,
+      data: {
+        title: item.title,
+        summary: item.summary,
+        body: item.body,
+        tag: item.tag as SolutionTypeValue,
+        workflowState: item.status,
+        owner: item.owner,
+        scheduledDate: item.scheduledDate,
+      },
+      overrideAccess: true,
+    });
   }
+}
 
+async function seedDefaultSubmissions(payload: PayloadClient) {
   const submissions = await payload.find({
     collection: "submissions",
     limit: 1,
     overrideAccess: true,
   });
 
-  if (submissions.totalDocs === 0) {
-    for (const item of seedSubmissions) {
-      await payload.create({
-        collection: "submissions",
-        data: {
-          organization: item.organization,
-          origin: item.origin,
-          title: item.title,
-          description: item.description,
-          tags: item.tags.map((tag) => ({ value: tag })),
-          received: new Date(item.received).toISOString(),
-          state: item.state,
-        },
-        overrideAccess: true,
-      });
-    }
+  if (submissions.totalDocs > 0) {
+    return;
   }
 
+  for (const item of seedSubmissionItems) {
+    await payload.create({
+      collection: "submissions",
+      data: {
+        organization: item.organization,
+        origin: item.origin,
+        title: item.title,
+        description: item.description,
+        tags: item.tags.map((tag: string) => ({ value: tag })),
+        received: new Date(item.received).toISOString(),
+        state: item.state,
+      },
+      overrideAccess: true,
+    });
+  }
+}
+
+async function seedChartContent() {
+  const payload = await getPayload({ config });
+  const solutionSeedItems = readSolutionSeed();
+  const forceContentSeed = ["1", "true", "yes"].includes(
+    process.env.CHART_FORCE_CONTENT_SEED?.toLowerCase() ?? "",
+  );
+  const contentItems = await payload.find({
+    collection: "content-items",
+    limit: 1,
+    overrideAccess: true,
+  });
+  const shouldSeedContent = forceContentSeed || contentItems.totalDocs === 0;
+
+  if (shouldSeedContent) {
+    for (const item of solutionSeedItems) {
+      await upsertSolutionSeedItem(payload, item);
+    }
+
+    await seedDefaultContentItems(payload);
+  } else {
+    console.log("Content seed skipped because content-items already contains records.");
+  }
+
+  await seedDefaultSubmissions(payload);
+
   console.log(
-    `Seed complete. Imported ${airtableSolutions.length} Airtable solutions.`,
+    shouldSeedContent
+      ? `Seed complete. Upserted ${solutionSeedItems.length} solution repository items.`
+      : "Seed complete. Existing content was left unchanged.",
   );
 }
 

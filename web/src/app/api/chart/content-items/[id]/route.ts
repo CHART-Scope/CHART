@@ -22,6 +22,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const params = await context.params;
   const item = await payload.update({
     collection: "content-items",
+    depth: 1,
+    draft: true,
     id: params.id,
     data: mapDraftToContentData(draft),
     overrideAccess: true,

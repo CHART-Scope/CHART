@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { type CmsItem, type SubmissionItem } from "../content/cms";
+import { type CmsAsset, type CmsItem, type SubmissionItem } from "../content/cms";
 import {
   dashboardActions,
   dashboardBoundary,
@@ -52,6 +52,7 @@ type ChartContentValue = {
   cmsSubmissions: SubmissionItem[];
   saveCmsItem: (itemId: string, draft: CmsDraftInput) => Promise<CmsItem | undefined>;
   createCmsItem: (draft: CmsDraftInput) => Promise<CmsItem>;
+  uploadCmsMedia: (file: File) => Promise<CmsAsset>;
 };
 
 const chartContentContext = createContext<ChartContentValue | null>(null);
@@ -98,6 +99,10 @@ export function ChartContentProvider({ children }: { children: ReactNode }) {
     return newItem;
   }
 
+  async function uploadCmsMedia(file: File) {
+    return cmsRepositoryRef.current.uploadMedia(file);
+  }
+
   const value = useMemo<ChartContentValue>(
     () => ({
       landingNavLinks,
@@ -117,6 +122,7 @@ export function ChartContentProvider({ children }: { children: ReactNode }) {
       cmsSubmissions,
       saveCmsItem,
       createCmsItem,
+      uploadCmsMedia,
     }),
     [cmsItems, cmsSubmissions],
   );

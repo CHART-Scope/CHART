@@ -64,8 +64,6 @@ export function WorkspaceShell({
         </button>
 
         <div className="workspace-sidebar-foot">
-          Shared planning for climate-health teams. Public resources stay open; scoped
-          planning stays inside the workspace.
           {onSignOut ? (
             <button className="workspace-signout" type="button" onClick={onSignOut}>
               Sign out

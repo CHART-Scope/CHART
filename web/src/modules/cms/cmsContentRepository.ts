@@ -1,10 +1,10 @@
-import { type CmsItem, type SubmissionItem } from "../../content/cms";
+import { type CmsAsset, type CmsItem, type SubmissionItem } from "../../content/cms";
 
 const defaultCmsApiBaseUrl = "/api/chart";
 
 export type CmsDraftInput = Pick<
   CmsItem,
-  "title" | "summary" | "body" | "type" | "tag" | "solution"
+  "title" | "summary" | "body" | "tag" | "solution"
 >;
 
 type CmsRepositorySnapshot = {
@@ -16,6 +16,7 @@ export type CmsContentRepository = {
   loadSnapshot: () => Promise<CmsRepositorySnapshot>;
   saveItem: (itemId: string, draft: CmsDraftInput) => Promise<CmsItem | undefined>;
   createItem: (draft: CmsDraftInput) => Promise<CmsItem>;
+  uploadMedia: (file: File) => Promise<CmsAsset>;
 };
 
 export function createCmsContentRepository(): CmsContentRepository {
@@ -64,6 +65,22 @@ export function createCmsContentRepository(): CmsContentRepository {
       }
 
       return (await response.json()) as CmsItem;
+    },
+    async uploadMedia(file) {
+      const formData = new FormData();
+      formData.set("file", file);
+      formData.set("alt", file.name);
+
+      const response = await fetch(`${defaultCmsApiBaseUrl}/media`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("CMS media upload failed.");
+      }
+
+      return (await response.json()) as CmsAsset;
     },
   };
 }

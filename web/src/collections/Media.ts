@@ -28,6 +28,9 @@ export const Media: CollectionConfig = {
     {
       name: "source",
       type: "text",
+      admin: {
+        hidden: true,
+      },
     },
   ],
 };

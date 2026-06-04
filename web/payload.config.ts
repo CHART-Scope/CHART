@@ -14,6 +14,29 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 const chartWebOrigin = process.env.CHART_WEB_ORIGIN ?? "http://127.0.0.1:3100";
 const postgresConnectionString =
   process.env.DATABASE_URL ?? "postgres://chart:chart@127.0.0.1:5432/chart";
+const payloadTables = [
+  "users",
+  "users_sessions",
+  "media",
+  "content_items",
+  "content_items_case_studies",
+  "content_items_climate_hazards",
+  "content_items_solution_types",
+  "content_items_useful_links",
+  "_content_items_v",
+  "_content_items_v_version_case_studies",
+  "_content_items_v_version_climate_hazards",
+  "_content_items_v_version_solution_types",
+  "_content_items_v_version_useful_links",
+  "submissions",
+  "submissions_tags",
+  "payload_kv",
+  "payload_locked_documents",
+  "payload_locked_documents_rels",
+  "payload_preferences",
+  "payload_preferences_rels",
+  "payload_migrations",
+];
 
 export default buildConfig({
   secret: process.env.PAYLOAD_SECRET ?? "chart-dev-secret",
@@ -31,6 +54,7 @@ export default buildConfig({
     pool: {
       connectionString: postgresConnectionString,
     },
+    tablesFilter: payloadTables,
   }),
   collections: [Users, Media, ContentItems, Submissions],
   routes: {
