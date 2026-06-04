@@ -1,18 +1,16 @@
 import type { ChartCmsItem, ChartSubmissionItem } from "./chartContent";
 
 const emptySolution = {
+  solutionTypes: [],
   climateHazards: [],
-  healthDomains: [],
-  resiliencePhases: [],
   usefulLinks: [],
   caseStudies: [],
 };
 
 export const seedContentItems: Omit<ChartCmsItem, "id" | "updated">[] = [
   {
-    type: "solution",
     title: "HeatCare Kit: household-level protection for at-risk groups",
-    tag: "Household kit",
+    tag: "communities",
     status: "review",
     owner: "Priya N.",
     scheduledDate: "2026-05-28",
@@ -23,9 +21,8 @@ export const seedContentItems: Omit<ChartCmsItem, "id" | "updated">[] = [
     solution: emptySolution,
   },
   {
-    type: "solution",
     title: "Cool-roof retrofit guide for PHCs",
-    tag: "Infrastructure",
+    tag: "infrastructure",
     status: "scheduled",
     owner: "Asha R.",
     scheduledDate: "2026-05-25",
@@ -36,9 +33,8 @@ export const seedContentItems: Omit<ChartCmsItem, "id" | "updated">[] = [
     solution: emptySolution,
   },
   {
-    type: "solution",
     title: "Climate Ready training: facilitator pack v3",
-    tag: "Training",
+    tag: "health_workforce",
     status: "published",
     owner: "Rahul A.",
     scheduledDate: "2026-05-04",
@@ -49,9 +45,8 @@ export const seedContentItems: Omit<ChartCmsItem, "id" | "updated">[] = [
     solution: emptySolution,
   },
   {
-    type: "model",
     title: "Heat-MNCH risk index v1.4",
-    tag: "Model · MNCH",
+    tag: "health_workforce",
     status: "published",
     owner: "Sneha L.",
     scheduledDate: "2026-05-02",
@@ -62,9 +57,8 @@ export const seedContentItems: Omit<ChartCmsItem, "id" | "updated">[] = [
     solution: emptySolution,
   },
   {
-    type: "vra",
     title: "Health workforce indicator catalogue v2.2",
-    tag: "VRA · Indicators",
+    tag: "health_workforce",
     status: "review",
     owner: "Priya N.",
     scheduledDate: "2026-05-30",
@@ -74,9 +68,8 @@ export const seedContentItems: Omit<ChartCmsItem, "id" | "updated">[] = [
     solution: emptySolution,
   },
   {
-    type: "landing",
     title: "Landing hero — monsoon-season copy",
-    tag: "Hero block",
+    tag: "communities",
     status: "scheduled",
     owner: "Rahul A.",
     scheduledDate: "2026-06-01",

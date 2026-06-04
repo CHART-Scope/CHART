@@ -24,13 +24,15 @@ out/
 # generated local app artifacts
 api/openapi.yaml
 web/payload-types.ts
-web/public/imported-airtable/
+web/public/imported-*/
 web/chart-cms.db
 
 # local docs and notes
 docs/
 data/
+web/public/uploads/
 .local/
 
 # OS files
 .DS_Store
+.claude

@@ -1,5 +1,11 @@
 import type { CollectionConfig } from "payload";
 
+import {
+  costOptions,
+  hazardOptions,
+  solutionTypeOptions,
+} from "../lib/solutionRepositoryOptions";
+
 function isAuthenticated() {
   return ({ req }: { req: { user?: unknown } }) => Boolean(req.user);
 }
@@ -8,7 +14,7 @@ export const ContentItems: CollectionConfig = {
   slug: "content-items",
   admin: {
     useAsTitle: "title",
-    defaultColumns: ["title", "type", "workflowState", "solutionType", "updatedAt"],
+    defaultColumns: ["title", "type", "workflowState", "solutionTypes", "updatedAt"],
   },
   access: {
     read: () => true,
@@ -22,25 +28,15 @@ export const ContentItems: CollectionConfig = {
   },
   fields: [
     {
-      name: "type",
-      type: "select",
-      required: true,
-      options: [
-        { label: "Solution", value: "solution" },
-        { label: "Model", value: "model" },
-        { label: "VRA", value: "vra" },
-        { label: "Landing", value: "landing" },
-      ],
-    },
-    {
       name: "title",
       type: "text",
       required: true,
     },
     {
       name: "tag",
-      type: "text",
+      type: "select",
       required: true,
+      options: [...solutionTypeOptions],
     },
     {
       name: "workflowState",
@@ -138,53 +134,21 @@ export const ContentItems: CollectionConfig = {
           label: "Solution repository",
           fields: [
             {
-              name: "solutionType",
-              type: "text",
-            },
-            {
-              name: "solutionGroup",
-              type: "text",
+              name: "solutionTypes",
+              type: "select",
+              hasMany: true,
+              options: [...solutionTypeOptions],
             },
             {
               name: "climateHazards",
-              type: "array",
-              fields: [
-                {
-                  name: "value",
-                  type: "text",
-                  required: true,
-                },
-              ],
-            },
-            {
-              name: "healthDomains",
-              type: "array",
-              fields: [
-                {
-                  name: "value",
-                  type: "text",
-                  required: true,
-                },
-              ],
-            },
-            {
-              name: "resiliencePhases",
-              type: "array",
-              fields: [
-                {
-                  name: "value",
-                  type: "text",
-                  required: true,
-                },
-              ],
+              type: "select",
+              hasMany: true,
+              options: [...hazardOptions],
             },
             {
               name: "costOfImplementation",
-              type: "text",
-            },
-            {
-              name: "implementationEffort",
-              type: "text",
+              type: "select",
+              options: [...costOptions],
             },
             {
               name: "usefulLinks",
@@ -201,18 +165,13 @@ export const ContentItems: CollectionConfig = {
                 },
               ],
             },
-            {
-              name: "organizationName",
-              type: "text",
-            },
-            {
-              name: "contactInformation",
-              type: "text",
-            },
           ],
         },
         {
-          label: "Source",
+          label: "System",
+          admin: {
+            hidden: true,
+          },
           fields: [
             {
               name: "externalSource",

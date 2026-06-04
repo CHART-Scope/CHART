@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
   const payload = await getPayload({ config });
   const result = await payload.find({
     collection: "content-items",
+    depth: 1,
     limit: 100,
     overrideAccess: true,
     sort: "-updatedAt",
@@ -30,6 +31,8 @@ export async function POST(request: NextRequest) {
   const payload = await getPayload({ config });
   const item = await payload.create({
     collection: "content-items",
+    depth: 1,
+    draft: true,
     data: {
       ...mapDraftToContentData(draft),
       workflowState: "draft",

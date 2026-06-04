@@ -1,7 +1,20 @@
+import type {
+  CostValue,
+  HazardValue,
+  SolutionTypeValue,
+} from "./solutionRepositoryOptions";
+import {
+  costOptions,
+  hazardOptions,
+  normalizeOptionValue,
+  normalizeOptionValues,
+  solutionTypeOptions,
+} from "./solutionRepositoryOptions";
+
 export type ChartCmsStatus = "draft" | "review" | "scheduled" | "published";
-export type ChartCmsType = "solution" | "model" | "vra" | "landing";
 
 export type ChartCmsAsset = {
+  id?: string | number;
   url?: string;
   filename?: string;
   type?: string;
@@ -14,27 +27,18 @@ export type ChartCmsLink = {
 };
 
 export type ChartCmsSolutionMetadata = {
-  solutionType?: string;
-  solutionGroup?: string;
-  climateHazards: string[];
-  healthDomains: string[];
-  resiliencePhases: string[];
-  costOfImplementation?: string;
-  implementationEffort?: string;
+  solutionTypes: SolutionTypeValue[];
+  climateHazards: HazardValue[];
+  costOfImplementation?: CostValue;
   usefulLinks: ChartCmsLink[];
   caseStudies: ChartCmsAsset[];
   image?: ChartCmsAsset;
-  organizationName?: string;
-  contactInformation?: string;
-  externalSource?: string;
-  externalId?: string;
 };
 
 export type ChartCmsDraftInput = {
   title: string;
   summary: string;
   body: string;
-  type: ChartCmsType;
   tag: string;
   solution?: Partial<ChartCmsSolutionMetadata>;
 };
@@ -65,8 +69,7 @@ export type StoredContentItem = {
   title: string;
   summary: string;
   body: string;
-  type: ChartCmsType;
-  tag: string;
+  tag: SolutionTypeValue | string;
   workflowState: ChartCmsStatus;
   owner?: string | null;
   scheduledDate?: string | null;
@@ -74,18 +77,10 @@ export type StoredContentItem = {
   image?: StoredMedia | string | null;
   externalImage?: StoredAsset | null;
   caseStudies?: StoredAsset[] | null;
-  solutionType?: string | null;
-  solutionGroup?: string | null;
+  solutionTypes?: StoredArrayValue[] | string[] | null;
   climateHazards?: StoredArrayValue[] | string[] | null;
-  healthDomains?: StoredArrayValue[] | string[] | null;
-  resiliencePhases?: StoredArrayValue[] | string[] | null;
   costOfImplementation?: string | null;
-  implementationEffort?: string | null;
   usefulLinks?: StoredLink[] | null;
-  organizationName?: string | null;
-  contactInformation?: string | null;
-  externalSource?: string | null;
-  externalId?: string | null;
 };
 
 type StoredArrayValue = {
@@ -93,6 +88,7 @@ type StoredArrayValue = {
 };
 
 type StoredAsset = {
+  id?: string | number | null;
   url?: string | null;
   filename?: string | null;
   type?: string | null;
@@ -106,6 +102,7 @@ type StoredLink = {
 };
 
 type StoredMedia = {
+  id?: string | number | null;
   url?: string | null;
   filename?: string | null;
   mimeType?: string | null;
@@ -123,21 +120,9 @@ export type StoredSubmission = {
   state: "new" | "imported" | "waiting";
 };
 
-export function createCmsThumbnail(type: ChartCmsType, imageUrl?: string) {
+export function createCmsThumbnail(imageUrl?: string) {
   if (imageUrl) {
     return `url("${imageUrl}") center / cover`;
-  }
-
-  if (type === "model") {
-    return "linear-gradient(135deg,#FCE9DF,#F0936B)";
-  }
-
-  if (type === "vra") {
-    return "linear-gradient(135deg,#E0F4F4,#0EA5A5)";
-  }
-
-  if (type === "landing") {
-    return "linear-gradient(135deg,#E8F3EA,#2E9449)";
   }
 
   return "linear-gradient(135deg,#9AB89D,#5C8762)";
@@ -161,6 +146,7 @@ function mapAsset(asset?: StoredAsset | null): ChartCmsAsset | undefined {
   return {
     url: asset.url ?? undefined,
     filename: asset.filename ?? undefined,
+    id: asset.id ?? undefined,
     type: asset.type ?? undefined,
     size: asset.size ?? undefined,
   };
@@ -174,6 +160,7 @@ function mapMedia(media?: StoredMedia | string | null): ChartCmsAsset | undefine
   return {
     url: media.url ?? undefined,
     filename: media.filename ?? undefined,
+    id: media.id ?? undefined,
     type: media.mimeType ?? undefined,
     size: media.filesize ?? undefined,
   };
@@ -190,10 +177,6 @@ function mapLinks(links?: StoredLink[] | null): ChartCmsLink[] {
       url: link.url ?? "",
     }))
     .filter((link) => link.url);
-}
-
-function toArrayRows(values?: string[]) {
-  return values?.filter(Boolean).map((value) => ({ value })) ?? [];
 }
 
 function toLinkRows(values?: ChartCmsLink[]) {
@@ -221,6 +204,10 @@ function toAssetRows(values?: ChartCmsAsset[]) {
   );
 }
 
+function relationshipId(asset?: ChartCmsAsset) {
+  return typeof asset?.id === "number" ? asset.id : undefined;
+}
+
 export function mapDraftToContentData(draft: ChartCmsDraftInput) {
   const solution = draft.solution ?? {};
 
@@ -228,22 +215,14 @@ export function mapDraftToContentData(draft: ChartCmsDraftInput) {
     title: draft.title,
     summary: draft.summary,
     body: draft.body,
-    type: draft.type,
-    tag: draft.tag,
-    solutionType: solution.solutionType,
-    solutionGroup: solution.solutionGroup,
-    climateHazards: toArrayRows(solution.climateHazards),
-    healthDomains: toArrayRows(solution.healthDomains),
-    resiliencePhases: toArrayRows(solution.resiliencePhases),
+    tag: draft.tag as SolutionTypeValue,
+    image: relationshipId(solution.image),
+    solutionTypes: solution.solutionTypes ?? [],
+    climateHazards: solution.climateHazards ?? [],
     costOfImplementation: solution.costOfImplementation,
-    implementationEffort: solution.implementationEffort,
     usefulLinks: toLinkRows(solution.usefulLinks),
     caseStudies: toAssetRows(solution.caseStudies),
-    externalImage: solution.image,
-    organizationName: solution.organizationName,
-    contactInformation: solution.contactInformation,
-    externalSource: solution.externalSource,
-    externalId: solution.externalId,
+    externalImage: relationshipId(solution.image) ? undefined : solution.image,
   };
 }
 
@@ -296,7 +275,6 @@ export function mapContentItem(doc: StoredContentItem): ChartCmsItem {
 
   return {
     id: doc.id,
-    type: doc.type,
     title: doc.title,
     tag: doc.tag,
     status: doc.workflowState,
@@ -305,15 +283,20 @@ export function mapContentItem(doc: StoredContentItem): ChartCmsItem {
     scheduledDate: toIsoDate(doc.scheduledDate),
     summary: doc.summary,
     body: doc.body,
-    thumbnail: createCmsThumbnail(doc.type, image?.url),
+    thumbnail: createCmsThumbnail(image?.url),
     solution: {
-      solutionType: doc.solutionType ?? undefined,
-      solutionGroup: doc.solutionGroup ?? undefined,
-      climateHazards: mapArrayValues(doc.climateHazards),
-      healthDomains: mapArrayValues(doc.healthDomains),
-      resiliencePhases: mapArrayValues(doc.resiliencePhases),
-      costOfImplementation: doc.costOfImplementation ?? undefined,
-      implementationEffort: doc.implementationEffort ?? undefined,
+      solutionTypes: normalizeOptionValues(
+        mapArrayValues(doc.solutionTypes),
+        solutionTypeOptions,
+      ),
+      climateHazards: normalizeOptionValues(
+        mapArrayValues(doc.climateHazards),
+        hazardOptions,
+      ),
+      costOfImplementation: normalizeOptionValue(
+        doc.costOfImplementation ?? undefined,
+        costOptions,
+      ),
       usefulLinks: mapLinks(doc.usefulLinks),
       caseStudies: Array.isArray(doc.caseStudies)
         ? doc.caseStudies
@@ -321,10 +304,6 @@ export function mapContentItem(doc: StoredContentItem): ChartCmsItem {
             .filter((asset): asset is ChartCmsAsset => Boolean(asset))
         : [],
       image,
-      organizationName: doc.organizationName ?? undefined,
-      contactInformation: doc.contactInformation ?? undefined,
-      externalSource: doc.externalSource ?? undefined,
-      externalId: doc.externalId ?? undefined,
     },
   };
 }

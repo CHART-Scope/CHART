@@ -9,7 +9,6 @@ node_modules/
 
 data/
 docs/
-web/public/imported-airtable/
 web/payload-types.ts
 web/src/app/(payload)/admin/importMap.ts
 
