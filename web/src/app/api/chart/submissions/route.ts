@@ -3,10 +3,17 @@ import { getPayload } from "payload";
 
 import config from "@payload-config";
 
-import { mapSubmission } from "@/lib/chartContent";
+import { type StoredSubmission, mapSubmission } from "@/lib/chartContent";
+import { requireContentEditor } from "@/lib/chartApiAccess";
 import { corsJson, corsOptions } from "@/lib/cors";
 
 export async function GET(request: NextRequest) {
+  const access = await requireContentEditor(request);
+
+  if ("response" in access) {
+    return access.response;
+  }
+
   const payload = await getPayload({ config });
   const result = await payload.find({
     collection: "submissions",
@@ -17,7 +24,7 @@ export async function GET(request: NextRequest) {
 
   return corsJson(
     request,
-    result.docs.map((item) => mapSubmission(item as never)),
+    result.docs.map((item) => mapSubmission(item as unknown as StoredSubmission)),
   );
 }
 

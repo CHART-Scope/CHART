@@ -4,7 +4,8 @@ export type ChartRole =
   | "u3_district_health_officer"
   | "u4_district_cross_sector_officer"
   | "u5_public_visitor"
-  | "chart_admin";
+  | "chart_admin"
+  | "content_editor";
 
 export type GeographyLevel = "country" | "geo_level_1" | "geo_level_2" | "geo_level_3";
 
@@ -23,6 +24,12 @@ export type AuthSession = {
   accessToken?: string;
   idToken?: string;
   refreshToken?: string;
+};
+
+export type AuthTokenResponse = {
+  access_token?: string;
+  id_token?: string;
+  refresh_token?: string;
 };
 
 const authStorageKey = "chart.auth.session";
@@ -83,12 +90,12 @@ export async function completeKeycloakSignIn(search: string) {
     throw new Error("CHART sign-in did not return a valid token.");
   }
 
-  const tokens = (await tokenResponse.json()) as {
-    access_token?: string;
-    id_token?: string;
-    refresh_token?: string;
-  };
+  const tokens = (await tokenResponse.json()) as AuthTokenResponse;
 
+  return storeTokenSession(tokens);
+}
+
+export async function storeTokenSession(tokens: AuthTokenResponse) {
   if (!tokens.access_token) {
     throw new Error("CHART sign-in response is missing an access token.");
   }
@@ -107,9 +114,9 @@ export async function completeKeycloakSignIn(search: string) {
   return session;
 }
 
-export function signOutOfKeycloak() {
+export function signOutOfKeycloak(returnTo = "/") {
   clearAuthSession();
-  window.location.assign("/auth/signout");
+  window.location.assign(`/auth/signout?returnTo=${encodeURIComponent(returnTo)}`);
 }
 
 async function fetchCurrentUser(accessToken?: string) {

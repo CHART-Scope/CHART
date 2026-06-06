@@ -3,9 +3,16 @@ import { getPayload } from "payload";
 
 import config from "@payload-config";
 
+import { requireContentEditor } from "@/lib/chartApiAccess";
 import { corsJson, corsOptions } from "@/lib/cors";
 
 export async function POST(request: NextRequest) {
+  const access = await requireContentEditor(request);
+
+  if ("response" in access) {
+    return access.response;
+  }
+
   const formData = await request.formData();
   const file = formData.get("file");
 

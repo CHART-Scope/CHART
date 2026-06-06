@@ -1,6 +1,6 @@
 import { useChartContent } from "../../app/ChartContentProvider";
-
-export type ChartRoute = "landing" | "dashboard" | "cms" | "auth";
+import { PublicAuthAction } from "../auth/PublicAuthAction";
+import type { ChartRoute } from "../routes/types";
 
 type LandingPageProps = {
   onNavigate: (route: ChartRoute) => void;
@@ -17,9 +17,9 @@ const partnerLogos = [
     className: "chai",
   },
   {
-    name: "County Government of Kajiado",
-    label: "County Government of Kajiado",
-    className: "kajiado",
+    name: "Partner government",
+    label: "Partner government",
+    className: "partner-government",
   },
 ];
 
@@ -52,9 +52,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           ))}
         </nav>
 
-        <a className="button primary-button nav-sign-in" href="/auth/signin">
-          Sign in
-        </a>
+        <PublicAuthAction />
       </header>
 
       <main>
@@ -73,8 +71,8 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <a className="button ghost-button" href="#contact">
                 Contact us
               </a>
-              <a className="button primary-button" href="/auth/signin">
-                Request access
+              <a className="button primary-button" href="/onboarding">
+                Start setup
               </a>
             </div>
           </div>
@@ -182,7 +180,10 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 <div className="toolkit-copy">
                   <h3>{section.title}</h3>
                   <p>{section.description}</p>
-                  <a className="button primary-button" href={`#${section.id}`}>
+                  <a
+                    className="button primary-button"
+                    href={section.id === "solutions" ? "/solutions" : `#${section.id}`}
+                  >
                     {section.ctaLabel}
                   </a>
                 </div>
@@ -206,8 +207,8 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <a className="button ghost-button" href="mailto:hello@scopeimpact.fi">
                 Contact us
               </a>
-              <a className="button primary-button" href="/auth/signin">
-                Request access
+              <a className="button primary-button" href="/onboarding">
+                Start setup
               </a>
             </div>
           </div>
@@ -256,20 +257,20 @@ function DashboardLaptopPreview() {
         <div className="preview-dashboard">
           <div className="preview-topbar">
             <strong>My dashboard</strong>
-            <span>Welcome, Rahul</span>
+            <span>Welcome, planning lead</span>
           </div>
           <div className="preview-metric-grid">
             <div>
-              <small>Max temperature</small>
-              <strong>48°C</strong>
+              <small>Geography</small>
+              <strong>Set scope</strong>
             </div>
             <div>
-              <small>Extreme heat days</small>
-              <strong>103</strong>
+              <small>Risk layers</small>
+              <strong>Connect data</strong>
             </div>
             <div>
-              <small>Affected population</small>
-              <strong>76K</strong>
+              <small>Planning</small>
+              <strong>Prioritize</strong>
             </div>
           </div>
           <div className="preview-chart">

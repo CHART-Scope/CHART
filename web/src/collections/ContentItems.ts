@@ -14,7 +14,7 @@ export const ContentItems: CollectionConfig = {
   slug: "content-items",
   admin: {
     useAsTitle: "title",
-    defaultColumns: ["title", "type", "workflowState", "solutionTypes", "updatedAt"],
+    defaultColumns: ["title", "tag", "workflowState", "solutionTypes", "updatedAt"],
   },
   access: {
     read: () => true,

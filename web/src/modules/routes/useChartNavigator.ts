@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 
 import { startKeycloakSignIn } from "../auth/authClient";
-import type { ChartRoute } from "../landing/LandingPage";
+import type { ChartRoute } from "./types";
 
 export function useChartNavigator() {
   const router = useRouter();

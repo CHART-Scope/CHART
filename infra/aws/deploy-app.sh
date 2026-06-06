@@ -82,6 +82,8 @@ KEYCLOAK_JWKS_URL=http://$KEYCLOAK_CONTAINER:8080/identity/realms/chart/protocol
 KEYCLOAK_CLOCK_SKEW_SECONDS=30
 KEYCLOAK_SERVER_URL=http://$KEYCLOAK_CONTAINER:8080/identity
 KEYCLOAK_BROWSER_URL=http://$PUBLIC_HOST/identity
+KEYCLOAK_ADMIN_URL=http://$KEYCLOAK_CONTAINER:8080/identity
+KEYCLOAK_ADMIN_USERNAME=admin
 KEYCLOAK_REALM=chart
 KEYCLOAK_WEB_CLIENT_ID=chart-web
 CHART_API_INTERNAL_URL=http://$API_CONTAINER:3200
@@ -224,6 +226,16 @@ docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh update \
   -s 'webOrigins=["+"]' >/dev/null
 
 docker build -f "$APP_DIR/api/Dockerfile" -t "$API_IMAGE" "$APP_DIR"
+
+docker run --rm \
+  --network "$NETWORK" \
+  -e KEYCLOAK_ADMIN_URL="http://$KEYCLOAK_CONTAINER:8080/identity" \
+  -e KEYCLOAK_ADMIN_USERNAME=admin \
+  -e KEYCLOAK_ADMIN_PASSWORD="$KEYCLOAK_ADMIN_PASSWORD" \
+  -e KEYCLOAK_REALM=chart \
+  -e KEYCLOAK_REALM_FILE=/keycloak/chart-realm.json \
+  -v "$APP_DIR/infra/keycloak:/keycloak:ro" \
+  node:22-alpine node /keycloak/sync-realm.js
 
 docker run --rm \
   --network "$NETWORK" \

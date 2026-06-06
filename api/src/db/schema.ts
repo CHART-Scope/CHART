@@ -5,6 +5,7 @@ import {
   index,
   boolean,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -19,14 +20,40 @@ const geographyLevelValues = [
   "geo_level_3",
 ] as const;
 
+const workspaceStatusValues = ["active", "archived"] as const;
+const workspaceMemberRoleValues = ["owner", "editor", "viewer"] as const;
+
 export type GeographyLevelValue = (typeof geographyLevelValues)[number];
+export type WorkspaceStatusValue = (typeof workspaceStatusValues)[number];
+export type WorkspaceMemberRoleValue = (typeof workspaceMemberRoleValues)[number];
+
+type AppSetupHazard = {
+  taxonomyId: string;
+  label: string;
+};
 
 function geographyLevel(columnName: string) {
   return text(columnName).$type<GeographyLevelValue>();
 }
 
+function workspaceStatus(columnName: string) {
+  return text(columnName).$type<WorkspaceStatusValue>();
+}
+
+function workspaceMemberRole(columnName: string) {
+  return text(columnName).$type<WorkspaceMemberRoleValue>();
+}
+
 function geographyLevelCheck(column: SQLWrapper) {
   return sql`${column} in ('country', 'geo_level_1', 'geo_level_2', 'geo_level_3')`;
+}
+
+function workspaceStatusCheck(column: SQLWrapper) {
+  return sql`${column} in ('active', 'archived')`;
+}
+
+function workspaceMemberRoleCheck(column: SQLWrapper) {
+  return sql`${column} in ('owner', 'editor', 'viewer')`;
 }
 
 function timestamps() {
@@ -131,19 +158,41 @@ export const userGeographyScopes = pgTable(
   ],
 );
 
+export const appSetup = pgTable("app_setup", {
+  id: text("id").primaryKey(),
+  completed: boolean("completed").default(false).notNull(),
+  countryCode: text("country_code"),
+  countryName: text("country_name"),
+  geographyLevelLabel: text("geography_level_label"),
+  rootGeographyId: text("root_geography_id").references(() => geographies.id, {
+    onDelete: "set null",
+  }),
+  workspaceId: text("workspace_id"),
+  firstAdminUserId: text("first_admin_user_id"),
+  firstAdminEmail: text("first_admin_email"),
+  hazards: jsonb("hazards").$type<AppSetupHazard[]>().default([]).notNull(),
+  ...timestamps(),
+});
+
 export const workspaces = pgTable(
   "workspaces",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     planningCycle: text("planning_cycle"),
-    status: text("status").default("active").notNull(),
+    status: workspaceStatus("status").default("active").notNull(),
+    createdByUserId: text("created_by_user_id"),
+    ownerUserId: text("owner_user_id"),
     ownerGeographyId: text("owner_geography_id").references(() => geographies.id, {
       onDelete: "set null",
     }),
     ...timestamps(),
   },
-  (table) => [index("workspaces_owner_geography_idx").on(table.ownerGeographyId)],
+  (table) => [
+    index("workspaces_owner_geography_idx").on(table.ownerGeographyId),
+    index("workspaces_owner_user_idx").on(table.ownerUserId),
+    check("workspaces_status_check", workspaceStatusCheck(table.status)),
+  ],
 );
 
 export const workspaceMembers = pgTable(
@@ -154,7 +203,7 @@ export const workspaceMembers = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     userId: text("user_id").notNull(),
-    role: text("role").notNull(),
+    role: workspaceMemberRole("role").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -163,6 +212,7 @@ export const workspaceMembers = pgTable(
       table.userId,
     ),
     index("workspace_members_user_idx").on(table.userId),
+    check("workspace_members_role_check", workspaceMemberRoleCheck(table.role)),
   ],
 );
 
@@ -201,12 +251,23 @@ export const solutionRepositoryItems = pgTable(
     maintenanceRequirement: text("maintenance_requirement"),
     timeToImplement: text("time_to_implement"),
     evidenceLevel: text("evidence_level"),
+    sourceId: text("source_id").default("chart-solution-repository").notNull(),
+    sourceRecordId: text("source_record_id"),
+    sourceVersion: text("source_version"),
+    sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+    license: text("license"),
+    attribution: text("attribution"),
     status: text("status").default("imported").notNull(),
     ...timestamps(),
   },
   (table) => [
     uniqueIndex("solution_repository_items_slug_unique").on(table.slug),
+    uniqueIndex("solution_repository_items_source_record_unique").on(
+      table.sourceId,
+      table.sourceRecordId,
+    ),
     index("solution_repository_items_status_idx").on(table.status),
+    index("solution_repository_items_source_idx").on(table.sourceId),
   ],
 );
 
@@ -224,6 +285,26 @@ export const solutionRepositoryTaxonomies = pgTable(
       table.label,
     ),
     index("solution_repository_taxonomies_type_idx").on(table.type),
+  ],
+);
+
+export const workspaceHazards = pgTable(
+  "workspace_hazards",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    taxonomyId: text("taxonomy_id")
+      .notNull()
+      .references(() => solutionRepositoryTaxonomies.id, { onDelete: "restrict" }),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.workspaceId, table.taxonomyId],
+    }),
+    index("workspace_hazards_taxonomy_idx").on(table.taxonomyId),
   ],
 );
 

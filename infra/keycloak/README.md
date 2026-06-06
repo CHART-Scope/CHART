@@ -6,7 +6,15 @@ Keycloak is the identity system. CHART remains the policy system.
 
 ```bash
 docker compose up -d chart-postgres chart-keycloak
+make identity-sync
 ```
+
+`make identity-sync` re-applies the current seed groups and users to an existing
+realm. Use it after changing `chart-realm.json` or when a local Postgres volume was
+created from an older seed.
+
+Use `make identity-restart` after changing local theme files. Keycloak caches theme
+resources while the container is running.
 
 Admin console:
 
@@ -17,10 +25,11 @@ Admin console:
 
 Seed users:
 
-- `u1-health-india` / `password`
-- `u2-sector-kenya` / `password`
-- `u3-health-gwalior` / `password`
-- `u4-sector-loitokitok` / `password`
+- `chart-admin` / `password`
+- `u1-health-region` / `password`
+- `u2-sector-region` / `password`
+- `u3-health-district` / `password`
+- `u4-sector-district` / `password`
 
 ## Model
 
@@ -38,13 +47,16 @@ Roles are Keycloak client roles on `chart-api`:
 - `u4_district_cross_sector_officer`
 - `u5_public_visitor`
 - `chart_admin`
+- `content_editor`
 
-Geography scope is represented by hierarchical Keycloak groups:
+Geography scope is represented by hierarchical Keycloak groups. The local realm uses
+generic fixture groups only; real deployments should load their own geography reference
+data and matching Keycloak groups.
 
-- `/india/madhya-pradesh`
-- `/india/madhya-pradesh/gwalior`
-- `/kenya/kajiado`
-- `/kenya/kajiado/loitokitok`
+- `/country-a/region-a`
+- `/country-a/region-a/district-a`
+- `/country-b/region-b`
+- `/country-b/region-b/district-c`
 
 The API reads `roles` and `groups` from the access token and builds the current user
 context. The app database owns geography metadata, display labels, boundaries, solution
