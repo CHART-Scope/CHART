@@ -38,30 +38,34 @@
         {
           "name": "chart_admin",
           "description": "CHART administrator"
+        },
+        {
+          "name": "content_editor",
+          "description": "Can manage CHART public content and solution repository records"
         }
       ]
     }
   },
   "groups": [
     {
-      "name": "india",
+      "name": "country-a",
       "attributes": {
-        "country_code": ["IN"],
+        "country_code": ["CTA"],
         "geo_level": ["country"]
       },
       "subGroups": [
         {
-          "name": "madhya-pradesh",
+          "name": "region-a",
           "attributes": {
-            "country_code": ["IN"],
+            "country_code": ["CTA"],
             "geo_level": ["geo_level_1"],
-            "level_label": ["state"]
+            "level_label": ["region"]
           },
           "subGroups": [
             {
-              "name": "gwalior",
+              "name": "district-a",
               "attributes": {
-                "country_code": ["IN"],
+                "country_code": ["CTA"],
                 "geo_level": ["geo_level_2"],
                 "level_label": ["district"]
               }
@@ -71,26 +75,26 @@
       ]
     },
     {
-      "name": "kenya",
+      "name": "country-b",
       "attributes": {
-        "country_code": ["KE"],
+        "country_code": ["CTB"],
         "geo_level": ["country"]
       },
       "subGroups": [
         {
-          "name": "kajiado",
+          "name": "region-b",
           "attributes": {
-            "country_code": ["KE"],
+            "country_code": ["CTB"],
             "geo_level": ["geo_level_1"],
-            "level_label": ["county"]
+            "level_label": ["region"]
           },
           "subGroups": [
             {
-              "name": "loitokitok",
+              "name": "district-c",
               "attributes": {
-                "country_code": ["KE"],
+                "country_code": ["CTB"],
                 "geo_level": ["geo_level_2"],
-                "level_label": ["sub-county"]
+                "level_label": ["district"]
               }
             }
           ]
@@ -108,14 +112,10 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "fullScopeAllowed": true,
-      "redirectUris": [
-        "http://localhost:3100/*",
-        "http://127.0.0.1:3100/*",
-        "http://16.16.56.56/*"
-      ],
+      "redirectUris": ["http://localhost:3100/*", "http://127.0.0.1:3100/*"],
       "webOrigins": ["+"],
       "attributes": {
-        "post.logout.redirect.uris": "http://localhost:3100##http://localhost:3100/*##http://127.0.0.1:3100##http://127.0.0.1:3100/*##http://16.16.56.56##http://16.16.56.56/*"
+        "post.logout.redirect.uris": "http://localhost:3100##http://localhost:3100/*##http://127.0.0.1:3100##http://127.0.0.1:3100/*"
       },
       "protocolMappers": [
         {
@@ -147,12 +147,30 @@
   ],
   "users": [
     {
-      "username": "u1-health-india",
+      "username": "chart-admin",
       "enabled": true,
-      "email": "u1-health-india@example.org",
+      "email": "chart-admin@example.org",
+      "firstName": "CHART",
+      "lastName": "Admin",
+      "groups": ["/country-a"],
+      "clientRoles": {
+        "chart-api": ["chart_admin", "content_editor"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "u1-health-region",
+      "enabled": true,
+      "email": "u1-health-region@example.org",
       "firstName": "U1",
-      "lastName": "Health India",
-      "groups": ["/india/madhya-pradesh"],
+      "lastName": "Health Region",
+      "groups": ["/country-a/region-a"],
       "clientRoles": {
         "chart-api": ["u1_health_lead"]
       },
@@ -165,12 +183,12 @@
       ]
     },
     {
-      "username": "u2-sector-kenya",
+      "username": "u2-sector-region",
       "enabled": true,
-      "email": "u2-sector-kenya@example.org",
+      "email": "u2-sector-region@example.org",
       "firstName": "U2",
-      "lastName": "Sector Kenya",
-      "groups": ["/kenya/kajiado"],
+      "lastName": "Sector Region",
+      "groups": ["/country-b/region-b"],
       "clientRoles": {
         "chart-api": ["u2_cross_sector_lead"]
       },
@@ -183,12 +201,12 @@
       ]
     },
     {
-      "username": "u3-health-gwalior",
+      "username": "u3-health-district",
       "enabled": true,
-      "email": "u3-health-gwalior@example.org",
+      "email": "u3-health-district@example.org",
       "firstName": "U3",
-      "lastName": "Health Gwalior",
-      "groups": ["/india/madhya-pradesh/gwalior"],
+      "lastName": "Health District",
+      "groups": ["/country-a/region-a/district-a"],
       "clientRoles": {
         "chart-api": ["u3_district_health_officer"]
       },
@@ -201,12 +219,12 @@
       ]
     },
     {
-      "username": "u4-sector-loitokitok",
+      "username": "u4-sector-district",
       "enabled": true,
-      "email": "u4-sector-loitokitok@example.org",
+      "email": "u4-sector-district@example.org",
       "firstName": "U4",
-      "lastName": "Sector Loitokitok",
-      "groups": ["/kenya/kajiado/loitokitok"],
+      "lastName": "Sector District",
+      "groups": ["/country-b/region-b/district-c"],
       "clientRoles": {
         "chart-api": ["u4_district_cross_sector_officer"]
       },

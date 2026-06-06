@@ -9,7 +9,9 @@ export function CmsRoutePage() {
 
   return (
     <RequireAuth>
-      {(_session, signOut) => <CmsPage onNavigate={navigate} onSignOut={signOut} />}
+      {(session, signOut) => (
+        <CmsPage currentUser={session.user} onNavigate={navigate} onSignOut={signOut} />
+      )}
     </RequireAuth>
   );
 }

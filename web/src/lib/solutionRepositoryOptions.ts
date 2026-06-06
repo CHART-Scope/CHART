@@ -11,6 +11,7 @@ export const hazardOptions = [
   { label: "Flood", value: "flood" },
   { label: "Sea level rise", value: "sea_level_rise" },
   { label: "Cold wave", value: "cold_wave" },
+  { label: "Drought", value: "drought" },
   { label: "Wildfire", value: "wildfire" },
   { label: "Increased CO2 levels", value: "increased_co2_levels" },
   { label: "Landslide", value: "landslide" },

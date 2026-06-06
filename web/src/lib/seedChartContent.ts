@@ -5,10 +5,8 @@ import { getPayload } from "payload";
 
 import config from "@payload-config";
 
-import { seedContentItems, seedSubmissions as seedSubmissionItems } from "./seedData";
 import {
   type CostValue,
-  type SolutionTypeValue,
   costOptions,
   hazardOptions,
   normalizeOptionValue,
@@ -45,7 +43,8 @@ type SolutionSeedFile = {
 function readSolutionSeed(): SolutionSeedItem[] {
   const sourcePath = path.resolve(
     process.cwd(),
-    "src/content/solutionRepositorySeed.json",
+    process.env.CHART_SOLUTION_REPOSITORY_SEED_FILE ??
+      "src/content/solutionRepositorySeed.json",
   );
   const parsed = JSON.parse(readFileSync(sourcePath, "utf8")) as SolutionSeedFile;
 
@@ -115,7 +114,7 @@ async function upsertSolutionSeedItem(payload: PayloadClient, item: SolutionSeed
   const data = {
     title: item.title,
     tag: solutionTypes[0] ?? solutionTypeOptions[0].value,
-    workflowState: "review" as const,
+    workflowState: "published" as const,
     owner: "Solution repository",
     summary: createSummary(item.description),
     body: item.description,
@@ -147,59 +146,6 @@ async function upsertSolutionSeedItem(payload: PayloadClient, item: SolutionSeed
   });
 }
 
-async function seedDefaultContentItems(payload: PayloadClient) {
-  for (const item of seedContentItems) {
-    const existing = await findContentItemByTitle(payload, item.title);
-
-    if (existing) {
-      continue;
-    }
-
-    await payload.create({
-      collection: "content-items",
-      draft: true,
-      data: {
-        title: item.title,
-        summary: item.summary,
-        body: item.body,
-        tag: item.tag as SolutionTypeValue,
-        workflowState: item.status,
-        owner: item.owner,
-        scheduledDate: item.scheduledDate,
-      },
-      overrideAccess: true,
-    });
-  }
-}
-
-async function seedDefaultSubmissions(payload: PayloadClient) {
-  const submissions = await payload.find({
-    collection: "submissions",
-    limit: 1,
-    overrideAccess: true,
-  });
-
-  if (submissions.totalDocs > 0) {
-    return;
-  }
-
-  for (const item of seedSubmissionItems) {
-    await payload.create({
-      collection: "submissions",
-      data: {
-        organization: item.organization,
-        origin: item.origin,
-        title: item.title,
-        description: item.description,
-        tags: item.tags.map((tag: string) => ({ value: tag })),
-        received: new Date(item.received).toISOString(),
-        state: item.state,
-      },
-      overrideAccess: true,
-    });
-  }
-}
-
 async function seedChartContent() {
   const payload = await getPayload({ config });
   const solutionSeedItems = readSolutionSeed();
@@ -217,13 +163,9 @@ async function seedChartContent() {
     for (const item of solutionSeedItems) {
       await upsertSolutionSeedItem(payload, item);
     }
-
-    await seedDefaultContentItems(payload);
   } else {
     console.log("Content seed skipped because content-items already contains records.");
   }
-
-  await seedDefaultSubmissions(payload);
 
   console.log(
     shouldSeedContent

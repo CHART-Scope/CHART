@@ -12,14 +12,21 @@ The root package is only a workspace controller. It is not the web app and shoul
 
 ## Run locally
 
+For a clean local setup and verification run:
+
 ```bash
 make install
-docker compose up -d chart-postgres chart-keycloak
-make api-db-migrate
-make api-db-seed
-make api
-make web
+make all
 ```
+
+To start the local app after setup:
+
+```bash
+make run
+```
+
+`make run` provisions local dependencies, then starts the Fastify API and
+Next/Payload web app together. It stays running until stopped.
 
 Open `http://127.0.0.1:3100`.
 
@@ -31,14 +38,20 @@ Local Postgres uses one database, `chart`. Drizzle manages only the CHART app
 tables from `api/src/db/schema.ts`; Payload and Keycloak manage their own tables in
 the same database.
 
+Reference data is deployment-configurable:
+
+- `CHART_GEOGRAPHY_SEED_FILE`: optional JSON file for the deployer's geography hierarchy.
+- `CHART_SOLUTION_REPOSITORY_SEED_FILE`: optional JSON file for solution repository seed data. If unset, the local development seed at `web/src/content/solutionRepositorySeed.json` is used.
+
 Seed sign-in users are available through Keycloak at `http://127.0.0.1:8080`:
 
-- `u1-health-india` / `password`
-- `u2-sector-kenya` / `password`
-- `u3-health-gwalior` / `password`
-- `u4-sector-loitokitok` / `password`
+- `chart-admin` / `password`
+- `u1-health-region` / `password`
+- `u2-sector-region` / `password`
+- `u3-health-district` / `password`
+- `u4-sector-district` / `password`
 
-## EC2 demo routing
+## EC2 deployment routing
 
 The EC2 deployment exposes one public port:
 
@@ -53,10 +66,16 @@ reverse proxy publishes port `80`.
 ## Useful commands
 
 ```bash
+make all
+make run
+make local-setup
+make verify
 make web-build
 make web-typecheck
 make web-seed
 make identity
+make identity-wait
+make identity-sync
 make api-db-generate
 make api-db-migrate
 make api-db-check

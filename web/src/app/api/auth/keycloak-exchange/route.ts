@@ -1,8 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs";
+import {
+  buildKeycloakTokenUrl,
+  getKeycloakClientId,
+  pkceCookieName,
+} from "@/lib/keycloak";
+import { getRequestOrigin } from "@/lib/httpRequest";
 
-const pkceCookieName = "chart.auth.pkce";
+export const runtime = "nodejs";
 
 type TokenResponse = {
   access_token?: string;
@@ -37,7 +42,11 @@ export async function POST(request: NextRequest) {
   }
 
   const tokens = (await tokenResponse.json()) as TokenResponse;
-  const response = NextResponse.json(tokens);
+  const response = NextResponse.json(tokens, {
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
 
   response.cookies.delete(pkceCookieName);
 
@@ -70,46 +79,4 @@ function readPkceCookie(value?: string) {
   }
 
   return { state, verifier };
-}
-
-function buildKeycloakTokenUrl(request: NextRequest) {
-  return `${getKeycloakServerBaseUrl(request)}/realms/${getKeycloakRealm()}/protocol/openid-connect/token`;
-}
-
-function getKeycloakServerBaseUrl(request: NextRequest) {
-  return trimTrailingSlash(
-    process.env.KEYCLOAK_SERVER_URL ??
-      process.env.KEYCLOAK_BROWSER_URL ??
-      process.env.NEXT_PUBLIC_KEYCLOAK_URL ??
-      `${getRequestOrigin(request)}/identity`,
-  );
-}
-
-function getKeycloakRealm() {
-  return (
-    process.env.KEYCLOAK_REALM ?? process.env.NEXT_PUBLIC_KEYCLOAK_REALM ?? "chart"
-  );
-}
-
-function getKeycloakClientId() {
-  return (
-    process.env.KEYCLOAK_WEB_CLIENT_ID ??
-    process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID ??
-    "chart-web"
-  );
-}
-
-function getRequestOrigin(request: NextRequest) {
-  const forwardedProto = request.headers.get("x-forwarded-proto");
-  const forwardedHost = request.headers.get("x-forwarded-host");
-
-  if (forwardedProto && forwardedHost) {
-    return `${forwardedProto}://${forwardedHost}`;
-  }
-
-  return new URL(request.url).origin;
-}
-
-function trimTrailingSlash(value: string) {
-  return value.replace(/\/$/, "");
 }

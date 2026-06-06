@@ -41,8 +41,10 @@ export class AuthError extends Error {
   }
 }
 
+const localKeycloakIssuerUrl = "http://127.0.0.1:8080/realms/chart";
+
 export function getAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig {
-  const issuerUrl = env.KEYCLOAK_ISSUER_URL ?? "";
+  const issuerUrl = env.KEYCLOAK_ISSUER_URL ?? localKeycloakIssuerUrl;
 
   return {
     issuerUrl,
@@ -128,11 +130,7 @@ export function canSelectActiveGeography(
   context: CurrentUserContext,
   activeGeographyId: string,
 ): boolean {
-  const normalizedActiveGeography = normalizeGeographyPath(activeGeographyId);
-
-  return context.geographyScopes.some((scope) => {
-    return normalizeGeographyPath(scope) === normalizedActiveGeography;
-  });
+  return canReadGeographyPath(context, activeGeographyId);
 }
 
 function applyActiveGeography(

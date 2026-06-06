@@ -1,4 +1,5 @@
 import { type CmsAsset, type CmsItem, type SubmissionItem } from "../../content/cms";
+import { getStoredAuthSession } from "../auth/authClient";
 
 const defaultCmsApiBaseUrl = "/api/chart";
 
@@ -22,26 +23,21 @@ export type CmsContentRepository = {
 export function createCmsContentRepository(): CmsContentRepository {
   return {
     async loadSnapshot() {
-      const [itemsResponse, submissionsResponse] = await Promise.all([
-        fetch(`${defaultCmsApiBaseUrl}/content-items`),
-        fetch(`${defaultCmsApiBaseUrl}/submissions`),
-      ]);
+      const itemsResponse = await fetch(`${defaultCmsApiBaseUrl}/content-items`);
 
-      if (!itemsResponse.ok || !submissionsResponse.ok) {
-        throw new Error("CMS snapshot request failed.");
+      if (!itemsResponse.ok) {
+        throw new Error("CMS content request failed.");
       }
 
       return {
         items: (await itemsResponse.json()) as CmsItem[],
-        submissions: (await submissionsResponse.json()) as SubmissionItem[],
+        submissions: await loadSubmissions(),
       };
     },
     async saveItem(itemId, draft) {
       const response = await fetch(`${defaultCmsApiBaseUrl}/content-items/${itemId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: jsonAuthHeaders(),
         body: JSON.stringify(draft),
       });
 
@@ -54,9 +50,7 @@ export function createCmsContentRepository(): CmsContentRepository {
     async createItem(draft) {
       const response = await fetch(`${defaultCmsApiBaseUrl}/content-items`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: jsonAuthHeaders(),
         body: JSON.stringify(draft),
       });
 
@@ -73,6 +67,7 @@ export function createCmsContentRepository(): CmsContentRepository {
 
       const response = await fetch(`${defaultCmsApiBaseUrl}/media`, {
         method: "POST",
+        headers: authHeaders(),
         body: formData,
       });
 
@@ -83,4 +78,41 @@ export function createCmsContentRepository(): CmsContentRepository {
       return (await response.json()) as CmsAsset;
     },
   };
+}
+
+async function loadSubmissions() {
+  const headers = authHeaders();
+
+  if (!headers.has("Authorization")) {
+    return [];
+  }
+
+  const response = await fetch(`${defaultCmsApiBaseUrl}/submissions`, {
+    headers,
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  return (await response.json()) as SubmissionItem[];
+}
+
+function jsonAuthHeaders() {
+  const headers = authHeaders();
+
+  headers.set("Content-Type", "application/json");
+
+  return headers;
+}
+
+function authHeaders() {
+  const headers = new Headers();
+  const accessToken = getStoredAuthSession()?.accessToken;
+
+  if (accessToken) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  return headers;
 }

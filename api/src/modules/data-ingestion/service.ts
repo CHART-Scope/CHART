@@ -30,11 +30,11 @@ const sources: SourceMetadata[] = [
     refreshMode: "seed",
   },
   {
-    id: "solutions-seed",
+    id: "solution-repository",
     kind: "solutions",
-    name: "Seed solution repository",
+    name: "CHART solution repository",
     provider: "CHART",
-    refreshMode: "seed",
+    refreshMode: "external",
   },
 ];
 

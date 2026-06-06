@@ -5,6 +5,7 @@ export const chartRoles = [
   "u4_district_cross_sector_officer",
   "u5_public_visitor",
   "chart_admin",
+  "content_editor",
 ] as const;
 
 export const geographyLevels = [

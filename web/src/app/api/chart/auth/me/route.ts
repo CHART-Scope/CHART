@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { getChartApiBaseUrl } from "@/lib/chartApi";
+
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
@@ -28,27 +30,4 @@ export async function GET(request: NextRequest) {
       "content-type": response.headers.get("content-type") ?? "application/json",
     },
   });
-}
-
-function getChartApiBaseUrl(request: NextRequest) {
-  return trimTrailingSlash(
-    process.env.CHART_API_INTERNAL_URL ??
-      process.env.NEXT_PUBLIC_CHART_API_URL ??
-      `${getRequestOrigin(request)}/chart-api`,
-  );
-}
-
-function getRequestOrigin(request: NextRequest) {
-  const forwardedProto = request.headers.get("x-forwarded-proto");
-  const forwardedHost = request.headers.get("x-forwarded-host");
-
-  if (forwardedProto && forwardedHost) {
-    return `${forwardedProto}://${forwardedHost}`;
-  }
-
-  return new URL(request.url).origin;
-}
-
-function trimTrailingSlash(value: string) {
-  return value.replace(/\/$/, "");
 }

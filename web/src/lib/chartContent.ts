@@ -65,7 +65,7 @@ export type ChartSubmissionItem = {
 };
 
 export type StoredContentItem = {
-  id: string;
+  id: string | number;
   title: string;
   summary: string;
   body: string;
@@ -274,7 +274,7 @@ export function mapContentItem(doc: StoredContentItem): ChartCmsItem {
   const image = uploadedImage ?? externalImage;
 
   return {
-    id: doc.id,
+    id: String(doc.id),
     title: doc.title,
     tag: doc.tag,
     status: doc.workflowState,

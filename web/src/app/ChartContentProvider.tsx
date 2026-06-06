@@ -4,22 +4,12 @@ import {
   createContext,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 
 import { type CmsAsset, type CmsItem, type SubmissionItem } from "../content/cms";
-import {
-  dashboardActions,
-  dashboardBoundary,
-  dashboardFilters,
-  dashboardHealthPosts,
-  dashboardMetrics,
-  dashboardPlans,
-  dashboardZones,
-} from "../content/dashboard";
 import {
   landingGovernmentQuestions,
   landingNavLinks,
@@ -41,13 +31,6 @@ type ChartContentValue = {
   landingGovernmentQuestions: typeof landingGovernmentQuestions;
   landingWorkflowSteps: typeof landingWorkflowSteps;
   landingResourceSections: typeof landingResourceSections;
-  dashboardFilters: typeof dashboardFilters;
-  dashboardMetrics: typeof dashboardMetrics;
-  dashboardActions: typeof dashboardActions;
-  dashboardPlans: typeof dashboardPlans;
-  dashboardBoundary: typeof dashboardBoundary;
-  dashboardZones: typeof dashboardZones;
-  dashboardHealthPosts: typeof dashboardHealthPosts;
   cmsItems: CmsItem[];
   cmsSubmissions: SubmissionItem[];
   saveCmsItem: (itemId: string, draft: CmsDraftInput) => Promise<CmsItem | undefined>;
@@ -103,29 +86,19 @@ export function ChartContentProvider({ children }: { children: ReactNode }) {
     return cmsRepositoryRef.current.uploadMedia(file);
   }
 
-  const value = useMemo<ChartContentValue>(
-    () => ({
-      landingNavLinks,
-      landingPriorityStatement,
-      landingPriorityExamples,
-      landingGovernmentQuestions,
-      landingWorkflowSteps,
-      landingResourceSections,
-      dashboardFilters,
-      dashboardMetrics,
-      dashboardActions,
-      dashboardPlans,
-      dashboardBoundary,
-      dashboardZones,
-      dashboardHealthPosts,
-      cmsItems,
-      cmsSubmissions,
-      saveCmsItem,
-      createCmsItem,
-      uploadCmsMedia,
-    }),
-    [cmsItems, cmsSubmissions],
-  );
+  const value: ChartContentValue = {
+    landingNavLinks,
+    landingPriorityStatement,
+    landingPriorityExamples,
+    landingGovernmentQuestions,
+    landingWorkflowSteps,
+    landingResourceSections,
+    cmsItems,
+    cmsSubmissions,
+    saveCmsItem,
+    createCmsItem,
+    uploadCmsMedia,
+  };
 
   return (
     <chartContentContext.Provider value={value}>

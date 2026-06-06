@@ -10,6 +10,7 @@ import {
 
 export const listSourcesRouteSchema = {
   tags: ["data-ingestion"],
+  operationId: "listSources",
   summary: "List configured data sources",
   response: {
     200: {
@@ -21,6 +22,7 @@ export const listSourcesRouteSchema = {
 
 export const getSourceRouteSchema = {
   tags: ["data-ingestion"],
+  operationId: "getSource",
   summary: "Get one configured data source",
   params: sourceIdParamsSchema,
   response: {
@@ -31,6 +33,7 @@ export const getSourceRouteSchema = {
 
 export const queueSourceSyncRouteSchema = {
   tags: ["data-ingestion"],
+  operationId: "queueSourceSync",
   summary: "Queue a data source sync",
   params: sourceIdParamsSchema,
   response: {
@@ -40,7 +43,7 @@ export const queueSourceSyncRouteSchema = {
 } as const;
 
 export async function registerDataIngestionRoutes(app: FastifyInstance) {
-  app.get("/", { schema: listSourcesRouteSchema }, async () => {
+  app.get("", { schema: listSourcesRouteSchema }, async () => {
     return listSources();
   });
 

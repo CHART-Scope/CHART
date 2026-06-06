@@ -28,7 +28,7 @@ export type LandingPriorityExample = {
 export const landingNavLinks = [
   { href: "#overview", label: "What CHART does" },
   { href: "#workflow", label: "Planning workflow" },
-  { href: "#solutions", label: "Solutions" },
+  { href: "/solutions", label: "Solution repository" },
 ];
 
 export const landingPriorityStatement =

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { getSetupStatus } from "../../lib/setupClient";
 import { completeKeycloakSignIn } from "./authClient";
 
 export function AuthCallbackPage() {
@@ -20,7 +21,8 @@ export function AuthCallbackPage() {
     async function completeSignIn() {
       try {
         await completeKeycloakSignIn(window.location.search);
-        router.replace("/dashboard");
+        const setupStatus = await getSetupStatus();
+        router.replace(setupStatus.requiresOnboarding ? "/onboarding" : "/dashboard");
       } catch {
         setError("The CHART sign-in response could not be completed.");
       }

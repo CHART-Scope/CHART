@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const defaultAllowedOrigins = ["http://127.0.0.1:5173", "http://localhost:5173"];
+const defaultAllowedOrigins = ["http://127.0.0.1:3100", "http://localhost:3100"];
 
 function resolveAllowedOrigin(request: NextRequest) {
   const requestOrigin = request.headers.get("origin");
