@@ -1,11 +1,11 @@
 export type ChartRole =
-  | "u1_health_lead"
-  | "u2_cross_sector_lead"
-  | "u3_district_health_officer"
-  | "u4_district_cross_sector_officer"
-  | "u5_public_visitor"
   | "chart_admin"
-  | "content_editor";
+  | "content_editor"
+  | "health_planning_lead"
+  | "cross_sector_planning_lead"
+  | "health_implementation_officer"
+  | "cross_sector_implementation_officer"
+  | "public_viewer";
 
 export type GeographyLevel = "country" | "geo_level_1" | "geo_level_2" | "geo_level_3";
 

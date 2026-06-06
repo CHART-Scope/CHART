@@ -38,7 +38,13 @@ test("GET /openapi.json returns the current API contract as JSON", async () => {
   assert.equal(body.openapi, "3.0.3");
   assert.equal(body.info.title, "CHART API");
   assert.ok(body.paths["/auth/me"]);
+  assert.ok(body.paths["/sources/dhis2/config"]);
+  assert.ok(body.paths["/sources/dhis2/test-connection"]);
   assert.equal(body.paths["/auth/me"].get.operationId, "getCurrentUser");
+  assert.equal(
+    body.paths["/sources/dhis2/test-connection"].post.operationId,
+    "testDhis2Connection",
+  );
   assert.deepEqual(body.paths["/auth/me"].get.security, [{ bearerAuth: [] }]);
   assert.equal(body.components.securitySchemes.bearerAuth.bearerFormat, "JWT");
   assert.ok(body.paths["/geographies"]);
@@ -76,7 +82,8 @@ test("writeOpenApiYaml writes the current contract to a YAML file", async () => 
   await writeOpenApiYaml(outputPath);
 
   const output = await readFile(outputPath, "utf8");
-  assert.match(output, /title: CHART API/);
+  assert.match(output, /title: ['"]?CHART API['"]?/);
+  assert.match(output, /\/sources\/dhis2\/config:/);
   assert.match(output, /\/sources\/\{sourceId\}\/sync:/);
 });
 

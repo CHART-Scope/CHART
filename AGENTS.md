@@ -97,7 +97,7 @@ Keep feature UI under `web/src/modules/`.
 
 - Public content stays accessible without login.
 - Authenticated features should be scoped to role and geography.
-- Build for the `U1` and `U2` flow first.
+- Build for the health planning lead and cross-sector planning lead flow first.
 - Prefer simple seeded data before adding real integrations.
 - Keep the first user flow understandable before making it comprehensive.
 

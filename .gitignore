@@ -31,6 +31,7 @@ outputs/
 # local docs and notes
 docs/
 data/
+outputs/
 web/public/uploads/
 .local/
 

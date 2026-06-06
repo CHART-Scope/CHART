@@ -22,10 +22,18 @@ const geographyLevelValues = [
 
 const workspaceStatusValues = ["active", "archived"] as const;
 const workspaceMemberRoleValues = ["owner", "editor", "viewer"] as const;
+const dataSourceKindValues = [
+  "climate",
+  "health",
+  "population",
+  "geography",
+  "solutions",
+] as const;
 
 export type GeographyLevelValue = (typeof geographyLevelValues)[number];
 export type WorkspaceStatusValue = (typeof workspaceStatusValues)[number];
 export type WorkspaceMemberRoleValue = (typeof workspaceMemberRoleValues)[number];
+export type DataSourceKindValue = (typeof dataSourceKindValues)[number];
 
 type AppSetupHazard = {
   taxonomyId: string;
@@ -44,6 +52,10 @@ function workspaceMemberRole(columnName: string) {
   return text(columnName).$type<WorkspaceMemberRoleValue>();
 }
 
+function dataSourceKind(columnName: string) {
+  return text(columnName).$type<DataSourceKindValue>();
+}
+
 function geographyLevelCheck(column: SQLWrapper) {
   return sql`${column} in ('country', 'geo_level_1', 'geo_level_2', 'geo_level_3')`;
 }
@@ -56,12 +68,34 @@ function workspaceMemberRoleCheck(column: SQLWrapper) {
   return sql`${column} in ('owner', 'editor', 'viewer')`;
 }
 
+function dataSourceKindCheck(column: SQLWrapper) {
+  return sql`${column} in ('climate', 'health', 'population', 'geography', 'solutions')`;
+}
+
 function timestamps() {
   return {
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   };
 }
+
+export const dataSources = pgTable(
+  "data_sources",
+  {
+    id: text("id").primaryKey(),
+    kind: dataSourceKind("kind").notNull(),
+    provider: text("provider").notNull(),
+    name: text("name").notNull(),
+    baseUrl: text("base_url"),
+    authMode: text("auth_mode"),
+    enabled: boolean("enabled").default(true).notNull(),
+    ...timestamps(),
+  },
+  (table) => [
+    index("data_sources_kind_idx").on(table.kind),
+    check("data_sources_kind_check", dataSourceKindCheck(table.kind)),
+  ],
+);
 
 export const countryGeoConfig = pgTable(
   "country_geo_config",
@@ -133,6 +167,36 @@ export const geographyBoundaries = pgTable(
       table.geographyId,
       table.boundaryType,
     ),
+  ],
+);
+
+export const externalGeographyMappings = pgTable(
+  "external_geography_mappings",
+  {
+    id: text("id").primaryKey(),
+    sourceId: text("source_id")
+      .notNull()
+      .references(() => dataSources.id, { onDelete: "cascade" }),
+    geographyId: text("geography_id")
+      .notNull()
+      .references(() => geographies.id, { onDelete: "cascade" }),
+    externalId: text("external_id").notNull(),
+    externalCode: text("external_code"),
+    externalName: text("external_name"),
+    externalPath: text("external_path"),
+    externalLevel: text("external_level"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("external_geography_mappings_source_external_unique").on(
+      table.sourceId,
+      table.externalId,
+    ),
+    uniqueIndex("external_geography_mappings_source_geo_unique").on(
+      table.sourceId,
+      table.geographyId,
+    ),
+    index("external_geography_mappings_geo_idx").on(table.geographyId),
   ],
 );
 

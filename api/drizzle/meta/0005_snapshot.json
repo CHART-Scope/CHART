@@ -1,6 +1,6 @@
 {
-  "id": "01a35df9-19c3-4b2e-b347-7e12ca2c0c30",
-  "prevId": "8d544c80-deb5-4d6c-a483-8375c9933007",
+  "id": "00a7fe4d-b369-4089-89dd-a8e7bdf5b20d",
+  "prevId": "01a35df9-19c3-4b2e-b347-7e12ca2c0c30",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -91,8 +91,12 @@
           "name": "app_setup_root_geography_id_geographies_id_fk",
           "tableFrom": "app_setup",
           "tableTo": "geographies",
-          "columnsFrom": ["root_geography_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "root_geography_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -159,7 +163,10 @@
       "compositePrimaryKeys": {
         "country_geo_config_country_code_level_key_pk": {
           "name": "country_geo_config_country_code_level_key_pk",
-          "columns": ["country_code", "level_key"]
+          "columns": [
+            "country_code",
+            "level_key"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -170,6 +177,257 @@
           "value": "\"country_geo_config\".\"level_key\" in ('country', 'geo_level_1', 'geo_level_2', 'geo_level_3')"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.data_sources": {
+      "name": "data_sources",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_url": {
+          "name": "base_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auth_mode": {
+          "name": "auth_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "data_sources_kind_idx": {
+          "name": "data_sources_kind_idx",
+          "columns": [
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "data_sources_kind_check": {
+          "name": "data_sources_kind_check",
+          "value": "\"data_sources\".\"kind\" in ('climate', 'health', 'population', 'geography', 'solutions')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.external_geography_mappings": {
+      "name": "external_geography_mappings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "source_id": {
+          "name": "source_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "geography_id": {
+          "name": "geography_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "external_id": {
+          "name": "external_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "external_code": {
+          "name": "external_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_name": {
+          "name": "external_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_path": {
+          "name": "external_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_level": {
+          "name": "external_level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "external_geography_mappings_source_external_unique": {
+          "name": "external_geography_mappings_source_external_unique",
+          "columns": [
+            {
+              "expression": "source_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "external_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "external_geography_mappings_source_geo_unique": {
+          "name": "external_geography_mappings_source_geo_unique",
+          "columns": [
+            {
+              "expression": "source_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "geography_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "external_geography_mappings_geo_idx": {
+          "name": "external_geography_mappings_geo_idx",
+          "columns": [
+            {
+              "expression": "geography_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "external_geography_mappings_source_id_data_sources_id_fk": {
+          "name": "external_geography_mappings_source_id_data_sources_id_fk",
+          "tableFrom": "external_geography_mappings",
+          "tableTo": "data_sources",
+          "columnsFrom": [
+            "source_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "external_geography_mappings_geography_id_geographies_id_fk": {
+          "name": "external_geography_mappings_geography_id_geographies_id_fk",
+          "tableFrom": "external_geography_mappings",
+          "tableTo": "geographies",
+          "columnsFrom": [
+            "geography_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.geographies": {
@@ -316,8 +574,12 @@
           "name": "geographies_parent_id_geographies_id_fk",
           "tableFrom": "geographies",
           "tableTo": "geographies",
-          "columnsFrom": ["parent_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -441,8 +703,12 @@
           "name": "geography_boundaries_geography_id_geographies_id_fk",
           "tableFrom": "geography_boundaries",
           "tableTo": "geographies",
-          "columnsFrom": ["geography_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "geography_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -550,8 +816,12 @@
           "name": "solution_repository_assets_solution_id_solution_repository_items_id_fk",
           "tableFrom": "solution_repository_assets",
           "tableTo": "solution_repository_items",
-          "columnsFrom": ["solution_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "solution_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -601,8 +871,12 @@
           "name": "solution_repository_item_taxonomies_solution_id_solution_repository_items_id_fk",
           "tableFrom": "solution_repository_item_taxonomies",
           "tableTo": "solution_repository_items",
-          "columnsFrom": ["solution_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "solution_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -610,8 +884,12 @@
           "name": "solution_repository_item_taxonomies_taxonomy_id_solution_repository_taxonomies_id_fk",
           "tableFrom": "solution_repository_item_taxonomies",
           "tableTo": "solution_repository_taxonomies",
-          "columnsFrom": ["taxonomy_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "taxonomy_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -619,7 +897,10 @@
       "compositePrimaryKeys": {
         "solution_repository_item_taxonomies_solution_id_taxonomy_id_pk": {
           "name": "solution_repository_item_taxonomies_solution_id_taxonomy_id_pk",
-          "columns": ["solution_id", "taxonomy_id"]
+          "columns": [
+            "solution_id",
+            "taxonomy_id"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -897,8 +1178,12 @@
           "name": "solution_repository_links_solution_id_solution_repository_items_id_fk",
           "tableFrom": "solution_repository_links",
           "tableTo": "solution_repository_items",
-          "columnsFrom": ["solution_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "solution_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1083,8 +1368,12 @@
           "name": "user_geography_scopes_geography_id_geographies_id_fk",
           "tableFrom": "user_geography_scopes",
           "tableTo": "geographies",
-          "columnsFrom": ["geography_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "geography_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1168,8 +1457,12 @@
           "name": "workspace_geography_scopes_workspace_id_workspaces_id_fk",
           "tableFrom": "workspace_geography_scopes",
           "tableTo": "workspaces",
-          "columnsFrom": ["workspace_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "workspace_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1177,8 +1470,12 @@
           "name": "workspace_geography_scopes_geography_id_geographies_id_fk",
           "tableFrom": "workspace_geography_scopes",
           "tableTo": "geographies",
-          "columnsFrom": ["geography_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "geography_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1242,8 +1539,12 @@
           "name": "workspace_hazards_workspace_id_workspaces_id_fk",
           "tableFrom": "workspace_hazards",
           "tableTo": "workspaces",
-          "columnsFrom": ["workspace_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "workspace_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1251,8 +1552,12 @@
           "name": "workspace_hazards_taxonomy_id_solution_repository_taxonomies_id_fk",
           "tableFrom": "workspace_hazards",
           "tableTo": "solution_repository_taxonomies",
-          "columnsFrom": ["taxonomy_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "taxonomy_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1260,7 +1565,10 @@
       "compositePrimaryKeys": {
         "workspace_hazards_workspace_id_taxonomy_id_pk": {
           "name": "workspace_hazards_workspace_id_taxonomy_id_pk",
-          "columns": ["workspace_id", "taxonomy_id"]
+          "columns": [
+            "workspace_id",
+            "taxonomy_id"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -1347,8 +1655,12 @@
           "name": "workspace_members_workspace_id_workspaces_id_fk",
           "tableFrom": "workspace_members",
           "tableTo": "workspaces",
-          "columnsFrom": ["workspace_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "workspace_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1463,8 +1775,12 @@
           "name": "workspaces_owner_geography_id_geographies_id_fk",
           "tableFrom": "workspaces",
           "tableTo": "geographies",
-          "columnsFrom": ["owner_geography_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "owner_geography_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "set null",
           "onUpdate": "no action"
         }

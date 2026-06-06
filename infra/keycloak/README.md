@@ -41,13 +41,16 @@ database:
 
 Roles are Keycloak client roles on `chart-api`:
 
-- `u1_health_lead`
-- `u2_cross_sector_lead`
-- `u3_district_health_officer`
-- `u4_district_cross_sector_officer`
-- `u5_public_visitor`
 - `chart_admin`
 - `content_editor`
+- `health_planning_lead`
+- `cross_sector_planning_lead`
+- `health_implementation_officer`
+- `cross_sector_implementation_officer`
+- `public_viewer`
+
+Older `u1_*` to `u5_*` token roles are accepted by the API as temporary aliases, but
+new deployments should use the standard role names above.
 
 Geography scope is represented by hierarchical Keycloak groups. The local realm uses
 generic fixture groups only; real deployments should load their own geography reference

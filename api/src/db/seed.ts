@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { closeDb, db } from "./client.js";
 import {
   countryGeoConfig,
+  dataSources,
   geographies,
   solutionRepositoryTaxonomies,
 } from "./schema.js";
@@ -64,6 +65,18 @@ const solutionRepositoryTaxonomySeed: (typeof solutionRepositoryTaxonomies.$infe
     { id: "solution-type-communities", type: "solution_type", label: "Communities" },
   ];
 
+const dataSourceSeed: (typeof dataSources.$inferInsert)[] = [
+  {
+    id: "health-dhis2",
+    kind: "health",
+    provider: "DHIS2",
+    name: "DHIS2 health data",
+    baseUrl: process.env.DHIS2_BASE_URL?.replace(/\/+$/, "") || null,
+    authMode: process.env.DHIS2_AUTH_MODE || "pat",
+    enabled: true,
+  },
+];
+
 try {
   const geographySeed = readGeographySeedFile(process.env.CHART_GEOGRAPHY_SEED_FILE);
 
@@ -111,6 +124,22 @@ try {
         set: {
           type: sql`excluded.type`,
           label: sql`excluded.label`,
+          updatedAt: sql`now()`,
+        },
+      });
+
+    await tx
+      .insert(dataSources)
+      .values(dataSourceSeed)
+      .onConflictDoUpdate({
+        target: dataSources.id,
+        set: {
+          kind: sql`excluded.kind`,
+          provider: sql`excluded.provider`,
+          name: sql`excluded.name`,
+          baseUrl: sql`excluded.base_url`,
+          authMode: sql`excluded.auth_mode`,
+          enabled: sql`excluded.enabled`,
           updatedAt: sql`now()`,
         },
       });

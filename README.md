@@ -51,6 +51,43 @@ Seed sign-in users are available through Keycloak at `http://127.0.0.1:8080`:
 - `u3-health-district` / `password`
 - `u4-sector-district` / `password`
 
+CHART role names are stable product roles. Geography level and scope decide whether
+a user is working at country, state, county, district, sub-county, or another
+deployment-specific level.
+
+- `chart_admin`
+- `content_editor`
+- `health_planning_lead`
+- `cross_sector_planning_lead`
+- `health_implementation_officer`
+- `cross_sector_implementation_officer`
+- `public_viewer`
+
+## DHIS2 health data source
+
+CHART connects to DHIS2 as a health data source. Keep DHIS2 credentials in environment
+variables; do not store secrets in Postgres.
+
+Recommended configuration is a DHIS2 Personal Access Token from a dedicated read-only
+service user:
+
+```bash
+DHIS2_BASE_URL=https://dhis2.example.org
+DHIS2_API_VERSION=41
+DHIS2_AUTH_MODE=pat
+DHIS2_API_TOKEN=d2pat_...
+```
+
+The API exposes masked config and a connection check:
+
+```bash
+curl http://127.0.0.1:3200/sources/dhis2/config
+curl -X POST http://127.0.0.1:3200/sources/dhis2/test-connection
+```
+
+DHIS2 organisation units should be mapped into CHART geographies through
+`external_geography_mappings`; DHIS2 should not replace CHART's geography model.
+
 ## EC2 deployment routing
 
 The EC2 deployment exposes one public port:

@@ -16,23 +16,23 @@
     "client": {
       "chart-api": [
         {
-          "name": "u1_health_lead",
-          "description": "State or county health lead"
+          "name": "health_planning_lead",
+          "description": "Health planning lead at state, county, or equivalent geography"
         },
         {
-          "name": "u2_cross_sector_lead",
-          "description": "State or county cross-sector lead"
+          "name": "cross_sector_planning_lead",
+          "description": "Cross-sector planning lead at state, county, or equivalent geography"
         },
         {
-          "name": "u3_district_health_officer",
-          "description": "District or sub-county health officer"
+          "name": "health_implementation_officer",
+          "description": "Health implementation officer at district, sub-county, or equivalent geography"
         },
         {
-          "name": "u4_district_cross_sector_officer",
-          "description": "District or sub-county cross-sector officer"
+          "name": "cross_sector_implementation_officer",
+          "description": "Cross-sector implementation officer at district, sub-county, or equivalent geography"
         },
         {
-          "name": "u5_public_visitor",
+          "name": "public_viewer",
           "description": "Public visitor or partner"
         },
         {
@@ -172,7 +172,7 @@
       "lastName": "Health Region",
       "groups": ["/country-a/region-a"],
       "clientRoles": {
-        "chart-api": ["u1_health_lead"]
+        "chart-api": ["health_planning_lead"]
       },
       "credentials": [
         {
@@ -190,7 +190,7 @@
       "lastName": "Sector Region",
       "groups": ["/country-b/region-b"],
       "clientRoles": {
-        "chart-api": ["u2_cross_sector_lead"]
+        "chart-api": ["cross_sector_planning_lead"]
       },
       "credentials": [
         {
@@ -208,7 +208,7 @@
       "lastName": "Health District",
       "groups": ["/country-a/region-a/district-a"],
       "clientRoles": {
-        "chart-api": ["u3_district_health_officer"]
+        "chart-api": ["health_implementation_officer"]
       },
       "credentials": [
         {
@@ -226,7 +226,7 @@
       "lastName": "Sector District",
       "groups": ["/country-b/region-b/district-c"],
       "clientRoles": {
-        "chart-api": ["u4_district_cross_sector_officer"]
+        "chart-api": ["cross_sector_implementation_officer"]
       },
       "credentials": [
         {

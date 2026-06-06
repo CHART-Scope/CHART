@@ -14,7 +14,7 @@ import type { KeycloakTokenClaims } from "./types.js";
 const testIssuerUrl = "http://keycloak.test/realms/chart";
 const testJwksUrl = "http://keycloak.test/certs";
 
-test("GET /auth/me resolves a U1 Keycloak JWT into role and geography context", async () => {
+test("GET /auth/me resolves a health planning lead into role and geography context", async () => {
   const auth = installKeycloakTestAuth({
     sub: "keycloak-u1",
     preferred_username: "u1-health-region",
@@ -24,7 +24,7 @@ test("GET /auth/me resolves a U1 Keycloak JWT into role and geography context", 
     groups: ["/country-a/region-a"],
     resource_access: {
       "chart-api": {
-        roles: ["u1_health_lead"],
+        roles: ["health_planning_lead"],
       },
     },
   });
@@ -44,7 +44,7 @@ test("GET /auth/me resolves a U1 Keycloak JWT into role and geography context", 
     const body = response.json();
     assert.equal(body.userId, "keycloak-u1");
     assert.equal(body.username, "u1-health-region");
-    assert.deepEqual(body.roles, ["u1_health_lead"]);
+    assert.deepEqual(body.roles, ["health_planning_lead"]);
     assert.deepEqual(body.geographyScopes, ["/country-a/region-a"]);
     assert.equal(body.activeGeographyId, "/country-a/region-a");
     assert.equal(body.geographyLevel, "geo_level_1");
@@ -54,7 +54,7 @@ test("GET /auth/me resolves a U1 Keycloak JWT into role and geography context", 
   }
 });
 
-test("GET /auth/me resolves a U2 Keycloak JWT into its own scope", async () => {
+test("GET /auth/me resolves a cross-sector planning lead into its own scope", async () => {
   const auth = installKeycloakTestAuth({
     sub: "keycloak-u2",
     preferred_username: "u2-sector-region",
@@ -64,7 +64,7 @@ test("GET /auth/me resolves a U2 Keycloak JWT into its own scope", async () => {
     groups: ["/country-b/region-b"],
     resource_access: {
       "chart-api": {
-        roles: ["u2_cross_sector_lead"],
+        roles: ["cross_sector_planning_lead"],
       },
     },
   });
@@ -83,7 +83,7 @@ test("GET /auth/me resolves a U2 Keycloak JWT into its own scope", async () => {
 
     const body = response.json();
     assert.equal(body.userId, "keycloak-u2");
-    assert.deepEqual(body.roles, ["u2_cross_sector_lead"]);
+    assert.deepEqual(body.roles, ["cross_sector_planning_lead"]);
     assert.deepEqual(body.geographyScopes, ["/country-b/region-b"]);
   } finally {
     auth.restore();
@@ -114,7 +114,7 @@ test("GET /auth/me allows the local web origin", async () => {
     groups: ["/country-a/region-a"],
     resource_access: {
       "chart-api": {
-        roles: ["u1_health_lead"],
+        roles: ["health_planning_lead"],
       },
     },
   });
@@ -150,7 +150,7 @@ test("GET /auth/me rejects an active geography outside the user's token scopes",
     groups: ["/country-a/region-a"],
     resource_access: {
       "chart-api": {
-        roles: ["u1_health_lead"],
+        roles: ["health_planning_lead"],
       },
     },
   });
@@ -182,7 +182,7 @@ test("GET /auth/geography-access allows child geographies inside the user's scop
     groups: ["/country-a/region-a"],
     resource_access: {
       "chart-api": {
-        roles: ["u1_health_lead"],
+        roles: ["health_planning_lead"],
       },
     },
   });
@@ -218,7 +218,7 @@ test("GET /auth/geography-access rejects unrelated geography paths", async () =>
     groups: ["/country-a/region-a"],
     resource_access: {
       "chart-api": {
-        roles: ["u1_health_lead"],
+        roles: ["health_planning_lead"],
       },
     },
   });
@@ -241,40 +241,40 @@ test("GET /auth/geography-access rejects unrelated geography paths", async () =>
   }
 });
 
-test("role and geography access checks cover U1-U4 planning scopes", async () => {
+test("role and geography access checks cover planning and implementation scopes", async () => {
   const scenarios = [
     {
-      name: "U1 state health lead can read state, child districts, and country context",
+      name: "health planning lead can read assigned area, children, and country context",
       sub: "keycloak-u1",
       username: "u1-health-region",
-      role: "u1_health_lead",
+      role: "health_planning_lead",
       scope: "/country-a/region-a",
       allowed: ["/country-a", "/country-a/region-a", "/country-a/region-a/district-a"],
       denied: ["/country-b/region-b", "/country-a/region-b"],
     },
     {
-      name: "U2 county cross-sector lead can read county, child sub-counties, and country context",
+      name: "cross-sector planning lead can read assigned area, children, and country context",
       sub: "keycloak-u2",
       username: "u2-sector-region",
-      role: "u2_cross_sector_lead",
+      role: "cross_sector_planning_lead",
       scope: "/country-b/region-b",
       allowed: ["/country-b", "/country-b/region-b", "/country-b/region-b/district-c"],
       denied: ["/country-a/region-a", "/country-b/region-c"],
     },
     {
-      name: "U3 district health officer can read own district and parent context, not peer districts",
+      name: "health implementation officer can read own area and parent context, not peers",
       sub: "keycloak-u3",
       username: "u3-health-district",
-      role: "u3_district_health_officer",
+      role: "health_implementation_officer",
       scope: "/country-a/region-a/district-a",
       allowed: ["/country-a", "/country-a/region-a", "/country-a/region-a/district-a"],
       denied: ["/country-a/region-a/district-b", "/country-b/region-b"],
     },
     {
-      name: "U4 sub-county cross-sector officer can read own sub-county and parent context, not peers",
+      name: "cross-sector implementation officer can read own area and parent context, not peers",
       sub: "keycloak-u4",
       username: "u4-sector-district",
-      role: "u4_district_cross_sector_officer",
+      role: "cross_sector_implementation_officer",
       scope: "/country-b/region-b/district-c",
       allowed: ["/country-b", "/country-b/region-b", "/country-b/region-b/district-c"],
       denied: ["/country-b/region-b/district-d", "/country-a/region-a"],
@@ -336,7 +336,7 @@ test("Keycloak claims map into CHART roles and geography scopes", () => {
       groups: ["/country-a/region-a/district-a"],
       resource_access: {
         "chart-api": {
-          roles: ["u3_district_health_officer", "unrelated_role"],
+          roles: ["health_implementation_officer", "unrelated_role"],
         },
       },
     },
@@ -345,9 +345,30 @@ test("Keycloak claims map into CHART roles and geography scopes", () => {
 
   assert.equal(context.userId, "keycloak-user-1");
   assert.equal(context.username, "district-health");
-  assert.deepEqual(context.roles, ["u3_district_health_officer"]);
+  assert.deepEqual(context.roles, ["health_implementation_officer"]);
   assert.deepEqual(context.geographyScopes, ["/country-a/region-a/district-a"]);
   assert.equal(context.geographyLevel, "geo_level_2");
+});
+
+test("legacy U-role claims map to canonical CHART roles", () => {
+  const context = mapKeycloakClaimsToCurrentUserContext(
+    {
+      sub: "legacy-keycloak-user",
+      preferred_username: "legacy-health-lead",
+      groups: ["/india/madhya-pradesh"],
+      resource_access: {
+        "chart-api": {
+          roles: ["u1_health_lead", "u2_cross_sector_lead"],
+        },
+      },
+    },
+    "chart-api",
+  );
+
+  assert.deepEqual(context.roles, [
+    "health_planning_lead",
+    "cross_sector_planning_lead",
+  ]);
 });
 
 test("geography access allows assigned, child, and parent context but rejects peers", () => {
@@ -358,7 +379,7 @@ test("geography access allows assigned, child, and parent context but rejects pe
       groups: ["/country-a/region-a/district-a"],
       resource_access: {
         "chart-api": {
-          roles: ["u3_district_health_officer"],
+          roles: ["health_implementation_officer"],
         },
       },
     },
@@ -418,7 +439,7 @@ test("API verifies an RS256 token and builds current user context", async () => 
         groups: ["/country-b/region-b"],
         resource_access: {
           "chart-api": {
-            roles: ["u1_health_lead"],
+            roles: ["health_planning_lead"],
           },
         },
       },
@@ -436,7 +457,7 @@ test("API verifies an RS256 token and builds current user context", async () => 
     );
 
     assert.equal(context.userId, "verified-user");
-    assert.deepEqual(context.roles, ["u1_health_lead"]);
+    assert.deepEqual(context.roles, ["health_planning_lead"]);
     assert.deepEqual(context.geographyScopes, ["/country-b/region-b"]);
   } finally {
     globalThis.fetch = originalFetch;
