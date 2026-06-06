@@ -7,6 +7,7 @@ import {
 import {
   chartRoles,
   geographyLevels,
+  legacyChartRoleAliases,
   type AuthConfig,
   type AuthErrorCode,
   type AuthRequestInput,
@@ -156,14 +157,24 @@ function applyActiveGeography(
 
 function collectChartRoles(claims: KeycloakTokenClaims, clientId: string): ChartRole[] {
   const tokenRoles = new Set<string>();
+  const canonicalRoles = new Set<ChartRole>();
   const realmRoles = toStringArray(claims.realm_access?.roles);
   const clientRoles = toStringArray(claims.resource_access?.[clientId]?.roles);
 
   for (const role of [...realmRoles, ...clientRoles]) {
     tokenRoles.add(role);
+    canonicalRoles.add(toCanonicalChartRole(role));
   }
 
-  return chartRoles.filter((role) => tokenRoles.has(role));
+  return chartRoles.filter((role) => tokenRoles.has(role) || canonicalRoles.has(role));
+}
+
+function toCanonicalChartRole(role: string): ChartRole {
+  if (role in legacyChartRoleAliases) {
+    return legacyChartRoleAliases[role as keyof typeof legacyChartRoleAliases];
+  }
+
+  return role as ChartRole;
 }
 
 function collectGeographyScopes(claims: KeycloakTokenClaims): string[] {
