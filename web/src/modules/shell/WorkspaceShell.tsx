@@ -4,7 +4,6 @@ import { useState, type ReactNode } from "react";
 
 import type { CurrentUserContext } from "../auth/authClient";
 import {
-  canManageContent,
   formatGeographyPath,
   formatRole,
   getUserProfile,
@@ -13,7 +12,7 @@ import {
 import type { ChartRoute } from "../routes/types";
 
 type WorkspaceShellProps = {
-  activeRoute: "dashboard" | "cms" | "setup";
+  activeRoute: "dashboard" | "setup";
   pageTitle: string;
   crumb: string;
   onNavigate: (route: ChartRoute) => void;
@@ -38,7 +37,6 @@ export function WorkspaceShell({
     year: "numeric",
   }).format(new Date());
   const profile = currentUser ? getUserProfile(currentUser) : undefined;
-  const userCanManageContent = currentUser ? canManageContent(currentUser) : false;
 
   return (
     <div className="workspace-shell">
@@ -61,16 +59,6 @@ export function WorkspaceShell({
           <span className="workspace-dot" />
           <span>Dashboard</span>
         </button>
-        {userCanManageContent ? (
-          <button
-            className={`workspace-item ${activeRoute === "cms" ? "active" : ""}`}
-            type="button"
-            onClick={() => onNavigate("cms")}
-          >
-            <span className="workspace-dot" />
-            <span>Content studio</span>
-          </button>
-        ) : null}
         <button
           className={`workspace-item ${activeRoute === "setup" ? "active" : ""}`}
           type="button"

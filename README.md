@@ -2,8 +2,9 @@
 
 CHART is a climate-health planning platform. This repository is a monorepo:
 
-- `web`: Next/Payload web app for the public site, CMS workflow, dashboard, and map UI.
+- `web`: Next web app for the public site, onboarding, dashboard, map UI, and public action repository.
 - `api`: Fastify API for backend modules such as auth, role/geography context, and data ingestion.
+- `solution-repository`: standalone Payload CMS service for maintaining published solution repository data. CHART core does not require it locally.
 - `docker-compose.yml`: local Postgres and Keycloak for development infrastructure.
 - `data/`: ignored local seed/import outputs.
 - `docs/`: ignored local planning notes.
@@ -26,7 +27,7 @@ make run
 ```
 
 `make run` provisions local dependencies, then starts the Fastify API and
-Next/Payload web app together. It stays running until stopped.
+Next web app together. It stays running until stopped.
 
 Open `http://127.0.0.1:3100`.
 
@@ -34,14 +35,16 @@ API docs are available at `http://127.0.0.1:3200/api`.
 Orval can consume `http://127.0.0.1:3200/openapi.json` or
 `http://127.0.0.1:3200/openapi.yaml`.
 
-Local Postgres uses one database, `chart`. Drizzle manages only the CHART app
-tables from `api/src/db/schema.ts`; Payload and Keycloak manage their own tables in
-the same database.
+Local development runs CHART app data and Keycloak in the same Docker stack. CHART app
+tables are defined in `api/src/db/schema.ts` and managed through Drizzle migrations.
+Keycloak uses its own local Postgres database so identity internals do not mix with
+CHART app tables.
 
 Reference data is deployment-configurable:
 
 - `CHART_GEOGRAPHY_SEED_FILE`: optional JSON file for the deployer's geography hierarchy.
-- `CHART_SOLUTION_REPOSITORY_SEED_FILE`: optional JSON file for solution repository seed data. If unset, the local development seed at `web/src/content/solutionRepositorySeed.json` is used.
+- `CHART_SOLUTION_REPOSITORY_SNAPSHOT_FILE`: optional JSON snapshot for public solution repository reads. If unset, the bundled development snapshot under `api/src/modules/solution-repository/seed-data/seed.json` is used.
+- `CHART_SOLUTION_REPOSITORY_URL`: optional public solution repository service URL for future remote adapter flows.
 
 Seed sign-in users are available through Keycloak at `http://127.0.0.1:8080`:
 
@@ -88,13 +91,34 @@ curl -X POST http://127.0.0.1:3200/sources/dhis2/test-connection
 DHIS2 organisation units should be mapped into CHART geographies through
 `external_geography_mappings`; DHIS2 should not replace CHART's geography model.
 
+## Solution repository boundary
+
+CHART core has a solution repository adapter in `api/src/modules/solution-repository`.
+It reads from a public JSON snapshot for local development and should later read from
+the hosted repository service. It does not own solution repository database tables.
+
+The Payload CMS implementation lives separately in `solution-repository/`. It owns
+editing, media, publishing workflow, and repository auth. It can later be split into a
+separate repository without changing CHART core.
+
+Dependency direction:
+
+```txt
+solution-repository publishes data
+        ↓
+api reads public snapshot/API responses
+        ↓
+web reads from api
+```
+
+Do not import Payload files into `api/` or `web/`.
+
 ## EC2 deployment routing
 
 The EC2 deployment exposes one public port:
 
 - `http://<host>/`: CHART web app
 - `http://<host>/identity`: Keycloak sign-in
-- `http://<host>/api`: Next/Payload API
 - `http://<host>/chart-api`: Fastify API
 
 Keycloak and the API still run on their container ports internally, but only the
@@ -109,7 +133,6 @@ make local-setup
 make verify
 make web-build
 make web-typecheck
-make web-seed
 make identity
 make identity-wait
 make identity-sync
