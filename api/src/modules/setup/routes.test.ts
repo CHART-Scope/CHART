@@ -24,8 +24,15 @@ const setupStatus: SetupStatus = {
   requiresOnboarding: true,
   counts: {
     geographies: 0,
-    repositoryItems: 0,
+    hazards: 0,
     workspaceMembers: 0,
+    workspaceSolutions: 0,
+  },
+  solutionImport: {
+    status: "not_started",
+    selectedHazards: 0,
+    importedSolutions: 0,
+    message: "No hazards have been selected for repository import.",
   },
 };
 
@@ -59,7 +66,7 @@ test("GET /setup/options returns onboarding choices", async () => {
 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.json(), {
-    hazardTaxonomies: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
+    hazards: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
   });
 
   await app.close();
@@ -73,7 +80,7 @@ test("POST /setup/complete completes onboarding for the signed-in admin", async 
     },
     async getOptions() {
       return {
-        hazardTaxonomies: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
+        hazards: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
       };
     },
     async bootstrapSetup() {
@@ -92,7 +99,7 @@ test("POST /setup/complete completes onboarding for the signed-in admin", async 
         countryCode: "GB",
         countryName: "United Kingdom",
         geographyLevelLabel: "county",
-        hazardTaxonomyIds: ["hazard-extreme-heat"],
+        hazardIds: ["hazard-extreme-heat"],
       } satisfies CompleteSetupInput);
 
       return {
@@ -106,8 +113,15 @@ test("POST /setup/complete completes onboarding for the signed-in admin", async 
         firstAdminUserId: currentUser.userId,
         counts: {
           geographies: 1,
-          repositoryItems: 12,
+          hazards: 14,
           workspaceMembers: 1,
+          workspaceSolutions: 3,
+        },
+        solutionImport: {
+          status: "completed",
+          selectedHazards: 1,
+          importedSolutions: 3,
+          message: "3 repository actions were imported for the selected hazards.",
         },
       };
     },
@@ -134,7 +148,7 @@ test("POST /setup/complete completes onboarding for the signed-in admin", async 
       countryCode: "GB",
       countryName: "United Kingdom",
       geographyLevelLabel: "county",
-      hazardTaxonomyIds: ["hazard-extreme-heat"],
+      hazardIds: ["hazard-extreme-heat"],
     },
   });
 
@@ -152,7 +166,7 @@ test("POST /setup/bootstrap creates the first admin without an existing token", 
     },
     async getOptions() {
       return {
-        hazardTaxonomies: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
+        hazards: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
       };
     },
     async bootstrapSetup(input) {
@@ -171,8 +185,15 @@ test("POST /setup/bootstrap creates the first admin without an existing token", 
           firstAdminUserId: "keycloak-admin",
           counts: {
             geographies: 1,
-            repositoryItems: 12,
+            hazards: 14,
             workspaceMembers: 1,
+            workspaceSolutions: 3,
+          },
+          solutionImport: {
+            status: "completed",
+            selectedHazards: 1,
+            importedSolutions: 3,
+            message: "3 repository actions were imported for the selected hazards.",
           },
         },
         admin: {
@@ -199,7 +220,7 @@ test("POST /setup/bootstrap creates the first admin without an existing token", 
       countryCode: "GB",
       countryName: "United Kingdom",
       geographyLevelLabel: "county",
-      hazardTaxonomyIds: ["hazard-extreme-heat"],
+      hazardIds: ["hazard-extreme-heat"],
       admin: {
         name: "CHART Admin",
         email: "chart-admin@example.org",
@@ -223,7 +244,7 @@ test("POST /setup/bootstrap maps identity user conflicts", async () => {
     },
     async getOptions() {
       return {
-        hazardTaxonomies: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
+        hazards: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
       };
     },
     async bootstrapSetup() {
@@ -246,7 +267,7 @@ test("POST /setup/bootstrap maps identity user conflicts", async () => {
       countryCode: "GB",
       countryName: "United Kingdom",
       geographyLevelLabel: "county",
-      hazardTaxonomyIds: ["hazard-extreme-heat"],
+      hazardIds: ["hazard-extreme-heat"],
       admin: {
         name: "CHART Admin",
         email: "chart-admin@example.org",
@@ -270,7 +291,7 @@ test("POST /setup/reset maps setup authorization errors", async () => {
     },
     async getOptions() {
       return {
-        hazardTaxonomies: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
+        hazards: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
       };
     },
     async bootstrapSetup() {
@@ -320,7 +341,7 @@ function createSetupServiceStub(): SetupService {
     },
     async getOptions() {
       return {
-        hazardTaxonomies: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
+        hazards: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
       };
     },
     async bootstrapSetup() {

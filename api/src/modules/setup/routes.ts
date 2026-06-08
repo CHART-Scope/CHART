@@ -51,6 +51,7 @@ export const completeSetupRouteSchema = {
     400: setupErrorResponseSchema,
     401: setupErrorResponseSchema,
     403: setupErrorResponseSchema,
+    502: setupErrorResponseSchema,
   },
 } as const;
 

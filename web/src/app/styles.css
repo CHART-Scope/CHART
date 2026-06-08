@@ -2618,7 +2618,9 @@ button {
 
 .user-setup-row {
   display: grid;
-  grid-template-columns: minmax(12rem, 1fr) minmax(11rem, 0.8fr) minmax(12rem, 1fr) auto;
+  grid-template-columns:
+    minmax(12rem, 1fr) minmax(11rem, 0.8fr) minmax(12rem, 1fr)
+    auto auto;
   gap: 0.85rem;
   align-items: center;
   padding: 0.85rem;
@@ -2646,6 +2648,12 @@ button {
   background: var(--green-active);
   color: var(--green-dark);
   font-size: 0.75rem;
+}
+
+.compact-button {
+  min-height: auto;
+  padding: 0.48rem 0.72rem;
+  font-size: 0.78rem;
 }
 
 .role-template-list.compact {
@@ -2834,6 +2842,21 @@ button {
 
 .onboarding-error {
   margin-bottom: 1rem;
+}
+
+.onboarding-status-message {
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(31, 110, 54, 0.16);
+  border-radius: var(--radius-md);
+  background: #f2f8ef;
+  color: var(--green-deep);
+  font-weight: 700;
+}
+
+.onboarding-muted-copy {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.6;
 }
 
 .onboarding-map-preview {

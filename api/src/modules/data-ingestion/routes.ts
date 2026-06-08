@@ -52,6 +52,7 @@ export const queueSourceSyncRouteSchema = {
 
 export const getDhis2ConfigRouteSchema = {
   tags: ["data-ingestion"],
+  operationId: "getDhis2Config",
   summary: "Get masked DHIS2 source configuration",
   response: {
     200: dhis2PublicConfigSchema,
@@ -60,6 +61,7 @@ export const getDhis2ConfigRouteSchema = {
 
 export const testDhis2ConnectionRouteSchema = {
   tags: ["data-ingestion"],
+  operationId: "testDhis2Connection",
   summary: "Test configured DHIS2 credentials",
   response: {
     200: dhis2ConnectionTestResultSchema,

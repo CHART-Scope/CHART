@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
+import { listGeographies, type GeographyRecord } from "../../lib/geographyClient";
 import { getSetupStatus, resetSetup, type SetupStatus } from "../../lib/setupClient";
+import {
+  createUser,
+  disableUser,
+  listUsers,
+  type ChartUserRecord,
+} from "../../lib/userClient";
 import type { ChartRole, CurrentUserContext } from "../auth/authClient";
 import {
-  canManageContent,
   canManageUsers,
   formatGeographyLevel,
   formatGeographyPath,
@@ -23,15 +29,7 @@ type SetupPageProps = {
   onSignOut: (returnTo?: string) => void;
 };
 
-type PlannedUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: ChartRole;
-  geography: string;
-};
-
-const defaultNewUserRole: ChartRole = "u1_health_lead";
+const defaultNewUserRole: ChartRole = "health_planning_lead";
 
 export function SetupPage({
   currentUser,
@@ -45,16 +43,20 @@ export function SetupPage({
   const [newUser, setNewUser] = useState({
     name: "",
     email: "",
+    username: "",
+    password: "",
     role: defaultNewUserRole,
-    geography: activeGeography,
+    geographyId: "",
   });
-  const [plannedUsers, setPlannedUsers] = useState<PlannedUser[]>([]);
+  const [users, setUsers] = useState<ChartUserRecord[]>([]);
+  const [geographies, setGeographies] = useState<GeographyRecord[]>([]);
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
   const [setupError, setSetupError] = useState<string | null>(null);
+  const [userError, setUserError] = useState<string | null>(null);
+  const [isSavingUser, setIsSavingUser] = useState(false);
   const [isResetConfirming, setIsResetConfirming] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const userCanManageUsers = canManageUsers(currentUser);
-  const userCanManageContent = canManageContent(currentUser);
 
   useEffect(() => {
     getSetupStatus()
@@ -62,27 +64,81 @@ export function SetupPage({
       .catch(() => setSetupError("CHART setup status could not be loaded."));
   }, []);
 
-  function addPlannedUser() {
-    if (!newUser.name.trim() || !newUser.email.trim()) {
+  useEffect(() => {
+    if (!userCanManageUsers) {
       return;
     }
 
-    setPlannedUsers((currentUsers) => [
-      ...currentUsers,
-      {
-        id: `${newUser.email}-${currentUsers.length}`,
-        name: newUser.name.trim(),
-        email: newUser.email.trim(),
-        role: newUser.role,
-        geography: newUser.geography.trim() || activeGeography,
-      },
-    ]);
-    setNewUser({
-      name: "",
-      email: "",
-      role: defaultNewUserRole,
-      geography: activeGeography,
-    });
+    Promise.all([listUsers(accessToken), listGeographies()])
+      .then(([userRows, geographyRows]) => {
+        setUsers(userRows);
+        setGeographies(geographyRows);
+        setNewUser((draft) => ({
+          ...draft,
+          geographyId: draft.geographyId || geographyRows[0]?.id || "",
+        }));
+      })
+      .catch((error) => {
+        setUserError(
+          error instanceof Error ? error.message : "CHART users could not be loaded.",
+        );
+      });
+  }, [accessToken, userCanManageUsers]);
+
+  async function addUser() {
+    setUserError(null);
+    setIsSavingUser(true);
+
+    try {
+      const createdUser = await createUser(
+        {
+          name: newUser.name,
+          email: newUser.email,
+          username: newUser.username,
+          password: newUser.password,
+          roles: [newUser.role],
+          geographyIds: [newUser.geographyId],
+        },
+        accessToken,
+      );
+
+      setUsers((currentUsers) => [
+        createdUser,
+        ...currentUsers.filter((user) => user.userId !== createdUser.userId),
+      ]);
+      setNewUser({
+        name: "",
+        email: "",
+        username: "",
+        password: "",
+        role: defaultNewUserRole,
+        geographyId: geographies[0]?.id || "",
+      });
+    } catch (error) {
+      setUserError(
+        error instanceof Error ? error.message : "CHART user could not be created.",
+      );
+    } finally {
+      setIsSavingUser(false);
+    }
+  }
+
+  async function disableManagedUser(userId: string) {
+    setUserError(null);
+
+    try {
+      const disabledUser = await disableUser(userId, accessToken);
+
+      setUsers((currentUsers) =>
+        currentUsers.map((user) =>
+          user.userId === disabledUser.userId ? disabledUser : user,
+        ),
+      );
+    } catch (error) {
+      setUserError(
+        error instanceof Error ? error.message : "CHART user could not be disabled.",
+      );
+    }
   }
 
   async function restartOnboarding() {
@@ -195,14 +251,18 @@ export function SetupPage({
             <span className="section-kicker">User access setup</span>
             <div className="setup-card-heading-row">
               <div>
-                <h2>Add planning users</h2>
+                <h2>Manage planning users</h2>
                 <p>
-                  The first administrator can prepare U1, U2, U3, U4, and content users
-                  for the selected geography scope.
+                  Create Keycloak-backed CHART users and keep their local role and
+                  geography records visible in setup.
                 </p>
               </div>
               <span className="setup-admin-badge">First admin ready</span>
             </div>
+
+            {userError ? (
+              <div className="auth-error setup-error">{userError}</div>
+            ) : null}
 
             <div className="user-setup-form">
               <label>
@@ -219,6 +279,19 @@ export function SetupPage({
                 />
               </label>
               <label>
+                Username
+                <input
+                  placeholder="health-lead"
+                  value={newUser.username}
+                  onChange={(event) =>
+                    setNewUser((draft) => ({
+                      ...draft,
+                      username: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
                 Email
                 <input
                   placeholder="name@example.org"
@@ -228,6 +301,20 @@ export function SetupPage({
                     setNewUser((draft) => ({
                       ...draft,
                       email: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Temporary password
+                <input
+                  placeholder="At least 8 characters"
+                  type="password"
+                  value={newUser.password}
+                  onChange={(event) =>
+                    setNewUser((draft) => ({
+                      ...draft,
+                      password: event.target.value,
                     }))
                   }
                 />
@@ -252,19 +339,29 @@ export function SetupPage({
               </label>
               <label>
                 Geography scope
-                <input
-                  placeholder={activeGeography || "/country/region"}
-                  value={newUser.geography}
+                <select
+                  value={newUser.geographyId}
                   onChange={(event) =>
                     setNewUser((draft) => ({
                       ...draft,
-                      geography: event.target.value,
+                      geographyId: event.target.value,
                     }))
                   }
-                />
+                >
+                  {geographies.map((geography) => (
+                    <option key={geography.id} value={geography.id}>
+                      {geography.name} ({geography.levelLabel})
+                    </option>
+                  ))}
+                </select>
               </label>
-              <button className="primary-button" type="button" onClick={addPlannedUser}>
-                Add user
+              <button
+                className="primary-button"
+                type="button"
+                disabled={isSavingUser || geographies.length === 0}
+                onClick={addUser}
+              >
+                {isSavingUser ? "Creating user" : "Create user"}
               </button>
             </div>
 
@@ -276,16 +373,33 @@ export function SetupPage({
                 role={currentUser.roles[0]}
                 status="Signed in admin"
               />
-              {plannedUsers.map((user) => (
-                <UserRow
-                  email={user.email}
-                  geography={user.geography}
-                  key={user.id}
-                  name={user.name}
-                  role={user.role}
-                  status="Ready to invite"
-                />
-              ))}
+              {users
+                .filter((user) => user.userId !== currentUser.userId)
+                .map((user) => {
+                  const primaryGeography = user.geographyScopes[0];
+
+                  return (
+                    <UserRow
+                      email={user.email ?? "Not provided"}
+                      geography={primaryGeography?.path ?? ""}
+                      key={user.userId}
+                      name={user.displayName}
+                      role={user.roles[0]}
+                      status={user.status === "active" ? "Active" : "Disabled"}
+                      action={
+                        user.status === "active" ? (
+                          <button
+                            className="ghost-button compact-button"
+                            type="button"
+                            onClick={() => disableManagedUser(user.userId)}
+                          >
+                            Disable
+                          </button>
+                        ) : null
+                      }
+                    />
+                  );
+                })}
             </div>
           </article>
         ) : null}
@@ -304,16 +418,12 @@ export function SetupPage({
         </article>
 
         <article className="panel-card setup-card">
-          <span className="section-kicker">Content controls</span>
-          <h2>
-            {userCanManageContent
-              ? "Content studio available"
-              : "Public repository access"}
-          </h2>
+          <span className="section-kicker">Repository source</span>
+          <h2>Public action repository</h2>
           <p>
-            {userCanManageContent
-              ? "This user can edit and publish public action repository records."
-              : "This user can browse the public action repository but cannot edit published records."}
+            CHART reads published action records through the repository adapter. Setup
+            imports the selected records into the workspace so planning has a stable
+            local snapshot.
           </p>
           <div className="setup-action-row">
             <button
@@ -323,15 +433,6 @@ export function SetupPage({
             >
               View action repository
             </button>
-            {userCanManageContent ? (
-              <button
-                className="primary-button"
-                type="button"
-                onClick={() => onNavigate("cms")}
-              >
-                Open content studio
-              </button>
-            ) : null}
           </div>
         </article>
 
@@ -349,17 +450,24 @@ export function SetupPage({
                 <strong>{setupStatus?.countryName ?? "Not set"}</strong>
               </div>
               <div className="setup-fact">
+                <span>Configured hazards</span>
+                <strong>{setupStatus?.counts.hazards ?? 0}</strong>
+              </div>
+              <div className="setup-fact">
                 <span>Repository actions</span>
-                <strong>{setupStatus?.counts.repositoryItems ?? 0}</strong>
+                <strong>{setupStatus?.counts.workspaceSolutions ?? 0}</strong>
               </div>
             </div>
+            {setupStatus?.solutionImport.message ? (
+              <p>{setupStatus.solutionImport.message}</p>
+            ) : null}
             {isResetConfirming ? (
               <div className="setup-reset-confirm">
                 <strong>Reset setup and sign out?</strong>
                 <p>
                   This clears the current workspace setup state and returns CHART to
-                  first-run onboarding. The public action repository seed data stays
-                  available.
+                  first-run onboarding. The next setup will pull matching actions from
+                  the repository again.
                 </p>
                 <div className="setup-action-row">
                   <button
@@ -407,12 +515,14 @@ function SetupStep({ title, text }: { title: string; text: string }) {
 }
 
 function UserRow({
+  action,
   email,
   geography,
   name,
   role,
   status,
 }: {
+  action?: ReactNode;
   email: string;
   geography: string;
   name: string;
@@ -428,6 +538,7 @@ function UserRow({
       <span>{formatRole(role)}</span>
       <span>{formatGeographyPath(geography)}</span>
       <b>{status}</b>
+      {action}
     </div>
   );
 }

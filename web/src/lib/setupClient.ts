@@ -8,8 +8,15 @@ export type SetupStatus = {
   firstAdminUserId?: string;
   counts: {
     geographies: number;
-    repositoryItems: number;
+    hazards: number;
     workspaceMembers: number;
+    workspaceSolutions: number;
+  };
+  solutionImport: {
+    status: "not_started" | "completed" | "empty";
+    selectedHazards: number;
+    importedSolutions: number;
+    message: string;
   };
 };
 
@@ -17,7 +24,7 @@ export type CompleteSetupInput = {
   countryCode: string;
   countryName: string;
   geographyLevelLabel: string;
-  hazardTaxonomyIds: string[];
+  hazardIds: string[];
 };
 
 export type BootstrapSetupInput = CompleteSetupInput & {
@@ -44,7 +51,7 @@ export type BootstrapSetupResponse = {
 };
 
 export type SetupOptions = {
-  hazardTaxonomies: {
+  hazards: {
     id: string;
     label: string;
   }[];
@@ -151,6 +158,8 @@ function setupErrorMessage(errorCode: string | undefined) {
       return "One of the selected hazards is no longer available. Refresh and choose again.";
     case "SETUP_HAZARD_REQUIRED":
       return "Select at least one climate hazard to onboard.";
+    case "SETUP_SOLUTION_IMPORT_FAILED":
+      return "CHART could not import matching action repository records. Check the repository service and try again.";
     case "SETUP_IDENTITY_ADMIN_AUTH_FAILED":
     case "SETUP_IDENTITY_CONFIG_INVALID":
       return "CHART cannot connect to identity administration. Check the Keycloak admin configuration.";

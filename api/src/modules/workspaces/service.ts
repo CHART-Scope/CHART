@@ -5,7 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../../db/client.js";
 import {
   geographies,
-  solutionRepositoryTaxonomies,
+  hazards,
   workspaceGeographyScopes,
   workspaceHazards,
   workspaceMembers,
@@ -64,8 +64,8 @@ export function createWorkspaceService(): WorkspaceService {
         throw new WorkspaceError("WORKSPACE_ACCESS_DENIED", 403);
       }
 
-      const hazardTaxonomyIds = uniqueValues(input.hazardTaxonomyIds ?? []);
-      await ensureHazardTaxonomiesExist(hazardTaxonomyIds);
+      const hazardIds = uniqueValues(input.hazardIds ?? []);
+      await ensureHazardsExist(hazardIds);
 
       const workspaceId = `workspace-${randomUUID()}`;
 
@@ -93,11 +93,11 @@ export function createWorkspaceService(): WorkspaceService {
           geographyId: ownerGeographyId,
         });
 
-        if (hazardTaxonomyIds.length > 0) {
+        if (hazardIds.length > 0) {
           await tx.insert(workspaceHazards).values(
-            hazardTaxonomyIds.map((taxonomyId, index) => ({
+            hazardIds.map((hazardId, index) => ({
               workspaceId,
-              taxonomyId,
+              hazardId,
               sortOrder: index,
             })),
           );
@@ -113,7 +113,7 @@ export function createWorkspaceService(): WorkspaceService {
         ownerUserId: context.userId,
         ownerGeographyId,
         memberRole: "owner",
-        hazardTaxonomyIds,
+        hazardIds,
       };
     },
 
@@ -146,7 +146,7 @@ export function createWorkspaceService(): WorkspaceService {
       }
 
       const hazardRows = await db
-        .select({ taxonomyId: workspaceHazards.taxonomyId })
+        .select({ hazardId: workspaceHazards.hazardId })
         .from(workspaceHazards)
         .where(eq(workspaceHazards.workspaceId, workspaceId));
 
@@ -159,7 +159,7 @@ export function createWorkspaceService(): WorkspaceService {
         ownerUserId: workspace.ownerUserId,
         ownerGeographyId: workspace.ownerGeographyId,
         memberRole: member?.role,
-        hazardTaxonomyIds: hazardRows.map((row) => row.taxonomyId),
+        hazardIds: hazardRows.map((row) => row.hazardId),
       };
     },
   };
@@ -167,7 +167,9 @@ export function createWorkspaceService(): WorkspaceService {
 
 function canCreateWorkspace(context: CurrentUserContext) {
   return context.roles.some((role) =>
-    ["u1_health_lead", "u2_cross_sector_lead", "chart_admin"].includes(role),
+    ["health_planning_lead", "cross_sector_planning_lead", "chart_admin"].includes(
+      role,
+    ),
   );
 }
 
@@ -189,23 +191,18 @@ async function findGeographyById(geographyId: string) {
   return rows[0];
 }
 
-async function ensureHazardTaxonomiesExist(taxonomyIds: string[]) {
-  if (taxonomyIds.length === 0) {
+async function ensureHazardsExist(hazardIds: string[]) {
+  if (hazardIds.length === 0) {
     return;
   }
 
   const rows = await db
-    .select({ id: solutionRepositoryTaxonomies.id })
-    .from(solutionRepositoryTaxonomies)
-    .where(
-      and(
-        inArray(solutionRepositoryTaxonomies.id, taxonomyIds),
-        eq(solutionRepositoryTaxonomies.type, "hazard"),
-      ),
-    );
+    .select({ id: hazards.id })
+    .from(hazards)
+    .where(and(inArray(hazards.id, hazardIds), eq(hazards.active, true)));
   const existingIds = new Set(rows.map((row) => row.id));
 
-  if (taxonomyIds.some((taxonomyId) => !existingIds.has(taxonomyId))) {
+  if (hazardIds.some((hazardId) => !existingIds.has(hazardId))) {
     throw new WorkspaceError("WORKSPACE_HAZARD_INVALID", 400);
   }
 }

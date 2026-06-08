@@ -1,0 +1,306 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "slug": "mental-health-screening-form",
+      "title": "Mental health screening form",
+      "description": "Community health services can prioritize efforts to support the mental health of communities. This could be achieved through:\n- Training, and equipping CHWs with standardised tools for conducting mental health screenings during their routine household visits or to facilitate peer support groups.\n- Integrating mental health services at primary healthcare facilities, ensuring they are equipped to offer services and provide support, resources, and tools for managing mental health and well- being.\n- Establishing a structured follow-up system to track progress and provide ongoing support for individuals who receive mental health assistance.",
+      "climateHazards": [
+        "Floods",
+        "Landslide",
+        "Tsunami",
+        "Earthquake",
+        "Volcano",
+        "Cyclone",
+        "Wildfire",
+        "Storm",
+        "Drought",
+        "Sea level rise",
+        "Increased temperature"
+      ],
+      "solutionTypes": ["Service delivery"],
+      "costOfImplementation": "medium",
+      "usefulLinks": [
+        "https://www.refugeehealthta.org/wp-content/uploads/2012/09/RHS15_Packet_PathwaysToWellness-1.pdf"
+      ],
+      "caseStudies": [
+        {
+          "filename": "Household-level mental health screening form.pdf",
+          "type": "application/pdf",
+          "size": 228903
+        }
+      ]
+    },
+    {
+      "slug": "solar-electrification",
+      "title": "Solar electrification",
+      "description": "Ideally PHC facilities would run totally on sustainable power - which currently may be too costly and challenging to build. However, it is important to build a reliable electric infrastructure with sufficient back-up system. When possible, it is also good to consider use of solar and wind power or other alternative methods such as biomass as fuel or thermosyphon for creating warm water. Lighting, information and communication systems that require less energy and can be powered through alternative methods are that already commercially available - in some cases these could be considered as possible solutions for new facilities.",
+      "climateHazards": ["Increased CO2 levels"],
+      "solutionTypes": ["Energy"],
+      "costOfImplementation": "high",
+      "usefulLinks": [],
+      "caseStudies": [
+        {
+          "filename": "Solar electrification.pdf",
+          "type": "application/pdf",
+          "size": 4571120
+        }
+      ]
+    },
+    {
+      "slug": "climate-health-training-module-for-health-workforce",
+      "title": "Climate Health training module for health workforce",
+      "description": "The integration of a climate change curriculum into health training clinics significantly enhances the capacity of healthcare professionals to effectively address, recover from, and adapt to climate-induced shocks and stresses, all while ensuring the continued delivery of essential health services. \n\nExamples of courses that could be offered encompass:\n\n- Exploring the Intersection of Climate Change Science and Health\n- Analyzing the Impact of Climate Change on Human Health",
+      "climateHazards": [
+        "Floods",
+        "Cold wave",
+        "Storm",
+        "Extreme heat",
+        "Drought",
+        "Wildfire",
+        "Sea level rise",
+        "Increased temperature",
+        "Increased CO2 levels",
+        "Landslide",
+        "Earthquake",
+        "Tsunami",
+        "Volcano",
+        "Cyclone"
+      ],
+      "solutionTypes": ["Service delivery"],
+      "costOfImplementation": "medium",
+      "usefulLinks": [
+        "https://www.who.int/news-room/feature-stories/detail/protecting-health-of-malawi-communities-from-climate-change"
+      ],
+      "caseStudies": []
+    },
+    {
+      "slug": "fungal-food-coating-solution",
+      "title": "Fungal Food Coating Solution",
+      "description": "Fungal chitosan, a natural biopolymer, boasts remarkable properties as a biocompatible, biodegradable, and non-toxic material. With inherent antimicrobial attributes, it serves as a potent shield, effectively barring the entry of bacteria cells.\n\nMoreover, chitosan can function as an agent for permeability control and possesses antimicrobial capabilities. Its versatile application spans across various food groups such as eggs, cheese, meat, and fruits. Studies have indicated its efficacy in inhibiting bacterial growth, enhancing shelf life, and refining the structure and quality of food products.\n\nIt can be used as a coating or packaging material for food products.",
+      "climateHazards": [],
+      "solutionTypes": ["Products and technology"],
+      "costOfImplementation": "medium",
+      "usefulLinks": [
+        "https://www.intechopen.com/chapters/78259",
+        "https://www.sciencedirect.com/science/article/pii/S0928493113000234"
+      ],
+      "caseStudies": []
+    },
+    {
+      "slug": "floating-clinic",
+      "title": "Floating clinic",
+      "description": "Equip and maintain boats or makeshift platforms for on-the-go healthcare to enhance medical accessibility in flood-affected regions. It is a cost-effective solution as it uses existing resources, and it provides immediate relief to cut-off communities.\n\nImplementation:\n- Identify or repurpose small boats for navigating flood zones.\n- Equip with essential medical supplies.\n- Train local healthcare professionals for staffing.\n- Respond to different flood-affected areas for basic healthcare, vaccinations, and education.",
+      "climateHazards": ["Floods", "Sea level rise", "Storm"],
+      "solutionTypes": ["Service delivery"],
+      "costOfImplementation": "high",
+      "usefulLinks": ["https://www.shidhulai.org/our-work.html"],
+      "caseStudies": []
+    },
+    {
+      "slug": "clay-based-humidity-management",
+      "title": "Clay-based humidity management",
+      "description": "Clay has the ability to absorb and release moisture in response to changes in humidity levels. This characteristic allows clay to naturally regulate indoor humidity, creating a more comfortable and healthier environment within PHC facilities. Clay helps to prevent the conditions conducive to mold formation, safeguarding the structural integrity of the building and maintaining a hygienic healthcare setting. By mitigating the risk of mold growth, the use of clay contributes to improved indoor air quality. This is particularly crucial in healthcare settings where vulnerable individuals, such as patients with respiratory conditions, may be more susceptible to allergens and airborne pollutants.\nBeyond humidity management, clay also contributes to thermal comfort by acting as a natural insulator. It helps in stabilizing indoor temperatures, making the healthcare facility more resilient to external weather fluctuations and extremes.\nClay is a sustainable and environmentally friendly building material, often sourced locally. \nMoreover, certain types of clay can be treated or naturally possess water-repellent qualities, adding an extra layer of protection against water damage. This is particularly advantageous in regions prone to heavy rainfall, storms, or flooding events.\nClay can be integrated into various architectural designs, providing flexibility in aesthetics while still serving functional purposes. This allows healthcare facilities to maintain a visually pleasing environment while addressing humidity concerns.\nClay's resistance to moisture and mold, along with its natural durability, can result in long-term cost savings for the healthcare facility. Reduced maintenance and repair costs contribute to the overall financial sustainability of the infrastructure.",
+      "climateHazards": ["Floods", "Storm"],
+      "solutionTypes": ["Infrastructure"],
+      "costOfImplementation": "high",
+      "usefulLinks": ["https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8911240/"],
+      "caseStudies": []
+    },
+    {
+      "slug": "roof-to-wall-wall-to-wall-wall-to-foundation-connections",
+      "title": "Roof-to-wall, wall-to-wall, wall-to-foundation connections",
+      "description": "Connecting all structural elements with ties, clips, straps, and additional connectors / fasteners creates a continuous load path that transfers force safely into\nthe building's foundation in case of hurricanes, earthquakes, etc.",
+      "climateHazards": ["Storm", "Earthquake", "Cyclone"],
+      "solutionTypes": ["Infrastructure"],
+      "costOfImplementation": "low",
+      "usefulLinks": [
+        "https://knowledge.uli.org/-/media/files/research-reports/2022/resilient-retrofits-climate-upgrades-for-existing-buildings.pdf?rev=36e6e8d45f0e452a868fa3855431f0e0&hash=45C38A1E9B8BA9D74A2B7632E066D16E"
+      ],
+      "caseStudies": []
+    },
+    {
+      "slug": "anticipatory-guidance-through-sms",
+      "title": "Anticipatory guidance through SMS",
+      "description": "Leveraging mobile Short Message Service (SMS) proves to be a highly effective and budget-friendly health promotion strategy, significantly improving disease prevention knowledge and practices within communities. This approach stands out as a promising and accessible tool for advancing health education initiatives.",
+      "climateHazards": [
+        "Floods",
+        "Storm",
+        "Cold wave",
+        "Extreme heat",
+        "Drought",
+        "Wildfire",
+        "Sea level rise",
+        "Increased temperature",
+        "Increased CO2 levels",
+        "Landslide",
+        "Earthquake",
+        "Volcano",
+        "Tsunami",
+        "Cyclone"
+      ],
+      "solutionTypes": ["Products and technology"],
+      "costOfImplementation": "low",
+      "usefulLinks": [
+        "https://bmchealthservres.biomedcentral.com/articles/10.1186/s12913-019-4541-z"
+      ],
+      "caseStudies": []
+    },
+    {
+      "slug": "use-of-rapid-cooling-body-bags",
+      "title": "Use of rapid cooling body bags",
+      "description": "Utilizing body bags emerges as an effective approach for treating heat stroke victims, owing to their widespread availability in hospitals, simplicity in preparation, portability, waterproof nature, and cost-effectiveness. The procedure entails filling the body bag with a combination of water and ice, positioning the patient inside, and securing the bag up to the armpits. This method ensures convenient access for medical equipment and close monitoring while maintaining proximity of the water and ice to the patient's skin within the self-contained bag.",
+      "climateHazards": ["Extreme heat", "Increased temperature"],
+      "solutionTypes": ["Service delivery"],
+      "costOfImplementation": "low",
+      "usefulLinks": ["https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7493529/"],
+      "caseStudies": []
+    },
+    {
+      "slug": "rain-water-harvesting-roofs-and-tanks",
+      "title": "Rain water harvesting roofs and tanks",
+      "description": "Some locations are suitable for rainwater harvesting due to seasonal or regular rainfalls. For maximizing this effect, the PHC facility roofs can be designed or retrofitted to collect rainwater in the inner courtyards and from around the outer edges of the roof. The collected water is channeled through a piping and filtering system into an underwater reservoir. The size of the tank is calculated based on the size of the facility, estimated use and the amount and frequency of the rain in the region.\nThe ideal use for the collected water can be for toilets, cleaning and laundry purposes as well as for outdoor use. If the rainwater system is connected to hot water system the benefits are even greater.",
+      "climateHazards": ["Storm"],
+      "solutionTypes": ["WASH"],
+      "costOfImplementation": "medium",
+      "usefulLinks": [],
+      "caseStudies": []
+    },
+    {
+      "slug": "green-cooling-walls",
+      "title": "Green cooling walls",
+      "description": "Green walls help maintain a cool temperature inside while still allowing natural light to come in. The sunlight in equatorial areas comes from the east in the morning and the west in the afternoon. This means that the best position for windows in these regions is facing south and north to shelter the occupants from the afternoon sun. However, this is not always possible. If a space needs to have windows facing west, a cooling green wall can be planted in front of those windows.",
+      "climateHazards": ["Extreme heat", "Increased temperature"],
+      "solutionTypes": ["Infrastructure"],
+      "costOfImplementation": "medium",
+      "usefulLinks": [],
+      "caseStudies": [
+        {
+          "filename": "Rain water harvesting and green walls.pdf",
+          "type": "application/pdf",
+          "size": 5031158
+        }
+      ]
+    },
+    {
+      "slug": "flood-gates-flood-barriers",
+      "title": "Flood gates/ Flood barriers",
+      "description": "Flood door barriers offer a robust defense mechanism against potential floods, presenting a reliable safeguard for health clinics. These barriers, designed as a temporary yet highly effective solution, are strategically placed in front of the clinic's doors, providing a responsive shield when the threat of flooding arises. They require no maintenance and can conveniently be stored away during non-utilization periods.",
+      "climateHazards": ["Floods", "Storm", "Sea level rise"],
+      "solutionTypes": ["Infrastructure"],
+      "costOfImplementation": "low",
+      "usefulLinks": [
+        "https://disastercompany.com/everything-you-need-to-know-about-flood-barriers/"
+      ],
+      "caseStudies": []
+    },
+    {
+      "slug": "natural-ventilation",
+      "title": "Natural ventilation",
+      "description": "Design or retrofit PHC facility for cross-ventilation throughout, which means the air can be continuously renewed. The building is cooled down by natural ventilation, to save costs and be environmentally friendly.\nVentilation bricks and inner courtyards make the cross-ventilation possible. Hot air is lighter than cool air and so the ventilation openings in the spaces are designed to let cool air in and the hot air to rise and find it's way out of the building.",
+      "climateHazards": ["Extreme heat", "Increased temperature"],
+      "solutionTypes": ["Infrastructure"],
+      "costOfImplementation": "high",
+      "usefulLinks": [],
+      "caseStudies": [
+        {
+          "filename": "Natural ventilation.pdf",
+          "type": "application/pdf",
+          "size": 10424942
+        }
+      ]
+    },
+    {
+      "slug": "shaded-outdoor-waiting-area",
+      "title": "Shaded outdoor waiting area",
+      "description": "Covered outdoor waiting areas offer a multitude of advantages. It can facilitate the clearance of entrance areas, hallways, and corridors, promoting smooth movement for both staff and visitors within the facility. Additionally, they enable health facilities to accommodate a larger number of patients simultaneously. These spaces prove particularly valuable during viral outbreaks, as come individuals may perceive outdoor waiting as a safer alternative to indoor areas with shared spaces.",
+      "climateHazards": ["Extreme heat", "Increased temperature"],
+      "solutionTypes": ["Infrastructure"],
+      "costOfImplementation": "low",
+      "usefulLinks": [],
+      "caseStudies": [
+        {
+          "filename": "Canopy external waiting areas.pdf",
+          "type": "application/pdf",
+          "size": 147279
+        }
+      ]
+    },
+    {
+      "slug": "drying-beads",
+      "title": "Drying Beads",
+      "description": "Drying beads offer a sustainable and efficient solution for seed preservation, featuring rapid water absorption and reusability. Particularly effective in high humidity and high temperature environments, these beads help prevent the rapid deterioration of seeds during storage. When paired with hermetic containers, they provide a quick and reliable method for maintaining safe moisture levels, ensuring the long-term viability of stored seeds.",
+      "climateHazards": [],
+      "solutionTypes": ["Products and technology"],
+      "costOfImplementation": "low",
+      "usefulLinks": [
+        "http://www.rhino-research.com/backend/web/uploads/pdf/260cbb317b039a91c608f580b1fe0490.pdf"
+      ],
+      "caseStudies": []
+    },
+    {
+      "slug": "facility-based-heat-alert-checklist",
+      "title": "Facility based heat alert checklist",
+      "description": "The Facility-Based Heat Alert Checklist serves as a comprehensive guide to proactively address and manage clinic operations during extreme heat events. It comes into play whenever local weather forecasts indicate temperatures above the seasonal average or when an extreme heat event is officially declared by local weather forecasting agencies.\n\nThis tool can outline steps to be taken before, during, and after periods of extreme heat, offering clear guidance on crucial administrative tasks leading up to such events. Delegation of these tasks to appropriate staff members is facilitated.\n\nIn essence, the checklist aids health centers in formulating annual or long-term policies and procedures, ensuring the facility's resilience and preparedness for extreme heat events.",
+      "climateHazards": ["Extreme heat", "Increased temperature"],
+      "solutionTypes": ["Service delivery"],
+      "costOfImplementation": "low",
+      "usefulLinks": [
+        "https://www.americares.org/wp-content/uploads/2.-ADMIN.Heat_Facility_Preparedness_Guidance_2023Final.pdf"
+      ],
+      "caseStudies": []
+    },
+    {
+      "slug": "warnings-on-increased-risk-of-vectorborne-diseases",
+      "title": "Warnings on increased risk of vectorborne diseases",
+      "description": "In times of increased risk, awareness and education initiatives can emphasize efforts to prevent vectorborne diseases in flood-prone areas. This could be achieved in different ways:\n- District or health systems can disseminate information to to all community members through SMS alerts, informing them about the risks of vector and waterborne diseases in the region and providing preventive measures for the population to follow.\n- CHWs can conduct community events or increase frequency of routine household visits to disseminate information and preventive measures concerning vector and waterborne diseases.",
+      "climateHazards": ["Floods"],
+      "solutionTypes": ["Service delivery"],
+      "costOfImplementation": "low",
+      "usefulLinks": [
+        "https://iris.who.int/bitstream/handle/10665/259205/9789241512978-eng.pdf?sequence=1"
+      ],
+      "caseStudies": [
+        {
+          "filename": "Prevention of vectorborne diseases.pdf",
+          "type": "application/pdf",
+          "size": 171739
+        }
+      ]
+    },
+    {
+      "slug": "exterior-shade-features",
+      "title": "Exterior shade features",
+      "description": "Overhangs, awnings, and exterior shutters, blinds, or louvers can all keep heat from entering the building, reducing indoor temperatures. Exterior features are more effective at blocking heat gain than interior curtains or blinds. These features can be designed to allow solar heat gain in winter to help reduce heating energy in temperate climates. Moderating heat gain also reduces energy needed for heating and cooling.",
+      "climateHazards": ["Extreme heat", "Increased temperature"],
+      "solutionTypes": ["Infrastructure"],
+      "costOfImplementation": "low",
+      "usefulLinks": [
+        "https://www.researchgate.net/publication/357050721_A_short_review_on_passive_strategies_applied_to_minimise_the_building_cooling_loads_in_hot_locations"
+      ],
+      "caseStudies": []
+    },
+    {
+      "slug": "pest-exclusion-net",
+      "title": "Pest-Exclusion Net",
+      "description": "Pest-exclusion nets offer an inexpensive and safe protection against insect pests, reducing the reliance on toxic and expensive pesticides, which can be harmful to human health and the environment.",
+      "climateHazards": [],
+      "solutionTypes": ["Products and technology"],
+      "costOfImplementation": "low",
+      "usefulLinks": [
+        "https://horticulture.ucdavis.edu/information/pest-exclusion-nets-protect-crops-boost-yield"
+      ],
+      "caseStudies": []
+    },
+    {
+      "slug": "reflective-paint-on-roof-and-facades",
+      "title": "Reflective paint on roof and facades",
+      "description": "The use of light-colored or reflective materials on roofs and facades helps to bounce back a significant amount of solar radiation. This reduces the absorption of heat by the building, keeping indoor temperatures lower and minimizing the need for excessive air conditioning. This not only lowers operational costs for the healthcare facility but also contributes to overall energy efficiency and sustainability.\nBy deflecting heat, cool roofs and facades also contribute to a more moderate and comfortable indoor environment, fostering a conducive setting for patient recovery and healthcare operations.",
+      "climateHazards": ["Extreme heat", "Increased temperature"],
+      "solutionTypes": ["Infrastructure"],
+      "costOfImplementation": "low",
+      "usefulLinks": [],
+      "caseStudies": []
+    }
+  ]
+}
