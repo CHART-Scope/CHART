@@ -1,25 +1,27 @@
 {
-  "name": "@chart/web",
+  "name": "@chart/solution-repository",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next dev --webpack --hostname 127.0.0.1 --port 3100",
+    "dev": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next dev --webpack --hostname 127.0.0.1 --port 3300",
     "build": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next build --webpack --experimental-build-mode compile && NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next build --webpack --experimental-build-mode generate-env",
-    "start": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next start --hostname ${HOSTNAME:-127.0.0.1} --port ${PORT:-3100}",
+    "start": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next start --hostname ${HOSTNAME:-127.0.0.1} --port ${PORT:-3300}",
+    "seed": "payload run src/lib/seedChartContent.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "leaflet": "^1.9.4",
+    "@payloadcms/db-postgres": "^3.63.0",
+    "@payloadcms/next": "^3.63.0",
     "next": "^16.2.2",
+    "payload": "^3.63.0",
+    "pg": "^8.16.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "recharts": "^3.8.1",
     "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@next/swc-wasm-nodejs": "16.2.6",
-    "@types/leaflet": "^1.9.21",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",

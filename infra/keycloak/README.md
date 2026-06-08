@@ -5,7 +5,7 @@ Keycloak is the identity system. CHART remains the policy system.
 ## Local start
 
 ```bash
-docker compose up -d chart-postgres chart-keycloak
+docker compose up -d chart-postgres chart-keycloak-postgres chart-keycloak
 make identity-sync
 ```
 
@@ -33,11 +33,11 @@ Seed users:
 
 ## Model
 
-Postgres is shared platform infrastructure. Local and deployed environments use one
-database:
+Keycloak runs inside the CHART deployment, but its internal tables should stay separate
+from CHART app tables:
 
-- `chart`: Payload CMS tables, Keycloak internal tables, and CHART-owned Drizzle
-  tables.
+- `chart`: CHART app tables managed by Drizzle.
+- `chart_keycloak`: Keycloak internal tables.
 
 Roles are Keycloak client roles on `chart-api`:
 

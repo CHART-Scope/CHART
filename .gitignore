@@ -26,6 +26,8 @@ api/openapi.yaml
 web/payload-types.ts
 web/public/imported-*/
 web/chart-cms.db
+solution-repository/payload-types.ts
+solution-repository/public/uploads/
 outputs/
 
 # local docs and notes

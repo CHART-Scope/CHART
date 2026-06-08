@@ -246,9 +246,9 @@ export function DashboardPage({
               <button
                 className="ghost-button"
                 type="button"
-                onClick={() => onNavigate("cms")}
+                onClick={() => onNavigate("solutions")}
               >
-                Open content studio
+                Open action repository
               </button>
             ) : null}
           </div>

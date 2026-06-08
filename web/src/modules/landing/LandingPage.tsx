@@ -1,4 +1,11 @@
-import { useChartContent } from "../../app/ChartContentProvider";
+import {
+  landingGovernmentQuestions,
+  landingNavLinks,
+  landingPriorityExamples,
+  landingPriorityStatement,
+  landingResourceSections,
+  landingWorkflowSteps,
+} from "../../content/landing";
 import { PublicAuthAction } from "../auth/PublicAuthAction";
 import type { ChartRoute } from "../routes/types";
 
@@ -24,15 +31,6 @@ const partnerLogos = [
 ];
 
 export function LandingPage({ onNavigate }: LandingPageProps) {
-  const {
-    landingGovernmentQuestions,
-    landingNavLinks,
-    landingPriorityExamples,
-    landingPriorityStatement,
-    landingResourceSections,
-    landingWorkflowSteps,
-  } = useChartContent();
-
   return (
     <div className="landing-shell">
       <header className="landing-nav">
