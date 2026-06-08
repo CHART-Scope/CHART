@@ -12,35 +12,36 @@ const roleProfiles: Partial<Record<ChartRole, UserProfile>> = {
   chart_admin: {
     roleLabel: "Platform administrator",
     workspaceTitle: "Platform setup workspace",
-    setupFocus: "Platform configuration, users, content, and geography readiness.",
+    setupFocus:
+      "Platform configuration, users, repository source, and geography readiness.",
     capabilities: [
-      "Manage content and solution repository records",
+      "Configure the published solution repository source",
       "Coordinate user onboarding and role assignments",
       "Review platform setup before country or region rollout",
     ],
     nextActions: [
       "Confirm the deployment geography and level labels",
       "Add the first health and cross-sector users",
-      "Publish the initial action repository records",
+      "Confirm the initial action repository import",
     ],
   },
   content_editor: {
-    roleLabel: "Content editor",
-    workspaceTitle: "Content management workspace",
+    roleLabel: "Repository coordinator",
+    workspaceTitle: "Repository coordination workspace",
 
-    setupFocus: "Content quality, media, useful links, and publication readiness.",
+    setupFocus: "Repository quality, useful links, and publication readiness.",
     capabilities: [
-      "Create and edit public action repository records",
-      "Upload images and case study resources",
-      "Review submitted content before publishing",
+      "Review public action repository records available to this deployment",
+      "Coordinate updates with the external solution repository service",
+      "Check source links and case study resources before rollout",
     ],
     nextActions: [
-      "Review draft action records",
-      "Check images, case studies, and useful links",
-      "Publish content when it is ready for public use",
+      "Review imported action records",
+      "Check case studies and useful links",
+      "Request updates in the source repository when records need changes",
     ],
   },
-  u1_health_lead: {
+  health_planning_lead: {
     roleLabel: "State / county health lead",
     workspaceTitle: "Health planning workspace",
 
@@ -56,7 +57,7 @@ const roleProfiles: Partial<Record<ChartRole, UserProfile>> = {
       "Start a health-sector planning discussion",
     ],
   },
-  u2_cross_sector_lead: {
+  cross_sector_planning_lead: {
     roleLabel: "State / county cross-sector lead",
     workspaceTitle: "Cross-sector coordination workspace",
 
@@ -72,7 +73,7 @@ const roleProfiles: Partial<Record<ChartRole, UserProfile>> = {
       "Confirm owners for cross-sector follow-up",
     ],
   },
-  u3_district_health_officer: {
+  health_implementation_officer: {
     roleLabel: "District / sub-county health officer",
     workspaceTitle: "District health execution workspace",
 
@@ -88,7 +89,7 @@ const roleProfiles: Partial<Record<ChartRole, UserProfile>> = {
       "Prepare implementation actions for review",
     ],
   },
-  u4_district_cross_sector_officer: {
+  cross_sector_implementation_officer: {
     roleLabel: "District / sub-county cross-sector officer",
     workspaceTitle: "District cross-sector execution workspace",
 
@@ -104,7 +105,7 @@ const roleProfiles: Partial<Record<ChartRole, UserProfile>> = {
       "Coordinate local implementation follow-up",
     ],
   },
-  u5_public_visitor: {
+  public_viewer: {
     roleLabel: "Public visitor / partner",
     workspaceTitle: "Public CHART workspace",
 
@@ -131,32 +132,32 @@ const genericProfile: UserProfile = {
 
 export const setupRoleOptions = [
   {
-    role: "u1_health_lead",
+    role: "health_planning_lead",
     label: "U1 health lead",
     responsibility: "Owns health planning at state, county, or equivalent level.",
   },
   {
-    role: "u2_cross_sector_lead",
+    role: "cross_sector_planning_lead",
     label: "U2 cross-sector lead",
     responsibility:
       "Coordinates non-health sectors at state, county, or equivalent level.",
   },
   {
-    role: "u3_district_health_officer",
+    role: "health_implementation_officer",
     label: "U3 district health officer",
     responsibility:
       "Supports health implementation at district, sub-county, or equivalent level.",
   },
   {
-    role: "u4_district_cross_sector_officer",
+    role: "cross_sector_implementation_officer",
     label: "U4 district cross-sector officer",
     responsibility: "Supports local non-health implementation and escalation.",
   },
   {
     role: "content_editor",
-    label: "Content editor",
+    label: "Repository coordinator",
     responsibility:
-      "Maintains public solution repository records and supporting resources.",
+      "Coordinates public solution repository updates with the external repository service.",
   },
 ] as const satisfies readonly {
   role: ChartRole;

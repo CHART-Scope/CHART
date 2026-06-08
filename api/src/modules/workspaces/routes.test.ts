@@ -10,7 +10,7 @@ import { WorkspaceError, type WorkspaceService } from "./service.js";
 const currentUser: CurrentUserContext = {
   userId: "keycloak-u1",
   username: "u1-health-region",
-  roles: ["u1_health_lead"],
+  roles: ["health_planning_lead"],
   geographyScopes: ["/country-a/region-a"],
   activeGeographyId: "/country-a/region-a",
   geographyLevel: "geo_level_1",
@@ -25,7 +25,7 @@ const workspace = {
   ownerUserId: "keycloak-u1",
   ownerGeographyId: "geo-country-a-region-a",
   memberRole: "owner" as const,
-  hazardTaxonomyIds: ["hazard-extreme-heat"],
+  hazardIds: ["hazard-extreme-heat"],
 };
 
 test("POST /workspaces creates a geography-scoped planning workspace", async () => {
@@ -37,7 +37,7 @@ test("POST /workspaces creates a geography-scoped planning workspace", async () 
         name: workspace.name,
         ownerGeographyId: "geo-country-a-region-a",
         planningCycle: "2026",
-        hazardTaxonomyIds: ["hazard-extreme-heat"],
+        hazardIds: ["hazard-extreme-heat"],
       });
       return workspace;
     },
@@ -64,7 +64,7 @@ test("POST /workspaces creates a geography-scoped planning workspace", async () 
       name: workspace.name,
       ownerGeographyId: "geo-country-a-region-a",
       planningCycle: "2026",
-      hazardTaxonomyIds: ["hazard-extreme-heat"],
+      hazardIds: ["hazard-extreme-heat"],
     },
   });
 

@@ -22,6 +22,16 @@ const geographyLevelValues = [
 
 const workspaceStatusValues = ["active", "archived"] as const;
 const workspaceMemberRoleValues = ["owner", "editor", "viewer"] as const;
+const chartRoleValues = [
+  "chart_admin",
+  "content_editor",
+  "health_planning_lead",
+  "cross_sector_planning_lead",
+  "health_implementation_officer",
+  "cross_sector_implementation_officer",
+  "public_viewer",
+] as const;
+const chartUserStatusValues = ["active", "disabled"] as const;
 const dataSourceKindValues = [
   "climate",
   "health",
@@ -33,11 +43,34 @@ const dataSourceKindValues = [
 export type GeographyLevelValue = (typeof geographyLevelValues)[number];
 export type WorkspaceStatusValue = (typeof workspaceStatusValues)[number];
 export type WorkspaceMemberRoleValue = (typeof workspaceMemberRoleValues)[number];
+export type ChartRoleValue = (typeof chartRoleValues)[number];
+export type ChartUserStatusValue = (typeof chartUserStatusValues)[number];
 export type DataSourceKindValue = (typeof dataSourceKindValues)[number];
 
-type AppSetupHazard = {
-  taxonomyId: string;
+type ChartSetupHazard = {
+  hazardId: string;
   label: string;
+};
+
+export type WorkspaceSolutionTaxonomy = {
+  id: string;
+  type: string;
+  label: string;
+};
+
+export type WorkspaceSolutionLink = {
+  label: string;
+  url: string;
+};
+
+export type WorkspaceSolutionAsset = {
+  id: string;
+  kind: string;
+  filename: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  storageUrl: string | null;
+  attribution: string | null;
 };
 
 function geographyLevel(columnName: string) {
@@ -50,6 +83,14 @@ function workspaceStatus(columnName: string) {
 
 function workspaceMemberRole(columnName: string) {
   return text(columnName).$type<WorkspaceMemberRoleValue>();
+}
+
+function chartRole(columnName: string) {
+  return text(columnName).$type<ChartRoleValue>();
+}
+
+function chartUserStatus(columnName: string) {
+  return text(columnName).$type<ChartUserStatusValue>();
 }
 
 function dataSourceKind(columnName: string) {
@@ -66,6 +107,14 @@ function workspaceStatusCheck(column: SQLWrapper) {
 
 function workspaceMemberRoleCheck(column: SQLWrapper) {
   return sql`${column} in ('owner', 'editor', 'viewer')`;
+}
+
+function chartRoleCheck(column: SQLWrapper) {
+  return sql`${column} in ('chart_admin', 'content_editor', 'health_planning_lead', 'cross_sector_planning_lead', 'health_implementation_officer', 'cross_sector_implementation_officer', 'public_viewer')`;
+}
+
+function chartUserStatusCheck(column: SQLWrapper) {
+  return sql`${column} in ('active', 'disabled')`;
 }
 
 function dataSourceKindCheck(column: SQLWrapper) {
@@ -94,6 +143,22 @@ export const dataSources = pgTable(
   (table) => [
     index("data_sources_kind_idx").on(table.kind),
     check("data_sources_kind_check", dataSourceKindCheck(table.kind)),
+  ],
+);
+
+export const hazards = pgTable(
+  "hazards",
+  {
+    id: text("id").primaryKey(),
+    label: text("label").notNull(),
+    description: text("description"),
+    active: boolean("active").default(true).notNull(),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("hazards_label_unique").on(table.label),
+    index("hazards_active_sort_idx").on(table.active, table.sortOrder),
   ],
 );
 
@@ -200,6 +265,48 @@ export const externalGeographyMappings = pgTable(
   ],
 );
 
+export const chartUsers = pgTable(
+  "chart_users",
+  {
+    id: text("id").primaryKey(),
+    username: text("username").notNull(),
+    email: text("email"),
+    displayName: text("display_name").notNull(),
+    status: chartUserStatus("status").default("active").notNull(),
+    identityProvider: text("identity_provider").default("keycloak").notNull(),
+    createdByUserId: text("created_by_user_id"),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("chart_users_username_unique").on(table.username),
+    uniqueIndex("chart_users_email_unique").on(table.email),
+    index("chart_users_status_idx").on(table.status),
+    check("chart_users_status_check", chartUserStatusCheck(table.status)),
+  ],
+);
+
+export const chartUserRoles = pgTable(
+  "chart_user_roles",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => chartUsers.id, { onDelete: "cascade" }),
+    role: chartRole("role").notNull(),
+    source: text("source").default("keycloak").notNull(),
+    syncedAt: timestamp("synced_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.role] }),
+    index("chart_user_roles_role_idx").on(table.role),
+    check("chart_user_roles_role_check", chartRoleCheck(table.role)),
+  ],
+);
+
 export const userGeographyScopes = pgTable(
   "user_geography_scopes",
   {
@@ -222,7 +329,7 @@ export const userGeographyScopes = pgTable(
   ],
 );
 
-export const appSetup = pgTable("app_setup", {
+export const chartSetup = pgTable("chart_setup", {
   id: text("id").primaryKey(),
   completed: boolean("completed").default(false).notNull(),
   countryCode: text("country_code"),
@@ -234,7 +341,7 @@ export const appSetup = pgTable("app_setup", {
   workspaceId: text("workspace_id"),
   firstAdminUserId: text("first_admin_user_id"),
   firstAdminEmail: text("first_admin_email"),
-  hazards: jsonb("hazards").$type<AppSetupHazard[]>().default([]).notNull(),
+  hazards: jsonb("hazards").$type<ChartSetupHazard[]>().default([]).notNull(),
   ...timestamps(),
 });
 
@@ -301,125 +408,96 @@ export const workspaceGeographyScopes = pgTable(
   ],
 );
 
-// Repository facets stay data-driven because source options can change.
-export const solutionRepositoryItems = pgTable(
-  "solution_repository_items",
-  {
-    id: text("id").primaryKey(),
-    slug: text("slug").notNull(),
-    name: text("name").notNull(),
-    summary: text("summary"),
-    description: text("description"),
-    implementationNotes: text("implementation_notes"),
-    costOfImplementation: text("cost_of_implementation"),
-    maintenanceRequirement: text("maintenance_requirement"),
-    timeToImplement: text("time_to_implement"),
-    evidenceLevel: text("evidence_level"),
-    sourceId: text("source_id").default("chart-solution-repository").notNull(),
-    sourceRecordId: text("source_record_id"),
-    sourceVersion: text("source_version"),
-    sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
-    license: text("license"),
-    attribution: text("attribution"),
-    status: text("status").default("imported").notNull(),
-    ...timestamps(),
-  },
-  (table) => [
-    uniqueIndex("solution_repository_items_slug_unique").on(table.slug),
-    uniqueIndex("solution_repository_items_source_record_unique").on(
-      table.sourceId,
-      table.sourceRecordId,
-    ),
-    index("solution_repository_items_status_idx").on(table.status),
-    index("solution_repository_items_source_idx").on(table.sourceId),
-  ],
-);
-
-export const solutionRepositoryTaxonomies = pgTable(
-  "solution_repository_taxonomies",
-  {
-    id: text("id").primaryKey(),
-    type: text("type").notNull(),
-    label: text("label").notNull(),
-    ...timestamps(),
-  },
-  (table) => [
-    uniqueIndex("solution_repository_taxonomies_type_label_unique").on(
-      table.type,
-      table.label,
-    ),
-    index("solution_repository_taxonomies_type_idx").on(table.type),
-  ],
-);
-
 export const workspaceHazards = pgTable(
   "workspace_hazards",
   {
     workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
-    taxonomyId: text("taxonomy_id")
+    hazardId: text("hazard_id")
       .notNull()
-      .references(() => solutionRepositoryTaxonomies.id, { onDelete: "restrict" }),
+      .references(() => hazards.id, { onDelete: "restrict" }),
     sortOrder: integer("sort_order").default(0).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     primaryKey({
-      columns: [table.workspaceId, table.taxonomyId],
+      columns: [table.workspaceId, table.hazardId],
     }),
-    index("workspace_hazards_taxonomy_idx").on(table.taxonomyId),
+    index("workspace_hazards_hazard_idx").on(table.hazardId),
   ],
 );
 
-export const solutionRepositoryItemTaxonomies = pgTable(
-  "solution_repository_item_taxonomies",
+export const workspaceSolutionRecords = pgTable(
+  "workspace_solution_records",
   {
-    solutionId: text("solution_id")
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
       .notNull()
-      .references(() => solutionRepositoryItems.id, { onDelete: "cascade" }),
-    taxonomyId: text("taxonomy_id")
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    sourceId: text("source_id")
       .notNull()
-      .references(() => solutionRepositoryTaxonomies.id, { onDelete: "cascade" }),
+      .references(() => dataSources.id, { onDelete: "restrict" }),
+    sourceRecordId: text("source_record_id"),
+    sourceVersion: text("source_version"),
+    sourceUpdatedAt: text("source_updated_at"),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    summary: text("summary"),
+    description: text("description"),
+    costOfImplementation: text("cost_of_implementation"),
+    status: text("status").default("published").notNull(),
+    license: text("license"),
+    attribution: text("attribution"),
+    taxonomies: jsonb("taxonomies")
+      .$type<WorkspaceSolutionTaxonomy[]>()
+      .default([])
+      .notNull(),
+    links: jsonb("links").$type<WorkspaceSolutionLink[]>().default([]).notNull(),
+    assets: jsonb("assets").$type<WorkspaceSolutionAsset[]>().default([]).notNull(),
+    importedAt: timestamp("imported_at", { withTimezone: true }).defaultNow().notNull(),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("workspace_solution_records_workspace_source_slug_unique").on(
+      table.workspaceId,
+      table.sourceId,
+      table.slug,
+    ),
+    index("workspace_solution_records_workspace_idx").on(table.workspaceId),
+    index("workspace_solution_records_source_idx").on(table.sourceId, table.slug),
+    index("workspace_solution_records_status_idx").on(table.status),
+  ],
+);
+
+export const workspaceSolutionHazards = pgTable(
+  "workspace_solution_hazards",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    solutionRecordId: text("solution_record_id").notNull(),
+    hazardId: text("hazard_id").notNull(),
   },
   (table) => [
     primaryKey({
-      columns: [table.solutionId, table.taxonomyId],
+      name: "workspace_solution_hazards_pk",
+      columns: [table.workspaceId, table.solutionRecordId, table.hazardId],
     }),
-    index("solution_repository_item_taxonomies_taxonomy_idx").on(table.taxonomyId),
+    foreignKey({
+      columns: [table.workspaceId],
+      foreignColumns: [workspaces.id],
+      name: "workspace_solution_hazards_workspace_fk",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.solutionRecordId],
+      foreignColumns: [workspaceSolutionRecords.id],
+      name: "workspace_solution_hazards_record_fk",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.hazardId],
+      foreignColumns: [hazards.id],
+      name: "workspace_solution_hazards_hazard_fk",
+    }).onDelete("restrict"),
+    index("workspace_solution_hazards_workspace_idx").on(table.workspaceId),
+    index("workspace_solution_hazards_hazard_idx").on(table.hazardId),
   ],
-);
-
-export const solutionRepositoryLinks = pgTable(
-  "solution_repository_links",
-  {
-    id: text("id").primaryKey(),
-    solutionId: text("solution_id")
-      .notNull()
-      .references(() => solutionRepositoryItems.id, { onDelete: "cascade" }),
-    label: text("label").notNull(),
-    url: text("url").notNull(),
-    sortOrder: integer("sort_order").default(0).notNull(),
-    ...timestamps(),
-  },
-  (table) => [index("solution_repository_links_solution_idx").on(table.solutionId)],
-);
-
-export const solutionRepositoryAssets = pgTable(
-  "solution_repository_assets",
-  {
-    id: text("id").primaryKey(),
-    solutionId: text("solution_id")
-      .notNull()
-      .references(() => solutionRepositoryItems.id, { onDelete: "cascade" }),
-    kind: text("kind").default("document").notNull(),
-    filename: text("filename").notNull(),
-    mimeType: text("mime_type"),
-    sizeBytes: integer("size_bytes"),
-    storageUrl: text("storage_url"),
-    attribution: text("attribution"),
-    sortOrder: integer("sort_order").default(0).notNull(),
-    ...timestamps(),
-  },
-  (table) => [index("solution_repository_assets_solution_idx").on(table.solutionId)],
 );

@@ -7,6 +7,7 @@ import { registerDataIngestionRoutes } from "./modules/data-ingestion/routes.js"
 import { registerGeographyRoutes } from "./modules/geographies/routes.js";
 import { registerSetupRoutes } from "./modules/setup/routes.js";
 import { registerSolutionRepositoryRoutes } from "./modules/solution-repository/routes.js";
+import { registerUserRoutes } from "./modules/users/routes.js";
 import { registerWorkspaceRoutes } from "./modules/workspaces/routes.js";
 
 const allowedCorsOrigins = new Set(
@@ -107,6 +108,7 @@ export function buildApp() {
   app.register(registerGeographyRoutes, { prefix: "/geographies" });
   app.register(registerSetupRoutes, { prefix: "/setup" });
   app.register(registerSolutionRepositoryRoutes, { prefix: "/solutions" });
+  app.register(registerUserRoutes, { prefix: "/users" });
   app.register(registerWorkspaceRoutes, { prefix: "/workspaces" });
 
   return app;

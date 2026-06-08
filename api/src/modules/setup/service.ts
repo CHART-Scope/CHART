@@ -4,19 +4,23 @@ import { count, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../../db/client.js";
 import {
-  appSetup,
+  chartSetup,
   countryGeoConfig,
   geographies,
-  solutionRepositoryItems,
-  solutionRepositoryTaxonomies,
-  userGeographyScopes,
+  hazards,
+  workspaceSolutionRecords,
   workspaceGeographyScopes,
   workspaceHazards,
   workspaceMembers,
   workspaces,
 } from "../../db/schema.js";
 import type { CurrentUserContext } from "../auth/types.js";
-import { importSolutionRepositorySeedFile } from "../solution-repository/seed.js";
+import { persistUserProjection } from "../users/service.js";
+import {
+  prepareWorkspaceSolutionImport,
+  replaceWorkspaceSolutions,
+  summarizeWorkspaceSolutionImport,
+} from "../workspace-solutions/service.js";
 import { SetupError } from "./errors.js";
 import { createBootstrapAdminUser } from "./keycloakAdmin.js";
 import type {
@@ -47,17 +51,16 @@ export function createSetupService(): SetupService {
     },
 
     async getOptions() {
-      await importSolutionRepositorySeedFile();
       const hazardRows = await db
         .select({
-          id: solutionRepositoryTaxonomies.id,
-          label: solutionRepositoryTaxonomies.label,
+          id: hazards.id,
+          label: hazards.label,
         })
-        .from(solutionRepositoryTaxonomies)
-        .where(eq(solutionRepositoryTaxonomies.type, "hazard"));
+        .from(hazards)
+        .where(eq(hazards.active, true));
 
       return {
-        hazardTaxonomies: hazardRows.sort((first, second) =>
+        hazards: hazardRows.sort((first, second) =>
           first.label.localeCompare(second.label),
         ),
       };
@@ -77,8 +80,6 @@ export function createSetupService(): SetupService {
       const adminUser = await createBootstrapAdminUser({
         ...adminInput,
         groupPath,
-        countryCode: setupInput.countryCode,
-        countryName: setupInput.countryName,
       });
       const nextSetupStatus = await completeSetupForContext(setupInput, {
         userId: adminUser.userId,
@@ -108,8 +109,8 @@ export function createSetupService(): SetupService {
       await db.transaction(async (tx) => {
         const setupRows = await tx
           .select()
-          .from(appSetup)
-          .where(eq(appSetup.id, setupId))
+          .from(chartSetup)
+          .where(eq(chartSetup.id, setupId))
           .limit(1);
         const setup = setupRows[0];
 
@@ -131,14 +132,14 @@ export function createSetupService(): SetupService {
         }
 
         await tx
-          .insert(appSetup)
+          .insert(chartSetup)
           .values({
             id: setupId,
             completed: false,
             hazards: [],
           })
           .onConflictDoUpdate({
-            target: appSetup.id,
+            target: chartSetup.id,
             set: {
               completed: false,
               countryCode: null,
@@ -166,23 +167,23 @@ async function completeSetupForContext(
   const countryCode = input.countryCode.trim().toUpperCase();
   const countryName = input.countryName.trim();
   const geographyLevelLabel = input.geographyLevelLabel.trim();
-  const hazardTaxonomyIds = uniqueValues(input.hazardTaxonomyIds);
+  const hazardIds = uniqueValues(input.hazardIds);
 
   if (!countryCode || !countryName || !geographyLevelLabel) {
     throw new SetupError("SETUP_COUNTRY_REQUIRED", 400);
   }
 
-  if (hazardTaxonomyIds.length === 0) {
+  if (hazardIds.length === 0) {
     throw new SetupError("SETUP_HAZARD_REQUIRED", 400);
   }
 
-  await importSolutionRepositorySeedFile();
-  const hazardRows = await findHazardTaxonomies(hazardTaxonomyIds);
+  const hazardRows = await findHazards(hazardIds);
 
-  if (hazardRows.length !== hazardTaxonomyIds.length) {
+  if (hazardRows.length !== hazardIds.length) {
     throw new SetupError("SETUP_HAZARD_INVALID", 400);
   }
 
+  const solutionImport = await prepareSolutionImport(hazardIds);
   const existingSetup = await readStoredSetup();
   const countrySlug = normalizeSlug(countryName);
   const rootGeographyId = `geo-${countryCode.toLowerCase()}`;
@@ -240,26 +241,6 @@ async function completeSetupForContext(
       });
 
     await tx
-      .insert(userGeographyScopes)
-      .values({
-        id: `user-geo-${randomUUID()}`,
-        userId: context.userId,
-        geographyId: rootGeographyId,
-        source: "onboarding",
-        externalGroupPath: context.geographyScopes[0],
-      })
-      .onConflictDoUpdate({
-        target: [
-          userGeographyScopes.userId,
-          userGeographyScopes.geographyId,
-          userGeographyScopes.source,
-        ],
-        set: {
-          externalGroupPath: sql`excluded.external_group_path`,
-        },
-      });
-
-    await tx
       .insert(workspaces)
       .values({
         id: workspaceId,
@@ -311,15 +292,17 @@ async function completeSetupForContext(
       .where(eq(workspaceHazards.workspaceId, workspaceId));
 
     await tx.insert(workspaceHazards).values(
-      hazardTaxonomyIds.map((taxonomyId, index) => ({
+      hazardIds.map((hazardId, index) => ({
         workspaceId,
-        taxonomyId,
+        hazardId,
         sortOrder: index,
       })),
     );
 
+    await replaceWorkspaceSolutions(tx, workspaceId, solutionImport);
+
     await tx
-      .insert(appSetup)
+      .insert(chartSetup)
       .values({
         id: setupId,
         completed: true,
@@ -331,12 +314,12 @@ async function completeSetupForContext(
         firstAdminUserId: context.userId,
         firstAdminEmail: context.email,
         hazards: hazardRows.map((row) => ({
-          taxonomyId: row.id,
+          hazardId: row.id,
           label: row.label,
         })),
       })
       .onConflictDoUpdate({
-        target: appSetup.id,
+        target: chartSetup.id,
         set: {
           completed: true,
           countryCode: sql`excluded.country_code`,
@@ -352,25 +335,48 @@ async function completeSetupForContext(
       });
   });
 
+  const rootGeographyRows = await db
+    .select()
+    .from(geographies)
+    .where(eq(geographies.id, rootGeographyId))
+    .limit(1);
+
+  await persistUserProjection({
+    userId: context.userId,
+    username: context.username,
+    email: context.email,
+    displayName: context.username,
+    roles: context.roles,
+    geographies: rootGeographyRows,
+    source: "onboarding",
+  });
+
   return readSetupStatus();
 }
 
 async function readSetupStatus(): Promise<SetupStatus> {
-  const [setupRows, geographyCount, repositoryCount, memberCount] = await Promise.all([
-    db.select().from(appSetup).where(eq(appSetup.id, setupId)).limit(1),
-    readGeographyCount(),
-    readRepositoryCount(),
-    readWorkspaceMemberCount(),
-  ]);
+  const [setupRows, geographyCount, hazardCount, memberCount, solutionCount] =
+    await Promise.all([
+      db.select().from(chartSetup).where(eq(chartSetup.id, setupId)).limit(1),
+      readGeographyCount(),
+      readHazardCount(),
+      readWorkspaceMemberCount(),
+      readWorkspaceSolutionCount(),
+    ]);
   const setup = setupRows[0];
   const counts = {
     geographies: geographyCount,
-    repositoryItems: repositoryCount,
+    hazards: hazardCount,
     workspaceMembers: memberCount,
+    workspaceSolutions: solutionCount,
   };
   const completed = Boolean(setup?.completed);
   const hasRequiredData =
-    counts.geographies > 0 && counts.repositoryItems > 0 && counts.workspaceMembers > 0;
+    counts.geographies > 0 && counts.hazards > 0 && counts.workspaceMembers > 0;
+  const solutionImport = summarizeWorkspaceSolutionImport(
+    readSetupHazardIds(setup?.hazards ?? []),
+    solutionCount,
+  );
 
   return {
     completed: completed && hasRequiredData,
@@ -381,14 +387,15 @@ async function readSetupStatus(): Promise<SetupStatus> {
     workspaceId: setup?.workspaceId ?? undefined,
     firstAdminUserId: setup?.firstAdminUserId ?? undefined,
     counts,
+    solutionImport,
   };
 }
 
 async function readStoredSetup() {
   const rows = await db
     .select()
-    .from(appSetup)
-    .where(eq(appSetup.id, setupId))
+    .from(chartSetup)
+    .where(eq(chartSetup.id, setupId))
     .limit(1);
 
   return rows[0];
@@ -400,8 +407,8 @@ async function readGeographyCount() {
   return Number(rows[0]?.total ?? 0);
 }
 
-async function readRepositoryCount() {
-  const rows = await db.select({ total: count() }).from(solutionRepositoryItems);
+async function readHazardCount() {
+  const rows = await db.select({ total: count() }).from(hazards);
 
   return Number(rows[0]?.total ?? 0);
 }
@@ -412,14 +419,28 @@ async function readWorkspaceMemberCount() {
   return Number(rows[0]?.total ?? 0);
 }
 
-async function findHazardTaxonomies(hazardTaxonomyIds: string[]) {
+async function readWorkspaceSolutionCount() {
+  const rows = await db.select({ total: count() }).from(workspaceSolutionRecords);
+
+  return Number(rows[0]?.total ?? 0);
+}
+
+async function findHazards(hazardIds: string[]) {
   return db
     .select({
-      id: solutionRepositoryTaxonomies.id,
-      label: solutionRepositoryTaxonomies.label,
+      id: hazards.id,
+      label: hazards.label,
     })
-    .from(solutionRepositoryTaxonomies)
-    .where(inArray(solutionRepositoryTaxonomies.id, hazardTaxonomyIds));
+    .from(hazards)
+    .where(inArray(hazards.id, hazardIds));
+}
+
+async function prepareSolutionImport(hazardIds: string[]) {
+  try {
+    return await prepareWorkspaceSolutionImport(hazardIds);
+  } catch {
+    throw new SetupError("SETUP_SOLUTION_IMPORT_FAILED", 502);
+  }
 }
 
 function assertSetupAdmin(context: CurrentUserContext) {
@@ -433,7 +454,7 @@ function normalizeSetupInput(input: CompleteSetupInput): CompleteSetupInput {
     countryCode: input.countryCode.trim().toUpperCase(),
     countryName: input.countryName.trim(),
     geographyLevelLabel: input.geographyLevelLabel.trim(),
-    hazardTaxonomyIds: uniqueValues(input.hazardTaxonomyIds),
+    hazardIds: uniqueValues(input.hazardIds),
   };
 }
 
@@ -456,6 +477,17 @@ function normalizeAdminInput(input: BootstrapSetupInput["admin"]) {
 
 function uniqueValues(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function readSetupHazardIds(
+  setupHazards: {
+    hazardId?: string;
+    taxonomyId?: string;
+  }[],
+) {
+  return setupHazards
+    .map((hazard) => hazard.hazardId ?? hazard.taxonomyId)
+    .filter((hazardId): hazardId is string => Boolean(hazardId));
 }
 
 function normalizeSlug(value: string) {

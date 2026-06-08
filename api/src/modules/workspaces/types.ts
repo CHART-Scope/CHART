@@ -7,7 +7,7 @@ export interface CreateWorkspaceInput {
   name: string;
   ownerGeographyId: string;
   planningCycle?: string;
-  hazardTaxonomyIds?: string[];
+  hazardIds?: string[];
 }
 
 export interface WorkspaceRecord {
@@ -19,7 +19,7 @@ export interface WorkspaceRecord {
   ownerUserId: string | null;
   ownerGeographyId: string | null;
   memberRole?: WorkspaceMemberRoleValue;
-  hazardTaxonomyIds: string[];
+  hazardIds: string[];
 }
 
 export type WorkspaceErrorCode =
@@ -41,7 +41,7 @@ export const createWorkspaceBodySchema = {
     name: { type: "string" },
     ownerGeographyId: { type: "string" },
     planningCycle: { type: "string" },
-    hazardTaxonomyIds: {
+    hazardIds: {
       type: "array",
       items: { type: "string" },
     },
@@ -66,7 +66,7 @@ export const workspaceRecordSchema = {
     "createdByUserId",
     "ownerUserId",
     "ownerGeographyId",
-    "hazardTaxonomyIds",
+    "hazardIds",
   ],
   properties: {
     id: { type: "string" },
@@ -77,7 +77,7 @@ export const workspaceRecordSchema = {
     ownerUserId: { type: ["string", "null"] },
     ownerGeographyId: { type: ["string", "null"] },
     memberRole: { type: "string", enum: ["owner", "editor", "viewer"] },
-    hazardTaxonomyIds: {
+    hazardIds: {
       type: "array",
       items: { type: "string" },
     },

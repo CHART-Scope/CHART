@@ -1,24 +1,64 @@
-import { and, asc, count, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-import { db } from "../../db/client.js";
-import {
-  solutionRepositoryAssets,
-  solutionRepositoryItems,
-  solutionRepositoryItemTaxonomies,
-  solutionRepositoryLinks,
-  solutionRepositoryTaxonomies,
-} from "../../db/schema.js";
 import type {
   SolutionRepositoryAssetRecord,
   SolutionRepositoryErrorCode,
   SolutionRepositoryItemRecord,
-  SolutionRepositoryLinkRecord,
   SolutionRepositoryListResponse,
   SolutionRepositoryQuery,
   SolutionRepositoryTaxonomyRecord,
 } from "./types.js";
 
-type SolutionItemRow = typeof solutionRepositoryItems.$inferSelect;
+type SolutionSeedAsset = {
+  filename?: string;
+  type?: string;
+  size?: number;
+  url?: string;
+  attribution?: string;
+};
+
+type SolutionSeedItem = {
+  slug: string;
+  title: string;
+  description: string;
+  climateHazards?: string[];
+  solutionTypes?: string[];
+  costOfImplementation?: string;
+  usefulLinks?: string[];
+  caseStudies?: SolutionSeedAsset[];
+  image?: SolutionSeedAsset;
+  sourceRecordId?: string;
+  sourceUpdatedAt?: string;
+  license?: string;
+  attribution?: string;
+};
+
+type SolutionSeedFile = {
+  version: number | string;
+  sourceId?: string;
+  license?: string;
+  attribution?: string;
+  items: SolutionSeedItem[];
+};
+
+type TaxonomyType = "hazard" | "solution_type";
+
+const defaultSourceId = "chart-solution-repository";
+const defaultSeedCandidates = [
+  "api/src/modules/solution-repository/seed-data/seed.json",
+  "../api/src/modules/solution-repository/seed-data/seed.json",
+];
+const taxonomyAliases: Record<string, string> = {
+  floods: "Flood",
+  "products technical": "Products and technology",
+  technical: "Products and technology",
+  technology: "Products and technology",
+  "water sanitation and hygiene": "WASH",
+};
+const taxonomyIdOverrides: Record<string, string> = {
+  "solution_type:products and technology": "solution-type-products-technology",
+};
 
 export class SolutionRepositoryError extends Error {
   constructor(
@@ -41,290 +81,296 @@ export interface SolutionRepositoryService {
 export function createSolutionRepositoryService(): SolutionRepositoryService {
   return {
     async listSolutions(query = {}) {
-      const allowedIds = await resolveTaxonomyFilteredSolutionIds(query);
+      const snapshot = loadSolutionSnapshot();
+      const items = snapshot.items.filter((item) => matchesQuery(item, query));
 
-      if (allowedIds && allowedIds.size === 0) {
-        return { items: [], total: 0 };
-      }
-
-      const filters = buildItemFilters(query, allowedIds);
-      const whereClause = filters.length > 0 ? and(...filters) : undefined;
-      const [rows, totalRows] = await Promise.all([
-        db
-          .select()
-          .from(solutionRepositoryItems)
-          .where(whereClause)
-          .orderBy(asc(solutionRepositoryItems.name))
-          .limit(resolveLimit(query.limit)),
-        db.select({ total: count() }).from(solutionRepositoryItems).where(whereClause),
-      ]);
-      const items = await hydrateSolutions(rows);
-      const total = Number(totalRows[0]?.total ?? items.length);
-
-      return { items, total };
+      return {
+        items: items.slice(0, resolveLimit(query.limit)),
+        total: items.length,
+      };
     },
 
     async getSolutionBySlug(slug) {
-      const rows = await db
-        .select()
-        .from(solutionRepositoryItems)
-        .where(eq(solutionRepositoryItems.slug, slug))
-        .limit(1);
-      const item = rows[0];
+      const item = loadSolutionSnapshot().items.find(
+        (solution) => solution.slug === slug,
+      );
 
       if (!item) {
         throw new SolutionRepositoryError("SOLUTION_NOT_FOUND", 404);
       }
 
-      return (await hydrateSolutions([item]))[0];
+      return item;
     },
 
     async listTaxonomies() {
-      const rows = await db
-        .select({
-          id: solutionRepositoryTaxonomies.id,
-          type: solutionRepositoryTaxonomies.type,
-          label: solutionRepositoryTaxonomies.label,
-        })
-        .from(solutionRepositoryTaxonomies)
-        .orderBy(
-          asc(solutionRepositoryTaxonomies.type),
-          asc(solutionRepositoryTaxonomies.label),
-        );
-
-      return rows;
+      return loadSolutionSnapshot().taxonomies;
     },
   };
 }
 
-function buildItemFilters(
-  query: SolutionRepositoryQuery,
-  allowedIds: Set<string> | undefined,
-) {
-  const filters: SQL[] = [];
-  const search = query.search?.trim();
-  const cost = query.cost?.trim();
-  const status = query.status?.trim();
+function loadSolutionSnapshot() {
+  const seed = readSeedFile(resolveSeedFilePath());
+  const sourceId = seed.sourceId?.trim() || defaultSourceId;
+  const sourceVersion = String(seed.version);
+  const items = seed.items.map((item) =>
+    mapSeedItem(item, { sourceId, sourceVersion, seed }),
+  );
+  const taxonomyMap = new Map<string, SolutionRepositoryTaxonomyRecord>();
 
-  if (allowedIds) {
-    filters.push(inArray(solutionRepositoryItems.id, [...allowedIds]));
-  }
-
-  if (cost) {
-    filters.push(eq(solutionRepositoryItems.costOfImplementation, cost));
-  }
-
-  if (status) {
-    filters.push(eq(solutionRepositoryItems.status, status));
-  }
-
-  if (search) {
-    const searchPattern = `%${search}%`;
-    const searchFilter = or(
-      ilike(solutionRepositoryItems.name, searchPattern),
-      ilike(solutionRepositoryItems.summary, searchPattern),
-      ilike(solutionRepositoryItems.description, searchPattern),
-    );
-
-    if (searchFilter) {
-      filters.push(searchFilter);
+  for (const item of items) {
+    for (const taxonomy of item.taxonomies) {
+      taxonomyMap.set(taxonomy.id, taxonomy);
     }
   }
 
-  return filters;
+  return {
+    items,
+    taxonomies: [...taxonomyMap.values()].sort(compareTaxonomies),
+  };
 }
 
-async function resolveTaxonomyFilteredSolutionIds(query: SolutionRepositoryQuery) {
-  const taxonomyFilters = [
-    query.hazard ? { type: "hazard", value: query.hazard } : undefined,
-    query.solutionType
-      ? { type: "solution_type", value: query.solutionType }
-      : undefined,
-  ].filter((filter) => filter !== undefined);
-
-  if (taxonomyFilters.length === 0) {
-    return undefined;
-  }
-
-  let allowedSolutionIds: Set<string> | undefined;
-
-  for (const filter of taxonomyFilters) {
-    const taxonomyIds = await findTaxonomyIds(filter.type, filter.value);
-
-    if (taxonomyIds.length === 0) {
-      return new Set<string>();
-    }
-
-    const rows = await db
-      .select({ solutionId: solutionRepositoryItemTaxonomies.solutionId })
-      .from(solutionRepositoryItemTaxonomies)
-      .where(inArray(solutionRepositoryItemTaxonomies.taxonomyId, taxonomyIds));
-    const matchingSolutionIds = new Set(rows.map((row) => row.solutionId));
-
-    allowedSolutionIds = allowedSolutionIds
-      ? intersectSets(allowedSolutionIds, matchingSolutionIds)
-      : matchingSolutionIds;
-  }
-
-  return allowedSolutionIds;
-}
-
-async function findTaxonomyIds(type: string, value: string) {
-  const rows = await db
-    .select({
-      id: solutionRepositoryTaxonomies.id,
-      label: solutionRepositoryTaxonomies.label,
-    })
-    .from(solutionRepositoryTaxonomies)
-    .where(eq(solutionRepositoryTaxonomies.type, type));
-
-  return rows.filter((row) => taxonomyMatches(row, value)).map((row) => row.id);
-}
-
-async function hydrateSolutions(rows: SolutionItemRow[]) {
-  if (rows.length === 0) {
-    return [];
-  }
-
-  const solutionIds = rows.map((row) => row.id);
-  const [taxonomyRows, linkRows, assetRows] = await Promise.all([
-    db
-      .select({
-        solutionId: solutionRepositoryItemTaxonomies.solutionId,
-        id: solutionRepositoryTaxonomies.id,
-        type: solutionRepositoryTaxonomies.type,
-        label: solutionRepositoryTaxonomies.label,
-      })
-      .from(solutionRepositoryItemTaxonomies)
-      .innerJoin(
-        solutionRepositoryTaxonomies,
-        eq(
-          solutionRepositoryItemTaxonomies.taxonomyId,
-          solutionRepositoryTaxonomies.id,
-        ),
-      )
-      .where(inArray(solutionRepositoryItemTaxonomies.solutionId, solutionIds))
-      .orderBy(
-        asc(solutionRepositoryTaxonomies.type),
-        asc(solutionRepositoryTaxonomies.label),
-      ),
-    db
-      .select()
-      .from(solutionRepositoryLinks)
-      .where(inArray(solutionRepositoryLinks.solutionId, solutionIds))
-      .orderBy(
-        asc(solutionRepositoryLinks.sortOrder),
-        asc(solutionRepositoryLinks.label),
-      ),
-    db
-      .select()
-      .from(solutionRepositoryAssets)
-      .where(inArray(solutionRepositoryAssets.solutionId, solutionIds))
-      .orderBy(
-        asc(solutionRepositoryAssets.sortOrder),
-        asc(solutionRepositoryAssets.filename),
-      ),
+function mapSeedItem(
+  item: SolutionSeedItem,
+  context: {
+    sourceId: string;
+    sourceVersion: string;
+    seed: SolutionSeedFile;
+  },
+): SolutionRepositoryItemRecord {
+  const slug = normalizeSlug(item.slug || item.title);
+  const taxonomies = uniqueTaxonomies([
+    ...(item.climateHazards ?? [])
+      .filter(hasText)
+      .map((label) => normalizeTaxonomy("hazard", label)),
+    ...(item.solutionTypes ?? [])
+      .filter(hasText)
+      .map((label) => normalizeTaxonomy("solution_type", label)),
   ]);
 
-  const taxonomiesBySolution = groupBySolutionId(
-    taxonomyRows,
-    (row): SolutionRepositoryTaxonomyRecord => ({
-      id: row.id,
-      type: row.type,
-      label: row.label,
-    }),
-  );
-  const linksBySolution = groupBySolutionId(
-    linkRows,
-    (row): SolutionRepositoryLinkRecord => ({
-      label: row.label,
-      url: row.url,
-    }),
-  );
-  const assetsBySolution = groupBySolutionId(
-    assetRows,
-    (row): SolutionRepositoryAssetRecord => ({
-      id: row.id,
-      kind: row.kind,
-      filename: row.filename,
-      mimeType: row.mimeType,
-      sizeBytes: row.sizeBytes,
-      storageUrl: row.storageUrl,
-      attribution: row.attribution,
-    }),
-  );
+  return {
+    id: `solution-${slug}`,
+    slug,
+    name: item.title,
+    summary: createSummary(item.description),
+    description: item.description,
+    implementationNotes: null,
+    costOfImplementation: normalizeCost(item.costOfImplementation),
+    maintenanceRequirement: null,
+    timeToImplement: null,
+    evidenceLevel: null,
+    sourceId: context.sourceId,
+    sourceRecordId: item.sourceRecordId?.trim() || slug,
+    sourceVersion: context.sourceVersion,
+    sourceUpdatedAt: item.sourceUpdatedAt ?? null,
+    license: item.license ?? context.seed.license ?? null,
+    attribution: item.attribution ?? context.seed.attribution ?? null,
+    status: "published",
+    taxonomies,
+    links: normalizeLinks(item.usefulLinks),
+    assets: normalizeAssets(slug, item),
+  };
+}
 
-  return rows.map((row): SolutionRepositoryItemRecord => {
-    return {
-      id: row.id,
-      slug: row.slug,
-      name: row.name,
-      summary: row.summary,
-      description: row.description,
-      implementationNotes: row.implementationNotes,
-      costOfImplementation: row.costOfImplementation,
-      maintenanceRequirement: row.maintenanceRequirement,
-      timeToImplement: row.timeToImplement,
-      evidenceLevel: row.evidenceLevel,
-      sourceId: row.sourceId,
-      sourceRecordId: row.sourceRecordId,
-      sourceVersion: row.sourceVersion,
-      sourceUpdatedAt: row.sourceUpdatedAt?.toISOString() ?? null,
-      license: row.license,
-      attribution: row.attribution,
-      status: row.status,
-      taxonomies: taxonomiesBySolution.get(row.id) ?? [],
-      links: linksBySolution.get(row.id) ?? [],
-      assets: assetsBySolution.get(row.id) ?? [],
-    };
+function matchesQuery(
+  item: SolutionRepositoryItemRecord,
+  query: SolutionRepositoryQuery,
+) {
+  return (
+    matchesTaxonomy(item, "hazard", query.hazard) &&
+    matchesTaxonomy(item, "solution_type", query.solutionType) &&
+    matchesCost(item, query.cost) &&
+    matchesStatus(item, query.status) &&
+    matchesSearch(item, query.search)
+  );
+}
+
+function matchesTaxonomy(
+  item: SolutionRepositoryItemRecord,
+  type: TaxonomyType,
+  value: string | undefined,
+) {
+  if (!value?.trim()) {
+    return true;
+  }
+
+  const normalizedValue = normalizeLookupValue(value);
+
+  return item.taxonomies.some((taxonomy) => {
+    return (
+      taxonomy.type === type &&
+      (taxonomy.id === value ||
+        normalizeLookupValue(taxonomy.label) === normalizedValue)
+    );
   });
 }
 
-function groupBySolutionId<Row extends { solutionId: string }, Value>(
-  rows: Row[],
-  mapValue: (row: Row) => Value,
-) {
-  const valuesBySolution = new Map<string, Value[]>();
-
-  for (const row of rows) {
-    const values = valuesBySolution.get(row.solutionId) ?? [];
-    values.push(mapValue(row));
-    valuesBySolution.set(row.solutionId, values);
-  }
-
-  return valuesBySolution;
+function matchesCost(item: SolutionRepositoryItemRecord, value: string | undefined) {
+  return !value?.trim() || item.costOfImplementation === normalizeCost(value);
 }
 
-function resolveLimit(value: unknown) {
-  const limit = typeof value === "number" ? value : Number(value);
-
-  if (!Number.isFinite(limit)) {
-    return 50;
-  }
-
-  return Math.max(1, Math.min(100, Math.trunc(limit)));
+function matchesStatus(item: SolutionRepositoryItemRecord, value: string | undefined) {
+  return !value?.trim() || item.status === value;
 }
 
-function taxonomyMatches(row: { id: string; label: string }, value: string) {
-  const normalizedValue = normalizeLookupValue(value);
-  const normalizedId = normalizeLookupValue(row.id);
-  const normalizedLabel = normalizeLookupValue(row.label);
-  const normalizedIdWithoutPrefix = normalizeLookupValue(
-    row.id.replace(/^hazard-/, "").replace(/^solution-type-/, ""),
-  );
+function matchesSearch(item: SolutionRepositoryItemRecord, value: string | undefined) {
+  const search = value?.trim().toLowerCase();
 
-  return [normalizedId, normalizedLabel, normalizedIdWithoutPrefix].includes(
-    normalizedValue,
+  if (!search) {
+    return true;
+  }
+
+  return [item.name, item.summary, item.description].some((text) =>
+    text?.toLowerCase().includes(search),
   );
+}
+
+function readSeedFile(sourcePath: string) {
+  return JSON.parse(readFileSync(sourcePath, "utf8")) as SolutionSeedFile;
+}
+
+function resolveSeedFilePath() {
+  const configuredPath = process.env.CHART_SOLUTION_REPOSITORY_SNAPSHOT_FILE;
+  const candidates = configuredPath ? [configuredPath] : defaultSeedCandidates;
+
+  for (const candidate of candidates) {
+    const sourcePath = resolve(process.cwd(), candidate);
+
+    if (existsSync(sourcePath)) {
+      return sourcePath;
+    }
+  }
+
+  throw new Error("Solution repository snapshot file does not exist.");
+}
+
+function normalizeTaxonomy(type: TaxonomyType, value: string) {
+  const label = normalizeTaxonomyLabel(value);
+  const prefix = type === "hazard" ? "hazard" : "solution-type";
+  const overrideKey = `${type}:${normalizeLookupValue(label)}`;
+
+  return {
+    id: taxonomyIdOverrides[overrideKey] ?? `${prefix}-${normalizeSlug(label)}`,
+    type,
+    label,
+  };
+}
+
+function normalizeTaxonomyLabel(value: string) {
+  const trimmedValue = value.trim();
+  return taxonomyAliases[normalizeLookupValue(trimmedValue)] ?? trimmedValue;
 }
 
 function normalizeLookupValue(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function intersectSets(left: Set<string>, right: Set<string>) {
-  return new Set([...left].filter((value) => right.has(value)));
+function uniqueTaxonomies(taxonomies: SolutionRepositoryTaxonomyRecord[]) {
+  const byId = new Map<string, SolutionRepositoryTaxonomyRecord>();
+
+  for (const taxonomy of taxonomies) {
+    byId.set(taxonomy.id, taxonomy);
+  }
+
+  return [...byId.values()].sort(compareTaxonomies);
+}
+
+function compareTaxonomies(
+  first: SolutionRepositoryTaxonomyRecord,
+  second: SolutionRepositoryTaxonomyRecord,
+) {
+  return (
+    first.type.localeCompare(second.type) || first.label.localeCompare(second.label)
+  );
+}
+
+function normalizeLinks(values: string[] | undefined) {
+  return (values ?? [])
+    .map((url): SolutionRepositoryItemRecord["links"][number] => ({
+      label: url,
+      url,
+    }))
+    .filter((link) => hasText(link.url));
+}
+
+function normalizeAssets(slug: string, item: SolutionSeedItem) {
+  const assets: SolutionRepositoryAssetRecord[] = [];
+
+  if (item.image) {
+    assets.push(mapAsset(`solution-asset-${slug}-image`, "image", item.image));
+  }
+
+  for (const [index, asset] of (item.caseStudies ?? []).entries()) {
+    assets.push(
+      mapAsset(`solution-asset-${slug}-case-study-${index}`, "case_study", asset),
+    );
+  }
+
+  return assets;
+}
+
+function mapAsset(
+  id: string,
+  kind: string,
+  asset: SolutionSeedAsset,
+): SolutionRepositoryAssetRecord {
+  return {
+    id,
+    kind,
+    filename: asset.filename ?? "Untitled attachment",
+    mimeType: asset.type ?? null,
+    sizeBytes: asset.size ?? null,
+    storageUrl: asset.url ?? null,
+    attribution: asset.attribution ?? null,
+  };
+}
+
+function normalizeCost(value: string | undefined) {
+  const normalizedValue = value?.trim().toLowerCase();
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  if (normalizedValue.includes("high") || normalizedValue.includes("💲💲💲")) {
+    return "high";
+  }
+
+  if (normalizedValue.includes("medium") || normalizedValue.includes("💲💲")) {
+    return "medium";
+  }
+
+  if (normalizedValue.includes("low") || normalizedValue.includes("💲")) {
+    return "low";
+  }
+
+  return normalizedValue;
+}
+
+function createSummary(description: string) {
+  const compactDescription = description.replace(/\s+/g, " ").trim();
+
+  if (compactDescription.length <= 220) {
+    return compactDescription;
+  }
+
+  return `${compactDescription.slice(0, 217).trim()}...`;
+}
+
+function resolveLimit(limit: number | undefined) {
+  if (!limit) {
+    return 100;
+  }
+
+  return Math.max(1, Math.min(limit, 100));
+}
+
+function normalizeSlug(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function hasText(value: string | undefined) {
+  return Boolean(value?.trim());
 }

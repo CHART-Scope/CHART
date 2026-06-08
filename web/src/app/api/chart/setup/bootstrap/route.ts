@@ -9,7 +9,7 @@ type BootstrapSetupRequest = {
   countryCode?: string;
   countryName?: string;
   geographyLevelLabel?: string;
-  hazardTaxonomyIds?: string[];
+  hazardIds?: string[];
   admin?: {
     username?: string;
     password?: string;

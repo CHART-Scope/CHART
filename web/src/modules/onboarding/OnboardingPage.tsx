@@ -47,7 +47,7 @@ const geographyLevelLabels = [
 export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPageProps) {
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [options, setOptions] = useState<SetupOptions | null>(null);
-  const [repositoryItems, setRepositoryItems] = useState<SolutionRepositoryItem[]>([]);
+  const [solutionItems, setSolutionItems] = useState<SolutionRepositoryItem[]>([]);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [selectedCountryCode, setSelectedCountryCode] = useState("");
   const [geographyLevelLabel, setGeographyLevelLabel] = useState("administrative area");
@@ -60,6 +60,7 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
   });
   const [activeStep, setActiveStep] = useState(0);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [setupMessage, setSetupMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const selectedCountry = useMemo(
@@ -67,7 +68,7 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
       countryOptions.find((country) => country.code === selectedCountryCode) ?? null,
     [selectedCountryCode],
   );
-  const hazardOptions = options?.hazardTaxonomies ?? [];
+  const hazardOptions = options?.hazards ?? [];
   const isAdmin = Boolean(session?.user.roles.includes("chart_admin"));
   const isFirstBootstrap = Boolean(
     status?.requiresOnboarding && status.counts.workspaceMembers === 0,
@@ -82,8 +83,12 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
     status && (isFirstBootstrap || (requiresAdminSetup && isAdmin)),
   );
   const repositoryGroups = useMemo(
-    () => groupSolutionsByHazard(repositoryItems, hazardOptions, selectedHazardIds),
-    [hazardOptions, repositoryItems, selectedHazardIds],
+    () => groupSolutionsByHazard(solutionItems, hazardOptions, selectedHazardIds),
+    [hazardOptions, solutionItems, selectedHazardIds],
+  );
+  const matchingRepositoryItemCount = repositoryGroups.reduce(
+    (total, group) => total + group.items.length,
+    0,
   );
   const completedSteps = [
     Boolean(selectedCountry),
@@ -110,7 +115,7 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
         const setupOptions = await getSetupOptions();
         const repository = await listPublicSolutions({ limit: "100" });
         setOptions(setupOptions);
-        setRepositoryItems(repository.items);
+        setSolutionItems(repository.items);
         setStatus(await getSetupStatus());
       } catch {
         setError("CHART setup options could not be loaded.");
@@ -192,6 +197,7 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
 
     setIsCompleting(true);
     setError(null);
+    setSetupMessage("Preparing workspace and importing matching action records.");
 
     try {
       if (isFirstBootstrap) {
@@ -199,13 +205,14 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
           countryCode: selectedCountry.code,
           countryName: selectedCountry.name,
           geographyLevelLabel,
-          hazardTaxonomyIds: selectedHazardIds,
+          hazardIds: selectedHazardIds,
           admin: adminUser,
         });
         const nextSession = await storeTokenSession(response.tokens);
 
         setSession(nextSession);
         setStatus(response.setup);
+        setSetupMessage(response.setup.solutionImport.message);
         onNavigate("landing");
         return;
       }
@@ -215,12 +222,13 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
           countryCode: selectedCountry.code,
           countryName: selectedCountry.name,
           geographyLevelLabel,
-          hazardTaxonomyIds: selectedHazardIds,
+          hazardIds: selectedHazardIds,
         },
         session?.accessToken,
       );
 
       setStatus(nextStatus);
+      setSetupMessage(nextStatus.solutionImport.message);
       onNavigate("landing");
     } catch (setupError) {
       setError(
@@ -228,6 +236,7 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
           ? setupError.message
           : "CHART onboarding could not be completed.",
       );
+      setSetupMessage(null);
     } finally {
       setIsCompleting(false);
     }
@@ -287,8 +296,8 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
             </div>
             <div className="setup-fact-grid">
               <div className="setup-fact">
-                <span>Repository actions</span>
-                <strong>{status.counts.repositoryItems}</strong>
+                <span>Configured hazards</span>
+                <strong>{status.counts.hazards}</strong>
               </div>
               <div className="setup-fact">
                 <span>Workspace members</span>
@@ -298,7 +307,12 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
                 <span>Geographies</span>
                 <strong>{status.counts.geographies}</strong>
               </div>
+              <div className="setup-fact">
+                <span>Repository actions</span>
+                <strong>{status.counts.workspaceSolutions}</strong>
+              </div>
             </div>
+            <p>{status.solutionImport.message}</p>
             <div className="hero-button-row">
               <button
                 className="primary-button"
@@ -371,6 +385,9 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
         ) : null}
 
         {error ? <div className="auth-error onboarding-error">{error}</div> : null}
+        {setupMessage ? (
+          <div className="onboarding-status-message">{setupMessage}</div>
+        ) : null}
 
         {canUseWizard ? (
           <section className="onboarding-builder-grid">
@@ -464,13 +481,18 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
                 <div className="setup-fact-grid">
                   <div className="setup-fact">
                     <span>Repository actions</span>
-                    <strong>{status?.counts.repositoryItems ?? 0}</strong>
+                    <strong>{matchingRepositoryItemCount}</strong>
                   </div>
                   <div className="setup-fact">
                     <span>Selected hazards</span>
                     <strong>{selectedHazardIds.length}</strong>
                   </div>
                 </div>
+                <p className="onboarding-muted-copy">
+                  Finishing setup imports these matching actions into the workspace
+                  snapshot so planning can continue even if the repository service is
+                  unavailable later.
+                </p>
                 <div className="onboarding-repository-preview">
                   {repositoryGroups.map((group) => (
                     <div className="onboarding-repository-group" key={group.id}>

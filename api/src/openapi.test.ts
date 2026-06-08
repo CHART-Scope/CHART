@@ -50,6 +50,8 @@ test("GET /openapi.json returns the current API contract as JSON", async () => {
   assert.ok(body.paths["/geographies"]);
   assert.ok(body.paths["/solutions"]);
   assert.ok(body.paths["/solutions/{slug}"]);
+  assert.ok(body.paths["/users"]);
+  assert.equal(body.paths["/users"].post.operationId, "createUser");
   assert.ok(body.paths["/workspaces"]);
 
   await app.close();

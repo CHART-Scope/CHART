@@ -3,67 +3,33 @@ import { existsSync, readFileSync } from "node:fs";
 import { sql } from "drizzle-orm";
 
 import { closeDb, db } from "./client.js";
-import {
-  countryGeoConfig,
-  dataSources,
-  geographies,
-  solutionRepositoryTaxonomies,
-} from "./schema.js";
-import { importSolutionRepositorySeedFile } from "../modules/solution-repository/seed.js";
+import { countryGeoConfig, dataSources, geographies, hazards } from "./schema.js";
 
 type GeographySeedFile = {
   countryGeoConfig?: (typeof countryGeoConfig.$inferInsert)[];
   geographies?: (typeof geographies.$inferInsert)[];
 };
 
-const solutionRepositoryTaxonomySeed: (typeof solutionRepositoryTaxonomies.$inferInsert)[] =
-  [
-    { id: "hazard-storm", type: "hazard", label: "Storm" },
-    { id: "hazard-extreme-heat", type: "hazard", label: "Extreme heat" },
-    {
-      id: "hazard-increased-temperature",
-      type: "hazard",
-      label: "Increased temperature",
-    },
-    { id: "hazard-earthquake", type: "hazard", label: "Earthquake" },
-    { id: "hazard-flood", type: "hazard", label: "Flood" },
-    { id: "hazard-sea-level-rise", type: "hazard", label: "Sea level rise" },
-    { id: "hazard-cold-wave", type: "hazard", label: "Cold wave" },
-    { id: "hazard-drought", type: "hazard", label: "Drought" },
-    { id: "hazard-wildfire", type: "hazard", label: "Wildfire" },
-    {
-      id: "hazard-increased-co2-levels",
-      type: "hazard",
-      label: "Increased CO2 levels",
-    },
-    { id: "hazard-landslide", type: "hazard", label: "Landslide" },
-    { id: "hazard-tsunami", type: "hazard", label: "Tsunami" },
-    { id: "hazard-volcano", type: "hazard", label: "Volcano" },
-    { id: "hazard-cyclone", type: "hazard", label: "Cyclone" },
-    { id: "solution-type-wash", type: "solution_type", label: "WASH" },
-    {
-      id: "solution-type-health-workforce",
-      type: "solution_type",
-      label: "Health workforce",
-    },
-    { id: "solution-type-energy", type: "solution_type", label: "Energy" },
-    {
-      id: "solution-type-infrastructure",
-      type: "solution_type",
-      label: "Infrastructure",
-    },
-    {
-      id: "solution-type-products-technology",
-      type: "solution_type",
-      label: "Products and technology",
-    },
-    {
-      id: "solution-type-service-delivery",
-      type: "solution_type",
-      label: "Service delivery",
-    },
-    { id: "solution-type-communities", type: "solution_type", label: "Communities" },
-  ];
+const hazardSeed: (typeof hazards.$inferInsert)[] = [
+  { id: "hazard-storm", label: "Storm", sortOrder: 10 },
+  { id: "hazard-extreme-heat", label: "Extreme heat", sortOrder: 20 },
+  {
+    id: "hazard-increased-temperature",
+    label: "Increased temperature",
+    sortOrder: 30,
+  },
+  { id: "hazard-earthquake", label: "Earthquake", sortOrder: 40 },
+  { id: "hazard-flood", label: "Flood", sortOrder: 50 },
+  { id: "hazard-sea-level-rise", label: "Sea level rise", sortOrder: 60 },
+  { id: "hazard-cold-wave", label: "Cold wave", sortOrder: 70 },
+  { id: "hazard-drought", label: "Drought", sortOrder: 80 },
+  { id: "hazard-wildfire", label: "Wildfire", sortOrder: 90 },
+  { id: "hazard-increased-co2-levels", label: "Increased CO2 levels", sortOrder: 100 },
+  { id: "hazard-landslide", label: "Landslide", sortOrder: 110 },
+  { id: "hazard-tsunami", label: "Tsunami", sortOrder: 120 },
+  { id: "hazard-volcano", label: "Volcano", sortOrder: 130 },
+  { id: "hazard-cyclone", label: "Cyclone", sortOrder: 140 },
+];
 
 const dataSourceSeed: (typeof dataSources.$inferInsert)[] = [
   {
@@ -73,6 +39,15 @@ const dataSourceSeed: (typeof dataSources.$inferInsert)[] = [
     name: "DHIS2 health data",
     baseUrl: process.env.DHIS2_BASE_URL?.replace(/\/+$/, "") || null,
     authMode: process.env.DHIS2_AUTH_MODE || "pat",
+    enabled: true,
+  },
+  {
+    id: "chart-solution-repository",
+    kind: "solutions",
+    provider: "CHART",
+    name: "CHART solution repository",
+    baseUrl: process.env.CHART_SOLUTION_REPOSITORY_URL?.replace(/\/+$/, "") || null,
+    authMode: "public_snapshot",
     enabled: true,
   },
 ];
@@ -117,13 +92,14 @@ try {
     }
 
     await tx
-      .insert(solutionRepositoryTaxonomies)
-      .values(solutionRepositoryTaxonomySeed)
+      .insert(hazards)
+      .values(hazardSeed)
       .onConflictDoUpdate({
-        target: solutionRepositoryTaxonomies.id,
+        target: hazards.id,
         set: {
-          type: sql`excluded.type`,
           label: sql`excluded.label`,
+          active: sql`excluded.active`,
+          sortOrder: sql`excluded.sort_order`,
           updatedAt: sql`now()`,
         },
       });
@@ -144,14 +120,6 @@ try {
         },
       });
   });
-
-  const solutionSeedResult = await importSolutionRepositorySeedFile();
-
-  if (solutionSeedResult.status === "imported") {
-    console.log(
-      `Imported ${solutionSeedResult.importedItems} solution repository items from ${solutionSeedResult.sourcePath}.`,
-    );
-  }
 } finally {
   await closeDb();
 }
