@@ -13,7 +13,7 @@ on:
       - "web/tsconfig.json"
   push:
     branches:
-      - main
+      - dev
     paths:
       - ".github/workflows/storybook-pages.yml"
       - "Makefile"
@@ -50,7 +50,7 @@ jobs:
         run: npm ci
 
       - name: Check Storybook formatting
-        run: npx prettier --check web/.storybook web/src/modules/ui package.json package-lock.json
+        run: npx prettier --check web/.storybook web/src/modules/ui web/src/modules/solutions package.json package-lock.json
 
       - name: Typecheck web
         run: npm run typecheck:web
