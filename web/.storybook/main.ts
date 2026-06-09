@@ -7,6 +7,33 @@ const config: StorybookConfig = {
     name: "@storybook/nextjs-vite",
     options: {},
   },
+  async viteFinal(config) {
+    const stableOutputNames = {
+      assetFileNames: "assets/[name][extname]",
+      chunkFileNames: "assets/[name].js",
+      entryFileNames: "assets/[name].js",
+    };
+    const existingOutput = config.build?.rollupOptions?.output;
+
+    return {
+      ...config,
+      build: {
+        ...config.build,
+        rollupOptions: {
+          ...config.build?.rollupOptions,
+          output: Array.isArray(existingOutput)
+            ? existingOutput.map((output) => ({
+                ...output,
+                ...stableOutputNames,
+              }))
+            : {
+                ...existingOutput,
+                ...stableOutputNames,
+              },
+        },
+      },
+    };
+  },
 };
 
 export default config;
