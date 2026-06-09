@@ -4,12 +4,14 @@ import type {
   HealthOutcomeRepositoryItem,
 } from "./SolutionRepositoryComponents";
 
-const heatImage =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 800'%3E%3Crect width='1200' height='800' fill='%23fff0d8'/%3E%3Ccircle cx='905' cy='165' r='96' fill='%23f59e0b'/%3E%3Cpath d='M0 610c136-58 254-74 360-43 127 37 202 122 357 85 136-33 224-128 363-86 58 17 96 44 120 69v165H0z' fill='%23dc7633'/%3E%3Cpath d='M0 704c170-42 322-37 456 13 145 54 265 55 430 5 126-38 225-35 314 11v67H0z' fill='%238c4a2f'/%3E%3C/svg%3E";
-const floodImage =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 800'%3E%3Crect width='1200' height='800' fill='%23dff7fb'/%3E%3Cpath d='M0 565c105-28 187-22 270 16 102 47 196 53 314 4 133-55 236-55 364 5 89 42 171 48 252 18v192H0z' fill='%230e7490'/%3E%3Cpath d='M0 688c119-40 219-36 325 8 121 50 227 48 348-5 150-66 278-44 527 19v90H0z' fill='%230f5068'/%3E%3C/svg%3E";
-const communityImage =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 800'%3E%3Crect width='1200' height='800' fill='%23e9f7ef'/%3E%3Cpath d='M130 520h760V240L510 95 130 240z' fill='%232f8f62'/%3E%3Cpath d='M242 520h586V300H242z' fill='%23ffffff'/%3E%3Cpath d='M332 520V374h142v146zm230 0V374h142v146z' fill='%23bde7d0'/%3E%3Cpath d='M0 646c160-72 309-80 446-24 130 53 250 66 406 8 90-34 168-37 348-7v177H0z' fill='%231f6f54'/%3E%3C/svg%3E";
+const storybookCardImage = new URL(
+  "./assets/storybook-card-image.png",
+  import.meta.url,
+).toString();
+
+const heatImage = storybookCardImage;
+const floodImage = storybookCardImage;
+const communityImage = storybookCardImage;
 
 export const mentalHealthScreening = createSolution({
   slug: "mental-health-screening-form",
@@ -215,7 +217,7 @@ export const chartRepositoryHazards: HazardRepositoryItem[] = [
     priorityGroups: ["Smallholder households", "Rural clinics", "Children under five"],
     healthOutcomes: [mentalHealthOutcome],
     solutions: [mentalHealthScreening],
-    imageUrl: null,
+    imageUrl: communityImage,
   },
 ];
 
@@ -268,8 +270,8 @@ function createSolution(input: {
             {
               id: `solution-asset-${input.slug}-image`,
               kind: "image",
-              filename: `${input.slug}.svg`,
-              mimeType: "image/svg+xml",
+              filename: `${input.slug}.png`,
+              mimeType: "image/png",
               sizeBytes: null,
               storageUrl: input.imageUrl,
               attribution: "CHART story asset",
