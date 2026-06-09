@@ -11,7 +11,7 @@ data/
 docs/
 web/payload-types.ts
 web/src/app/(payload)/admin/importMap.ts
-solution-repository/payload-types.ts
-solution-repository/src/app/(payload)/admin/importMap.ts
+chart-repository/payload-types.ts
+chart-repository/src/app/(payload)/admin/importMap.ts
 
 package-lock.json

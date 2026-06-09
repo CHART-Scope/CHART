@@ -3,8 +3,8 @@
 CHART is a climate-health planning platform. This repository is a monorepo:
 
 - `web`: Next web app for the public site, onboarding, dashboard, map UI, and public action repository.
-- `api`: Fastify API for backend modules such as auth, role/geography context, and data ingestion.
-- `solution-repository`: standalone Payload CMS service for maintaining published solution repository data. CHART core does not require it locally.
+- `api`: Fastify API for backend modules such as auth, role/geography context, workspaces, and public chart-repository reads.
+- `chart-repository`: standalone Payload CMS and public repository API for maintaining published CHART repository data. CHART core does not require it locally.
 - `docker-compose.yml`: local Postgres and Keycloak for development infrastructure.
 - `data/`: ignored local seed/import outputs.
 - `docs/`: ignored local planning notes.
@@ -43,8 +43,8 @@ CHART app tables.
 Reference data is deployment-configurable:
 
 - `CHART_GEOGRAPHY_SEED_FILE`: optional JSON file for the deployer's geography hierarchy.
-- `CHART_SOLUTION_REPOSITORY_SNAPSHOT_FILE`: optional JSON snapshot for public solution repository reads. If unset, the bundled development snapshot under `api/src/modules/solution-repository/seed-data/seed.json` is used.
-- `CHART_SOLUTION_REPOSITORY_URL`: optional public solution repository service URL for future remote adapter flows.
+- `CHART_REPOSITORY_SNAPSHOT_FILE`: optional JSON snapshot for public repository reads. If unset, the bundled development snapshot under `api/src/services/chart-repository/seed-data/seed.json` is used.
+- `CHART_REPOSITORY_URL`: optional public CHART repository service URL. When set, the API reads published repository content from that service; otherwise it uses the bundled snapshot.
 
 Seed sign-in users are available through Keycloak at `http://127.0.0.1:8080`:
 
@@ -66,47 +66,29 @@ deployment-specific level.
 - `cross_sector_implementation_officer`
 - `public_viewer`
 
-## DHIS2 health data source
+## CHART repository boundary
 
-CHART connects to DHIS2 as a health data source. Keep DHIS2 credentials in environment
-variables; do not store secrets in Postgres.
+CHART core has a repository gateway in `api/src/services/chart-repository`.
+The Fastify API exposes thin `hazards` and `solutions` route modules that read
+through that service. It uses a public JSON snapshot for local development and can
+read from the hosted `chart-repository` service through `CHART_REPOSITORY_URL`.
+It does not own repository database tables.
 
-Recommended configuration is a DHIS2 Personal Access Token from a dedicated read-only
-service user:
+Onboarding still asks for priority hazards so dashboards can be personalized, but
+those choices come from the gateway and are stored only as setup context.
 
-```bash
-DHIS2_BASE_URL=https://dhis2.example.org
-DHIS2_API_VERSION=41
-DHIS2_AUTH_MODE=pat
-DHIS2_API_TOKEN=d2pat_...
-```
-
-The API exposes masked config and a connection check:
-
-```bash
-curl http://127.0.0.1:3200/sources/dhis2/config
-curl -X POST http://127.0.0.1:3200/sources/dhis2/test-connection
-```
-
-DHIS2 organisation units should be mapped into CHART geographies through
-`external_geography_mappings`; DHIS2 should not replace CHART's geography model.
-
-## Solution repository boundary
-
-CHART core has a solution repository adapter in `api/src/modules/solution-repository`.
-It reads from a public JSON snapshot for local development and should later read from
-the hosted repository service. It does not own solution repository database tables.
-
-The Payload CMS implementation lives separately in `solution-repository/`. It owns
-editing, media, publishing workflow, and repository auth. It can later be split into a
-separate repository without changing CHART core.
+The Payload CMS implementation lives separately in `chart-repository/`. It owns
+editing, media, publishing workflow, repository auth, and the public repository API.
+That service can publish richer repository-owned content such as health implications
+without making CHART core own those database tables.
+It can later be split into a separate repository without changing CHART core.
 
 Dependency direction:
 
 ```txt
-solution-repository publishes data
+chart-repository publishes data
         ↓
-api reads public snapshot/API responses
+api reads public snapshot/API responses through services/chart-repository
         ↓
 web reads from api
 ```

@@ -12,10 +12,6 @@ import {
   type SetupStatus,
 } from "../../lib/setupClient";
 import {
-  listPublicSolutions,
-  type SolutionRepositoryItem,
-} from "../../lib/solutionRepositoryClient";
-import {
   getStoredAuthSession,
   storeTokenSession,
   type AuthSession,
@@ -29,12 +25,7 @@ type OnboardingPageProps = {
   onNavigate: (route: ChartRoute) => void;
 };
 
-const setupSteps = [
-  "Choose geography",
-  "Select hazards",
-  "Prepare repository",
-  "Create admin",
-] as const;
+const setupSteps = ["Choose geography", "Select hazards", "Create admin"] as const;
 
 const geographyLevelLabels = [
   "administrative area",
@@ -47,7 +38,6 @@ const geographyLevelLabels = [
 export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPageProps) {
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [options, setOptions] = useState<SetupOptions | null>(null);
-  const [solutionItems, setSolutionItems] = useState<SolutionRepositoryItem[]>([]);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [selectedCountryCode, setSelectedCountryCode] = useState("");
   const [geographyLevelLabel, setGeographyLevelLabel] = useState("administrative area");
@@ -69,6 +59,9 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
     [selectedCountryCode],
   );
   const hazardOptions = options?.hazards ?? [];
+  const selectedHazardLabels = hazardOptions
+    .filter((hazard) => selectedHazardIds.includes(hazard.id))
+    .map((hazard) => hazard.label);
   const isAdmin = Boolean(session?.user.roles.includes("chart_admin"));
   const isFirstBootstrap = Boolean(
     status?.requiresOnboarding && status.counts.workspaceMembers === 0,
@@ -82,18 +75,9 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
   const canUseWizard = Boolean(
     status && (isFirstBootstrap || (requiresAdminSetup && isAdmin)),
   );
-  const repositoryGroups = useMemo(
-    () => groupSolutionsByHazard(solutionItems, hazardOptions, selectedHazardIds),
-    [hazardOptions, solutionItems, selectedHazardIds],
-  );
-  const matchingRepositoryItemCount = repositoryGroups.reduce(
-    (total, group) => total + group.items.length,
-    0,
-  );
   const completedSteps = [
     Boolean(selectedCountry),
     selectedHazardIds.length > 0,
-    repositoryGroups.some((group) => group.items.length > 0),
     isFirstBootstrap
       ? Boolean(
           adminUser.name.trim() &&
@@ -112,40 +96,20 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
 
     async function loadSetup() {
       try {
-        const setupOptions = await getSetupOptions();
-        const repository = await listPublicSolutions({ limit: "100" });
-        setOptions(setupOptions);
-        setSolutionItems(repository.items);
-        setStatus(await getSetupStatus());
+        const [nextStatus, nextOptions] = await Promise.all([
+          getSetupStatus(),
+          getSetupOptions(),
+        ]);
+
+        setStatus(nextStatus);
+        setOptions(nextOptions);
       } catch {
-        setError("CHART setup options could not be loaded.");
+        setError("CHART setup status could not be loaded.");
       }
     }
 
     void loadSetup();
   }, []);
-
-  useEffect(() => {
-    if (selectedHazardIds.length > 0 || hazardOptions.length === 0) {
-      return;
-    }
-
-    const defaultHazard =
-      hazardOptions.find((hazard) => hazard.id === "hazard-extreme-heat") ??
-      hazardOptions[0];
-
-    setSelectedHazardIds([defaultHazard.id]);
-  }, [hazardOptions, selectedHazardIds.length]);
-
-  function toggleHazard(taxonomyId: string) {
-    setSelectedHazardIds((currentIds) => {
-      if (currentIds.includes(taxonomyId)) {
-        return currentIds.filter((currentId) => currentId !== taxonomyId);
-      }
-
-      return [...currentIds, taxonomyId];
-    });
-  }
 
   function continueSetup() {
     if (activeStep === 0 && !selectedCountry) {
@@ -154,17 +118,25 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
     }
 
     if (activeStep === 1 && selectedHazardIds.length === 0) {
-      setError("Select at least one climate hazard to onboard.");
+      setError("Choose at least one hazard to personalize this dashboard.");
       return;
     }
 
-    if (activeStep === 3 && isFirstBootstrap && adminUser.password.length < 8) {
+    if (activeStep === 2 && isFirstBootstrap && adminUser.password.length < 8) {
       setError("Use a password with at least 8 characters for the first admin.");
       return;
     }
 
     setError(null);
     setActiveStep((step) => Math.min(setupSteps.length - 1, step + 1));
+  }
+
+  function toggleHazard(hazardId: string) {
+    setSelectedHazardIds((currentIds) =>
+      currentIds.includes(hazardId)
+        ? currentIds.filter((currentId) => currentId !== hazardId)
+        : [...currentIds, hazardId],
+    );
   }
 
   async function finishSetup() {
@@ -174,7 +146,7 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
     }
 
     if (!status.requiresOnboarding) {
-      onNavigate("landing");
+      onNavigate("dashboard");
       return;
     }
 
@@ -186,7 +158,7 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
 
     if (selectedHazardIds.length === 0) {
       setActiveStep(1);
-      setError("Select at least one climate hazard to onboard.");
+      setError("Choose at least one hazard to personalize this dashboard.");
       return;
     }
 
@@ -197,7 +169,7 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
 
     setIsCompleting(true);
     setError(null);
-    setSetupMessage("Preparing workspace and importing matching action records.");
+    setSetupMessage("Creating deployment geography and workspace.");
 
     try {
       if (isFirstBootstrap) {
@@ -212,8 +184,8 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
 
         setSession(nextSession);
         setStatus(response.setup);
-        setSetupMessage(response.setup.solutionImport.message);
-        onNavigate("landing");
+        setSetupMessage("Setup complete.");
+        onNavigate("dashboard");
         return;
       }
 
@@ -228,8 +200,8 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
       );
 
       setStatus(nextStatus);
-      setSetupMessage(nextStatus.solutionImport.message);
-      onNavigate("landing");
+      setSetupMessage("Setup complete.");
+      onNavigate("dashboard");
     } catch (setupError) {
       setError(
         setupError instanceof Error
@@ -269,8 +241,8 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
             <span className="section-kicker">Required setup</span>
             <h1>Onboard a CHART deployment before planning starts</h1>
             <p>
-              Choose the country, select priority climate hazards, prepare the public
-              action repository, and connect the first administrator account.
+              Choose the country, configure the first geography level, select priority
+              hazards, and connect the first administrator account.
             </p>
           </div>
           <div className="onboarding-progress-card" aria-label="Setup progress">
@@ -296,10 +268,6 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
             </div>
             <div className="setup-fact-grid">
               <div className="setup-fact">
-                <span>Configured hazards</span>
-                <strong>{status.counts.hazards}</strong>
-              </div>
-              <div className="setup-fact">
                 <span>Workspace members</span>
                 <strong>{status.counts.workspaceMembers}</strong>
               </div>
@@ -308,11 +276,10 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
                 <strong>{status.counts.geographies}</strong>
               </div>
               <div className="setup-fact">
-                <span>Repository actions</span>
-                <strong>{status.counts.workspaceSolutions}</strong>
+                <span>Selected hazards</span>
+                <strong>{status.selectedHazards.length}</strong>
               </div>
             </div>
-            <p>{status.solutionImport.message}</p>
             <div className="hero-button-row">
               <button
                 className="primary-button"
@@ -378,7 +345,7 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
                 onClick={() => setActiveStep(index)}
               >
                 <span>{index + 1}</span>
-                <strong>{step}</strong>
+                <span className="onboarding-step-label">{step}</span>
               </button>
             ))}
           </section>
@@ -438,15 +405,15 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
               <article className="onboarding-selection-card onboarding-step-panel">
                 <div className="onboarding-card-head">
                   <span className="section-kicker">2. Select hazards</span>
-                  <h2>Priority climate hazards</h2>
+                  <h2>Priority hazards for the dashboard</h2>
                   <p>
-                    These hazards decide which action repository records and planning
-                    prompts the first workspace starts with.
+                    These options come from the chart repository API and are stored only
+                    as setup context for dashboard personalization.
                   </p>
                 </div>
-                <div className="hazard-choice-grid">
-                  {hazardOptions.length > 0 ? (
-                    hazardOptions.map((hazard) => (
+                {hazardOptions.length > 0 ? (
+                  <div className="hazard-choice-grid">
+                    {hazardOptions.map((hazard) => (
                       <button
                         className={`hazard-choice ${
                           selectedHazardIds.includes(hazard.id) ? "selected" : ""
@@ -457,74 +424,20 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
                       >
                         {hazard.label}
                       </button>
-                    ))
-                  ) : (
-                    <div className="empty-panel">
-                      <h2>No hazards available yet</h2>
-                      <p>CHART could not load the initial action repository choices.</p>
-                    </div>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="onboarding-muted-copy">
+                    Hazard options are not available from the chart repository API yet.
+                  </p>
+                )}
               </article>
             ) : null}
 
             {activeStep === 2 ? (
               <article className="onboarding-selection-card onboarding-step-panel">
                 <div className="onboarding-card-head">
-                  <span className="section-kicker">3. Prepare repository</span>
-                  <h2>Actions matching selected hazards</h2>
-                  <p>
-                    Review the action repository records CHART will surface first for
-                    the hazards selected in this setup.
-                  </p>
-                </div>
-                <div className="setup-fact-grid">
-                  <div className="setup-fact">
-                    <span>Repository actions</span>
-                    <strong>{matchingRepositoryItemCount}</strong>
-                  </div>
-                  <div className="setup-fact">
-                    <span>Selected hazards</span>
-                    <strong>{selectedHazardIds.length}</strong>
-                  </div>
-                </div>
-                <p className="onboarding-muted-copy">
-                  Finishing setup imports these matching actions into the workspace
-                  snapshot so planning can continue even if the repository service is
-                  unavailable later.
-                </p>
-                <div className="onboarding-repository-preview">
-                  {repositoryGroups.map((group) => (
-                    <div className="onboarding-repository-group" key={group.id}>
-                      <div>
-                        <strong>{group.label}</strong>
-                        <span>{group.items.length} actions</span>
-                      </div>
-                      <div className="onboarding-solution-strip">
-                        {group.items.slice(0, 4).map((item) => (
-                          <article className="onboarding-solution-card" key={item.id}>
-                            <strong>{item.name}</strong>
-                            <p>{item.summary ?? item.description}</p>
-                          </article>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={() => onNavigate("solutions")}
-                >
-                  Preview public repository
-                </button>
-              </article>
-            ) : null}
-
-            {activeStep === 3 ? (
-              <article className="onboarding-selection-card onboarding-step-panel">
-                <div className="onboarding-card-head">
-                  <span className="section-kicker">4. Create admin</span>
+                  <span className="section-kicker">3. Create admin</span>
                   <h2>First administrator account</h2>
                   <p>
                     This account becomes the first owner for the selected country
@@ -596,7 +509,11 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
               <h2>{selectedCountry?.name ?? "Choose a country"} deployment</h2>
               <p>
                 {selectedCountry
-                  ? `${selectedCountry.name} will start with ${geographyLevelLabel} as a configurable geography label.`
+                  ? `${selectedCountry.name} will start with ${geographyLevelLabel} as a configurable geography label${
+                      selectedHazardLabels.length > 0
+                        ? ` and ${selectedHazardLabels.length} selected hazard${selectedHazardLabels.length === 1 ? "" : "s"} for the dashboard.`
+                        : "."
+                    }`
                   : "Select a country to connect the map and geography model."}
               </p>
             </div>
@@ -633,22 +550,4 @@ export function OnboardingPage({ countryOptions, onNavigate }: OnboardingPagePro
       </main>
     </div>
   );
-}
-
-function groupSolutionsByHazard(
-  items: SolutionRepositoryItem[],
-  hazards: { id: string; label: string }[],
-  selectedHazardIds: string[],
-) {
-  return selectedHazardIds.map((hazardId) => {
-    const hazard = hazards.find((candidate) => candidate.id === hazardId);
-
-    return {
-      id: hazardId,
-      label: hazard?.label ?? hazardId,
-      items: items.filter((item) =>
-        item.taxonomies.some((taxonomy) => taxonomy.id === hazardId),
-      ),
-    };
-  });
 }

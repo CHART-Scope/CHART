@@ -11,6 +11,7 @@ export type ChartUserRecord = {
   userId: string;
   username: string;
   email?: string;
+  phone?: string;
   displayName: string;
   status: "active" | "disabled";
   roles: ChartRole[];
@@ -20,6 +21,7 @@ export type ChartUserRecord = {
 export type CreateUserInput = {
   name: string;
   email: string;
+  phone?: string;
   username: string;
   password: string;
   roles: ChartRole[];

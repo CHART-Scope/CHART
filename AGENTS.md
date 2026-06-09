@@ -17,7 +17,7 @@ CHART is a monorepo. Do not treat the root as a Next app.
 
 - `web`: CHART Next web app.
 - `api`: Fastify backend API.
-- `solution-repository`: separate Payload CMS service for maintaining published solution repository data. It is not required to run CHART core.
+- `chart-repository`: separate Payload CMS service for maintaining published chart repository data. It is not required to run CHART core.
 - `data/`: local generated seed/import outputs, ignored by git.
 - `docs/`: local planning notes, ignored by git.
 
@@ -29,17 +29,22 @@ Use this structure:
 
 ```txt
 api/
-  src/modules/solution-repository/
-    routes.ts
+  src/services/chart-repository/
     service.ts
     types.ts
     seed-data/
+  src/modules/hazards/
+    routes.ts
+    routes.test.ts
+  src/modules/solutions/
+    routes.ts
+    routes.test.ts
 
 web/
   src/modules/solutions/
   src/lib/solutionRepositoryClient.ts
 
-solution-repository/
+chart-repository/
   payload.config.ts
   src/collections/
   src/app/(payload)/
@@ -48,22 +53,23 @@ solution-repository/
   docker-compose.yml
 ```
 
-The two solution-repository directories mean different things:
+The chart repository directories mean different things:
 
-- `api/src/modules/solution-repository`: CHART adapter and routes for reading a public repository snapshot/API. It must not define repository-owned Drizzle tables.
-- `solution-repository`: standalone Payload CMS service that owns editing, media, publishing workflow, and repository auth.
+- `api/src/services/chart-repository`: CHART adapter for reading a public repository snapshot/API. It must not define repository-owned Drizzle tables.
+- `api/src/modules/hazards` and `api/src/modules/solutions`: thin Fastify route modules that call the adapter.
+- `chart-repository`: standalone Payload CMS service that owns editing, media, publishing workflow, and repository auth.
 
 Dependency direction:
 
 ```txt
-solution-repository publishes data
+chart-repository publishes data
         ↓
 api reads public snapshot/API responses
         ↓
 web reads from api
 ```
 
-Never import from `solution-repository/` into `api/` or `web/`. Use an HTTP API or public JSON snapshot instead.
+Never import from `chart-repository/` into `api/` or `web/`. Use an HTTP API or public JSON snapshot instead.
 
 ## Current Stack
 
@@ -77,11 +83,10 @@ Never import from `solution-repository/` into `api/` or `web/`. Use an HTTP API 
 Build in this order:
 
 1. `auth`
-2. `data-ingestion`
-3. `planning-workspace`
-4. `dashboard`
-5. `planning`
-6. `budget-justification`
+2. `planning-workspace`
+3. `dashboard`
+4. `planning`
+5. `budget-justification`
 
 ## General Rules
 

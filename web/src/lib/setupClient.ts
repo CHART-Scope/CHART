@@ -4,19 +4,14 @@ export type SetupStatus = {
   countryCode?: string;
   countryName?: string;
   rootGeographyId?: string;
-  workspaceId?: string;
   firstAdminUserId?: string;
+  selectedHazards: {
+    id: string;
+    label: string;
+  }[];
   counts: {
     geographies: number;
-    hazards: number;
     workspaceMembers: number;
-    workspaceSolutions: number;
-  };
-  solutionImport: {
-    status: "not_started" | "completed" | "empty";
-    selectedHazards: number;
-    importedSolutions: number;
-    message: string;
   };
 };
 
@@ -57,9 +52,10 @@ export type SetupOptions = {
   }[];
 };
 
-export async function getSetupStatus() {
+export async function getSetupStatus(options: { signal?: AbortSignal } = {}) {
   const response = await fetch("/api/chart/setup/status", {
     cache: "no-store",
+    signal: options.signal,
   });
 
   if (!response.ok) {
@@ -155,11 +151,9 @@ function setupErrorMessage(errorCode: string | undefined) {
     case "SETUP_FORBIDDEN":
       return "Only a CHART administrator can change setup.";
     case "SETUP_HAZARD_INVALID":
-      return "One of the selected hazards is no longer available. Refresh and choose again.";
+      return "One or more selected hazards are no longer available from the chart repository.";
     case "SETUP_HAZARD_REQUIRED":
-      return "Select at least one climate hazard to onboard.";
-    case "SETUP_SOLUTION_IMPORT_FAILED":
-      return "CHART could not import matching action repository records. Check the repository service and try again.";
+      return "Choose at least one hazard to personalize this CHART deployment.";
     case "SETUP_IDENTITY_ADMIN_AUTH_FAILED":
     case "SETUP_IDENTITY_CONFIG_INVALID":
       return "CHART cannot connect to identity administration. Check the Keycloak admin configuration.";
