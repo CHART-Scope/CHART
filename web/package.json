@@ -8,7 +8,9 @@
     "build": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next build --webpack --experimental-build-mode compile && NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next build --webpack --experimental-build-mode generate-env",
     "start": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next start --hostname ${HOSTNAME:-127.0.0.1} --port ${PORT:-3100}",
     "seed": "payload run src/lib/seedChartContent.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "storybook": "NODE_PATH=$PWD/node_modules:$PWD/../node_modules storybook dev --port 6006 --host 127.0.0.1",
+    "build-storybook": "NODE_PATH=$PWD/node_modules:$PWD/../node_modules storybook build"
   },
   "dependencies": {
     "@payloadcms/db-postgres": "^3.63.0",
@@ -23,10 +25,14 @@
   },
   "devDependencies": {
     "@next/swc-wasm-nodejs": "16.2.6",
+    "@storybook/addon-a11y": "^9.1.20",
+    "@storybook/addon-docs": "^9.1.20",
+    "@storybook/nextjs-vite": "^9.1.20",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
+    "storybook": "^9.1.20",
     "typescript": "^5.9.3"
   }
 }

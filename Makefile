@@ -1,7 +1,7 @@
 NPM := $(shell command -v npm || command -v /opt/homebrew/bin/npm || command -v /usr/local/bin/npm)
 export PATH := $(dir $(NPM)):$(PATH)
 
-.PHONY: install web web-build web-start web-seed web-typecheck api api-build api-start api-test api-typecheck api-db-generate api-db-migrate api-db-check api-db-seed api-openapi-generate identity identity-down airtable-import format format-check
+.PHONY: install web web-build web-start web-seed web-typecheck web-storybook web-storybook-build api api-build api-start api-test api-typecheck api-db-generate api-db-migrate api-db-check api-db-seed api-openapi-generate identity identity-down airtable-import format format-check
 
 install:
 	$(NPM) install
@@ -20,6 +20,12 @@ web-seed:
 
 web-typecheck:
 	$(NPM) run typecheck:web
+
+web-storybook:
+	$(NPM) run storybook:web
+
+web-storybook-build:
+	$(NPM) run build-storybook:web
 
 api:
 	$(NPM) run dev:api

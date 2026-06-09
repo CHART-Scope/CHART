@@ -1,0 +1,28 @@
+.action-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.action-item-row:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.action-item-info {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.action-item-info strong {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.action-item-info span {
+  color: var(--ink-mute);
+  font-size: var(--text-xs);
+}
