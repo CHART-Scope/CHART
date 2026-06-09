@@ -1,82 +1,26 @@
-# CHART Governance
-
-This document describes how CHART maintainers guide project decisions and review
-changes.
-
-## Project Stewardship
+# Governance
 
 CHART is maintained by the CHART project maintainers under the CHART-Scope
-organization. Maintainers are responsible for keeping the platform useful,
-secure, testable, and aligned with climate-health planning needs.
+organization.
 
-## Decision Areas
+## Maintainers
 
-- Product direction: user flows, planning priorities, repository content model,
-  and public access expectations.
-- Technical direction: architecture, app boundaries, dependencies, CI, and
-  deployment workflow.
-- Data direction: seed data, repository snapshots, public API contracts,
-  attribution, and source quality.
-- Security direction: authentication, authorization, private data handling, and
-  incident response.
+Maintainers guide product direction, review contributions, manage releases, and
+protect the quality, security, and accessibility of the project.
 
-## Maintainer Responsibilities
+## Decisions
 
-Maintainers should:
+Most project decisions are made through pull request review and issue
+discussion. Larger decisions should be documented when they affect public API
+contracts, security, deployment, data ownership, or major dependencies.
 
-- Review pull requests for correctness, maintainability, product fit, and test
-  coverage.
-- Keep the `web`, `api`, and `chart-repository` boundaries clear.
-- Protect public content access and authenticated role/geography flows.
-- Avoid adding process that blocks small, useful contributions.
-- Document important decisions in repository docs or pull request discussions.
-- Escalate security and privacy concerns before merging affected changes.
+## Branches
 
-## Contribution Review
+`dev` is the active integration branch. Feature, fix, and documentation work
+should normally be proposed through pull requests into `dev`.
 
-Pull requests should be reviewed before merge. Reviewers should check:
+## Security
 
-- The change is scoped and understandable.
-- Required validation commands have passed.
-- User-facing behavior is covered by tests or clear manual verification.
-- API changes preserve stable response shapes or document migration needs.
-- New dependencies are justified.
-- Repository data and media attribution are preserved where relevant.
-
-## Branch Policy
-
-- `dev` is the active integration branch.
-- Feature, fix, and documentation branches should be merged into `dev` through
-  pull requests.
-- GitHub Pages Storybook deployment runs from `dev`.
-- Maintainers may use other release branches when needed for production or
-  deployment coordination.
-
-## Repository Boundary
-
-The standalone `chart-repository/` service owns editing, media, publishing
-workflow, repository auth, and public repository API behavior.
-
-CHART core reads public repository data through the Fastify gateway and public
-snapshots or remote APIs. CHART core must not import Payload CMS internals or own
-repository CMS tables.
-
-## Decision Process
-
-Most decisions can be made in pull request discussion. Larger decisions should
-be written down before implementation when they affect:
-
-- Auth or role/geography behavior.
-- Public API contracts.
-- Repository data ownership.
-- Deployment infrastructure.
-- New external services or major dependencies.
-
-If reviewers disagree, maintainers should choose the smallest reversible change
-that keeps the product moving while preserving the architecture boundaries.
-
-## Security Issues
-
-Security issues should not be disclosed in public issues or pull requests until
-maintainers have had time to assess and respond. Contact project maintainers
-privately with reproduction steps, affected areas, and any known impact.
+Do not report security issues in public issues or pull requests. Contact project
+maintainers privately with the affected area, reproduction steps, and known
+impact.
