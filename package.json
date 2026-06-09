@@ -11,6 +11,8 @@
     "build:web": "npm --workspace @chart/web run build",
     "start:web": "npm --workspace @chart/web run start",
     "typecheck:web": "npm --workspace @chart/web run typecheck",
+    "storybook:web": "npm --workspace @chart/web run storybook",
+    "build-storybook:web": "npm --workspace @chart/web run build-storybook",
     "dev:api": "npm --workspace @chart/api run dev",
     "build:api": "npm --workspace @chart/api run build",
     "start:api": "npm --workspace @chart/api run start",
