@@ -1,6 +1,6 @@
 import type { ChartRole } from "../auth/types.js";
 
-export type ChartUserStatus = "active" | "disabled";
+export type UserStatus = "active" | "disabled";
 
 export type UserGeographyScopeRecord = {
   geographyId: string;
@@ -9,19 +9,21 @@ export type UserGeographyScopeRecord = {
   levelLabel: string;
 };
 
-export type ChartUserRecord = {
+export type UserRecord = {
   userId: string;
   username: string;
   email?: string;
+  phone?: string;
   displayName: string;
-  status: ChartUserStatus;
+  status: UserStatus;
   roles: ChartRole[];
   geographyScopes: UserGeographyScopeRecord[];
 };
 
-export type CreateChartUserInput = {
+export type CreateUserInput = {
   name: string;
   email: string;
+  phone?: string;
   username: string;
   password: string;
   roles: ChartRole[];
@@ -65,13 +67,14 @@ export const userGeographyScopeSchema = {
   },
 } as const;
 
-export const chartUserRecordSchema = {
+export const userRecordSchema = {
   type: "object",
   required: ["userId", "username", "displayName", "status", "roles", "geographyScopes"],
   properties: {
     userId: { type: "string" },
     username: { type: "string" },
     email: { type: "string" },
+    phone: { type: "string" },
     displayName: { type: "string" },
     status: { type: "string", enum: ["active", "disabled"] },
     roles: {
@@ -96,18 +99,19 @@ export const chartUserRecordSchema = {
   },
 } as const;
 
-export const createChartUserBodySchema = {
+export const createUserBodySchema = {
   type: "object",
   required: ["name", "email", "username", "password", "roles", "geographyIds"],
   properties: {
     name: { type: "string", minLength: 2 },
     email: { type: "string", minLength: 3 },
+    phone: { type: "string", minLength: 3 },
     username: { type: "string", minLength: 2 },
     password: { type: "string", minLength: 8 },
     roles: {
       type: "array",
       minItems: 1,
-      items: chartUserRecordSchema.properties.roles.items,
+      items: userRecordSchema.properties.roles.items,
     },
     geographyIds: {
       type: "array",
