@@ -1,0 +1,79 @@
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 0.82rem 1.15rem;
+  color: var(--ink);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    transform var(--ease-default),
+    border-color var(--ease-default),
+    background var(--ease-default),
+    color var(--ease-default),
+    box-shadow var(--ease-default);
+}
+
+.ui-button:hover {
+  transform: translateY(-1px);
+}
+
+.ui-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(46, 148, 73, 0.14);
+}
+
+.ui-button:disabled,
+.ui-button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.ui-button-primary {
+  background: var(--blue);
+  color: #fff;
+}
+
+.ui-button-primary:hover {
+  background: var(--blue-hover);
+}
+
+.ui-button-green {
+  background: var(--green);
+  color: #fff;
+}
+
+.ui-button-green:hover {
+  background: var(--green-dark);
+}
+
+.ui-button-danger {
+  background: var(--red);
+  color: #fff;
+}
+
+.ui-button-danger:hover {
+  background: #c83e3e;
+}
+
+.ui-button-ghost {
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+}
+
+.ui-button-ghost:hover {
+  border-color: var(--green-soft);
+  background: var(--green-active);
+}
+
+.ui-button-compact {
+  padding: 0.48rem 0.76rem;
+  font-size: var(--text-sm);
+}
