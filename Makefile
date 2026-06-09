@@ -6,7 +6,7 @@ DRIZZLE_JOURNAL := api/drizzle/meta/_journal.json
 SOLUTION_REPOSITORY_DIR := solution-repository
 SOLUTION_REPOSITORY_COMPOSE := $(DOCKER) compose -f $(SOLUTION_REPOSITORY_DIR)/docker-compose.yml
 
-.PHONY: all help install run verify local-setup check-docker identity-wait web web-build web-start web-typecheck api api-build api-start api-test api-typecheck db-generate db-migrate db-check db-seed api-db-generate api-db-migrate api-db-check api-db-seed api-openapi-generate identity identity-sync identity-restart identity-down solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check ensure-drizzle-journal
+.PHONY: all help install run verify local-setup check-docker identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build api api-build api-start api-test api-typecheck db-generate db-migrate db-check db-seed api-db-generate api-db-migrate api-db-check api-db-seed api-openapi-generate identity identity-sync identity-restart identity-down solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check ensure-drizzle-journal
 
 help:
 	@printf "\nCHART commands\n"
@@ -59,6 +59,12 @@ web-start:
 
 web-typecheck:
 	$(NPM) run typecheck:web
+
+web-storybook:
+	$(NPM) run storybook:web
+
+web-storybook-build:
+	$(NPM) run build-storybook:web
 
 api:
 	$(NPM) run dev:api

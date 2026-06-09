@@ -1,0 +1,27 @@
+.loading-placeholder {
+  display: grid;
+  gap: 0.65rem;
+  padding: var(--space-sm) 0;
+}
+
+.loading-placeholder-line {
+  height: 0.75rem;
+  border-radius: var(--radius);
+  background: linear-gradient(
+    90deg,
+    var(--border) 25%,
+    var(--surface-alt) 50%,
+    var(--border) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

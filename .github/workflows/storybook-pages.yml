@@ -1,0 +1,86 @@
+name: Storybook Pages
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/storybook-pages.yml"
+      - "Makefile"
+      - "package.json"
+      - "package-lock.json"
+      - "web/.storybook/**"
+      - "web/package.json"
+      - "web/src/**"
+      - "web/tsconfig.json"
+  push:
+    branches:
+      - dev
+    paths:
+      - ".github/workflows/storybook-pages.yml"
+      - "Makefile"
+      - "package.json"
+      - "package-lock.json"
+      - "web/.storybook/**"
+      - "web/package.json"
+      - "web/src/**"
+      - "web/tsconfig.json"
+  workflow_dispatch:
+
+concurrency:
+  group: chart-storybook-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Storybook
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check Storybook formatting
+        run: npx prettier --check web/.storybook web/src/modules/ui web/src/modules/solutions package.json package-lock.json
+
+      - name: Typecheck web
+        run: npm run typecheck:web
+
+      - name: Build Storybook
+        run: npm run build-storybook:web
+
+      - name: Configure Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Storybook artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/storybook-static
+
+  deploy:
+    name: Deploy Storybook to GitHub Pages
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pages: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
