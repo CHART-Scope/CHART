@@ -9,8 +9,69 @@ type SolutionRepositoryItemCardProps = {
   onOpenDetail: (item: SolutionRepositoryItem) => void;
 };
 
+type SolutionRepositoryGridProps = {
+  items: SolutionRepositoryItem[];
+  onOpenDetail: (item: SolutionRepositoryItem) => void;
+};
+
 type SolutionRepositoryDetailDrawerProps = {
   item: SolutionRepositoryItem;
+  onClose: () => void;
+};
+
+export type HealthOutcomeRepositoryItem = {
+  id: string;
+  name: string;
+  summary: string;
+  description: string;
+  affectedGroups: string[];
+  indicators: { label: string; value: string }[];
+  relatedHazards: string[];
+  solutions: SolutionRepositoryItem[];
+  imageUrl?: string | null;
+};
+
+export type HazardRepositoryItem = {
+  id: string;
+  name: string;
+  summary: string;
+  description: string;
+  severity: string;
+  trend: string;
+  regionsAtRisk: string[];
+  priorityGroups: string[];
+  healthOutcomes: HealthOutcomeRepositoryItem[];
+  solutions: SolutionRepositoryItem[];
+  imageUrl?: string | null;
+};
+
+type HealthOutcomeRepositoryCardProps = {
+  item: HealthOutcomeRepositoryItem;
+  onOpenDetail: (item: HealthOutcomeRepositoryItem) => void;
+};
+
+type HealthOutcomeRepositoryGridProps = {
+  items: HealthOutcomeRepositoryItem[];
+  onOpenDetail: (item: HealthOutcomeRepositoryItem) => void;
+};
+
+type HealthOutcomeRepositoryDrawerProps = {
+  item: HealthOutcomeRepositoryItem;
+  onClose: () => void;
+};
+
+type HazardRepositoryCardProps = {
+  item: HazardRepositoryItem;
+  onOpenDetail: (item: HazardRepositoryItem) => void;
+};
+
+type HazardRepositoryGridProps = {
+  items: HazardRepositoryItem[];
+  onOpenDetail: (item: HazardRepositoryItem) => void;
+};
+
+type HazardRepositoryDrawerProps = {
+  item: HazardRepositoryItem;
   onClose: () => void;
 };
 
@@ -42,6 +103,23 @@ export function SolutionRepositoryItemCard({
         </div>
       </button>
     </article>
+  );
+}
+
+export function SolutionRepositoryGrid({
+  items,
+  onOpenDetail,
+}: SolutionRepositoryGridProps) {
+  return (
+    <section className="solution-repository-grid public-repository-grid">
+      {items.map((item) => (
+        <SolutionRepositoryItemCard
+          item={item}
+          key={item.id}
+          onOpenDetail={onOpenDetail}
+        />
+      ))}
+    </section>
   );
 }
 
@@ -103,6 +181,258 @@ export function SolutionRepositoryDetailDrawer({
       </aside>
     </div>
   );
+}
+
+export function SolutionCard(props: SolutionRepositoryItemCardProps) {
+  return <SolutionRepositoryItemCard {...props} />;
+}
+
+export function SolutionGrid(props: SolutionRepositoryGridProps) {
+  return <SolutionRepositoryGrid {...props} />;
+}
+
+export function SolutionDrawer(props: SolutionRepositoryDetailDrawerProps) {
+  return <SolutionRepositoryDetailDrawer {...props} />;
+}
+
+export function HealthOutcomeRepositoryCard({
+  item,
+  onOpenDetail,
+}: HealthOutcomeRepositoryCardProps) {
+  return (
+    <article className="solution-repository-card">
+      <button
+        className="solution-repository-card-main"
+        type="button"
+        onClick={() => onOpenDetail(item)}
+      >
+        <span className="solution-repository-image" style={imageStyle(item.imageUrl)} />
+        <div className="solution-repository-card-body">
+          <small>{item.relatedHazards.slice(0, 2).join(" · ")}</small>
+          <strong>{item.name}</strong>
+          <p>{item.summary}</p>
+          <span className="solution-meta-line">
+            {item.solutions.length} linked solutions
+          </span>
+          <SolutionRepositoryTagList labels={item.affectedGroups.slice(0, 3)} />
+        </div>
+      </button>
+    </article>
+  );
+}
+
+export function HealthOutcomeRepositoryGrid({
+  items,
+  onOpenDetail,
+}: HealthOutcomeRepositoryGridProps) {
+  return (
+    <section className="solution-repository-grid public-repository-grid">
+      {items.map((item) => (
+        <HealthOutcomeRepositoryCard
+          item={item}
+          key={item.id}
+          onOpenDetail={onOpenDetail}
+        />
+      ))}
+    </section>
+  );
+}
+
+export function HealthOutcomeRepositoryDrawer({
+  item,
+  onClose,
+}: HealthOutcomeRepositoryDrawerProps) {
+  return (
+    <div className="solution-drawer-backdrop" role="presentation" onClick={onClose}>
+      <aside
+        aria-label={`${item.name} details`}
+        className="solution-drawer"
+        role="dialog"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="solution-drawer-hero" style={imageStyle(item.imageUrl)} />
+        <div className="solution-drawer-body">
+          <div className="solution-drawer-head">
+            <div>
+              <h2>{item.name}</h2>
+            </div>
+            <button className="ghost-button" type="button" onClick={onClose}>
+              Close
+            </button>
+          </div>
+
+          <p>{item.description}</p>
+
+          <section className="drawer-section">
+            <span className="panel-eyebrow">Related hazards</span>
+            <SolutionRepositoryTagList labels={item.relatedHazards} />
+          </section>
+
+          <section className="drawer-section">
+            <span className="panel-eyebrow">Affected groups</span>
+            <SolutionRepositoryTagList labels={item.affectedGroups} />
+          </section>
+
+          <section className="drawer-section">
+            <span className="panel-eyebrow">Planning indicators</span>
+            <div className="asset-list compact">
+              {item.indicators.map((indicator) => (
+                <span className="asset-link" key={indicator.label}>
+                  <span>{indicator.label}</span>
+                  <small>{indicator.value}</small>
+                </span>
+              ))}
+            </div>
+          </section>
+
+          <section className="drawer-section">
+            <span className="panel-eyebrow">Linked solutions</span>
+            <div className="asset-list compact">
+              {item.solutions.map((solution) => (
+                <span className="asset-link" key={solution.id}>
+                  <span>{solution.name}</span>
+                  <small>{solutionMetaLine(solution)}</small>
+                </span>
+              ))}
+            </div>
+          </section>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+export function HealthOutcomeCard(props: HealthOutcomeRepositoryCardProps) {
+  return <HealthOutcomeRepositoryCard {...props} />;
+}
+
+export function HealthOutcomeGrid(props: HealthOutcomeRepositoryGridProps) {
+  return <HealthOutcomeRepositoryGrid {...props} />;
+}
+
+export function HealthOutcomeDrawer(props: HealthOutcomeRepositoryDrawerProps) {
+  return <HealthOutcomeRepositoryDrawer {...props} />;
+}
+
+export function HazardRepositoryCard({
+  item,
+  onOpenDetail,
+}: HazardRepositoryCardProps) {
+  return (
+    <article className="solution-repository-card">
+      <button
+        className="solution-repository-card-main"
+        type="button"
+        onClick={() => onOpenDetail(item)}
+      >
+        <span className="solution-repository-image" style={imageStyle(item.imageUrl)} />
+        <div className="solution-repository-card-body">
+          <small>{item.regionsAtRisk.slice(0, 2).join(" · ")}</small>
+          <strong>{item.name}</strong>
+          <p>{item.summary}</p>
+          <span className="solution-meta-line">
+            {item.severity} risk · {item.trend}
+          </span>
+          <SolutionRepositoryTagList
+            labels={item.healthOutcomes.map((outcome) => outcome.name).slice(0, 3)}
+          />
+        </div>
+      </button>
+    </article>
+  );
+}
+
+export function HazardRepositoryGrid({
+  items,
+  onOpenDetail,
+}: HazardRepositoryGridProps) {
+  return (
+    <section className="solution-repository-grid public-repository-grid">
+      {items.map((item) => (
+        <HazardRepositoryCard item={item} key={item.id} onOpenDetail={onOpenDetail} />
+      ))}
+    </section>
+  );
+}
+
+export function HazardRepositoryDrawer({ item, onClose }: HazardRepositoryDrawerProps) {
+  return (
+    <div className="solution-drawer-backdrop" role="presentation" onClick={onClose}>
+      <aside
+        aria-label={`${item.name} details`}
+        className="solution-drawer"
+        role="dialog"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="solution-drawer-hero" style={imageStyle(item.imageUrl)} />
+        <div className="solution-drawer-body">
+          <div className="solution-drawer-head">
+            <div>
+              <h2>{item.name}</h2>
+            </div>
+            <button className="ghost-button" type="button" onClick={onClose}>
+              Close
+            </button>
+          </div>
+
+          <p>{item.description}</p>
+
+          <div className="drawer-fact-row">
+            <span>Risk and trend</span>
+            <strong>
+              {item.severity} risk · {item.trend}
+            </strong>
+          </div>
+
+          <section className="drawer-section">
+            <span className="panel-eyebrow">Regions at risk</span>
+            <SolutionRepositoryTagList labels={item.regionsAtRisk} />
+          </section>
+
+          <section className="drawer-section">
+            <span className="panel-eyebrow">Priority groups</span>
+            <SolutionRepositoryTagList labels={item.priorityGroups} />
+          </section>
+
+          <section className="drawer-section">
+            <span className="panel-eyebrow">Health outcomes</span>
+            <div className="asset-list compact">
+              {item.healthOutcomes.map((outcome) => (
+                <span className="asset-link" key={outcome.id}>
+                  <span>{outcome.name}</span>
+                  <small>{outcome.summary}</small>
+                </span>
+              ))}
+            </div>
+          </section>
+
+          <section className="drawer-section">
+            <span className="panel-eyebrow">Linked solutions</span>
+            <div className="asset-list compact">
+              {item.solutions.map((solution) => (
+                <span className="asset-link" key={solution.id}>
+                  <span>{solution.name}</span>
+                  <small>{solutionMetaLine(solution)}</small>
+                </span>
+              ))}
+            </div>
+          </section>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+export function HazardCard(props: HazardRepositoryCardProps) {
+  return <HazardRepositoryCard {...props} />;
+}
+
+export function HazardGrid(props: HazardRepositoryGridProps) {
+  return <HazardRepositoryGrid {...props} />;
+}
+
+export function HazardDrawer(props: HazardRepositoryDrawerProps) {
+  return <HazardRepositoryDrawer {...props} />;
 }
 
 export function SolutionLinkSection({
