@@ -22,17 +22,10 @@ const currentUser: CurrentUserContext = {
 const setupStatus: SetupStatus = {
   completed: false,
   requiresOnboarding: true,
+  selectedHazards: [],
   counts: {
     geographies: 0,
-    hazards: 0,
     workspaceMembers: 0,
-    workspaceSolutions: 0,
-  },
-  solutionImport: {
-    status: "not_started",
-    selectedHazards: 0,
-    importedSolutions: 0,
-    message: "No hazards have been selected for repository import.",
   },
 };
 
@@ -109,19 +102,11 @@ test("POST /setup/complete completes onboarding for the signed-in admin", async 
         countryCode: "GB",
         countryName: "United Kingdom",
         rootGeographyId: "geo-gb",
-        workspaceId: "workspace-1",
         firstAdminUserId: currentUser.userId,
+        selectedHazards: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
         counts: {
           geographies: 1,
-          hazards: 14,
           workspaceMembers: 1,
-          workspaceSolutions: 3,
-        },
-        solutionImport: {
-          status: "completed",
-          selectedHazards: 1,
-          importedSolutions: 3,
-          message: "3 repository actions were imported for the selected hazards.",
         },
       };
     },
@@ -181,19 +166,11 @@ test("POST /setup/bootstrap creates the first admin without an existing token", 
           countryCode: "GB",
           countryName: "United Kingdom",
           rootGeographyId: "geo-gb",
-          workspaceId: "workspace-1",
           firstAdminUserId: "keycloak-admin",
+          selectedHazards: [{ id: "hazard-extreme-heat", label: "Extreme heat" }],
           counts: {
             geographies: 1,
-            hazards: 14,
             workspaceMembers: 1,
-            workspaceSolutions: 3,
-          },
-          solutionImport: {
-            status: "completed",
-            selectedHazards: 1,
-            importedSolutions: 3,
-            message: "3 repository actions were imported for the selected hazards.",
           },
         },
         admin: {

@@ -1,20 +1,18 @@
-import type { WorkspaceSolutionImportSummary } from "../workspace-solutions/types.js";
-
 export type SetupStatus = {
   completed: boolean;
   requiresOnboarding: boolean;
   countryCode?: string;
   countryName?: string;
   rootGeographyId?: string;
-  workspaceId?: string;
   firstAdminUserId?: string;
+  selectedHazards: {
+    id: string;
+    label: string;
+  }[];
   counts: {
     geographies: number;
-    hazards: number;
     workspaceMembers: number;
-    workspaceSolutions: number;
   };
-  solutionImport: WorkspaceSolutionImportSummary;
 };
 
 export type SetupOptions = {
@@ -54,7 +52,6 @@ export type SetupErrorCode =
   | "SETUP_COUNTRY_REQUIRED"
   | "SETUP_HAZARD_REQUIRED"
   | "SETUP_HAZARD_INVALID"
-  | "SETUP_SOLUTION_IMPORT_FAILED"
   | "SETUP_BOOTSTRAP_LOCKED"
   | "SETUP_ADMIN_REQUIRED"
   | "SETUP_ADMIN_PASSWORD_REQUIRED"
@@ -74,39 +71,37 @@ export type SetupErrorResponse = {
 
 const setupCountsSchema = {
   type: "object",
-  required: ["geographies", "hazards", "workspaceMembers", "workspaceSolutions"],
+  required: ["geographies", "workspaceMembers"],
   properties: {
     geographies: { type: "number" },
-    hazards: { type: "number" },
     workspaceMembers: { type: "number" },
-    workspaceSolutions: { type: "number" },
   },
 } as const;
 
-const setupSolutionImportSchema = {
+export const setupHazardSchema = {
   type: "object",
-  required: ["status", "selectedHazards", "importedSolutions", "message"],
+  required: ["id", "label"],
   properties: {
-    status: { type: "string", enum: ["not_started", "completed", "empty"] },
-    selectedHazards: { type: "number" },
-    importedSolutions: { type: "number" },
-    message: { type: "string" },
+    id: { type: "string" },
+    label: { type: "string" },
   },
 } as const;
 
 export const setupStatusSchema = {
   type: "object",
-  required: ["completed", "requiresOnboarding", "counts", "solutionImport"],
+  required: ["completed", "requiresOnboarding", "selectedHazards", "counts"],
   properties: {
     completed: { type: "boolean" },
     requiresOnboarding: { type: "boolean" },
     countryCode: { type: "string" },
     countryName: { type: "string" },
     rootGeographyId: { type: "string" },
-    workspaceId: { type: "string" },
     firstAdminUserId: { type: "string" },
+    selectedHazards: {
+      type: "array",
+      items: setupHazardSchema,
+    },
     counts: setupCountsSchema,
-    solutionImport: setupSolutionImportSchema,
   },
 } as const;
 
@@ -116,14 +111,7 @@ export const setupOptionsSchema = {
   properties: {
     hazards: {
       type: "array",
-      items: {
-        type: "object",
-        required: ["id", "label"],
-        properties: {
-          id: { type: "string" },
-          label: { type: "string" },
-        },
-      },
+      items: setupHazardSchema,
     },
   },
 } as const;

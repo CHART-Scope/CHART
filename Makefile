@@ -3,10 +3,10 @@ DOCKER := $(shell command -v docker || command -v /Applications/Docker.app/Conte
 export PATH := $(dir $(NPM)):$(PATH)
 
 DRIZZLE_JOURNAL := api/drizzle/meta/_journal.json
-SOLUTION_REPOSITORY_DIR := solution-repository
-SOLUTION_REPOSITORY_COMPOSE := $(DOCKER) compose -f $(SOLUTION_REPOSITORY_DIR)/docker-compose.yml
+CHART_REPOSITORY_DIR := chart-repository
+CHART_REPOSITORY_COMPOSE := $(DOCKER) compose -f $(CHART_REPOSITORY_DIR)/docker-compose.yml
 
-.PHONY: all help install run verify local-setup check-docker identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build api api-build api-start api-test api-typecheck db-generate db-migrate db-check db-seed api-db-generate api-db-migrate api-db-check api-db-seed api-openapi-generate identity identity-sync identity-restart identity-down solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check ensure-drizzle-journal
+.PHONY: all help install run verify local-setup check-docker identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build api api-build api-start api-test api-typecheck db-generate db-migrate db-check db-seed api-db-generate api-db-migrate api-db-check api-db-seed api-openapi-generate identity identity-sync identity-restart identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check ensure-drizzle-journal
 
 help:
 	@printf "\nCHART commands\n"
@@ -26,12 +26,12 @@ help:
 	@printf "  make api-test       Run API tests\n"
 	@printf "  make web-typecheck  Typecheck the web app\n"
 	@printf "  make format-check   Check formatting\n\n"
-	@printf "Solution repository commands\n"
-	@printf "  make solution-repo         Start repository Postgres, then run Payload on :3300\n"
-	@printf "  make solution-repo-db      Start repository Postgres only\n"
-	@printf "  make solution-repo-seed    Seed repository Payload content\n"
-	@printf "  make solution-repo-stop    Stop repository Postgres\n"
-	@printf "  make solution-repo-verify  Typecheck and build repository service\n\n"
+	@printf "Chart repository commands\n"
+	@printf "  make chart-repo         Start repository Postgres, then run Payload on :3300\n"
+	@printf "  make chart-repo-db      Start repository Postgres only\n"
+	@printf "  make chart-repo-seed    Seed repository Payload content\n"
+	@printf "  make chart-repo-stop    Stop repository Postgres\n"
+	@printf "  make chart-repo-verify  Typecheck and build repository service\n\n"
 
 all: local-setup verify
 
@@ -135,41 +135,51 @@ identity-restart: check-docker
 identity-down: check-docker
 	$(DOCKER) compose stop chart-keycloak
 
-solution-repo: solution-repo-install solution-repo-db solution-repo-db-wait
-	cd $(SOLUTION_REPOSITORY_DIR) && $(NPM) run dev
+chart-repo: chart-repo-install chart-repo-db chart-repo-db-wait
+	cd $(CHART_REPOSITORY_DIR) && $(NPM) run dev
 
-solution-repo-install:
-	cd $(SOLUTION_REPOSITORY_DIR) && $(NPM) install
+chart-repo-install:
+	cd $(CHART_REPOSITORY_DIR) && $(NPM) install
 
-solution-repo-db: check-docker
-	$(SOLUTION_REPOSITORY_COMPOSE) up -d solution-repository-postgres
+chart-repo-db: check-docker
+	$(CHART_REPOSITORY_COMPOSE) up -d chart-repository-postgres
 
-solution-repo-db-wait:
-	@printf "Waiting for solution repository Postgres"
+chart-repo-db-wait:
+	@printf "Waiting for chart repository Postgres"
 	@for attempt in $$(seq 1 60); do \
-		if $(SOLUTION_REPOSITORY_COMPOSE) exec -T solution-repository-postgres pg_isready -U chart_repository -d chart_repository >/dev/null 2>&1; then \
+		if $(CHART_REPOSITORY_COMPOSE) exec -T chart-repository-postgres pg_isready -U chart_repository -d chart_repository >/dev/null 2>&1; then \
 			printf " ready\n"; \
 			exit 0; \
 		fi; \
 		printf "."; \
 		sleep 1; \
 	done; \
-	printf "\nTimed out waiting for solution repository Postgres on 127.0.0.1:5433\n"; \
+	printf "\nTimed out waiting for chart repository Postgres on 127.0.0.1:5433\n"; \
 	exit 1
 
-solution-repo-seed: solution-repo-db solution-repo-db-wait
-	cd $(SOLUTION_REPOSITORY_DIR) && $(NPM) run seed
+chart-repo-seed: chart-repo-db chart-repo-db-wait
+	cd $(CHART_REPOSITORY_DIR) && $(NPM) run seed
 
-solution-repo-stop: check-docker
-	$(SOLUTION_REPOSITORY_COMPOSE) stop
+chart-repo-stop: check-docker
+	$(CHART_REPOSITORY_COMPOSE) stop
 
-solution-repo-typecheck:
-	cd $(SOLUTION_REPOSITORY_DIR) && $(NPM) run typecheck
+chart-repo-typecheck:
+	cd $(CHART_REPOSITORY_DIR) && $(NPM) run typecheck
 
-solution-repo-build:
-	cd $(SOLUTION_REPOSITORY_DIR) && $(NPM) run build
+chart-repo-build:
+	cd $(CHART_REPOSITORY_DIR) && $(NPM) run build
 
-solution-repo-verify: solution-repo-typecheck solution-repo-build
+chart-repo-verify: chart-repo-typecheck chart-repo-build
+
+solution-repo: chart-repo
+solution-repo-install: chart-repo-install
+solution-repo-db: chart-repo-db
+solution-repo-db-wait: chart-repo-db-wait
+solution-repo-seed: chart-repo-seed
+solution-repo-stop: chart-repo-stop
+solution-repo-typecheck: chart-repo-typecheck
+solution-repo-build: chart-repo-build
+solution-repo-verify: chart-repo-verify
 
 format:
 	$(NPM) run format

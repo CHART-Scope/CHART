@@ -41,6 +41,7 @@ type TokenResponse = {
 export type IdentityUserInput = {
   name: string;
   email: string;
+  phone?: string;
   username: string;
   password: string;
   roles: ChartRole[];
@@ -451,6 +452,7 @@ function toUserRepresentation(input: IdentityUserInput) {
     email: input.email,
     firstName: firstName || input.name,
     lastName: lastNameParts.join(" "),
+    attributes: input.phone ? { phone: [input.phone] } : undefined,
     enabled: true,
     emailVerified: true,
   };

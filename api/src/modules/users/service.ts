@@ -3,12 +3,7 @@ import { randomUUID } from "node:crypto";
 import { eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../../db/client.js";
-import {
-  chartUserRoles,
-  chartUsers,
-  geographies,
-  userGeographyScopes,
-} from "../../db/schema.js";
+import { geographies, userRoles, users, userGeographyScopes } from "../../db/schema.js";
 import { chartRoles, type ChartRole, type CurrentUserContext } from "../auth/types.js";
 import {
   disableKeycloakUser,
@@ -17,7 +12,7 @@ import {
   type IdentityUserInput,
 } from "./keycloakIdentity.js";
 import { UserError } from "./errors.js";
-import type { ChartUserRecord, CreateChartUserInput } from "./types.js";
+import type { CreateUserInput, UserRecord } from "./types.js";
 
 type UserIdentityProvider = {
   upsertUser(input: IdentityUserInput): Promise<IdentityUser>;
@@ -25,15 +20,12 @@ type UserIdentityProvider = {
 };
 
 type GeographyRow = typeof geographies.$inferSelect;
-type ChartUserRow = typeof chartUsers.$inferSelect;
+type UserRow = typeof users.$inferSelect;
 
 export interface UserService {
-  listUsers(context: CurrentUserContext): Promise<ChartUserRecord[]>;
-  createUser(
-    input: CreateChartUserInput,
-    context: CurrentUserContext,
-  ): Promise<ChartUserRecord>;
-  disableUser(userId: string, context: CurrentUserContext): Promise<ChartUserRecord>;
+  listUsers(context: CurrentUserContext): Promise<UserRecord[]>;
+  createUser(input: CreateUserInput, context: CurrentUserContext): Promise<UserRecord>;
+  disableUser(userId: string, context: CurrentUserContext): Promise<UserRecord>;
 }
 
 const defaultIdentityProvider: UserIdentityProvider = {
@@ -48,7 +40,7 @@ export function createUserService(
     async listUsers(context) {
       assertCanManageUsers(context);
 
-      return readChartUsers();
+      return readUsers();
     },
 
     async createUser(input, context) {
@@ -64,6 +56,7 @@ export function createUserService(
       const identityUser = await identityProvider.upsertUser({
         name: normalized.name,
         email: normalized.email,
+        phone: normalized.phone,
         username: normalized.username,
         password: normalized.password,
         roles: normalized.roles,
@@ -74,6 +67,7 @@ export function createUserService(
         userId: identityUser.userId,
         username: identityUser.username,
         email: identityUser.email,
+        phone: normalized.phone,
         displayName: normalized.name,
         roles: normalized.roles,
         geographies: geographyRows,
@@ -81,7 +75,7 @@ export function createUserService(
         source: "admin",
       });
 
-      const created = await readChartUser(identityUser.userId);
+      const created = await readUser(identityUser.userId);
 
       if (!created) {
         throw new UserError("USER_NOT_FOUND", 404);
@@ -97,7 +91,7 @@ export function createUserService(
         throw new UserError("USER_CANNOT_DISABLE_SELF", 400);
       }
 
-      const existing = await readChartUser(userId);
+      const existing = await readUser(userId);
 
       if (!existing) {
         throw new UserError("USER_NOT_FOUND", 404);
@@ -106,12 +100,12 @@ export function createUserService(
       await identityProvider.disableUser(userId);
 
       await db
-        .update(chartUsers)
+        .update(users)
         .set({
           status: "disabled",
           updatedAt: sql`now()`,
         })
-        .where(eq(chartUsers.id, userId));
+        .where(eq(users.id, userId));
 
       return {
         ...existing,
@@ -125,6 +119,7 @@ export async function persistUserProjection(input: {
   userId: string;
   username: string;
   email?: string;
+  phone?: string;
   displayName: string;
   roles: ChartRole[];
   geographies: GeographyRow[];
@@ -133,21 +128,23 @@ export async function persistUserProjection(input: {
 }) {
   await db.transaction(async (tx) => {
     await tx
-      .insert(chartUsers)
+      .insert(users)
       .values({
         id: input.userId,
         username: input.username,
         email: input.email ?? null,
+        phone: input.phone ?? null,
         displayName: input.displayName,
         status: "active",
         createdByUserId: input.createdByUserId,
         lastSeenAt: sql`now()`,
       })
       .onConflictDoUpdate({
-        target: chartUsers.id,
+        target: users.id,
         set: {
           username: sql`excluded.username`,
           email: sql`excluded.email`,
+          phone: sql`excluded.phone`,
           displayName: sql`excluded.display_name`,
           status: "active",
           lastSeenAt: sql`now()`,
@@ -155,10 +152,10 @@ export async function persistUserProjection(input: {
         },
       });
 
-    await tx.delete(chartUserRoles).where(eq(chartUserRoles.userId, input.userId));
+    await tx.delete(userRoles).where(eq(userRoles.userId, input.userId));
 
     if (input.roles.length > 0) {
-      await tx.insert(chartUserRoles).values(
+      await tx.insert(userRoles).values(
         input.roles.map((role) => ({
           userId: input.userId,
           role,
@@ -186,9 +183,9 @@ export async function persistUserProjection(input: {
   });
 }
 
-async function readChartUsers() {
-  const rows = await db.select().from(chartUsers);
-  const roles = await db.select().from(chartUserRoles);
+async function readUsers() {
+  const rows = await db.select().from(users);
+  const roles = await db.select().from(userRoles);
   const scopes = await readAllUserGeographyScopes();
 
   return rows
@@ -204,12 +201,8 @@ async function readChartUsers() {
     .sort((first, second) => first.displayName.localeCompare(second.displayName));
 }
 
-async function readChartUser(userId: string) {
-  const rows = await db
-    .select()
-    .from(chartUsers)
-    .where(eq(chartUsers.id, userId))
-    .limit(1);
+async function readUser(userId: string) {
+  const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   const row = rows[0];
 
   if (!row) {
@@ -218,8 +211,8 @@ async function readChartUser(userId: string) {
 
   const roleRows = await db
     .select()
-    .from(chartUserRoles)
-    .where(eq(chartUserRoles.userId, userId));
+    .from(userRoles)
+    .where(eq(userRoles.userId, userId));
   const scopes = await readAllUserGeographyScopes(userId);
 
   return mapUserRecord(
@@ -241,7 +234,7 @@ async function readAllUserGeographyScopes(userId?: string) {
     .from(userGeographyScopes)
     .innerJoin(geographies, eq(userGeographyScopes.geographyId, geographies.id))
     .where(userId ? eq(userGeographyScopes.userId, userId) : undefined);
-  const scopesByUser = new Map<string, ChartUserRecord["geographyScopes"]>();
+  const scopesByUser = new Map<string, UserRecord["geographyScopes"]>();
 
   for (const row of rows) {
     const scopes = scopesByUser.get(row.userId) ?? [];
@@ -259,14 +252,15 @@ async function readAllUserGeographyScopes(userId?: string) {
 }
 
 function mapUserRecord(
-  row: ChartUserRow,
+  row: UserRow,
   roles: ChartRole[],
-  geographyScopes: ChartUserRecord["geographyScopes"],
-): ChartUserRecord {
+  geographyScopes: UserRecord["geographyScopes"],
+): UserRecord {
   return {
     userId: row.id,
     username: row.username,
     email: row.email ?? undefined,
+    phone: row.phone ?? undefined,
     displayName: row.displayName,
     status: row.status,
     roles,
@@ -282,9 +276,10 @@ async function findGeographiesById(geographyIds: string[]) {
   return db.select().from(geographies).where(inArray(geographies.id, geographyIds));
 }
 
-function normalizeCreateUserInput(input: CreateChartUserInput): CreateChartUserInput {
+function normalizeCreateUserInput(input: CreateUserInput): CreateUserInput {
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
+  const phone = input.phone?.trim();
   const username = input.username.trim().toLowerCase();
   const roles = uniqueValues(input.roles);
   const geographyIds = uniqueValues(input.geographyIds);
@@ -320,6 +315,7 @@ function normalizeCreateUserInput(input: CreateChartUserInput): CreateChartUserI
   return {
     name,
     email,
+    phone,
     username,
     password: input.password,
     roles,

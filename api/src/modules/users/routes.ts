@@ -8,11 +8,11 @@ import type { CurrentUserContext } from "../auth/types.js";
 import { UserError } from "./errors.js";
 import { createUserService, type UserService } from "./service.js";
 import {
-  chartUserRecordSchema,
-  createChartUserBodySchema,
+  createUserBodySchema,
   userErrorResponseSchema,
   userParamsSchema,
-  type CreateChartUserInput,
+  userRecordSchema,
+  type CreateUserInput,
 } from "./types.js";
 
 type GetCurrentUser = (input: {
@@ -31,7 +31,7 @@ export const listUsersRouteSchema = {
   response: {
     200: {
       type: "array",
-      items: chartUserRecordSchema,
+      items: userRecordSchema,
     },
     401: userErrorResponseSchema,
     403: userErrorResponseSchema,
@@ -43,9 +43,9 @@ export const createUserRouteSchema = {
   operationId: "createUser",
   summary: "Create or update one CHART identity user",
   security: [{ bearerAuth: [] }],
-  body: createChartUserBodySchema,
+  body: createUserBodySchema,
   response: {
-    200: chartUserRecordSchema,
+    200: userRecordSchema,
     400: userErrorResponseSchema,
     401: userErrorResponseSchema,
     403: userErrorResponseSchema,
@@ -61,7 +61,7 @@ export const disableUserRouteSchema = {
   security: [{ bearerAuth: [] }],
   params: userParamsSchema,
   response: {
-    200: chartUserRecordSchema,
+    200: userRecordSchema,
     400: userErrorResponseSchema,
     401: userErrorResponseSchema,
     403: userErrorResponseSchema,
@@ -92,7 +92,7 @@ export async function registerUserRoutes(
     }
   });
 
-  app.post<{ Body: CreateChartUserInput }>(
+  app.post<{ Body: CreateUserInput }>(
     "",
     { schema: createUserRouteSchema },
     async (request, reply) => {

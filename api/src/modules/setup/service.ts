@@ -1,26 +1,19 @@
 import { randomUUID } from "node:crypto";
 
-import { count, eq, inArray, sql } from "drizzle-orm";
+import { count, eq, sql } from "drizzle-orm";
 
 import { db } from "../../db/client.js";
 import {
-  chartSetup,
   countryGeoConfig,
   geographies,
-  hazards,
-  workspaceSolutionRecords,
-  workspaceGeographyScopes,
-  workspaceHazards,
+  setupState,
+  type SetupSelectedHazard,
   workspaceMembers,
   workspaces,
 } from "../../db/schema.js";
+import { createChartRepositoryHazardService } from "../../services/chart-repository/service.js";
 import type { CurrentUserContext } from "../auth/types.js";
 import { persistUserProjection } from "../users/service.js";
-import {
-  prepareWorkspaceSolutionImport,
-  replaceWorkspaceSolutions,
-  summarizeWorkspaceSolutionImport,
-} from "../workspace-solutions/service.js";
 import { SetupError } from "./errors.js";
 import { createBootstrapAdminUser } from "./keycloakAdmin.js";
 import type {
@@ -51,18 +44,8 @@ export function createSetupService(): SetupService {
     },
 
     async getOptions() {
-      const hazardRows = await db
-        .select({
-          id: hazards.id,
-          label: hazards.label,
-        })
-        .from(hazards)
-        .where(eq(hazards.active, true));
-
       return {
-        hazards: hazardRows.sort((first, second) =>
-          first.label.localeCompare(second.label),
-        ),
+        hazards: await listSetupHazards(),
       };
     },
 
@@ -109,47 +92,40 @@ export function createSetupService(): SetupService {
       await db.transaction(async (tx) => {
         const setupRows = await tx
           .select()
-          .from(chartSetup)
-          .where(eq(chartSetup.id, setupId))
+          .from(setupState)
+          .where(eq(setupState.id, setupId))
           .limit(1);
         const setup = setupRows[0];
 
-        if (setup?.workspaceId) {
-          await tx.delete(workspaces).where(eq(workspaces.id, setup.workspaceId));
-        } else {
-          await tx.delete(workspaces);
-        }
+        await tx.delete(workspaces);
 
         if (setup?.countryCode) {
           await tx
-            .delete(countryGeoConfig)
-            .where(eq(countryGeoConfig.countryCode, setup.countryCode));
-          await tx
             .delete(geographies)
             .where(eq(geographies.countryCode, setup.countryCode));
+          await tx
+            .delete(countryGeoConfig)
+            .where(eq(countryGeoConfig.countryCode, setup.countryCode));
         } else if (setup?.rootGeographyId) {
           await tx.delete(geographies).where(eq(geographies.id, setup.rootGeographyId));
         }
 
         await tx
-          .insert(chartSetup)
+          .insert(setupState)
           .values({
             id: setupId,
             completed: false,
-            hazards: [],
           })
           .onConflictDoUpdate({
-            target: chartSetup.id,
+            target: setupState.id,
             set: {
               completed: false,
               countryCode: null,
               countryName: null,
-              geographyLevelLabel: null,
               rootGeographyId: null,
-              workspaceId: null,
               firstAdminUserId: null,
               firstAdminEmail: null,
-              hazards: [],
+              selectedHazards: [],
               updatedAt: sql`now()`,
             },
           });
@@ -177,17 +153,11 @@ async function completeSetupForContext(
     throw new SetupError("SETUP_HAZARD_REQUIRED", 400);
   }
 
-  const hazardRows = await findHazards(hazardIds);
-
-  if (hazardRows.length !== hazardIds.length) {
-    throw new SetupError("SETUP_HAZARD_INVALID", 400);
-  }
-
-  const solutionImport = await prepareSolutionImport(hazardIds);
-  const existingSetup = await readStoredSetup();
+  const selectedHazards = await resolveSelectedHazards(hazardIds);
   const countrySlug = normalizeSlug(countryName);
   const rootGeographyId = `geo-${countryCode.toLowerCase()}`;
-  const workspaceId = existingSetup?.workspaceId ?? `workspace-${randomUUID()}`;
+  const existingWorkspace = await readFirstWorkspace();
+  const workspaceId = existingWorkspace?.id ?? `workspace-${randomUUID()}`;
 
   await db.transaction(async (tx) => {
     await tx
@@ -196,7 +166,7 @@ async function completeSetupForContext(
         {
           countryCode,
           levelKey: "country",
-          levelLabel: "country",
+          levelLabel: "Country",
           sortOrder: 0,
         },
         {
@@ -222,7 +192,7 @@ async function completeSetupForContext(
         id: rootGeographyId,
         countryCode,
         level: "country",
-        levelLabel: "country",
+        levelLabel: "Country",
         name: countryName,
         path: `/${countrySlug}`,
         sortOrder: 0,
@@ -236,100 +206,6 @@ async function completeSetupForContext(
           name: sql`excluded.name`,
           path: sql`excluded.path`,
           sortOrder: sql`excluded.sort_order`,
-          updatedAt: sql`now()`,
-        },
-      });
-
-    await tx
-      .insert(workspaces)
-      .values({
-        id: workspaceId,
-        name: `${countryName} CHART setup`,
-        planningCycle: new Date().getUTCFullYear().toString(),
-        status: "active",
-        createdByUserId: context.userId,
-        ownerUserId: context.userId,
-        ownerGeographyId: rootGeographyId,
-      })
-      .onConflictDoUpdate({
-        target: workspaces.id,
-        set: {
-          name: sql`excluded.name`,
-          planningCycle: sql`excluded.planning_cycle`,
-          status: sql`excluded.status`,
-          ownerUserId: sql`excluded.owner_user_id`,
-          ownerGeographyId: sql`excluded.owner_geography_id`,
-          updatedAt: sql`now()`,
-        },
-      });
-
-    await tx
-      .insert(workspaceMembers)
-      .values({
-        id: `member-${randomUUID()}`,
-        workspaceId,
-        userId: context.userId,
-        role: "owner",
-      })
-      .onConflictDoUpdate({
-        target: [workspaceMembers.workspaceId, workspaceMembers.userId],
-        set: {
-          role: sql`excluded.role`,
-        },
-      });
-
-    await tx
-      .insert(workspaceGeographyScopes)
-      .values({
-        id: `workspace-geo-${randomUUID()}`,
-        workspaceId,
-        geographyId: rootGeographyId,
-      })
-      .onConflictDoNothing();
-
-    await tx
-      .delete(workspaceHazards)
-      .where(eq(workspaceHazards.workspaceId, workspaceId));
-
-    await tx.insert(workspaceHazards).values(
-      hazardIds.map((hazardId, index) => ({
-        workspaceId,
-        hazardId,
-        sortOrder: index,
-      })),
-    );
-
-    await replaceWorkspaceSolutions(tx, workspaceId, solutionImport);
-
-    await tx
-      .insert(chartSetup)
-      .values({
-        id: setupId,
-        completed: true,
-        countryCode,
-        countryName,
-        geographyLevelLabel,
-        rootGeographyId,
-        workspaceId,
-        firstAdminUserId: context.userId,
-        firstAdminEmail: context.email,
-        hazards: hazardRows.map((row) => ({
-          hazardId: row.id,
-          label: row.label,
-        })),
-      })
-      .onConflictDoUpdate({
-        target: chartSetup.id,
-        set: {
-          completed: true,
-          countryCode: sql`excluded.country_code`,
-          countryName: sql`excluded.country_name`,
-          geographyLevelLabel: sql`excluded.geography_level_label`,
-          rootGeographyId: sql`excluded.root_geography_id`,
-          workspaceId: sql`excluded.workspace_id`,
-          firstAdminUserId: sql`excluded.first_admin_user_id`,
-          firstAdminEmail: sql`excluded.first_admin_email`,
-          hazards: sql`excluded.hazards`,
           updatedAt: sql`now()`,
         },
       });
@@ -351,32 +227,88 @@ async function completeSetupForContext(
     source: "onboarding",
   });
 
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(workspaces)
+      .values({
+        id: workspaceId,
+        name: `${countryName} CHART setup`,
+        planningCycle: new Date().getUTCFullYear().toString(),
+        status: "active",
+        geographyId: rootGeographyId,
+        createdByUserId: context.userId,
+        ownerUserId: context.userId,
+      })
+      .onConflictDoUpdate({
+        target: workspaces.id,
+        set: {
+          name: sql`excluded.name`,
+          planningCycle: sql`excluded.planning_cycle`,
+          status: sql`excluded.status`,
+          geographyId: sql`excluded.geography_id`,
+          ownerUserId: sql`excluded.owner_user_id`,
+          updatedAt: sql`now()`,
+        },
+      });
+
+    await tx
+      .insert(workspaceMembers)
+      .values({
+        id: `member-${randomUUID()}`,
+        workspaceId,
+        userId: context.userId,
+        role: "owner",
+      })
+      .onConflictDoUpdate({
+        target: [workspaceMembers.workspaceId, workspaceMembers.userId],
+        set: {
+          role: sql`excluded.role`,
+        },
+      });
+
+    await tx
+      .insert(setupState)
+      .values({
+        id: setupId,
+        completed: true,
+        countryCode,
+        countryName,
+        rootGeographyId,
+        firstAdminUserId: context.userId,
+        firstAdminEmail: context.email,
+        selectedHazards,
+      })
+      .onConflictDoUpdate({
+        target: setupState.id,
+        set: {
+          completed: true,
+          countryCode: sql`excluded.country_code`,
+          countryName: sql`excluded.country_name`,
+          rootGeographyId: sql`excluded.root_geography_id`,
+          firstAdminUserId: sql`excluded.first_admin_user_id`,
+          firstAdminEmail: sql`excluded.first_admin_email`,
+          selectedHazards: sql`excluded.selected_hazards`,
+          updatedAt: sql`now()`,
+        },
+      });
+  });
+
   return readSetupStatus();
 }
 
 async function readSetupStatus(): Promise<SetupStatus> {
-  const [setupRows, geographyCount, hazardCount, memberCount, solutionCount] =
-    await Promise.all([
-      db.select().from(chartSetup).where(eq(chartSetup.id, setupId)).limit(1),
-      readGeographyCount(),
-      readHazardCount(),
-      readWorkspaceMemberCount(),
-      readWorkspaceSolutionCount(),
-    ]);
+  const [setupRows, geographyCount, memberCount] = await Promise.all([
+    db.select().from(setupState).where(eq(setupState.id, setupId)).limit(1),
+    readGeographyCount(),
+    readWorkspaceMemberCount(),
+  ]);
   const setup = setupRows[0];
   const counts = {
     geographies: geographyCount,
-    hazards: hazardCount,
     workspaceMembers: memberCount,
-    workspaceSolutions: solutionCount,
   };
   const completed = Boolean(setup?.completed);
-  const hasRequiredData =
-    counts.geographies > 0 && counts.hazards > 0 && counts.workspaceMembers > 0;
-  const solutionImport = summarizeWorkspaceSolutionImport(
-    readSetupHazardIds(setup?.hazards ?? []),
-    solutionCount,
-  );
+  const hasRequiredData = counts.geographies > 0 && counts.workspaceMembers > 0;
 
   return {
     completed: completed && hasRequiredData,
@@ -384,19 +316,14 @@ async function readSetupStatus(): Promise<SetupStatus> {
     countryCode: setup?.countryCode ?? undefined,
     countryName: setup?.countryName ?? undefined,
     rootGeographyId: setup?.rootGeographyId ?? undefined,
-    workspaceId: setup?.workspaceId ?? undefined,
     firstAdminUserId: setup?.firstAdminUserId ?? undefined,
+    selectedHazards: setup?.selectedHazards ?? [],
     counts,
-    solutionImport,
   };
 }
 
-async function readStoredSetup() {
-  const rows = await db
-    .select()
-    .from(chartSetup)
-    .where(eq(chartSetup.id, setupId))
-    .limit(1);
+async function readFirstWorkspace() {
+  const rows = await db.select().from(workspaces).limit(1);
 
   return rows[0];
 }
@@ -407,40 +334,10 @@ async function readGeographyCount() {
   return Number(rows[0]?.total ?? 0);
 }
 
-async function readHazardCount() {
-  const rows = await db.select({ total: count() }).from(hazards);
-
-  return Number(rows[0]?.total ?? 0);
-}
-
 async function readWorkspaceMemberCount() {
   const rows = await db.select({ total: count() }).from(workspaceMembers);
 
   return Number(rows[0]?.total ?? 0);
-}
-
-async function readWorkspaceSolutionCount() {
-  const rows = await db.select({ total: count() }).from(workspaceSolutionRecords);
-
-  return Number(rows[0]?.total ?? 0);
-}
-
-async function findHazards(hazardIds: string[]) {
-  return db
-    .select({
-      id: hazards.id,
-      label: hazards.label,
-    })
-    .from(hazards)
-    .where(inArray(hazards.id, hazardIds));
-}
-
-async function prepareSolutionImport(hazardIds: string[]) {
-  try {
-    return await prepareWorkspaceSolutionImport(hazardIds);
-  } catch {
-    throw new SetupError("SETUP_SOLUTION_IMPORT_FAILED", 502);
-  }
 }
 
 function assertSetupAdmin(context: CurrentUserContext) {
@@ -475,24 +372,36 @@ function normalizeAdminInput(input: BootstrapSetupInput["admin"]) {
   return { name, email, username, password };
 }
 
-function uniqueValues(values: string[]) {
-  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
-}
-
-function readSetupHazardIds(
-  setupHazards: {
-    hazardId?: string;
-    taxonomyId?: string;
-  }[],
-) {
-  return setupHazards
-    .map((hazard) => hazard.hazardId ?? hazard.taxonomyId)
-    .filter((hazardId): hazardId is string => Boolean(hazardId));
-}
-
 function normalizeSlug(value: string) {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+async function listSetupHazards(): Promise<SetupSelectedHazard[]> {
+  const response = await createChartRepositoryHazardService().listHazards();
+
+  return response.items
+    .map((hazard) => ({
+      id: hazard.id,
+      label: hazard.label,
+    }))
+    .sort((first, second) => first.label.localeCompare(second.label));
+}
+
+async function resolveSelectedHazards(hazardIds: string[]) {
+  const hazards = await listSetupHazards();
+  const hazardsById = new Map(hazards.map((hazard) => [hazard.id, hazard]));
+  const selectedHazards = hazardIds.map((hazardId) => hazardsById.get(hazardId));
+
+  if (selectedHazards.some((hazard) => !hazard)) {
+    throw new SetupError("SETUP_HAZARD_INVALID", 400);
+  }
+
+  return selectedHazards as SetupSelectedHazard[];
+}
+
+function uniqueValues(values: string[]) {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }

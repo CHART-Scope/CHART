@@ -5,9 +5,8 @@ import type {
 
 export interface CreateWorkspaceInput {
   name: string;
-  ownerGeographyId: string;
+  geographyId: string;
   planningCycle?: string;
-  hazardIds?: string[];
 }
 
 export interface WorkspaceRecord {
@@ -15,17 +14,15 @@ export interface WorkspaceRecord {
   name: string;
   planningCycle: string | null;
   status: WorkspaceStatusValue;
+  geographyId: string | null;
   createdByUserId: string | null;
   ownerUserId: string | null;
-  ownerGeographyId: string | null;
   memberRole?: WorkspaceMemberRoleValue;
-  hazardIds: string[];
 }
 
 export type WorkspaceErrorCode =
   | "WORKSPACE_NAME_REQUIRED"
   | "WORKSPACE_GEOGRAPHY_REQUIRED"
-  | "WORKSPACE_HAZARD_INVALID"
   | "WORKSPACE_CREATE_FORBIDDEN"
   | "WORKSPACE_ACCESS_DENIED"
   | "WORKSPACE_NOT_FOUND";
@@ -36,15 +33,11 @@ export interface WorkspaceErrorResponse {
 
 export const createWorkspaceBodySchema = {
   type: "object",
-  required: ["name", "ownerGeographyId"],
+  required: ["name", "geographyId"],
   properties: {
     name: { type: "string" },
-    ownerGeographyId: { type: "string" },
+    geographyId: { type: "string" },
     planningCycle: { type: "string" },
-    hazardIds: {
-      type: "array",
-      items: { type: "string" },
-    },
   },
 } as const;
 
@@ -63,24 +56,19 @@ export const workspaceRecordSchema = {
     "name",
     "planningCycle",
     "status",
+    "geographyId",
     "createdByUserId",
     "ownerUserId",
-    "ownerGeographyId",
-    "hazardIds",
   ],
   properties: {
     id: { type: "string" },
     name: { type: "string" },
     planningCycle: { type: ["string", "null"] },
     status: { type: "string", enum: ["active", "archived"] },
+    geographyId: { type: ["string", "null"] },
     createdByUserId: { type: ["string", "null"] },
     ownerUserId: { type: ["string", "null"] },
-    ownerGeographyId: { type: ["string", "null"] },
     memberRole: { type: "string", enum: ["owner", "editor", "viewer"] },
-    hazardIds: {
-      type: "array",
-      items: { type: "string" },
-    },
   },
 } as const;
 

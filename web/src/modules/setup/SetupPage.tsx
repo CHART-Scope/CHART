@@ -13,7 +13,6 @@ import {
 import type { ChartRole, CurrentUserContext } from "../auth/authClient";
 import {
   canManageUsers,
-  formatGeographyLevel,
   formatGeographyPath,
   formatRole,
   getUserProfile,
@@ -21,6 +20,8 @@ import {
 } from "../auth/userContext";
 import type { ChartRoute } from "../routes/types";
 import { WorkspaceShell } from "../shell/WorkspaceShell";
+import { DataCard } from "../ui/DataCard";
+import { ErrorBanner } from "../ui/ErrorBanner";
 
 type SetupPageProps = {
   currentUser: CurrentUserContext;
@@ -43,6 +44,7 @@ export function SetupPage({
   const [newUser, setNewUser] = useState({
     name: "",
     email: "",
+    phone: "",
     username: "",
     password: "",
     role: defaultNewUserRole,
@@ -94,6 +96,7 @@ export function SetupPage({
         {
           name: newUser.name,
           email: newUser.email,
+          phone: newUser.phone || undefined,
           username: newUser.username,
           password: newUser.password,
           roles: [newUser.role],
@@ -109,6 +112,7 @@ export function SetupPage({
       setNewUser({
         name: "",
         email: "",
+        phone: "",
         username: "",
         password: "",
         role: defaultNewUserRole,
@@ -169,7 +173,6 @@ export function SetupPage({
         <div>
           <div className="page-breadcrumb">Signed-in context</div>
           <h1 className="page-heading">{profile.roleLabel}</h1>
-          <p className="page-copy">{profile.setupFocus}</p>
         </div>
         <button
           className="primary-button"
@@ -180,17 +183,10 @@ export function SetupPage({
         </button>
       </section>
 
-      {setupError ? <div className="auth-error setup-error">{setupError}</div> : null}
+      {setupError ? <ErrorBanner message={setupError} /> : null}
 
       <section className="setup-grid">
-        <article className="panel-card setup-card setup-card-primary">
-          <span className="section-kicker">Current access</span>
-          <h2>{currentUser.username}</h2>
-          <p>
-            CHART reads this profile after sign-in and uses it to open the correct
-            workspace, geography, and content controls.
-          </p>
-
+        <DataCard eyebrow="Profile" title={currentUser.username}>
           <div className="setup-fact-grid">
             <div className="setup-fact">
               <span>Role</span>
@@ -201,68 +197,35 @@ export function SetupPage({
               <strong>{formatGeographyPath(activeGeography)}</strong>
             </div>
             <div className="setup-fact">
-              <span>Geography level</span>
-              <strong>{formatGeographyLevel(currentUser.geographyLevel)}</strong>
-            </div>
-            <div className="setup-fact">
               <span>Email</span>
               <strong>{currentUser.email ?? "Not provided"}</strong>
             </div>
           </div>
-        </article>
-
-        <article className="panel-card setup-card">
-          <span className="section-kicker">What this user can do</span>
-          <div className="setup-list">
-            {profile.capabilities.map((capability) => (
-              <div className="setup-list-item" key={capability}>
-                <span />
-                <p>{capability}</p>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="panel-card setup-card">
-          <span className="section-kicker">Next actions</span>
-          <div className="setup-step-list">
-            {profile.nextActions.map((action, index) => (
-              <SetupStep key={action} text={action} title={`Action ${index + 1}`} />
-            ))}
-          </div>
-        </article>
-
-        <article className="panel-card setup-card">
-          <span className="section-kicker">Geography scope</span>
-          <h2>Allowed areas</h2>
-          <div className="setup-token-list">
+          <div className="setup-scope-divider" />
+          <div className="setup-scope-pills">
             {currentUser.geographyScopes.length > 0 ? (
               currentUser.geographyScopes.map((scope) => (
-                <span key={scope}>{formatGeographyPath(scope)}</span>
+                <span className="setup-scope-pill" key={scope}>
+                  {formatGeographyPath(scope)}
+                </span>
               ))
             ) : (
-              <span>No geography scope assigned</span>
+              <span className="setup-scope-pill">No geography scope assigned</span>
             )}
           </div>
-        </article>
+        </DataCard>
 
         {userCanManageUsers ? (
-          <article className="panel-card setup-card setup-card-primary">
-            <span className="section-kicker">User access setup</span>
-            <div className="setup-card-heading-row">
-              <div>
-                <h2>Manage planning users</h2>
-                <p>
-                  Create Keycloak-backed CHART users and keep their local role and
-                  geography records visible in setup.
-                </p>
-              </div>
-              <span className="setup-admin-badge">First admin ready</span>
-            </div>
-
-            {userError ? (
-              <div className="auth-error setup-error">{userError}</div>
-            ) : null}
+          <DataCard
+            eyebrow="Administration"
+            title="Manage users"
+            actions={
+              <span className="setup-user-count-badge">
+                {users.length} {users.length === 1 ? "user" : "users"}
+              </span>
+            }
+          >
+            {userError ? <ErrorBanner message={userError} /> : null}
 
             <div className="user-setup-form">
               <label>
@@ -301,6 +264,20 @@ export function SetupPage({
                     setNewUser((draft) => ({
                       ...draft,
                       email: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Phone
+                <input
+                  placeholder="+1 555 0100"
+                  type="tel"
+                  value={newUser.phone}
+                  onChange={(event) =>
+                    setNewUser((draft) => ({
+                      ...draft,
+                      phone: event.target.value,
                     }))
                   }
                 />
@@ -356,7 +333,7 @@ export function SetupPage({
                 </select>
               </label>
               <button
-                className="primary-button"
+                className="primary-button user-setup-form-submit"
                 type="button"
                 disabled={isSavingUser || geographies.length === 0}
                 onClick={addUser}
@@ -366,6 +343,13 @@ export function SetupPage({
             </div>
 
             <div className="user-setup-list">
+              <div className="user-list-header">
+                <span>Name / Email</span>
+                <span>Role</span>
+                <span>Geography</span>
+                <span>Status</span>
+                <span />
+              </div>
               <UserRow
                 email={currentUser.email ?? "Not provided"}
                 geography={activeGeography}
@@ -384,6 +368,7 @@ export function SetupPage({
                       geography={primaryGeography?.path ?? ""}
                       key={user.userId}
                       name={user.displayName}
+                      phone={user.phone}
                       role={user.roles[0]}
                       status={user.status === "active" ? "Active" : "Disabled"}
                       action={
@@ -401,73 +386,34 @@ export function SetupPage({
                   );
                 })}
             </div>
-          </article>
+          </DataCard>
         ) : null}
 
-        <article className="panel-card setup-card">
-          <span className="section-kicker">Role model</span>
-          <h2>Required team roles</h2>
-          <div className="role-template-list">
-            {setupRoleOptions.map((roleOption) => (
-              <div className="role-template-row" key={roleOption.role}>
-                <strong>{roleOption.label}</strong>
-                <span>{roleOption.responsibility}</span>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="panel-card setup-card">
-          <span className="section-kicker">Repository source</span>
-          <h2>Public action repository</h2>
-          <p>
-            CHART reads published action records through the repository adapter. Setup
-            imports the selected records into the workspace so planning has a stable
-            local snapshot.
-          </p>
-          <div className="setup-action-row">
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => onNavigate("solutions")}
-            >
-              View action repository
-            </button>
-          </div>
-        </article>
-
         {userCanManageUsers ? (
-          <article className="panel-card setup-card">
-            <span className="section-kicker">Onboarding</span>
-            <h2>{setupStatus?.completed ? "Setup complete" : "Setup required"}</h2>
-            <p>
-              Restart onboarding when the deployment country, hazards, or first
-              workspace setup needs to be configured again.
-            </p>
+          <DataCard
+            eyebrow="Deployment"
+            title={setupStatus?.completed ? "Setup complete" : "Setup required"}
+          >
             <div className="setup-fact-grid">
               <div className="setup-fact">
                 <span>Country</span>
                 <strong>{setupStatus?.countryName ?? "Not set"}</strong>
               </div>
               <div className="setup-fact">
-                <span>Configured hazards</span>
-                <strong>{setupStatus?.counts.hazards ?? 0}</strong>
+                <span>Selected hazards</span>
+                <strong>{setupStatus?.selectedHazards.length ?? 0}</strong>
               </div>
               <div className="setup-fact">
-                <span>Repository actions</span>
-                <strong>{setupStatus?.counts.workspaceSolutions ?? 0}</strong>
+                <span>Workspace members</span>
+                <strong>{setupStatus?.counts.workspaceMembers ?? 0}</strong>
               </div>
             </div>
-            {setupStatus?.solutionImport.message ? (
-              <p>{setupStatus.solutionImport.message}</p>
-            ) : null}
             {isResetConfirming ? (
               <div className="setup-reset-confirm">
                 <strong>Reset setup and sign out?</strong>
                 <p>
                   This clears the current workspace setup state and returns CHART to
-                  first-run onboarding. The next setup will pull matching actions from
-                  the repository again.
+                  first-run onboarding.
                 </p>
                 <div className="setup-action-row">
                   <button
@@ -498,19 +444,10 @@ export function SetupPage({
                 Reset onboarding
               </button>
             )}
-          </article>
+          </DataCard>
         ) : null}
       </section>
     </WorkspaceShell>
-  );
-}
-
-function SetupStep({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="setup-step">
-      <strong>{title}</strong>
-      <p>{text}</p>
-    </div>
   );
 }
 
@@ -519,6 +456,7 @@ function UserRow({
   email,
   geography,
   name,
+  phone,
   role,
   status,
 }: {
@@ -526,6 +464,7 @@ function UserRow({
   email: string;
   geography: string;
   name: string;
+  phone?: string;
   role: ChartRole | undefined;
   status: string;
 }) {
@@ -534,6 +473,7 @@ function UserRow({
       <div>
         <strong>{name}</strong>
         <span>{email}</span>
+        {phone ? <span>{phone}</span> : null}
       </div>
       <span>{formatRole(role)}</span>
       <span>{formatGeographyPath(geography)}</span>

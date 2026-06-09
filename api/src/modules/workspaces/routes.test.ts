@@ -21,11 +21,10 @@ const workspace = {
   name: "Regional heat planning 2026",
   planningCycle: "2026",
   status: "active" as const,
+  geographyId: "geo-country-a-region-a",
   createdByUserId: "keycloak-u1",
   ownerUserId: "keycloak-u1",
-  ownerGeographyId: "geo-country-a-region-a",
   memberRole: "owner" as const,
-  hazardIds: ["hazard-extreme-heat"],
 };
 
 test("POST /workspaces creates a geography-scoped planning workspace", async () => {
@@ -35,9 +34,8 @@ test("POST /workspaces creates a geography-scoped planning workspace", async () 
       assert.equal(context.userId, currentUser.userId);
       assert.deepEqual(input, {
         name: workspace.name,
-        ownerGeographyId: "geo-country-a-region-a",
+        geographyId: "geo-country-a-region-a",
         planningCycle: "2026",
-        hazardIds: ["hazard-extreme-heat"],
       });
       return workspace;
     },
@@ -62,9 +60,8 @@ test("POST /workspaces creates a geography-scoped planning workspace", async () 
     },
     payload: {
       name: workspace.name,
-      ownerGeographyId: "geo-country-a-region-a",
+      geographyId: "geo-country-a-region-a",
       planningCycle: "2026",
-      hazardIds: ["hazard-extreme-heat"],
     },
   });
 

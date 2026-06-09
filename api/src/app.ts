@@ -3,10 +3,10 @@ import fastifySwagger from "@fastify/swagger";
 
 import { buildApiDocsHtml } from "./apiDocs.js";
 import { registerAuthRoutes } from "./modules/auth/routes.js";
-import { registerDataIngestionRoutes } from "./modules/data-ingestion/routes.js";
 import { registerGeographyRoutes } from "./modules/geographies/routes.js";
+import { registerHazardRoutes } from "./modules/hazards/routes.js";
 import { registerSetupRoutes } from "./modules/setup/routes.js";
-import { registerSolutionRepositoryRoutes } from "./modules/solution-repository/routes.js";
+import { registerSolutionRoutes } from "./modules/solutions/routes.js";
 import { registerUserRoutes } from "./modules/users/routes.js";
 import { registerWorkspaceRoutes } from "./modules/workspaces/routes.js";
 
@@ -104,10 +104,10 @@ export function buildApp() {
   });
 
   app.register(registerAuthRoutes, { prefix: "/auth" });
-  app.register(registerDataIngestionRoutes, { prefix: "/sources" });
   app.register(registerGeographyRoutes, { prefix: "/geographies" });
+  app.register(registerHazardRoutes, { prefix: "/hazards" });
   app.register(registerSetupRoutes, { prefix: "/setup" });
-  app.register(registerSolutionRepositoryRoutes, { prefix: "/solutions" });
+  app.register(registerSolutionRoutes, { prefix: "/solutions" });
   app.register(registerUserRoutes, { prefix: "/users" });
   app.register(registerWorkspaceRoutes, { prefix: "/workspaces" });
 

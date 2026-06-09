@@ -7,7 +7,7 @@ import type { CurrentUserContext } from "../auth/types.js";
 import { UserError } from "./errors.js";
 import { registerUserRoutes } from "./routes.js";
 import type { UserService } from "./service.js";
-import type { ChartUserRecord, CreateChartUserInput } from "./types.js";
+import type { CreateUserInput, UserRecord } from "./types.js";
 
 const adminUser: CurrentUserContext = {
   userId: "keycloak-admin",
@@ -19,10 +19,11 @@ const adminUser: CurrentUserContext = {
   geographyLevel: "country",
 };
 
-const planningUser: ChartUserRecord = {
+const planningUser: UserRecord = {
   userId: "keycloak-u1",
   username: "health-lead",
   email: "health-lead@example.org",
+  phone: "+441234567890",
   displayName: "Health Lead",
   status: "active",
   roles: ["health_planning_lead"],
@@ -73,11 +74,12 @@ test("POST /users creates a Keycloak-backed app user", async () => {
       assert.deepEqual(input, {
         name: "Health Lead",
         email: "health-lead@example.org",
+        phone: "+441234567890",
         username: "health-lead",
         password: "secure-password",
         roles: ["health_planning_lead"],
         geographyIds: ["geo-country-a"],
-      } satisfies CreateChartUserInput);
+      } satisfies CreateUserInput);
 
       return planningUser;
     },
@@ -103,6 +105,7 @@ test("POST /users creates a Keycloak-backed app user", async () => {
     payload: {
       name: "Health Lead",
       email: "health-lead@example.org",
+      phone: "+441234567890",
       username: "health-lead",
       password: "secure-password",
       roles: ["health_planning_lead"],
