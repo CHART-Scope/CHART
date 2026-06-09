@@ -19,6 +19,7 @@ out/
 **/coverage/
 **/.next/
 **/out/
+web/storybook-static/
 *.tsbuildinfo
 
 # generated local app artifacts
