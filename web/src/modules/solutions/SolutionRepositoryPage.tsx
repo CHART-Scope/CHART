@@ -12,7 +12,7 @@ import { PublicAuthAction } from "../auth/PublicAuthAction";
 import type { ChartRoute } from "../routes/types";
 import {
   SolutionRepositoryDetailDrawer,
-  SolutionRepositoryItemCard,
+  SolutionRepositoryGrid,
 } from "./SolutionRepositoryComponents";
 
 type SolutionRepositoryPageProps = {
@@ -132,15 +132,7 @@ export function SolutionRepositoryPage({ onNavigate }: SolutionRepositoryPagePro
             <p>{error}</p>
           </section>
         ) : filteredItems.length > 0 ? (
-          <section className="solution-repository-grid public-repository-grid">
-            {filteredItems.map((item) => (
-              <SolutionRepositoryItemCard
-                item={item}
-                key={item.id}
-                onOpenDetail={setDetailItem}
-              />
-            ))}
-          </section>
+          <SolutionRepositoryGrid items={filteredItems} onOpenDetail={setDetailItem} />
         ) : (
           <section className="empty-panel">
             <h2>
