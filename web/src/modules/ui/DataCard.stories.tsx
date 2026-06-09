@@ -5,7 +5,7 @@ import { DataCard } from "./DataCard";
 import { LoadingPlaceholder } from "./LoadingPlaceholder";
 
 const meta = {
-  title: "Design System/DataCard",
+  title: "CHART UI/DataCard",
   component: DataCard,
 } satisfies Meta<typeof DataCard>;
 
