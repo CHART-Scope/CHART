@@ -141,3 +141,42 @@ jobs:
 
             PUBLIC_HOST="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
             PUBLIC_HOST="$PUBLIC_HOST" bash "$APP_DIR/infra/aws/deploy-app.sh"
+
+      - name: Verify public app remains reachable
+        run: |
+          public_host="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
+          base_url="http://${public_host}"
+
+          for attempt in $(seq 1 12); do
+            web_status="$(curl -fsS -o /dev/null -w "%{http_code}" "$base_url/" || true)"
+            api_body="$(curl -fsS "$base_url/chart-api/health" || true)"
+            keycloak_status="$(curl -fsS -o /dev/null -w "%{http_code}" "$base_url/identity/realms/chart" || true)"
+
+            if [ "$web_status" != "200" ] || [ "$api_body" != '{"status":"ok"}' ] || [ "$keycloak_status" != "200" ]; then
+              echo "::error title=Public smoke check failed::attempt ${attempt}: web=${web_status:-000} api=${api_body:-empty} keycloak=${keycloak_status:-000}"
+              exit 1
+            fi
+
+            echo "Public smoke check ${attempt}/12 passed."
+            sleep 10
+          done
+
+      - name: Dump EC2 diagnostics on failure
+        if: failure()
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.AWS_APP_HOST }}
+          username: ${{ env.AWS_APP_USER }}
+          key: ${{ env.AWS_APP_SSH_KEY }}
+          script: |
+            set -uo pipefail
+
+            docker ps -a --filter "name=chart-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            ss -ltnp || true
+
+            for container in chart-proxy chart-web chart-api chart-keycloak chart-postgres chart-keycloak-postgres; do
+              if docker ps -a --format "{{.Names}}" | grep -qx "$container"; then
+                echo "===== $container logs ====="
+                docker logs --tail 120 "$container" || true
+              fi
+            done
