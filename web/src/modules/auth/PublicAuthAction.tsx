@@ -4,7 +4,17 @@ import { useEffect, useState } from "react";
 
 import { getStoredAuthSession, type AuthSession } from "./authClient";
 
-export function PublicAuthAction() {
+type PublicAuthActionProps = {
+  className?: string;
+  signedInLabel?: string;
+  signedOutLabel?: string;
+};
+
+export function PublicAuthAction({
+  className = "button primary-button nav-sign-in",
+  signedInLabel = "Open workspace",
+  signedOutLabel = "Sign in",
+}: PublicAuthActionProps = {}) {
   const [session, setSession] = useState<AuthSession | null>(null);
 
   useEffect(() => {
@@ -13,15 +23,15 @@ export function PublicAuthAction() {
 
   if (session) {
     return (
-      <a className="button primary-button nav-sign-in" href="/dashboard">
-        Open workspace
+      <a className={className} href="/dashboard">
+        {signedInLabel}
       </a>
     );
   }
 
   return (
-    <a className="button primary-button nav-sign-in" href="/auth/signin">
-      Sign in
+    <a className={className} href="/auth/signin">
+      {signedOutLabel}
     </a>
   );
 }
