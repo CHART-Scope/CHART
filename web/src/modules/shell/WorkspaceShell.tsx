@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 
 import type { CurrentUserContext } from "../auth/authClient";
 import {
+  canManageContent,
   formatGeographyPath,
   formatRole,
   getUserProfile,
@@ -11,10 +12,13 @@ import {
 } from "../auth/userContext";
 import type { ChartRoute } from "../routes/types";
 
+import "./WorkspaceShell.css";
+
 type WorkspaceShellProps = {
   activeRoute: "dashboard" | "setup";
   pageTitle: string;
-  crumb: string;
+  pageSubtitle?: string;
+  crumb?: string;
   onNavigate: (route: ChartRoute) => void;
   currentUser?: CurrentUserContext;
   onSignOut?: (returnTo?: string) => void;
@@ -24,6 +28,7 @@ type WorkspaceShellProps = {
 export function WorkspaceShell({
   activeRoute,
   pageTitle,
+  pageSubtitle,
   crumb,
   onNavigate,
   currentUser,
@@ -37,6 +42,7 @@ export function WorkspaceShell({
     year: "numeric",
   }).format(new Date());
   const profile = currentUser ? getUserProfile(currentUser) : undefined;
+  const userCanManageContent = currentUser ? canManageContent(currentUser) : false;
 
   return (
     <div className="workspace-shell">
@@ -47,7 +53,7 @@ export function WorkspaceShell({
           onClick={() => onNavigate("landing")}
         >
           CHART
-          <small>Toolkit</small>
+          <small>v1</small>
         </button>
 
         <div className="workspace-section-label">Workspace</div>
@@ -57,18 +63,19 @@ export function WorkspaceShell({
           onClick={() => onNavigate("dashboard")}
         >
           <span className="workspace-dot" />
-          <span>Dashboard</span>
+          <span>My dashboard</span>
         </button>
         <button
-          className={`workspace-item ${activeRoute === "setup" ? "active" : ""}`}
+          className="workspace-item disabled"
           type="button"
-          onClick={() => onNavigate("setup")}
+          title="Coming soon"
+          disabled
         >
           <span className="workspace-dot" />
-          <span>Profile & setup</span>
+          <span>My plans</span>
         </button>
 
-        <div className="workspace-section-label">Public</div>
+        <div className="workspace-section-label">CHART Toolkit</div>
         <button
           className="workspace-item"
           type="button"
@@ -77,16 +84,30 @@ export function WorkspaceShell({
           <span className="workspace-dot public" />
           <span>Action repository</span>
         </button>
-        <button
-          className="workspace-item"
-          type="button"
-          onClick={() => onNavigate("landing")}
-        >
-          <span className="workspace-dot public" />
-          <span>Landing page</span>
-        </button>
+
+        {userCanManageContent ? (
+          <>
+            <div className="workspace-section-label">Admin</div>
+            <button
+              className={`workspace-item ${activeRoute === "setup" ? "active" : ""}`}
+              type="button"
+              onClick={() => onNavigate("setup")}
+            >
+              <span className="workspace-dot" />
+              <span>Content studio</span>
+            </button>
+          </>
+        ) : null}
 
         <div className="workspace-sidebar-foot">
+          <button
+            className="workspace-item"
+            type="button"
+            onClick={() => onNavigate("landing")}
+          >
+            <span className="workspace-dot public" />
+            <span>Public site</span>
+          </button>
           {onSignOut ? (
             <button
               className="workspace-signout"
@@ -101,21 +122,19 @@ export function WorkspaceShell({
 
       <div className="workspace-main">
         <header className="workspace-topbar">
-          <div>
-            <div className="workspace-crumb">{crumb}</div>
-            <div className="workspace-title">{pageTitle}</div>
+          <div className="workspace-topbar-heading">
+            {crumb ? <div className="workspace-crumb">{crumb}</div> : null}
+            <h1>{pageTitle}</h1>
+            {pageSubtitle ? <p>{pageSubtitle}</p> : null}
           </div>
           <div className="workspace-topbar-right">
-            <div className="workspace-date">{today}</div>
-            {onSignOut ? (
-              <button
-                className="topbar-signout"
-                type="button"
-                onClick={() => onSignOut()}
-              >
-                Sign out
-              </button>
+            {currentUser ? (
+              <span className="workspace-welcome">Welcome, {currentUser.username}</span>
             ) : null}
+            <div className="workspace-date">{today}</div>
+            <button className="ghost-button" type="button" disabled>
+              Customize
+            </button>
             {currentUser ? (
               <div className="workspace-profile-menu">
                 <button

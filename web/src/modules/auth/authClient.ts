@@ -36,11 +36,13 @@ const authStorageKey = "chart.auth.session";
 const legacyPkceStorageKey = "chart.auth.pkce";
 
 export function getStoredAuthSession(): AuthSession | null {
-  if (typeof window === "undefined") {
+  const storage = getBrowserStorage("localStorage");
+
+  if (!storage) {
     return null;
   }
 
-  const rawSession = window.localStorage.getItem(authStorageKey);
+  const rawSession = storage.getItem(authStorageKey);
 
   if (!rawSession) {
     return null;
@@ -49,24 +51,30 @@ export function getStoredAuthSession(): AuthSession | null {
   try {
     return JSON.parse(rawSession) as AuthSession;
   } catch {
-    window.localStorage.removeItem(authStorageKey);
+    storage.removeItem(authStorageKey);
     return null;
   }
 }
 
 export function storeAuthSession(session: AuthSession) {
-  window.localStorage.setItem(authStorageKey, JSON.stringify(session));
+  const storage = getBrowserStorage("localStorage");
+
+  if (!storage) {
+    throw new Error("Browser storage is not available for CHART sign-in.");
+  }
+
+  storage.setItem(authStorageKey, JSON.stringify(session));
 }
 
 export function clearAuthSession() {
-  window.localStorage.removeItem(authStorageKey);
-  window.localStorage.removeItem(legacyPkceStorageKey);
-  window.sessionStorage.removeItem(legacyPkceStorageKey);
+  getBrowserStorage("localStorage")?.removeItem(authStorageKey);
+  getBrowserStorage("localStorage")?.removeItem(legacyPkceStorageKey);
+  getBrowserStorage("sessionStorage")?.removeItem(legacyPkceStorageKey);
 }
 
-export async function startKeycloakSignIn() {
+export function startKeycloakSignIn() {
   clearAuthSession();
-  window.location.assign("/auth/signin");
+  window.location.replace("/auth/signin");
 }
 
 export async function completeKeycloakSignIn(search: string) {
@@ -135,4 +143,16 @@ async function fetchCurrentUser(accessToken?: string) {
   }
 
   return (await response.json()) as CurrentUserContext;
+}
+
+function getBrowserStorage(kind: "localStorage" | "sessionStorage") {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return window[kind] ?? null;
+  } catch {
+    return null;
+  }
 }

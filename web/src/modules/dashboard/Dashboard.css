@@ -1,0 +1,171 @@
+/* Dashboard page layout */
+
+.dashboard-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-bottom: var(--space-lg);
+}
+
+.dashboard-content-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-lower-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
+  gap: 1rem;
+}
+
+.dashboard-lower-grid .map-panel {
+  height: 28rem;
+}
+
+/* Risk group list (used in HighestRiskGroupsCard) */
+
+.risk-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.risk-group-item {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.risk-group-item:last-child {
+  border-bottom: none;
+}
+
+.risk-group-rank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 999px;
+  background: var(--green-tint);
+  color: var(--green-dark);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+}
+
+.risk-group-info {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.risk-group-info strong {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.risk-group-info small {
+  color: var(--ink-mute);
+  font-size: var(--text-xs);
+}
+
+/* Resilience score (used in HealthResilienceCard) */
+
+.resilience-score-display {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+}
+
+.resilience-score-value {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.resilience-score-value strong {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.03em;
+  color: var(--green-dark);
+}
+
+.resilience-score-value span {
+  color: var(--ink-mute);
+  font-size: var(--text-md);
+}
+
+.resilience-bar-track {
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.resilience-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--green), var(--green-dark));
+  transition: width 0.6s ease;
+}
+
+.resilience-label {
+  color: var(--ink-mute);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+/* Community concerns (used in CommunityConcernsCard) */
+
+.community-concerns-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.community-concern-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.community-concern-row:last-child {
+  border-bottom: none;
+}
+
+.community-concern-row span {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+
+.community-concern-row small {
+  flex-shrink: 0;
+  color: var(--ink-mute);
+  font-size: var(--text-xs);
+}
+
+/* Responsive */
+
+@media (max-width: 1280px) {
+  .dashboard-kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-content-grid,
+  .dashboard-lower-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-kpi-row {
+    grid-template-columns: 1fr;
+  }
+}
