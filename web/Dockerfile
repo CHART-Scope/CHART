@@ -6,6 +6,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS=--max-old-space-size=1536
 
 COPY package.json package-lock.json ./
+COPY api/package.json api/package.json
 COPY web/package.json web/package.json
 RUN npm ci
 

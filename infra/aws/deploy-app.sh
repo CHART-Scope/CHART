@@ -60,6 +60,11 @@ if [ -z "$PUBLIC_HOST" ]; then
   exit 1
 fi
 
+if [[ "$PUBLIC_HOST" == http://* || "$PUBLIC_HOST" == https://* || "$PUBLIC_HOST" == */* ]]; then
+  echo "Set PUBLIC_HOST to a bare hostname or IP without a scheme or path." >&2
+  exit 1
+fi
+
 mkdir -p "$ENV_DIR"
 
 if [ -f "$ENV_FILE" ]; then
