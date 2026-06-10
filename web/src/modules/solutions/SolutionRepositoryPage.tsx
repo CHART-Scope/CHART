@@ -14,6 +14,7 @@ import {
   SolutionRepositoryDetailDrawer,
   SolutionRepositoryGrid,
 } from "./SolutionRepositoryComponents";
+import { FilterBar } from "../ui/FilterBar";
 
 type SolutionRepositoryPageProps = {
   onNavigate: (route: ChartRoute) => void;
@@ -92,49 +93,51 @@ export function SolutionRepositoryPage({ onNavigate }: SolutionRepositoryPagePro
           </p>
         </section>
 
-        <section className="repository-filter-panel">
-          <label>
-            Hazard
-            <select
-              value={selectedHazard}
-              onChange={(event) => setSelectedHazard(event.target.value)}
-            >
-              <option value="all">All hazards</option>
-              {hazardOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Action type
-            <select
-              value={selectedType}
-              onChange={(event) => setSelectedType(event.target.value)}
-            >
-              <option value="all">All action types</option>
-              {solutionTypeOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <span>
-            {filteredItems.length} of {items.length} public actions
+        <div className="repository-filter-row">
+          <FilterBar
+            filters={[
+              {
+                id: "hazard",
+                label: "Hazard",
+                options: [
+                  { value: "all", label: "All hazards" },
+                  ...hazardOptions.map((option) => ({
+                    value: option.id,
+                    label: option.label,
+                  })),
+                ],
+                value: selectedHazard,
+                onChange: setSelectedHazard,
+              },
+              {
+                id: "type",
+                label: "Action type",
+                options: [
+                  { value: "all", label: "All action types" },
+                  ...solutionTypeOptions.map((option) => ({
+                    value: option.id,
+                    label: option.label,
+                  })),
+                ],
+                value: selectedType,
+                onChange: setSelectedType,
+              },
+            ]}
+          />
+          <span className="filter-result-count">
+            {filteredItems.length} of {items.length} actions
           </span>
-        </section>
+        </div>
 
         {error ? (
-          <section className="empty-panel">
+          <section className="repository-empty-state">
             <h2>Repository unavailable</h2>
             <p>{error}</p>
           </section>
         ) : filteredItems.length > 0 ? (
           <SolutionRepositoryGrid items={filteredItems} onOpenDetail={setDetailItem} />
         ) : (
-          <section className="empty-panel">
+          <section className="repository-empty-state">
             <h2>
               {items.length === 0
                 ? "No public actions have been prepared yet"

@@ -4,8 +4,20 @@ import { useEffect, useRef, useState } from "react";
 
 import type { GeographyRecord } from "../../lib/geographyClient";
 
+import "./OpenStreetMapPanel.css";
+
+type MarkerDefinition = {
+  position: [number, number];
+  label?: string;
+  color?: string;
+};
+
 type OpenStreetMapPanelProps = {
   selectedGeography?: GeographyRecord;
+  center?: [number, number];
+  bounds?: [[number, number], [number, number]];
+  markers?: MarkerDefinition[];
+  className?: string;
 };
 
 type LookupState = "idle" | "loading" | "found" | "not-found" | "error";
@@ -71,11 +83,18 @@ async function lookupGeography(
   return results[0];
 }
 
-export function OpenStreetMapPanel({ selectedGeography }: OpenStreetMapPanelProps) {
+export function OpenStreetMapPanel({
+  selectedGeography,
+  center,
+  bounds,
+  markers,
+  className,
+}: OpenStreetMapPanelProps) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const layerRef = useRef<import("leaflet").LayerGroup | null>(null);
   const [lookupState, setLookupState] = useState<LookupState>("idle");
+  const showRiskLegend = markers && markers.length > 0;
 
   useEffect(() => {
     let isMounted = true;
@@ -92,7 +111,7 @@ export function OpenStreetMapPanel({ selectedGeography }: OpenStreetMapPanelProp
       }
 
       const map = leaflet.map(mapElementRef.current, {
-        center: [20, 0],
+        center: center ?? [20, 0],
         zoom: 2,
         zoomControl: true,
         scrollWheelZoom: true,
@@ -125,9 +144,54 @@ export function OpenStreetMapPanel({ selectedGeography }: OpenStreetMapPanelProp
 
       layerRef.current = null;
     };
-  }, []);
+  }, [center]);
 
+  // Handle direct bounds/center props (skip Nominatim lookup)
   useEffect(() => {
+    if (!mapRef.current || !layerRef.current) {
+      return;
+    }
+
+    if (!bounds && !center && !markers) {
+      return;
+    }
+
+    const leaflet = require("leaflet") as typeof import("leaflet");
+
+    if (bounds) {
+      const leafletBounds = leaflet.latLngBounds(bounds[0], bounds[1]);
+      mapRef.current.fitBounds(leafletBounds, { animate: true, padding: [28, 28] });
+    } else if (center) {
+      mapRef.current.setView(center, 8, { animate: true });
+    }
+
+    if (markers && layerRef.current) {
+      // Clear previous markers only if using direct marker mode
+      for (const marker of markers) {
+        leaflet
+          .circleMarker(marker.position, {
+            radius: 7,
+            color: "#ffffff",
+            weight: 2,
+            fillColor: marker.color ?? "#185E2B",
+            fillOpacity: 1,
+          })
+          .addTo(layerRef.current)
+          .bindTooltip(marker.label ?? "", {
+            direction: "top",
+            offset: [0, -8],
+          });
+      }
+    }
+  }, [bounds, center, markers]);
+
+  // Handle geography-based lookup (existing behavior)
+  useEffect(() => {
+    // Skip Nominatim lookup when direct coordinates are provided
+    if (center || bounds) {
+      return;
+    }
+
     if (!selectedGeography || !mapRef.current || !layerRef.current) {
       setLookupState(selectedGeography ? "loading" : "idle");
       return;
@@ -163,10 +227,10 @@ export function OpenStreetMapPanel({ selectedGeography }: OpenStreetMapPanelProp
         }
 
         const [south, north, west, east] = result.boundingbox.map(Number);
-        const bounds = leaflet.latLngBounds([south, west], [north, east]);
+        const leafletBounds = leaflet.latLngBounds([south, west], [north, east]);
 
         leaflet
-          .rectangle(bounds, {
+          .rectangle(leafletBounds, {
             color: "#185E2B",
             weight: 2,
             fillColor: "#5FB96F",
@@ -191,7 +255,7 @@ export function OpenStreetMapPanel({ selectedGeography }: OpenStreetMapPanelProp
             .openTooltip();
         }
 
-        mapRef.current.fitBounds(bounds, {
+        mapRef.current.fitBounds(leafletBounds, {
           animate: true,
           padding: [28, 28],
           maxZoom: 8,
@@ -213,10 +277,10 @@ export function OpenStreetMapPanel({ selectedGeography }: OpenStreetMapPanelProp
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [selectedGeography]);
+  }, [selectedGeography, center, bounds]);
 
   return (
-    <div className="map-panel">
+    <div className={`map-panel${className ? ` ${className}` : ""}`}>
       <div className="map-canvas" ref={mapElementRef} />
       <div className="map-legend">
         <div className="map-legend-title">Map data</div>
@@ -228,6 +292,26 @@ export function OpenStreetMapPanel({ selectedGeography }: OpenStreetMapPanelProp
           <span className="map-legend-line" />
           Selected geography
         </div>
+        {showRiskLegend ? (
+          <>
+            <div className="map-legend-row">
+              <span className="map-legend-dot crit" />
+              Critical
+            </div>
+            <div className="map-legend-row">
+              <span className="map-legend-dot high" />
+              High
+            </div>
+            <div className="map-legend-row">
+              <span className="map-legend-dot med" />
+              Moderate
+            </div>
+            <div className="map-legend-row">
+              <span className="map-legend-dot low" />
+              Low
+            </div>
+          </>
+        ) : null}
       </div>
       <div className="map-status-card">
         {lookupState === "idle" ? "Select a configured geography to locate it." : null}

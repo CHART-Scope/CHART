@@ -1,0 +1,311 @@
+/* WorkspaceShell layout — extracted from styles.css */
+
+.workspace-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+
+.workspace-sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--green);
+  color: #fff;
+}
+
+.workspace-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 1.25rem 1.5rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #fff;
+  text-align: left;
+}
+
+.workspace-brand small {
+  font-size: 0.65rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.72;
+}
+
+.workspace-section-label {
+  padding: 0.9rem 1.5rem 0.45rem;
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.workspace-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.82rem 1.5rem;
+  color: rgba(255, 255, 255, 0.95);
+  text-align: left;
+  border-left: 4px solid transparent;
+}
+
+.workspace-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.workspace-item.active {
+  background: var(--green-active);
+  color: var(--ink);
+  border-left-color: var(--green-dark);
+}
+
+.workspace-item.disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.workspace-item.disabled:hover {
+  background: transparent;
+}
+
+.workspace-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.workspace-dot.public {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.workspace-sidebar-foot {
+  margin-top: auto;
+  padding: 1rem 1.5rem 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.workspace-signout {
+  display: inline-flex;
+  width: 100%;
+  justify-content: center;
+  margin-top: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.85rem;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-weight: 700;
+}
+
+.workspace-signout:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.workspace-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.workspace-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 2rem;
+  background: var(--green-tint);
+  border-bottom: 1px solid var(--border);
+}
+
+.workspace-topbar-heading h1 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.workspace-topbar-heading p {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--ink-mute);
+}
+
+.workspace-crumb {
+  font-size: 0.82rem;
+  color: var(--ink-mute);
+  margin-bottom: 0.4rem;
+}
+
+.workspace-title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.workspace-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.workspace-welcome {
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.topbar-signout {
+  border: 1px solid var(--green-soft);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.8rem;
+  background: #fff;
+  color: var(--green-dark);
+  font-weight: 700;
+}
+
+.workspace-profile-menu {
+  position: relative;
+}
+
+.workspace-avatar-button {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid rgba(31, 110, 54, 0.16);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem 0.25rem 0.25rem;
+  background: #fff;
+  color: var(--ink);
+}
+
+.workspace-date {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.workspace-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.workspace-avatar-copy {
+  display: grid;
+  gap: 0.05rem;
+  text-align: left;
+}
+
+.workspace-avatar-copy strong {
+  font-size: 0.82rem;
+}
+
+.workspace-avatar-copy small {
+  max-width: 12rem;
+  overflow: hidden;
+  color: var(--ink-mute);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-popover {
+  position: absolute;
+  top: calc(100% + 0.7rem);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  gap: 0.9rem;
+  width: min(21rem, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: var(--shadow-lg);
+}
+
+.profile-popover h3,
+.profile-popover p {
+  margin: 0;
+}
+
+.profile-popover p {
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.profile-fact {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.8rem;
+  border-radius: var(--radius-md);
+  background: var(--green-active);
+}
+
+.profile-fact span {
+  color: var(--green-dark);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.workspace-content {
+  padding: 1.75rem 2rem 2.5rem;
+}
+
+/* Responsive */
+
+@media (max-width: 900px) {
+  .workspace-topbar,
+  .workspace-content {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .workspace-shell {
+    grid-template-columns: 72px 1fr;
+  }
+
+  .workspace-brand {
+    justify-content: center;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    font-size: 0.95rem;
+  }
+
+  .workspace-brand small,
+  .workspace-item span:not(.workspace-dot),
+  .workspace-section-label,
+  .workspace-sidebar-foot {
+    display: none;
+  }
+
+  .workspace-item {
+    justify-content: center;
+    padding-left: 0.8rem;
+    padding-right: 0.8rem;
+  }
+
+  .profile-popover {
+    position: fixed;
+    top: 5rem;
+    right: 1rem;
+  }
+}

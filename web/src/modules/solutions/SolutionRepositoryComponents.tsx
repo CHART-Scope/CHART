@@ -96,7 +96,10 @@ export function SolutionRepositoryItemCard({
           <p>
             {item.summary ?? item.description ?? "Action details are being prepared."}
           </p>
-          <span className="solution-meta-line">{solutionMetaLine(item)}</span>
+          <div className="solution-meta-row">
+            <span className="solution-meta-line">{solutionTypeLine(item)}</span>
+            <CostIndicator cost={item.costOfImplementation} />
+          </div>
           <SolutionRepositoryTagList
             labels={taxonomyLabels(item, "hazard").slice(0, 3)}
           />
@@ -145,7 +148,7 @@ export function SolutionRepositoryDetailDrawer({
               <h2>{item.name}</h2>
             </div>
             <button className="ghost-button" type="button" onClick={onClose}>
-              Close
+              &#10005; Close
             </button>
           </div>
 
@@ -153,7 +156,10 @@ export function SolutionRepositoryDetailDrawer({
 
           <div className="drawer-fact-row">
             <span>Type and cost</span>
-            <strong>{solutionMetaLine(item)}</strong>
+            <div className="drawer-cost-row">
+              <strong>{solutionTypeLine(item)}</strong>
+              <CostIndicator cost={item.costOfImplementation} />
+            </div>
           </div>
 
           <section className="drawer-section">
@@ -444,22 +450,59 @@ export function SolutionLinkSection({
     return null;
   }
 
+  const pdfLinks = links.filter((link) => /\.pdf($|\?)/i.test(link.url));
+  const otherLinks = links.filter((link) => !/\.pdf($|\?)/i.test(link.url));
+
   return (
     <section className="drawer-section">
       <span className="panel-eyebrow">Useful links</span>
-      <div className="asset-list compact">
-        {links.map((link) => (
-          <a
-            className="asset-link"
-            href={link.url}
-            key={link.url}
-            rel="noreferrer"
-            target="_blank"
-          >
-            <span>{link.label}</span>
-          </a>
-        ))}
-      </div>
+      {pdfLinks.length > 0 ? (
+        <div className="drawer-asset-grid">
+          {pdfLinks.map((link) => (
+            <a
+              className="drawer-asset-card"
+              href={link.url}
+              key={link.url}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <span className="drawer-asset-embed-wrap">
+                <embed
+                  className="drawer-asset-embed"
+                  src={link.url}
+                  type="application/pdf"
+                />
+                <span className="drawer-asset-embed-overlay" />
+              </span>
+              <span className="drawer-asset-info">
+                <span className="drawer-asset-name">{link.label}</span>
+                <small>PDF &#183; opens in new tab</small>
+              </span>
+            </a>
+          ))}
+        </div>
+      ) : null}
+      {otherLinks.length > 0 ? (
+        <div className="drawer-link-list">
+          {otherLinks.map((link) => (
+            <a
+              className="drawer-link-card"
+              href={link.url}
+              key={link.url}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <span className="drawer-link-icon" aria-hidden="true">
+                &#8599;
+              </span>
+              <span className="drawer-link-text">
+                <span className="drawer-link-label">{link.label}</span>
+                <span className="drawer-link-url">{link.url}</span>
+              </span>
+            </a>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -476,19 +519,60 @@ export function SolutionAssetSection({
   return (
     <section className="drawer-section">
       <span className="panel-eyebrow">Case studies</span>
-      <div className="asset-list compact">
-        {assets.map((asset) => (
-          <a
-            className="asset-link"
-            href={asset.storageUrl ?? "#"}
-            key={asset.id}
-            rel="noreferrer"
-            target="_blank"
-          >
-            <span>{asset.filename}</span>
-            <small>{asset.mimeType ?? "Resource"}</small>
-          </a>
-        ))}
+      <div className="drawer-asset-grid">
+        {assets.map((asset) => {
+          const isPdf =
+            asset.mimeType?.includes("pdf") || asset.filename.endsWith(".pdf");
+          const isImage =
+            asset.mimeType?.startsWith("image/") ||
+            /\.(jpg|jpeg|png|webp|gif)$/i.test(asset.filename);
+          const url = asset.storageUrl ?? "#";
+
+          return (
+            <a
+              className="drawer-asset-card"
+              href={url}
+              key={asset.id}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {isPdf && asset.storageUrl ? (
+                <span className="drawer-asset-embed-wrap">
+                  <embed
+                    className="drawer-asset-embed"
+                    src={asset.storageUrl}
+                    type="application/pdf"
+                  />
+                  <span className="drawer-asset-embed-overlay" />
+                </span>
+              ) : isImage && asset.storageUrl ? (
+                <span className="drawer-asset-preview">
+                  <img
+                    className="drawer-asset-img"
+                    src={asset.storageUrl}
+                    alt={asset.filename}
+                    loading="lazy"
+                  />
+                </span>
+              ) : (
+                <span className="drawer-asset-preview drawer-asset-preview-file">
+                  <span className="drawer-asset-filetype">
+                    {(asset.mimeType?.split("/").pop() ?? "FILE")
+                      .toUpperCase()
+                      .slice(0, 4)}
+                  </span>
+                </span>
+              )}
+              <span className="drawer-asset-info">
+                <span className="drawer-asset-name">{asset.filename}</span>
+                <small>
+                  {isPdf ? "PDF document" : (asset.mimeType ?? "Resource")} &#183; opens
+                  in new tab
+                </small>
+              </span>
+            </a>
+          );
+        })}
       </div>
     </section>
   );
@@ -517,10 +601,48 @@ export function taxonomyLabels(item: SolutionRepositoryItem, type: string) {
 }
 
 export function solutionMetaLine(item: SolutionRepositoryItem) {
-  const types = taxonomyLabels(item, "solution_type").slice(0, 2).join(", ");
+  const types = solutionTypeLine(item);
   const cost = formatCost(item.costOfImplementation);
 
   return [types, cost].filter(Boolean).join(" · ") || "Action details";
+}
+
+function solutionTypeLine(item: SolutionRepositoryItem) {
+  return (
+    taxonomyLabels(item, "solution_type").slice(0, 2).join(", ") || "Action details"
+  );
+}
+
+const costLevels: Record<string, { filled: number; label: string }> = {
+  low: { filled: 1, label: "Low" },
+  medium: { filled: 2, label: "Medium" },
+  high: { filled: 3, label: "High" },
+};
+
+function CostIndicator({ cost }: { cost: string | null }) {
+  if (!cost) {
+    return null;
+  }
+
+  const level = costLevels[cost];
+
+  if (!level) {
+    return <span className="cost-indicator-label">{cost.replace(/[_-]+/g, " ")}</span>;
+  }
+
+  return (
+    <span className="cost-indicator">
+      {[1, 2, 3].map((n) => (
+        <span
+          className={`cost-pip${n <= level.filled ? " cost-pip-filled" : ""}`}
+          key={n}
+        >
+          $
+        </span>
+      ))}
+      <span className="cost-indicator-label">{level.label}</span>
+    </span>
+  );
 }
 
 function formatCost(cost: string | null) {
