@@ -5,78 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1780565629290,
-      "tag": "0000_misty_tempest",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1780579596257,
-      "tag": "0001_loving_tenebrous",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1780582041838,
-      "tag": "0002_romantic_vapor",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1780617895958,
-      "tag": "0003_reflective_tusk",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1780619206631,
-      "tag": "0004_reconcile_workspace_setup",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1780918769810,
-      "tag": "0005_shocking_calypso",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1780921788259,
-      "tag": "0006_glossy_starjammers",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1780929872151,
-      "tag": "0007_groovy_spitfire",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1780932243422,
-      "tag": "0008_chunky_sentinels",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1780946470522,
-      "tag": "0009_futuristic_cable",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1781024730821,
-      "tag": "0010_clear_shriek",
+      "when": 1781109576420,
+      "tag": "0000_dapper_tomorrow_man",
       "breakpoints": true
     }
   ]
