@@ -4458,10 +4458,10 @@ button {
 
 .partner-logo-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(2rem, 7vw, 6rem);
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: clamp(1rem, 2vw, 1.5rem);
   align-items: center;
-  width: min(1200px, 100vw - 7rem);
+  width: min(1120px, calc(100vw - 3rem));
   margin-left: 50%;
   transform: translateX(-50%);
 }
@@ -4470,66 +4470,76 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 5.4rem;
-  color: #a8a8a8;
-  filter: grayscale(1);
-  opacity: 0.9;
+  min-width: 0;
+  min-height: 7.2rem;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid #e4eee5;
+  border-radius: 0.9rem;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(22, 67, 31, 0.06);
   text-align: center;
 }
 
-.partner-logo.scope span {
-  max-width: 9rem;
-  font-size: 2.25rem;
-  font-weight: 900;
-  line-height: 0.82;
-  text-transform: uppercase;
-  letter-spacing: -0.08em;
-}
-
-.partner-logo.scope span::after {
-  content: "IMPACT";
+.partner-logo img {
   display: block;
-  margin-top: 0.25rem;
-  padding: 0.1rem 0.22rem;
-  color: #fff;
-  background: #a8a8a8;
-  font-size: 0.88rem;
-  letter-spacing: 0.22em;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
-.partner-logo.path span {
-  font-size: 3.8rem;
-  font-weight: 900;
-  letter-spacing: 0.03em;
+.partner-logo.seal-logo img {
+  max-height: 6.1rem;
 }
 
-.partner-logo.chai span {
-  max-width: 11rem;
-  font-family: Georgia, serif;
-  font-size: 1rem;
-  line-height: 1.1;
+.partner-logo.square-logo img {
+  max-height: 5rem;
+}
+
+.partner-logo.wordmark-logo img,
+.partner-logo.wide-logo img,
+.partner-logo.extra-wide-logo img {
+  max-height: 4.5rem;
+}
+
+.partner-logo.extra-wide-logo {
+  grid-column: span 2;
+}
+
+.landing-governance-note {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  width: min(780px, calc(100% - 3rem));
+  margin: 3rem auto 0;
+}
+
+.landing-governance-note div {
+  min-height: 8rem;
+  padding: 1rem;
+  border: 1px solid #d9e8dc;
+  border-radius: 0.9rem;
+  background: #fbfdfb;
+}
+
+.landing-governance-note strong,
+.landing-governance-note span {
+  display: block;
+}
+
+.landing-governance-note strong {
+  margin-bottom: 0.55rem;
+  color: var(--green-deep);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.partner-logo.partner-government {
-  position: relative;
-}
-
-.partner-logo.partner-government::before {
-  content: "";
-  width: 6rem;
-  height: 6rem;
-  border: 0.35rem double #a8a8a8;
-  border-radius: 999px;
-}
-
-.partner-logo.partner-government span {
-  position: absolute;
-  max-width: 4.5rem;
-  font-family: Georgia, serif;
-  font-size: 0.52rem;
-  line-height: 1.1;
-  text-transform: uppercase;
+.landing-governance-note span {
+  color: #1f1f1f;
+  font-size: 0.96rem;
+  line-height: 1.5;
 }
 
 .landing-footer {
@@ -4853,6 +4863,14 @@ button {
   }
 
   .partner-logo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .partner-logo.extra-wide-logo {
+    grid-column: auto;
+  }
+
+  .landing-governance-note {
     grid-template-columns: 1fr;
   }
 

@@ -16,17 +16,54 @@ type LandingPageProps = {
 type ToolkitPreview = "risk" | "vra" | "solutions";
 
 const partnerLogos = [
-  { name: "Scope Impact", label: "SCOPE", className: "scope" },
-  { name: "PATH", label: "PATH", className: "path" },
   {
-    name: "Clinton Health Access Initiative",
-    label: "Clinton Health Access Initiative",
-    className: "chai",
+    name: "Government of Madhya Pradesh",
+    src: "/landing/partner-logos/madhya-pradesh-government.png",
+    width: 150,
+    height: 146,
+    className: "seal-logo",
   },
   {
-    name: "Partner government",
-    label: "Partner government",
-    className: "partner-government",
+    name: "County Government of Kajiado",
+    src: "/landing/partner-logos/kajiado-county-government.png",
+    width: 161,
+    height: 161,
+    className: "seal-logo",
+  },
+  {
+    name: "Amref Health Africa",
+    src: "/landing/partner-logos/amref-health-africa.png",
+    width: 241,
+    height: 147,
+    className: "wide-logo",
+  },
+  {
+    name: "PATH",
+    src: "/landing/partner-logos/path.png",
+    width: 135,
+    height: 67,
+    className: "wordmark-logo",
+  },
+  {
+    name: "Amp Health",
+    src: "/landing/partner-logos/amphealth.png",
+    width: 321,
+    height: 81,
+    className: "extra-wide-logo",
+  },
+  {
+    name: "Expert Analytics",
+    src: "/landing/partner-logos/expert-analytics.png",
+    width: 240,
+    height: 106,
+    className: "wide-logo",
+  },
+  {
+    name: "GDI",
+    src: "/landing/partner-logos/gdi.png",
+    width: 108,
+    height: 100,
+    className: "square-logo",
   },
 ];
 
@@ -69,9 +106,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <a className="button ghost-button" href="#contact">
                 Contact us
               </a>
-              <a className="button primary-button" href="/onboarding">
-                Start setup
-              </a>
+              <PublicAuthAction signedOutLabel="Sign in to start" />
             </div>
           </div>
 
@@ -205,9 +240,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <a className="button ghost-button" href="mailto:hello@scopeimpact.fi">
                 Contact us
               </a>
-              <a className="button primary-button" href="/onboarding">
-                Start setup
-              </a>
+              <PublicAuthAction signedOutLabel="Sign in to start" />
             </div>
           </div>
 
@@ -215,19 +248,39 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             <h3>Co-created by:</h3>
             <div className="partner-logo-grid">
               {partnerLogos.map((partner) => (
-                <div
+                <figure
                   className={`partner-logo ${partner.className}`}
                   key={partner.name}
-                  aria-label={partner.name}
                 >
-                  <span>{partner.label}</span>
-                </div>
+                  <img
+                    src={partner.src}
+                    alt={partner.name}
+                    width={partner.width}
+                    height={partner.height}
+                    loading="lazy"
+                  />
+                </figure>
               ))}
             </div>
           </div>
 
+          <div className="landing-governance-note" aria-label="Platform governance">
+            <div>
+              <strong>Platform license</strong>
+              <span>CHART platform code is licensed under AGPL-3.0.</span>
+            </div>
+            <div>
+              <strong>Solution repository</strong>
+              <span>
+                Solution content is maintained as a published repository so evidence
+                summaries and implementation notes can be reviewed and updated
+                independently of each deployment.
+              </span>
+            </div>
+          </div>
+
           <footer className="landing-footer">
-            <span>CHART platform code is licensed under AGPL-3.0.</span>
+            <span>CHART is an open-source climate and health planning tool.</span>
             <a
               href="https://github.com/CHART-Scope/CHART"
               rel="noreferrer"
