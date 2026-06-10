@@ -161,6 +161,10 @@ http {
 EOF
 chmod 600 "$PROXY_CONFIG_FILE"
 
+echo "Building CHART images before restarting live containers..."
+docker build -f "$APP_DIR/api/Dockerfile" -t "$API_IMAGE" "$APP_DIR"
+docker build -f "$APP_DIR/web/Dockerfile" -t "$WEB_IMAGE" "$APP_DIR"
+
 docker network create "$NETWORK" >/dev/null 2>&1 || true
 
 docker rm -f "$PROXY_CONTAINER" "$WEB_CONTAINER" "$API_CONTAINER" "$KEYCLOAK_CONTAINER" "$KEYCLOAK_DB_CONTAINER" "$DB_CONTAINER" >/dev/null 2>&1 || true
@@ -240,8 +244,6 @@ docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh update \
   -s "attributes={\"post.logout.redirect.uris\":\"http://$PUBLIC_HOST##http://$PUBLIC_HOST/*##http://localhost:3100##http://localhost:3100/*##http://127.0.0.1:3100##http://127.0.0.1:3100/*\"}" \
   -s 'webOrigins=["+"]' >/dev/null
 
-docker build -f "$APP_DIR/api/Dockerfile" -t "$API_IMAGE" "$APP_DIR"
-
 docker run --rm \
   --network "$NETWORK" \
   -e KEYCLOAK_ADMIN_URL="http://$KEYCLOAK_CONTAINER:8080/identity" \
@@ -273,8 +275,6 @@ docker run -d \
   "$API_IMAGE" >/dev/null
 
 wait_for_command "CHART API" curl -fsS "http://127.0.0.1:3200/health"
-
-docker build -f "$APP_DIR/web/Dockerfile" -t "$WEB_IMAGE" "$APP_DIR"
 
 docker run -d \
   --name "$WEB_CONTAINER" \
