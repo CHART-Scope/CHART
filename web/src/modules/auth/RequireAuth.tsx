@@ -25,6 +25,16 @@ export function RequireAuth({ children }: RequireAuthProps) {
       const storedSession = getStoredAuthSession();
 
       if (!storedSession) {
+        const setupStatus = await getSetupStatus();
+
+        if (
+          setupStatus.requiresOnboarding &&
+          window.location.pathname !== "/onboarding"
+        ) {
+          window.location.assign("/onboarding");
+          return;
+        }
+
         redirectToSignIn();
         return;
       }
