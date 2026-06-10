@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { getSetupStatus } from "../../lib/setupClient";
 import {
@@ -18,15 +18,19 @@ export function RequireAuth({ children }: RequireAuthProps) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
     async function checkAccess() {
       const storedSession = getStoredAuthSession();
 
       if (!storedSession) {
-        await startKeycloakSignIn();
+        redirectToSignIn();
         return;
       }
+
+      setSession(storedSession);
+      setIsChecking(false);
 
       const setupStatus = await getSetupStatus();
 
@@ -35,11 +39,7 @@ export function RequireAuth({ children }: RequireAuthProps) {
         window.location.pathname !== "/onboarding"
       ) {
         window.location.assign("/onboarding");
-        return;
       }
-
-      setSession(storedSession);
-      setIsChecking(false);
     }
 
     checkAccess().catch(() => {
@@ -47,6 +47,15 @@ export function RequireAuth({ children }: RequireAuthProps) {
       setIsChecking(false);
     });
   }, []);
+
+  function redirectToSignIn() {
+    if (hasRedirectedRef.current) {
+      return;
+    }
+
+    hasRedirectedRef.current = true;
+    startKeycloakSignIn();
+  }
 
   function signOut(returnTo?: string) {
     signOutOfKeycloak(returnTo);

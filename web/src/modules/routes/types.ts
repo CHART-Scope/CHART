@@ -4,4 +4,5 @@ export type ChartRoute =
   | "setup"
   | "solutions"
   | "onboarding"
-  | "auth";
+  | "auth"
+  | "plans";
