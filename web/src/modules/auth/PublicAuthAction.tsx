@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { getSetupStatus } from "../../lib/setupClient";
 import { getStoredAuthSession, type AuthSession } from "./authClient";
 
 type PublicAuthActionProps = {
@@ -16,9 +17,24 @@ export function PublicAuthAction({
   signedOutLabel = "Sign in",
 }: PublicAuthActionProps = {}) {
   const [session, setSession] = useState<AuthSession | null>(null);
+  const [requiresOnboarding, setRequiresOnboarding] = useState(false);
 
   useEffect(() => {
-    setSession(getStoredAuthSession());
+    const storedSession = getStoredAuthSession();
+
+    setSession(storedSession);
+
+    if (storedSession) {
+      return;
+    }
+
+    getSetupStatus()
+      .then((status) => {
+        setRequiresOnboarding(status.requiresOnboarding);
+      })
+      .catch(() => {
+        setRequiresOnboarding(false);
+      });
   }, []);
 
   if (session) {
@@ -30,8 +46,8 @@ export function PublicAuthAction({
   }
 
   return (
-    <a className={className} href="/auth/signin">
-      {signedOutLabel}
+    <a className={className} href={requiresOnboarding ? "/onboarding" : "/auth/signin"}>
+      {requiresOnboarding ? "Start setup" : signedOutLabel}
     </a>
   );
 }
