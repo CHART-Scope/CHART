@@ -7,6 +7,8 @@ on:
     paths:
       - ".github/workflows/app-deploy.yml"
       - "api/**"
+      - ".prettierignore"
+      - ".prettierrc.json"
       - "docker-compose.yml"
       - "infra/**"
       - "package.json"
@@ -14,11 +16,13 @@ on:
       - "web/**"
   workflow_dispatch:
     inputs:
-      force_content_seed:
-        description: "Re-run the CMS solution/content seed even if content already exists."
+      public_host:
+        description: "Optional public hostname for browser URLs, such as dev.example.org. Defaults to AWS_APP_PUBLIC_HOST or AWS_APP_HOST."
         required: false
-        default: false
-        type: boolean
+        type: string
+
+env:
+  DEPLOY_BRANCH: dev
 
 concurrency:
   group: chart-app-deploy-dev
@@ -28,21 +32,100 @@ permissions:
   contents: read
 
 jobs:
+  validate:
+    name: Validate deploy candidate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: chart
+          POSTGRES_USER: chart
+          POSTGRES_PASSWORD: chart
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chart -d chart"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://chart:chart@127.0.0.1:5432/chart
+    steps:
+      - name: Check out deploy branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_BRANCH }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npx prettier --check .github README.md api infra web/src web/.storybook web/*.json web/*.mjs web/*.ts docker-compose.yml package.json
+
+      - name: Check API migrations
+        run: npm run db:check:api
+
+      - name: Typecheck API
+        run: npm run typecheck:api
+
+      - name: Test API
+        run: npm run test:api
+
+      - name: Build API
+        run: npm run build:api
+
+      - name: Typecheck web
+        run: npm run typecheck:web
+
+      - name: Build web
+        run: npm run build:web
+
+      - name: Build API image
+        run: docker build -f api/Dockerfile -t chart-api:ci .
+
+      - name: Build web image
+        run: docker build -f web/Dockerfile -t chart-web:ci .
+
   deploy:
     name: Deploy app
+    needs: validate
     runs-on: ubuntu-latest
+    environment: dev
+    env:
+      AWS_APP_HOST: ${{ secrets.AWS_APP_HOST }}
+      AWS_APP_PUBLIC_HOST: ${{ secrets.AWS_APP_PUBLIC_HOST }}
+      AWS_APP_SSH_KEY: ${{ secrets.AWS_APP_SSH_KEY }}
+      AWS_APP_USER: ${{ secrets.AWS_APP_USER }}
     steps:
+      - name: Validate deploy secrets
+        run: |
+          missing=0
+          for name in AWS_APP_HOST AWS_APP_SSH_KEY AWS_APP_USER; do
+            if [ -z "${!name}" ]; then
+              echo "::error title=Missing deploy secret::$name is required for EC2 deploy"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
       - name: Deploy app on EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.AWS_APP_HOST }}
-          username: ${{ secrets.AWS_APP_USER }}
-          key: ${{ secrets.AWS_APP_SSH_KEY }}
+          host: ${{ env.AWS_APP_HOST }}
+          username: ${{ env.AWS_APP_USER }}
+          key: ${{ env.AWS_APP_SSH_KEY }}
           script: |
             set -euo pipefail
 
             APP_DIR="${APP_DIR:-/opt/chart}"
-            BRANCH="dev"
+            BRANCH="${{ env.DEPLOY_BRANCH }}"
 
             if [ -d "$APP_DIR/.git" ]; then
               git -C "$APP_DIR" reset --hard
@@ -56,4 +139,5 @@ jobs:
               git clone --branch "$BRANCH" https://github.com/CHART-Scope/CHART.git "$APP_DIR"
             fi
 
-            CHART_FORCE_CONTENT_SEED="${{ inputs.force_content_seed || false }}" PUBLIC_HOST="${{ secrets.AWS_APP_HOST }}" bash "$APP_DIR/infra/aws/deploy-app.sh"
+            PUBLIC_HOST="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
+            PUBLIC_HOST="$PUBLIC_HOST" bash "$APP_DIR/infra/aws/deploy-app.sh"
