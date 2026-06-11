@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { getSetupStatus } from "../../lib/setupClient";
+import { Button } from "../ui/Button";
 import { getStoredAuthSession, type AuthSession } from "./authClient";
 
 type PublicAuthActionProps = {
@@ -12,7 +13,7 @@ type PublicAuthActionProps = {
 };
 
 export function PublicAuthAction({
-  className = "button primary-button nav-sign-in",
+  className = "nav-sign-in",
   signedInLabel = "Open workspace",
   signedOutLabel = "Sign in",
 }: PublicAuthActionProps = {}) {
@@ -39,15 +40,18 @@ export function PublicAuthAction({
 
   if (session) {
     return (
-      <a className={className} href="/dashboard">
+      <Button className={className} href="/dashboard">
         {signedInLabel}
-      </a>
+      </Button>
     );
   }
 
   return (
-    <a className={className} href={requiresOnboarding ? "/onboarding" : "/auth/signin"}>
+    <Button
+      className={className}
+      href={requiresOnboarding ? "/onboarding" : "/auth/signin"}
+    >
       {requiresOnboarding ? "Start setup" : signedOutLabel}
-    </a>
+    </Button>
   );
 }
