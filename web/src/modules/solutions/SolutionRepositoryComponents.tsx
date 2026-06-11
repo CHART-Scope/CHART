@@ -91,10 +91,10 @@ export function SolutionRepositoryItemCard({
       >
         <span className="solution-repository-image" style={imageStyle(image)} />
         <div className="solution-repository-card-body">
-          <small>{hazards || "Climate-health action"}</small>
+          <small>{hazards || "Climate-health solution"}</small>
           <strong>{item.name}</strong>
           <p>
-            {item.summary ?? item.description ?? "Action details are being prepared."}
+            {item.summary ?? item.description ?? "Solution details are being prepared."}
           </p>
           <div className="solution-meta-row">
             <span className="solution-meta-line">{solutionTypeLine(item)}</span>
@@ -155,7 +155,7 @@ export function SolutionRepositoryDetailDrawer({
           <p>{item.summary ?? item.description}</p>
 
           <div className="drawer-fact-row">
-            <span>Type and cost</span>
+            <span>Solution type and cost</span>
             <div className="drawer-cost-row">
               <strong>{solutionTypeLine(item)}</strong>
               <CostIndicator cost={item.costOfImplementation} />
@@ -168,7 +168,7 @@ export function SolutionRepositoryDetailDrawer({
           </section>
 
           <section className="drawer-section">
-            <span className="panel-eyebrow">Action types</span>
+            <span className="panel-eyebrow">Solution types</span>
             <SolutionRepositoryTagList labels={taxonomyLabels(item, "solution_type")} />
           </section>
 
@@ -604,12 +604,12 @@ export function solutionMetaLine(item: SolutionRepositoryItem) {
   const types = solutionTypeLine(item);
   const cost = formatCost(item.costOfImplementation);
 
-  return [types, cost].filter(Boolean).join(" · ") || "Action details";
+  return [types, cost].filter(Boolean).join(" · ") || "Solution details";
 }
 
 function solutionTypeLine(item: SolutionRepositoryItem) {
   return (
-    taxonomyLabels(item, "solution_type").slice(0, 2).join(", ") || "Action details"
+    taxonomyLabels(item, "solution_type").slice(0, 2).join(", ") || "Solution details"
   );
 }
 
