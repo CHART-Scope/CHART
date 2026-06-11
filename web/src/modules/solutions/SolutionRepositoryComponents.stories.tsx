@@ -4,18 +4,16 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { SolutionRepositoryItem } from "../../lib/solutionRepositoryClient";
 import {
   chartRepositorySolutions,
-  floatingClinic,
   mentalHealthScreening,
 } from "./chartRepositoryStoryData";
 import {
-  SolutionCard as SolutionCardComponent,
-  SolutionDrawer as SolutionDrawerComponent,
-  SolutionGrid as SolutionGridComponent,
+  SolutionRepositoryDetailDrawer,
+  SolutionRepositoryGrid,
   SolutionRepositoryItemCard,
 } from "./SolutionRepositoryComponents";
 
 const meta = {
-  title: "CHART Repository/Solutions",
+  title: "Repository/Solutions",
   component: SolutionRepositoryItemCard,
   parameters: {
     layout: "fullscreen",
@@ -32,14 +30,6 @@ export const ItemCard: Story = {
     onOpenDetail: () => undefined,
   },
   render: (args) => <SingleSolutionCardPreview item={args.item} />,
-};
-
-export const SolutionCard: Story = {
-  args: {
-    item: floatingClinic,
-    onOpenDetail: () => undefined,
-  },
-  render: (args) => <SingleSolutionCardPreview item={args.item} variant="solution" />,
 };
 
 export const SolutionGrid: Story = {
@@ -66,24 +56,14 @@ export const FunctionalSolutions: Story = {
   render: () => <SolutionGridPreview />,
 };
 
-function SingleSolutionCardPreview({
-  item,
-  variant = "item",
-}: {
-  item: SolutionRepositoryItem;
-  variant?: "item" | "solution";
-}) {
+function SingleSolutionCardPreview({ item }: { item: SolutionRepositoryItem }) {
   const [selectedItem, setSelectedItem] = useState<SolutionRepositoryItem | null>(null);
 
   return (
     <div style={{ maxWidth: 420, padding: 32 }}>
-      {variant === "solution" ? (
-        <SolutionCardComponent item={item} onOpenDetail={setSelectedItem} />
-      ) : (
-        <SolutionRepositoryItemCard item={item} onOpenDetail={setSelectedItem} />
-      )}
+      <SolutionRepositoryItemCard item={item} onOpenDetail={setSelectedItem} />
       {selectedItem ? (
-        <SolutionDrawerComponent
+        <SolutionRepositoryDetailDrawer
           item={selectedItem}
           onClose={() => setSelectedItem(null)}
         />
@@ -97,12 +77,12 @@ function SolutionGridPreview() {
 
   return (
     <div style={{ padding: 32 }}>
-      <SolutionGridComponent
+      <SolutionRepositoryGrid
         items={chartRepositorySolutions}
         onOpenDetail={setSelectedItem}
       />
       {selectedItem ? (
-        <SolutionDrawerComponent
+        <SolutionRepositoryDetailDrawer
           item={selectedItem}
           onClose={() => setSelectedItem(null)}
         />
@@ -120,7 +100,7 @@ function SolutionDrawerPreview() {
         Open drawer
       </button>
       {isOpen ? (
-        <SolutionDrawerComponent
+        <SolutionRepositoryDetailDrawer
           item={mentalHealthScreening}
           onClose={() => setIsOpen(false)}
         />

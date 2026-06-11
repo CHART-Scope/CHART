@@ -1,14 +1,10 @@
+import { Select, type SelectOption } from "./Select";
 import "./FilterBar.css";
-
-type FilterOption = {
-  value: string;
-  label: string;
-};
 
 type FilterDefinition = {
   id: string;
   label: string;
-  options: FilterOption[];
+  options: SelectOption[];
   value: string;
   onChange: (value: string) => void;
 };
@@ -21,19 +17,13 @@ export function FilterBar({ filters }: FilterBarProps) {
   return (
     <div className="filter-bar">
       {filters.map((filter) => (
-        <label className="filter-bar-select" key={filter.id}>
-          {filter.label}
-          <select
-            value={filter.value}
-            onChange={(event) => filter.onChange(event.target.value)}
-          >
-            {filter.options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Select
+          key={filter.id}
+          label={filter.label}
+          options={filter.options}
+          value={filter.value}
+          onChange={(event) => filter.onChange(event.target.value)}
+        />
       ))}
     </div>
   );

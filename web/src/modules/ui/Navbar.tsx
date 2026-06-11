@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import "./Navbar.css";
+
 export type NavbarLink = {
   href: string;
   label: string;
@@ -23,28 +25,28 @@ export function Navbar({
   onBrandClick,
 }: NavbarProps) {
   const brand = onBrandClick ? (
-    <button className="landing-brand" type="button" onClick={onBrandClick}>
+    <button className="ui-navbar-brand" type="button" onClick={onBrandClick}>
       {brandLabel}
     </button>
   ) : (
-    <a className="landing-brand" href={brandHref}>
+    <a className="ui-navbar-brand" href={brandHref}>
       {brandLabel}
     </a>
   );
 
   return (
-    <header className="landing-nav">
+    <header className="ui-navbar">
       {brand}
 
-      <nav className="landing-links" aria-label={ariaLabel}>
+      <nav className="ui-navbar-links" aria-label={ariaLabel}>
         {links.map((item) => (
-          <a className="landing-link" href={item.href} key={item.href}>
+          <a className="ui-navbar-link" href={item.href} key={item.href}>
             {item.label}
           </a>
         ))}
       </nav>
 
-      {action ? <div className="landing-actions">{action}</div> : null}
+      {action ? <div className="ui-navbar-actions">{action}</div> : null}
     </header>
   );
 }

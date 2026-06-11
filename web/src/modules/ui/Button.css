@@ -4,8 +4,8 @@
   justify-content: center;
   gap: 0.45rem;
   border: 1px solid transparent;
-  border-radius: var(--radius);
-  padding: 0.82rem 1.15rem;
+  border-radius: var(--radius-button);
+  padding: 0.85rem 1.4rem;
   color: var(--ink);
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
