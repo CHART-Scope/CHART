@@ -5,7 +5,7 @@ import { ErrorBanner } from "./ErrorBanner";
 import { LoadingPlaceholder } from "./LoadingPlaceholder";
 
 const meta = {
-  title: "CHART UI/Status Patterns",
+  title: "UI/Status Patterns",
   parameters: {
     layout: "padded",
   },

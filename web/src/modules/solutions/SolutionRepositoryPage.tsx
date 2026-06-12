@@ -9,6 +9,8 @@ import {
   type SolutionRepositoryTaxonomy,
 } from "../../lib/solutionRepositoryClient";
 import type { ChartRoute } from "../routes/types";
+import { MultiSelect } from "../ui/MultiSelect";
+import { TextInput } from "../ui/TextInput";
 import {
   SolutionRepositoryDetailDrawer,
   SolutionRepositoryGrid,
@@ -145,15 +147,14 @@ export function SolutionRepositoryExplorer({
         </div>
 
         <div className="repository-toolbar" aria-label="Solution repository filters">
-          <label className="repository-search-field">
-            <input
-              placeholder="Search solutions"
-              type="search"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
-          </label>
-          <RepositoryMultiSelect
+          <TextInput
+            className="repository-search-field"
+            placeholder="Search solutions"
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+          <MultiSelect
             id="hazard"
             isOpen={openFilterId === "hazard"}
             label="Climate hazard"
@@ -162,7 +163,7 @@ export function SolutionRepositoryExplorer({
             onChange={setSelectedHazardIds}
             onOpenChange={(isOpen) => setOpenFilterId(isOpen ? "hazard" : null)}
           />
-          <RepositoryMultiSelect
+          <MultiSelect
             id="health-implications"
             isOpen={openFilterId === "health-implications"}
             label="Health implications"
@@ -214,101 +215,6 @@ export function SolutionRepositoryExplorer({
         />
       ) : null}
     </div>
-  );
-}
-
-function RepositoryMultiSelect({
-  id,
-  isOpen,
-  label,
-  options,
-  selectedIds,
-  onChange,
-  onOpenChange,
-}: {
-  id: string;
-  isOpen: boolean;
-  label: string;
-  options: RepositoryFilterOption[];
-  selectedIds: string[];
-  onChange: (selectedIds: string[]) => void;
-  onOpenChange: (isOpen: boolean) => void;
-}) {
-  const [optionQuery, setOptionQuery] = useState("");
-  const selectedOptions = options.filter((option) => selectedIds.includes(option.id));
-  const filteredOptions = options.filter((option) =>
-    option.label.toLowerCase().includes(optionQuery.trim().toLowerCase()),
-  );
-  const selectedSummary =
-    selectedOptions.length === 1
-      ? selectedOptions[0]?.label
-      : `${selectedOptions.length} selected`;
-
-  function toggleOption(optionId: string) {
-    onChange(
-      selectedIds.includes(optionId)
-        ? selectedIds.filter((id) => id !== optionId)
-        : [...selectedIds, optionId],
-    );
-  }
-
-  return (
-    <details
-      className="repository-multi-select"
-      open={isOpen}
-      onToggle={(event) => onOpenChange(event.currentTarget.open)}
-    >
-      <summary>
-        <span id={`repository-filter-${id}`}>{label}</span>
-        {selectedOptions.length > 0 ? <strong>{selectedSummary}</strong> : null}
-      </summary>
-      <div
-        className="repository-multi-select-menu"
-        aria-labelledby={`repository-filter-${id}`}
-      >
-        <label className="repository-option-search">
-          <span>Find a record</span>
-          <input
-            type="search"
-            value={optionQuery}
-            onChange={(event) => setOptionQuery(event.target.value)}
-          />
-        </label>
-        <div className="repository-option-list">
-          {filteredOptions.length > 0 ? (
-            filteredOptions.map((option) => {
-              const isSelected = selectedIds.includes(option.id);
-
-              return (
-                <label
-                  className={`repository-option-row ${isSelected ? "selected" : ""}`}
-                  key={option.id}
-                >
-                  <input
-                    checked={isSelected}
-                    type="checkbox"
-                    onChange={() => toggleOption(option.id)}
-                  />
-                  <span>{option.label}</span>
-                </label>
-              );
-            })
-          ) : (
-            <p className="repository-option-empty">No matching options.</p>
-          )}
-        </div>
-        <div className="repository-multi-select-foot">
-          <span>{label} is</span>
-          <button
-            disabled={selectedIds.length === 0}
-            type="button"
-            onClick={() => onChange([])}
-          >
-            Clear
-          </button>
-        </div>
-      </div>
-    </details>
   );
 }
 

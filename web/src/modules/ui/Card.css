@@ -1,0 +1,20 @@
+.ui-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.ui-card-interactive {
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.28s ease;
+}
+
+.ui-card-interactive:hover {
+  transform: translateY(-4px);
+  border-color: var(--green-soft);
+  box-shadow: var(--shadow-card-hover);
+}

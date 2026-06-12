@@ -1,0 +1,37 @@
+.ui-select {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.ui-select-label {
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ui-select select {
+  width: 100%;
+  min-height: 3.05rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(16, 24, 20, 0.06);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ui-select select:focus {
+  border-color: #1f6feb;
+  box-shadow:
+    0 2px 8px rgba(16, 24, 20, 0.06),
+    0 0 0 3px rgba(37, 99, 235, 0.16);
+}
+
+.ui-select select:disabled {
+  background: var(--surface-alt);
+  color: var(--ink-mute);
+  cursor: not-allowed;
+}
