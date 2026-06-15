@@ -6,7 +6,7 @@ This repo contains the core app:
 
 - `web`: Next app for the public site, onboarding, dashboard, map UI, and solution repository UI.
 - `api`: Fastify API for auth context, setup, users, workspaces, geographies, hazards, and solutions.
-- `docker-compose.yml`: local Postgres and Keycloak.
+- `infra/docker-compose.yml`: local Postgres and Keycloak.
 
 The solution repository is consumed through `CHART_REPOSITORY_URL` when available.
 If it is unset, the API uses the bundled snapshot in

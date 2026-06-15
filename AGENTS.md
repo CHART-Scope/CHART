@@ -50,7 +50,7 @@ chart-repository/
   src/app/(payload)/
   src/lib/
   Dockerfile
-  docker-compose.yml
+  infra/docker-compose.yml
 ```
 
 The chart repository directories mean different things:
