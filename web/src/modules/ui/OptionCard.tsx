@@ -26,7 +26,12 @@ export function OptionCard({
     .join(" ");
 
   return (
-    <button aria-pressed={selected} className={classes} type="button" onClick={onToggle}>
+    <button
+      aria-pressed={selected}
+      className={classes}
+      type="button"
+      onClick={onToggle}
+    >
       {icon ? (
         <span className="ui-option-card-icon" aria-hidden="true">
           {icon}
