@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { getSetupStatus } from "../../lib/setupClient";
 import type { CurrentUserContext } from "../auth/authClient";
 import { canManageContent } from "../auth/userContext";
+import { Button } from "../ui/Button";
 import { DataCard } from "../ui/DataCard";
 import { ErrorBanner } from "../ui/ErrorBanner";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
@@ -114,13 +115,9 @@ export function DashboardPage({
             title={selectedGeography?.name ?? "No geography selected"}
             actions={
               userCanManageContent ? (
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={() => onNavigate("solutions")}
-                >
+                <Button compact variant="ghost" onClick={() => onNavigate("solutions")}>
                   Open action repository
-                </button>
+                </Button>
               ) : null
             }
           >

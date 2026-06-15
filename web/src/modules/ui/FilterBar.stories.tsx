@@ -38,7 +38,7 @@ function FilterBarStory() {
 }
 
 const meta = {
-  title: "CHART UI/FilterBar",
+  title: "UI/Filter Bar",
   render: () => <FilterBarStory />,
 } satisfies Meta;
 

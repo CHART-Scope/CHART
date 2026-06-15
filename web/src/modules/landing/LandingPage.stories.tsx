@@ -75,10 +75,6 @@ export const PartnerLogos: Story = {
   ),
 };
 
-export const SolutionRepositoryPage: Story = {
-  render: () => <StorybookSolutionRepositoryPage />,
-};
-
 function LandingStoryRouter() {
   const [route, setRoute] = useState<"landing" | "solutions">("landing");
 

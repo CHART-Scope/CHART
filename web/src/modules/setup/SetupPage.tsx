@@ -20,8 +20,11 @@ import {
 } from "../auth/userContext";
 import type { ChartRoute } from "../routes/types";
 import { WorkspaceShell } from "../shell/WorkspaceShell";
+import { Button } from "../ui/Button";
 import { DataCard } from "../ui/DataCard";
 import { ErrorBanner } from "../ui/ErrorBanner";
+import { Select } from "../ui/Select";
+import { TextInput } from "../ui/TextInput";
 
 type SetupPageProps = {
   currentUser: CurrentUserContext;
@@ -174,13 +177,7 @@ export function SetupPage({
           <div className="page-breadcrumb">Signed-in context</div>
           <h1 className="page-heading">{profile.roleLabel}</h1>
         </div>
-        <button
-          className="primary-button"
-          type="button"
-          onClick={() => onNavigate("dashboard")}
-        >
-          Open workspace
-        </button>
+        <Button onClick={() => onNavigate("dashboard")}>Open workspace</Button>
       </section>
 
       {setupError ? <ErrorBanner message={setupError} /> : null}
@@ -228,118 +225,99 @@ export function SetupPage({
             {userError ? <ErrorBanner message={userError} /> : null}
 
             <div className="user-setup-form">
-              <label>
-                Name
-                <input
-                  placeholder="User name"
-                  value={newUser.name}
-                  onChange={(event) =>
-                    setNewUser((draft) => ({
-                      ...draft,
-                      name: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Username
-                <input
-                  placeholder="health-lead"
-                  value={newUser.username}
-                  onChange={(event) =>
-                    setNewUser((draft) => ({
-                      ...draft,
-                      username: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Email
-                <input
-                  placeholder="name@example.org"
-                  type="email"
-                  value={newUser.email}
-                  onChange={(event) =>
-                    setNewUser((draft) => ({
-                      ...draft,
-                      email: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Phone
-                <input
-                  placeholder="+1 555 0100"
-                  type="tel"
-                  value={newUser.phone}
-                  onChange={(event) =>
-                    setNewUser((draft) => ({
-                      ...draft,
-                      phone: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Temporary password
-                <input
-                  placeholder="At least 8 characters"
-                  type="password"
-                  value={newUser.password}
-                  onChange={(event) =>
-                    setNewUser((draft) => ({
-                      ...draft,
-                      password: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Role
-                <select
-                  value={newUser.role}
-                  onChange={(event) =>
-                    setNewUser((draft) => ({
-                      ...draft,
-                      role: event.target.value as ChartRole,
-                    }))
-                  }
-                >
-                  {setupRoleOptions.map((roleOption) => (
-                    <option key={roleOption.role} value={roleOption.role}>
-                      {roleOption.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Geography scope
-                <select
-                  value={newUser.geographyId}
-                  onChange={(event) =>
-                    setNewUser((draft) => ({
-                      ...draft,
-                      geographyId: event.target.value,
-                    }))
-                  }
-                >
-                  {geographies.map((geography) => (
-                    <option key={geography.id} value={geography.id}>
-                      {geography.name} ({geography.levelLabel})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                className="primary-button user-setup-form-submit"
-                type="button"
+              <TextInput
+                label="Name"
+                placeholder="User name"
+                value={newUser.name}
+                onChange={(event) =>
+                  setNewUser((draft) => ({
+                    ...draft,
+                    name: event.target.value,
+                  }))
+                }
+              />
+              <TextInput
+                label="Username"
+                placeholder="health-lead"
+                value={newUser.username}
+                onChange={(event) =>
+                  setNewUser((draft) => ({
+                    ...draft,
+                    username: event.target.value,
+                  }))
+                }
+              />
+              <TextInput
+                label="Email"
+                placeholder="name@example.org"
+                type="email"
+                value={newUser.email}
+                onChange={(event) =>
+                  setNewUser((draft) => ({
+                    ...draft,
+                    email: event.target.value,
+                  }))
+                }
+              />
+              <TextInput
+                label="Phone"
+                placeholder="+1 555 0100"
+                type="tel"
+                value={newUser.phone}
+                onChange={(event) =>
+                  setNewUser((draft) => ({
+                    ...draft,
+                    phone: event.target.value,
+                  }))
+                }
+              />
+              <TextInput
+                label="Temporary password"
+                placeholder="At least 8 characters"
+                type="password"
+                value={newUser.password}
+                onChange={(event) =>
+                  setNewUser((draft) => ({
+                    ...draft,
+                    password: event.target.value,
+                  }))
+                }
+              />
+              <Select
+                label="Role"
+                options={setupRoleOptions.map((roleOption) => ({
+                  value: roleOption.role,
+                  label: roleOption.label,
+                }))}
+                value={newUser.role}
+                onChange={(event) =>
+                  setNewUser((draft) => ({
+                    ...draft,
+                    role: event.target.value as ChartRole,
+                  }))
+                }
+              />
+              <Select
+                label="Geography scope"
+                options={geographies.map((geography) => ({
+                  value: geography.id,
+                  label: `${geography.name} (${geography.levelLabel})`,
+                }))}
+                value={newUser.geographyId}
+                onChange={(event) =>
+                  setNewUser((draft) => ({
+                    ...draft,
+                    geographyId: event.target.value,
+                  }))
+                }
+              />
+              <Button
+                className="user-setup-form-submit"
                 disabled={isSavingUser || geographies.length === 0}
                 onClick={addUser}
               >
                 {isSavingUser ? "Creating user" : "Create user"}
-              </button>
+              </Button>
             </div>
 
             <div className="user-setup-list">
@@ -373,13 +351,13 @@ export function SetupPage({
                       status={user.status === "active" ? "Active" : "Disabled"}
                       action={
                         user.status === "active" ? (
-                          <button
-                            className="ghost-button compact-button"
-                            type="button"
+                          <Button
+                            compact
+                            variant="ghost"
                             onClick={() => disableManagedUser(user.userId)}
                           >
                             Disable
-                          </button>
+                          </Button>
                         ) : null
                       }
                     />
@@ -416,33 +394,30 @@ export function SetupPage({
                   first-run onboarding.
                 </p>
                 <div className="setup-action-row">
-                  <button
-                    className="danger-button"
+                  <Button
                     disabled={isResetting}
-                    type="button"
+                    variant="danger"
                     onClick={restartOnboarding}
                   >
                     {isResetting ? "Resetting" : "Confirm reset"}
-                  </button>
-                  <button
-                    className="ghost-button"
+                  </Button>
+                  <Button
                     disabled={isResetting}
-                    type="button"
+                    variant="ghost"
                     onClick={() => setIsResetConfirming(false)}
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => setIsResetConfirming(true)}
+              <Button
                 disabled={isResetting}
+                variant="ghost"
+                onClick={() => setIsResetConfirming(true)}
               >
                 Reset onboarding
-              </button>
+              </Button>
             )}
           </DataCard>
         ) : null}

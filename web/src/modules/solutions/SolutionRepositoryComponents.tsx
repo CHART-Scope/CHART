@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 
 import type { SolutionRepositoryItem } from "../../lib/solutionRepositoryClient";
+import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { TagList } from "../ui/Tag";
 
@@ -91,9 +92,9 @@ export function SolutionRepositoryDetailDrawer({
             <div>
               <h2>{item.name}</h2>
             </div>
-            <button className="ghost-button" type="button" onClick={onClose}>
+            <Button compact variant="ghost" onClick={onClose}>
               &#10005; Close
-            </button>
+            </Button>
           </div>
 
           <p>{item.summary ?? item.description}</p>
