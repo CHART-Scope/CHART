@@ -41,3 +41,4 @@ web/public/uploads/
 # OS files
 .DS_Store
 .claude
+build-storybook.log

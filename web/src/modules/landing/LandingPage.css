@@ -1,87 +1,7 @@
-/* Figma-aligned public landing page */
+/* Figma-aligned public landing + toolkit detail pages */
 .landing-shell {
   min-height: 100vh;
   background: #fff;
-}
-
-.landing-nav {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 2rem;
-  min-height: 4rem;
-  padding: 0 2.25rem;
-  border-bottom: none;
-  background: #187a1f;
-  box-shadow: none;
-}
-
-.landing-brand {
-  border: 0;
-  background: transparent;
-  color: #fff;
-  cursor: pointer;
-  font-family: Inter, "Segoe UI", sans-serif;
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: 0;
-}
-
-.landing-links {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(1.35rem, 3.5vw, 3rem);
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.landing-link {
-  padding: 0.55rem 0;
-  border: none;
-  border-radius: 0;
-  color: rgba(255, 255, 255, 0.92);
-  font-family: Inter, "Segoe UI", sans-serif;
-  font-size: 1rem;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.landing-link::before {
-  display: none;
-}
-
-.landing-link:hover,
-.landing-link:focus-visible {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-  color: #fff;
-  outline: none;
-  text-decoration: underline;
-  text-underline-offset: 0.38rem;
-  transform: none;
-}
-
-.landing-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-left: 0;
-}
-
-.nav-sign-in {
-  width: fit-content;
-  min-width: 5.9rem;
-  justify-self: end;
-  border-radius: 0.5rem;
-  padding: 0.72rem 1.35rem;
 }
 
 .landing-hero {
@@ -109,7 +29,6 @@
   max-width: none;
   margin: 0;
   color: var(--green-deep);
-  font-family: Inter, "Segoe UI", sans-serif;
   font-size: clamp(3.8rem, 6.4vw, 5.3rem);
   font-weight: 800;
   letter-spacing: 0;
@@ -119,7 +38,6 @@
 .hero-subtitle {
   margin: 0.65rem 0 1.7rem;
   color: var(--green-deep);
-  font-family: Inter, "Segoe UI", sans-serif;
   font-size: clamp(1.55rem, 2.8vw, 1.92rem);
   font-weight: 400;
   letter-spacing: 0;
@@ -159,8 +77,6 @@
 
 .landing-shell .hero-button-row .ui-button {
   min-width: 7.8rem;
-  border-radius: 0.5rem;
-  padding: 0.85rem 1.4rem;
 }
 
 .laptop-preview {
@@ -199,7 +115,6 @@
 .toolkit-section-head h2 {
   margin: 0;
   color: var(--green-deep);
-  font-family: Inter, "Segoe UI", sans-serif;
   font-size: clamp(1.9rem, 3vw, 2.1rem);
   font-weight: 400;
   letter-spacing: 0;
@@ -223,7 +138,6 @@
 
 .toolkit-copy h3 {
   margin: 0 0 1rem;
-  font-family: Inter, "Segoe UI", sans-serif;
   font-size: clamp(1.55rem, 2.5vw, 1.75rem);
   font-weight: 400;
   letter-spacing: 0;
@@ -243,6 +157,12 @@
   border: 1px solid #d8d8d8;
   background: #fff;
   box-shadow: none;
+}
+
+.toolkit-preview.is-compact {
+  width: min(27rem, 100%);
+  min-height: 17rem;
+  justify-self: end;
 }
 
 .risk-preview {
@@ -389,7 +309,6 @@
 .partner-logo-block h3 {
   margin: 0 0 1.5rem;
   color: var(--green-deep);
-  font-family: Inter, "Segoe UI", sans-serif;
   font-size: clamp(1.9rem, 3vw, 2.15rem);
   font-weight: 400;
 }
@@ -483,30 +402,144 @@
   text-underline-offset: 0.25rem;
 }
 
+.landing-data-card {
+  border-color: #d9e8dc;
+  border-radius: 0.4rem;
+  background: #fff;
+  box-shadow: none;
+}
+
+.landing-data-card .data-card-head {
+  margin-bottom: 0.85rem;
+}
+
+.landing-data-card .data-card-title {
+  color: var(--green-deep);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.toolkit-detail-main {
+  background: #fff;
+}
+
+.toolkit-detail-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(22rem, 0.7fr);
+  gap: clamp(2rem, 5vw, 5rem);
+  align-items: center;
+  width: min(1120px, calc(100% - 6rem));
+  margin: 0 auto;
+  padding: 5.5rem 0 4.5rem;
+}
+
+.toolkit-detail-copy h1 {
+  max-width: 12ch;
+  margin: 0.45rem 0 1.2rem;
+  color: var(--green-deep);
+  font-size: clamp(3rem, 5vw, 4.4rem);
+  font-weight: 600;
+  line-height: 0.98;
+}
+
+.toolkit-detail-copy > p {
+  max-width: 42rem;
+  margin: 0;
+  color: #171717;
+  font-size: 1.15rem;
+  line-height: 1.58;
+}
+
+.toolkit-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 2rem;
+}
+
+.toolkit-detail-section {
+  padding: 4rem 0;
+  background: #eef5ef;
+}
+
+.toolkit-detail-section-head,
+.toolkit-detail-grid {
+  width: min(1080px, calc(100% - 6rem));
+  margin: 0 auto;
+}
+
+.toolkit-detail-section-head {
+  margin-bottom: 1.4rem;
+}
+
+.toolkit-detail-section-head h2 {
+  margin: 0;
+  color: var(--green-deep);
+  font-size: clamp(2rem, 3vw, 2.35rem);
+  font-weight: 500;
+}
+
+.toolkit-detail-section-head p {
+  max-width: 42rem;
+  margin: 0.9rem 0 0;
+  color: #1f1f1f;
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+.toolkit-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.toolkit-detail-card {
+  min-height: 12rem;
+}
+
+.toolkit-detail-card .data-card-title {
+  margin: 0 0 0.8rem;
+  font-size: 1.08rem;
+}
+
+.toolkit-detail-card p {
+  margin: 0;
+  color: #1f1f1f;
+  line-height: 1.5;
+}
+
 .landing-story-section {
   min-height: 100vh;
   padding: 2rem 0;
 }
 
 @media (max-width: 980px) {
-  .landing-nav {
-    grid-template-columns: 1fr auto;
-    min-height: auto;
-    padding: 0.9rem 1rem;
-  }
-
-  .landing-links {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
-    width: 100%;
-    overflow-x: auto;
-    padding-top: 0.4rem;
-  }
-
   .landing-hero {
     grid-template-columns: 1fr;
     width: min(100%, calc(100% - 2rem));
     padding: 3.8rem 0;
+  }
+
+  .toolkit-detail-hero,
+  .toolkit-detail-section-head,
+  .toolkit-detail-grid {
+    width: min(100%, calc(100% - 2rem));
+  }
+
+  .toolkit-detail-hero {
+    grid-template-columns: 1fr;
+    padding: 3.8rem 0;
+  }
+
+  .toolkit-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toolkit-preview.is-compact {
+    justify-self: start;
   }
 
   .hero-copy-card {
@@ -534,14 +567,6 @@
 }
 
 @media (max-width: 620px) {
-  .landing-nav {
-    grid-template-columns: 1fr;
-  }
-
-  .nav-sign-in {
-    justify-self: start;
-  }
-
   .hero-copy-card h1 {
     font-size: clamp(3.4rem, 18vw, 4.4rem);
   }
@@ -552,6 +577,15 @@
 
   .solutions-preview {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .toolkit-detail-card {
+    min-height: auto;
+  }
+
+  .toolkit-detail-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .partner-logo-grid {
