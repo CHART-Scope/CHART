@@ -7,6 +7,7 @@ import {
 import {
   chartRoles,
   geographyLevels,
+  legacyChartRoleAliases,
   type AuthConfig,
   type AuthErrorCode,
   type AuthRequestInput,
@@ -41,8 +42,10 @@ export class AuthError extends Error {
   }
 }
 
+const localKeycloakIssuerUrl = "http://127.0.0.1:8080/realms/chart";
+
 export function getAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig {
-  const issuerUrl = env.KEYCLOAK_ISSUER_URL ?? "http://127.0.0.1:8080/realms/chart";
+  const issuerUrl = env.KEYCLOAK_ISSUER_URL ?? localKeycloakIssuerUrl;
 
   return {
     issuerUrl,
@@ -128,11 +131,7 @@ export function canSelectActiveGeography(
   context: CurrentUserContext,
   activeGeographyId: string,
 ): boolean {
-  const normalizedActiveGeography = normalizeGeographyPath(activeGeographyId);
-
-  return context.geographyScopes.some((scope) => {
-    return normalizeGeographyPath(scope) === normalizedActiveGeography;
-  });
+  return canReadGeographyPath(context, activeGeographyId);
 }
 
 function applyActiveGeography(
@@ -158,14 +157,24 @@ function applyActiveGeography(
 
 function collectChartRoles(claims: KeycloakTokenClaims, clientId: string): ChartRole[] {
   const tokenRoles = new Set<string>();
+  const canonicalRoles = new Set<ChartRole>();
   const realmRoles = toStringArray(claims.realm_access?.roles);
   const clientRoles = toStringArray(claims.resource_access?.[clientId]?.roles);
 
   for (const role of [...realmRoles, ...clientRoles]) {
     tokenRoles.add(role);
+    canonicalRoles.add(toCanonicalChartRole(role));
   }
 
-  return chartRoles.filter((role) => tokenRoles.has(role));
+  return chartRoles.filter((role) => tokenRoles.has(role) || canonicalRoles.has(role));
+}
+
+function toCanonicalChartRole(role: string): ChartRole {
+  if (role in legacyChartRoleAliases) {
+    return legacyChartRoleAliases[role as keyof typeof legacyChartRoleAliases];
+  }
+
+  return role as ChartRole;
 }
 
 function collectGeographyScopes(claims: KeycloakTokenClaims): string[] {

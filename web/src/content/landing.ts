@@ -1,129 +1,134 @@
+export type LandingResourceId = "models" | "vra" | "solutions";
+
+export type LandingToolkitPreview = "risk" | "vra" | "solutions";
+
 export type LandingResourceSection = {
-  id: string;
+  id: LandingResourceId;
+  href: string;
   title: string;
   description: string;
   ctaLabel: string;
-  preview: "risk" | "vra" | "solutions";
-};
-
-export type LandingGovernmentQuestion = {
-  question: string;
-  answer: string;
-};
-
-export type LandingWorkflowStep = {
-  step: string;
-  title: string;
-  description: string;
-};
-
-export type LandingPriorityExample = {
-  hazard: string;
-  signal: string;
-  impact: string;
-  score: number;
-  isPriority?: boolean;
+  preview: LandingToolkitPreview;
+  detail: {
+    eyebrow: string;
+    lead: string;
+    highlights: Array<{
+      title: string;
+      description: string;
+    }>;
+    nextHref: string;
+    nextLabel: string;
+  };
 };
 
 export const landingNavLinks = [
-  { href: "#overview", label: "What CHART does" },
-  { href: "#workflow", label: "Planning workflow" },
-  { href: "#solutions", label: "Solutions" },
-];
-
-export const landingPriorityStatement =
-  "If I have limited resources, CHART helps me see which climate hazard to prioritize first and where action will have the biggest impact.";
-
-export const landingPriorityExamples: LandingPriorityExample[] = [
-  {
-    hazard: "Extreme heat",
-    signal: "Very high risk",
-    impact: "Largest preventable health impact",
-    score: 91,
-    isPriority: true,
-  },
-  {
-    hazard: "Air pollution",
-    signal: "High risk",
-    impact: "Important but less urgent here",
-    score: 74,
-  },
-  {
-    hazard: "Flooding",
-    signal: "Medium risk",
-    impact: "Targeted action needed",
-    score: 62,
-  },
-];
-
-export const landingGovernmentQuestions: LandingGovernmentQuestion[] = [
-  {
-    question: "What is CHART?",
-    answer:
-      "A planning tool that connects climate hazards, health risks, local vulnerability, and practical adaptation actions in one place.",
-  },
-  {
-    question: "Who is it for?",
-    answer:
-      "State, county, district, and health-sector officials who need to coordinate climate and health planning across teams.",
-  },
-  {
-    question: "Why does it matter?",
-    answer:
-      "It helps teams see where risk is highest, who may be most affected, and what actions can be prioritized with evidence.",
-  },
-];
-
-export const landingWorkflowSteps: LandingWorkflowStep[] = [
-  {
-    step: "1",
-    title: "Understand hazards",
-    description:
-      "Start with climate signals such as extreme heat, flooding, or changing rainfall in your area.",
-  },
-  {
-    step: "2",
-    title: "See health risk",
-    description:
-      "Translate hazards into likely health impacts for people, services, and facilities.",
-  },
-  {
-    step: "3",
-    title: "Review gaps",
-    description:
-      "Check which populations, facilities, or services may be more exposed or less prepared.",
-  },
-  {
-    step: "4",
-    title: "Find solutions",
-    description:
-      "Compare practical actions and supporting resources for planning and budget discussions.",
-  },
+  { href: "/#models", label: "Climate and health risks" },
+  { href: "/#vra", label: "Vulnerability assessments" },
+  { href: "/#solutions", label: "Solution repository" },
 ];
 
 export const landingResourceSections: LandingResourceSection[] = [
   {
     id: "models",
-    title: "Understand local hazards and health risks",
+    href: "#models",
+    title: "Climate and health risks",
     description:
-      "Start with plain-language climate signals, such as extreme heat or floods, and see what they could mean for health services and communities in your area.",
-    ctaLabel: "Start with risks",
+      "Explore contextual climate and health risk predictions for your local area.",
+    ctaLabel: "Explore climate and health risks",
     preview: "risk",
+    detail: {
+      eyebrow: "Climate and health risks",
+      lead: "Use climate and health signals to identify the hazards that need attention first in a local planning cycle.",
+      highlights: [
+        {
+          title: "Compare hazards",
+          description:
+            "Review heat, flooding, rainfall, air quality, and other risk signals in a common planning view.",
+        },
+        {
+          title: "Connect risk to health",
+          description:
+            "Translate climate hazards into likely pressure on people, facilities, services, and health outcomes.",
+        },
+        {
+          title: "Prioritize first action",
+          description:
+            "Use risk scoring to support a focused planning conversation when resources are limited.",
+        },
+      ],
+      nextHref: "/#vra",
+      nextLabel: "Continue to vulnerability",
+    },
   },
   {
     id: "vra",
-    title: "Review who and what may need support",
+    href: "#vra",
+    title: "Vulnerability assessments",
     description:
-      "Review where people, facilities, and services may need more support. Vulnerability assessment simply means checking who is more exposed and less able to cope.",
-    ctaLabel: "Review vulnerability",
+      "Access guidance and tools for exposure and vulnerability assessments across health system areas.",
+    ctaLabel: "Explore vulnerability assessments",
     preview: "vra",
+    detail: {
+      eyebrow: "Vulnerability assessments",
+      lead: "Move from hazard signals to a practical view of who may be most affected and which services may need reinforcement.",
+      highlights: [
+        {
+          title: "Assess local exposure",
+          description:
+            "Bring population, facility, and service context into the same workflow as climate risk.",
+        },
+        {
+          title: "Review service readiness",
+          description:
+            "Capture where facilities, programs, or response systems may be more exposed to shocks.",
+        },
+        {
+          title: "Prepare action criteria",
+          description:
+            "Create a clear basis for selecting solutions and explaining why they matter locally.",
+        },
+      ],
+      nextHref: "/solutions",
+      nextLabel: "Continue to solutions",
+    },
   },
   {
     id: "solutions",
-    title: "Move from evidence to action",
+    href: "/solutions",
+    title: "Solution repository",
     description:
-      "Compare practical adaptation actions, example resources, and implementation notes that can support planning and budget discussions.",
-    ctaLabel: "Find solutions",
+      "Browse through a repository of climate-resilient health adaptation interventions.",
+    ctaLabel: "Explore solution repository",
     preview: "solutions",
+    detail: {
+      eyebrow: "Solution repository",
+      lead: "Use reviewed interventions and implementation notes to turn evidence into planning and budget-ready choices.",
+      highlights: [
+        {
+          title: "Browse adaptation interventions",
+          description:
+            "Compare policy, infrastructure, service delivery, surveillance, and community-level interventions.",
+        },
+        {
+          title: "Review implementation evidence",
+          description:
+            "Keep evidence summaries and practical notes maintainable outside a single deployment.",
+        },
+        {
+          title: "Support budget conversations",
+          description:
+            "Use solution detail as a starting point for cost, owner, and implementation planning.",
+        },
+      ],
+      nextHref: "/#contact",
+      nextLabel: "Talk to the CHART team",
+    },
   },
 ];
+
+export function getLandingResourceSection(resourceId: LandingResourceId) {
+  return (
+    landingResourceSections.find((section) => section.id === resourceId) ??
+    landingResourceSections[0]
+  );
+}

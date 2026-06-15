@@ -18,7 +18,9 @@ type AuthQuery = {
 
 export const getCurrentUserRouteSchema = {
   tags: ["auth"],
+  operationId: "getCurrentUser",
   summary: "Resolve the current user role and geography context",
+  security: [{ bearerAuth: [] }],
   querystring: {
     type: "object",
     properties: {
@@ -35,7 +37,9 @@ export const getCurrentUserRouteSchema = {
 
 export const getGeographyAccessRouteSchema = {
   tags: ["auth"],
+  operationId: "checkGeographyAccess",
   summary: "Check whether the current user can read a geography path",
+  security: [{ bearerAuth: [] }],
   querystring: {
     type: "object",
     required: ["geography"],

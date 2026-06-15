@@ -2,9 +2,11 @@ import crypto from "node:crypto";
 
 import { type NextRequest, NextResponse } from "next/server";
 
+import { buildKeycloakAuthorizeUrl, pkceCookieName } from "@/lib/keycloak";
+import { getRequestOrigin, isSecureRequest } from "@/lib/httpRequest";
+
 export const runtime = "nodejs";
 
-const pkceCookieName = "chart.auth.pkce";
 const pkceCookieMaxAgeSeconds = 10 * 60;
 
 export function GET(request: NextRequest) {
@@ -29,58 +31,6 @@ export function GET(request: NextRequest) {
   });
 
   return response;
-}
-
-function buildKeycloakAuthorizeUrl(input: {
-  challenge: string;
-  origin: string;
-  state: string;
-}) {
-  const url = new URL(
-    `${getKeycloakBaseUrl()}/realms/${getKeycloakRealm()}/protocol/openid-connect/auth`,
-  );
-
-  url.search = new URLSearchParams({
-    client_id: getKeycloakClientId(),
-    code_challenge: input.challenge,
-    code_challenge_method: "S256",
-    redirect_uri: `${input.origin}/auth/callback`,
-    response_type: "code",
-    scope: "openid profile email",
-    state: input.state,
-  }).toString();
-
-  return url;
-}
-
-function getKeycloakBaseUrl() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_URL ?? "http://127.0.0.1:8080";
-}
-
-function getKeycloakRealm() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_REALM ?? "chart";
-}
-
-function getKeycloakClientId() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID ?? "chart-web";
-}
-
-function getRequestOrigin(request: NextRequest) {
-  const forwardedProto = request.headers.get("x-forwarded-proto");
-  const forwardedHost = request.headers.get("x-forwarded-host");
-
-  if (forwardedProto && forwardedHost) {
-    return `${forwardedProto}://${forwardedHost}`;
-  }
-
-  return new URL(request.url).origin;
-}
-
-function isSecureRequest(request: NextRequest) {
-  return (
-    new URL(request.url).protocol === "https:" ||
-    request.headers.get("x-forwarded-proto") === "https"
-  );
 }
 
 function createRandomString() {

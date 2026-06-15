@@ -4,23 +4,30 @@ on:
   pull_request:
     paths:
       - ".github/workflows/storybook-pages.yml"
+      - ".prettierignore"
+      - ".prettierrc.json"
       - "Makefile"
       - "package.json"
       - "package-lock.json"
       - "web/.storybook/**"
       - "web/package.json"
+      - "web/public/**"
       - "web/src/**"
       - "web/tsconfig.json"
   push:
     branches:
       - main
+      - dev
     paths:
       - ".github/workflows/storybook-pages.yml"
+      - ".prettierignore"
+      - ".prettierrc.json"
       - "Makefile"
       - "package.json"
       - "package-lock.json"
       - "web/.storybook/**"
       - "web/package.json"
+      - "web/public/**"
       - "web/src/**"
       - "web/tsconfig.json"
   workflow_dispatch:
@@ -50,17 +57,20 @@ jobs:
         run: npm ci
 
       - name: Check Storybook formatting
-        run: npx prettier --check web/.storybook web/src/modules/ui package.json package-lock.json
+        run: npx prettier --check web/.storybook web/src package.json
 
       - name: Typecheck web
         run: npm run typecheck:web
 
-      - name: Build Storybook
-        run: npm run build-storybook:web
-
       - name: Configure Pages
+        id: pages
         if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v5
+
+      - name: Build Storybook
+        run: npm run build-storybook:web
+        env:
+          STORYBOOK_BASE_URL: ${{ steps.pages.outputs.base_path }}
 
       - name: Upload Storybook artifact
         if: github.event_name != 'pull_request'

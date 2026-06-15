@@ -15,7 +15,6 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@payload-config": ["./payload.config.ts"],
       "@/*": ["./src/*"]
     },
     "plugins": [
@@ -24,6 +23,12 @@
       }
     ]
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": ["node_modules", ".next"]
 }

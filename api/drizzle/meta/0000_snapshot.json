@@ -1,5 +1,5 @@
 {
-  "id": "fca1756e-02ec-47da-a000-dab649a4d76a",
+  "id": "9a9556c0-7d7f-46ee-bf67-37be350a72f5",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -16,8 +16,7 @@
         },
         "level_key": {
           "name": "level_key",
-          "type": "geography_level",
-          "typeSchema": "public",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -66,7 +65,12 @@
       },
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "country_geo_config_level_key_check": {
+          "name": "country_geo_config_level_key_check",
+          "value": "\"country_geo_config\".\"level_key\" in ('country', 'geo_level_1', 'geo_level_2', 'geo_level_3')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.geographies": {
@@ -87,8 +91,7 @@
         },
         "level": {
           "name": "level",
-          "type": "geography_level",
-          "typeSchema": "public",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -218,6 +221,15 @@
           "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
+        },
+        "geographies_country_level_country_geo_config_fk": {
+          "name": "geographies_country_level_country_geo_config_fk",
+          "tableFrom": "geographies",
+          "tableTo": "country_geo_config",
+          "columnsFrom": ["country_code", "level"],
+          "columnsTo": ["country_code", "level_key"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -227,12 +239,16 @@
         "geographies_path_check": {
           "name": "geographies_path_check",
           "value": "\"geographies\".\"path\" like '/%'"
+        },
+        "geographies_level_check": {
+          "name": "geographies_level_check",
+          "value": "\"geographies\".\"level\" in ('country', 'geo_level_1', 'geo_level_2', 'geo_level_3')"
         }
       },
       "isRLSEnabled": false
     },
-    "public.geography_boundaries": {
-      "name": "geography_boundaries",
+    "public.setup_state": {
+      "name": "setup_state",
       "schema": "",
       "columns": {
         "id": {
@@ -241,408 +257,49 @@
           "primaryKey": true,
           "notNull": true
         },
-        "geography_id": {
-          "name": "geography_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "boundary_type": {
-          "name": "boundary_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_name": {
-          "name": "source_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_url": {
-          "name": "source_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "storage_url": {
-          "name": "storage_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attribution": {
-          "name": "attribution",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
+        "completed": {
+          "name": "completed",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
+          "default": false
         },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "geography_boundaries_geography_idx": {
-          "name": "geography_boundaries_geography_idx",
-          "columns": [
-            {
-              "expression": "geography_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "geography_boundaries_geography_type_unique": {
-          "name": "geography_boundaries_geography_type_unique",
-          "columns": [
-            {
-              "expression": "geography_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "boundary_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "geography_boundaries_geography_id_geographies_id_fk": {
-          "name": "geography_boundaries_geography_id_geographies_id_fk",
-          "tableFrom": "geography_boundaries",
-          "tableTo": "geographies",
-          "columnsFrom": ["geography_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.solution_repository_assets": {
-      "name": "solution_repository_assets",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "solution_id": {
-          "name": "solution_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "airtable_attachment_id": {
-          "name": "airtable_attachment_id",
+        "country_code": {
+          "name": "country_code",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'document'"
-        },
-        "filename": {
-          "name": "filename",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mime_type": {
-          "name": "mime_type",
+        "country_name": {
+          "name": "country_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "size_bytes": {
-          "name": "size_bytes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "temporary_source_url": {
-          "name": "temporary_source_url",
+        "root_geography_id": {
+          "name": "root_geography_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "storage_url": {
-          "name": "storage_url",
+        "first_admin_user_id": {
+          "name": "first_admin_user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "attribution": {
-          "name": "attribution",
+        "first_admin_email": {
+          "name": "first_admin_email",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "sort_order": {
-          "name": "sort_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "solution_repository_assets_solution_idx": {
-          "name": "solution_repository_assets_solution_idx",
-          "columns": [
-            {
-              "expression": "solution_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "solution_repository_assets_airtable_attachment_unique": {
-          "name": "solution_repository_assets_airtable_attachment_unique",
-          "columns": [
-            {
-              "expression": "airtable_attachment_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "solution_repository_assets_solution_id_solution_repository_items_id_fk": {
-          "name": "solution_repository_assets_solution_id_solution_repository_items_id_fk",
-          "tableFrom": "solution_repository_assets",
-          "tableTo": "solution_repository_items",
-          "columnsFrom": ["solution_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.solution_repository_item_taxonomies": {
-      "name": "solution_repository_item_taxonomies",
-      "schema": "",
-      "columns": {
-        "solution_id": {
-          "name": "solution_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "taxonomy_id": {
-          "name": "taxonomy_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "solution_repository_item_taxonomies_taxonomy_idx": {
-          "name": "solution_repository_item_taxonomies_taxonomy_idx",
-          "columns": [
-            {
-              "expression": "taxonomy_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "solution_repository_item_taxonomies_solution_id_solution_repository_items_id_fk": {
-          "name": "solution_repository_item_taxonomies_solution_id_solution_repository_items_id_fk",
-          "tableFrom": "solution_repository_item_taxonomies",
-          "tableTo": "solution_repository_items",
-          "columnsFrom": ["solution_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "solution_repository_item_taxonomies_taxonomy_id_solution_repository_taxonomies_id_fk": {
-          "name": "solution_repository_item_taxonomies_taxonomy_id_solution_repository_taxonomies_id_fk",
-          "tableFrom": "solution_repository_item_taxonomies",
-          "tableTo": "solution_repository_taxonomies",
-          "columnsFrom": ["taxonomy_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "solution_repository_item_taxonomies_solution_id_taxonomy_id_pk": {
-          "name": "solution_repository_item_taxonomies_solution_id_taxonomy_id_pk",
-          "columns": ["solution_id", "taxonomy_id"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.solution_repository_items": {
-      "name": "solution_repository_items",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "airtable_record_id": {
-          "name": "airtable_record_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "slug": {
-          "name": "slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "summary": {
-          "name": "summary",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "implementation_notes": {
-          "name": "implementation_notes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cost_of_implementation": {
-          "name": "cost_of_implementation",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "maintenance_requirement": {
-          "name": "maintenance_requirement",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "time_to_implement": {
-          "name": "time_to_implement",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "evidence_level": {
-          "name": "evidence_level",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'imported'"
-        },
-        "source_url": {
-          "name": "source_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_updated_at": {
-          "name": "source_updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "raw_fields": {
-          "name": "raw_fields",
+        "selected_hazards": {
+          "name": "selected_hazards",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{}'::jsonb"
+          "default": "'[]'::jsonb"
         },
         "created_at": {
           "name": "created_at",
@@ -659,233 +316,27 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "solution_repository_items_slug_unique": {
-          "name": "solution_repository_items_slug_unique",
-          "columns": [
-            {
-              "expression": "slug",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "solution_repository_items_airtable_record_unique": {
-          "name": "solution_repository_items_airtable_record_unique",
-          "columns": [
-            {
-              "expression": "airtable_record_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "solution_repository_items_status_idx": {
-          "name": "solution_repository_items_status_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.solution_repository_links": {
-      "name": "solution_repository_links",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "solution_id": {
-          "name": "solution_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "label": {
-          "name": "label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "url": {
-          "name": "url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_field": {
-          "name": "source_field",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sort_order": {
-          "name": "sort_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "solution_repository_links_solution_idx": {
-          "name": "solution_repository_links_solution_idx",
-          "columns": [
-            {
-              "expression": "solution_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
-        "solution_repository_links_solution_id_solution_repository_items_id_fk": {
-          "name": "solution_repository_links_solution_id_solution_repository_items_id_fk",
-          "tableFrom": "solution_repository_links",
-          "tableTo": "solution_repository_items",
-          "columnsFrom": ["solution_id"],
+        "setup_state_root_geography_id_geographies_id_fk": {
+          "name": "setup_state_root_geography_id_geographies_id_fk",
+          "tableFrom": "setup_state",
+          "tableTo": "geographies",
+          "columnsFrom": ["root_geography_id"],
           "columnsTo": ["id"],
-          "onDelete": "cascade",
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "setup_state_first_admin_user_id_users_id_fk": {
+          "name": "setup_state_first_admin_user_id_users_id_fk",
+          "tableFrom": "setup_state",
+          "tableTo": "users",
+          "columnsFrom": ["first_admin_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.solution_repository_taxonomies": {
-      "name": "solution_repository_taxonomies",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "type": {
-          "name": "type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "label": {
-          "name": "label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'airtable'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "solution_repository_taxonomies_type_label_unique": {
-          "name": "solution_repository_taxonomies_type_label_unique",
-          "columns": [
-            {
-              "expression": "type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "label",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "solution_repository_taxonomies_type_idx": {
-          "name": "solution_repository_taxonomies_type_idx",
-          "columns": [
-            {
-              "expression": "type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -980,6 +431,15 @@
         }
       },
       "foreignKeys": {
+        "user_geography_scopes_user_id_users_id_fk": {
+          "name": "user_geography_scopes_user_id_users_id_fk",
+          "tableFrom": "user_geography_scopes",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
         "user_geography_scopes_geography_id_geographies_id_fk": {
           "name": "user_geography_scopes_geography_id_geographies_id_fk",
           "tableFrom": "user_geography_scopes",
@@ -996,27 +456,35 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.workspace_geography_scopes": {
-      "name": "workspace_geography_scopes",
+    "public.user_roles": {
+      "name": "user_roles",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "workspace_id": {
-          "name": "workspace_id",
+        "user_id": {
+          "name": "user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "geography_id": {
-          "name": "geography_id",
+        "role": {
+          "name": "role",
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'keycloak'"
+        },
+        "synced_at": {
+          "name": "synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         },
         "created_at": {
           "name": "created_at",
@@ -1027,32 +495,11 @@
         }
       },
       "indexes": {
-        "workspace_geography_scopes_workspace_geo_unique": {
-          "name": "workspace_geography_scopes_workspace_geo_unique",
+        "user_roles_role_idx": {
+          "name": "user_roles_role_idx",
           "columns": [
             {
-              "expression": "workspace_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "geography_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "workspace_geography_scopes_geo_idx": {
-          "name": "workspace_geography_scopes_geo_idx",
-          "columns": [
-            {
-              "expression": "geography_id",
+              "expression": "role",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1065,29 +512,181 @@
         }
       },
       "foreignKeys": {
-        "workspace_geography_scopes_workspace_id_workspaces_id_fk": {
-          "name": "workspace_geography_scopes_workspace_id_workspaces_id_fk",
-          "tableFrom": "workspace_geography_scopes",
-          "tableTo": "workspaces",
-          "columnsFrom": ["workspace_id"],
+        "user_roles_user_id_users_id_fk": {
+          "name": "user_roles_user_id_users_id_fk",
+          "tableFrom": "user_roles",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "user_roles_user_id_role_pk": {
+          "name": "user_roles_user_id_role_pk",
+          "columns": ["user_id", "role"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "user_roles_role_check": {
+          "name": "user_roles_role_check",
+          "value": "\"user_roles\".\"role\" in ('chart_admin', 'content_editor', 'health_planning_lead', 'cross_sector_planning_lead', 'health_implementation_officer', 'cross_sector_implementation_officer', 'public_viewer')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
         },
-        "workspace_geography_scopes_geography_id_geographies_id_fk": {
-          "name": "workspace_geography_scopes_geography_id_geographies_id_fk",
-          "tableFrom": "workspace_geography_scopes",
-          "tableTo": "geographies",
-          "columnsFrom": ["geography_id"],
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "identity_provider": {
+          "name": "identity_provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'keycloak'"
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_seen_at": {
+          "name": "first_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "users_username_unique": {
+          "name": "users_username_unique",
+          "columns": [
+            {
+              "expression": "username",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "users_status_idx": {
+          "name": "users_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "users_created_by_user_id_users_id_fk": {
+          "name": "users_created_by_user_id_users_id_fk",
+          "tableFrom": "users",
+          "tableTo": "users",
+          "columnsFrom": ["created_by_user_id"],
           "columnsTo": ["id"],
-          "onDelete": "cascade",
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "users_status_check": {
+          "name": "users_status_check",
+          "value": "\"users\".\"status\" in ('active', 'disabled')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.workspace_members": {
@@ -1173,12 +772,26 @@
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "workspace_members_user_id_users_id_fk": {
+          "name": "workspace_members_user_id_users_id_fk",
+          "tableFrom": "workspace_members",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "workspace_members_role_check": {
+          "name": "workspace_members_role_check",
+          "value": "\"workspace_members\".\"role\" in ('owner', 'editor', 'viewer')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.workspaces": {
@@ -1210,8 +823,20 @@
           "notNull": true,
           "default": "'active'"
         },
-        "owner_geography_id": {
-          "name": "owner_geography_id",
+        "geography_id": {
+          "name": "geography_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owner_user_id": {
+          "name": "owner_user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1232,11 +857,26 @@
         }
       },
       "indexes": {
-        "workspaces_owner_geography_idx": {
-          "name": "workspaces_owner_geography_idx",
+        "workspaces_geography_idx": {
+          "name": "workspaces_geography_idx",
           "columns": [
             {
-              "expression": "owner_geography_id",
+              "expression": "geography_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "workspaces_owner_user_idx": {
+          "name": "workspaces_owner_user_idx",
+          "columns": [
+            {
+              "expression": "owner_user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1249,11 +889,29 @@
         }
       },
       "foreignKeys": {
-        "workspaces_owner_geography_id_geographies_id_fk": {
-          "name": "workspaces_owner_geography_id_geographies_id_fk",
+        "workspaces_geography_id_geographies_id_fk": {
+          "name": "workspaces_geography_id_geographies_id_fk",
           "tableFrom": "workspaces",
           "tableTo": "geographies",
-          "columnsFrom": ["owner_geography_id"],
+          "columnsFrom": ["geography_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "workspaces_created_by_user_id_users_id_fk": {
+          "name": "workspaces_created_by_user_id_users_id_fk",
+          "tableFrom": "workspaces",
+          "tableTo": "users",
+          "columnsFrom": ["created_by_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "workspaces_owner_user_id_users_id_fk": {
+          "name": "workspaces_owner_user_id_users_id_fk",
+          "tableFrom": "workspaces",
+          "tableTo": "users",
+          "columnsFrom": ["owner_user_id"],
           "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
@@ -1262,17 +920,16 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "workspaces_status_check": {
+          "name": "workspaces_status_check",
+          "value": "\"workspaces\".\"status\" in ('active', 'archived')"
+        }
+      },
       "isRLSEnabled": false
     }
   },
-  "enums": {
-    "public.geography_level": {
-      "name": "geography_level",
-      "schema": "public",
-      "values": ["country", "geo_level_1", "geo_level_2", "geo_level_3"]
-    }
-  },
+  "enums": {},
   "schemas": {},
   "sequences": {},
   "roles": {},

@@ -25,13 +25,20 @@ web/storybook-static/
 # generated local app artifacts
 api/openapi.yaml
 web/payload-types.ts
-web/public/imported-airtable/
+web/public/imported-*/
 web/chart-cms.db
+chart-repository/payload-types.ts
+chart-repository/public/uploads/
+outputs/
 
 # local docs and notes
-docs/
 data/
+data/
+outputs/
+web/public/uploads/
 .local/
 
 # OS files
 .DS_Store
+.claude
+build-storybook.log

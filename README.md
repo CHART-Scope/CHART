@@ -1,76 +1,54 @@
 # CHART
 
-CHART is a climate-health planning platform. This repository is a monorepo:
+CHART is a climate-health planning platform.
 
-- `web`: Next/Payload web app for the public site, CMS workflow, dashboard, and map UI.
-- `api`: Fastify API for backend modules such as auth, role/geography context, and data ingestion.
-- `docker-compose.yml`: local Postgres and Keycloak for development infrastructure.
-- `data/`: ignored local seed/import outputs.
-- `docs/`: ignored local planning notes.
+This repo contains the core app:
 
-The root package is only a workspace controller. It is not the web app and should not contain framework-specific application code.
+- `web`: Next app for the public site, onboarding, dashboard, map UI, and solution repository UI.
+- `api`: Fastify API for auth context, setup, users, workspaces, geographies, hazards, and solutions.
+- `infra/docker-compose.yml`: local Postgres and Keycloak.
 
-## Run locally
+The solution repository is consumed through `CHART_REPOSITORY_URL` when available.
+If it is unset, the API uses the bundled snapshot in
+`api/src/services/chart-repository/seed-data/seed.json`.
+
+## Run Locally
 
 ```bash
 make install
-docker compose up -d chart-postgres chart-keycloak
-make api-db-migrate
-make api-db-seed
-make api
-make web
+make run
 ```
 
-Open `http://127.0.0.1:3100`.
+Open the web app at `http://127.0.0.1:3100`.
 
-API docs are available at `http://127.0.0.1:3200/api`.
-Orval can consume `http://127.0.0.1:3200/openapi.json` or
-`http://127.0.0.1:3200/openapi.yaml`.
+## Routes
 
-Local Postgres uses one database, `chart`. Drizzle manages only the CHART app
-tables from `api/src/db/schema.ts`; Payload and Keycloak manage their own tables in
-the same database.
+Local development:
 
-Seed sign-in users are available through Keycloak at `http://127.0.0.1:8080`:
+- `http://127.0.0.1:3100`: web app
+- `http://127.0.0.1:3200/api`: API docs
+- `http://127.0.0.1:8080`: Keycloak
 
-- `u1-health-india` / `password`
-- `u2-sector-kenya` / `password`
-- `u3-health-gwalior` / `password`
-- `u4-sector-loitokitok` / `password`
+Deployed app:
 
-## EC2 demo routing
+- `http://<host>/`: web app
+- `http://<host>/chart-api`: API
+- `http://<host>/identity`: Keycloak
 
-The EC2 deployment exposes one public port:
+## Configuration
 
-- `http://<host>/`: CHART web app
-- `http://<host>/identity`: Keycloak sign-in
-- `http://<host>/api`: Next/Payload API
-- `http://<host>/chart-api`: Fastify API
+- `CHART_REPOSITORY_URL`: hosted solution repository API.
+- `CHART_REPOSITORY_SNAPSHOT_FILE`: optional local snapshot override.
+- `CHART_GEOGRAPHY_SEED_FILE`: optional geography seed override.
 
-Keycloak and the API still run on their container ports internally, but only the
-reverse proxy publishes port `80`.
-
-## Useful commands
+## Useful Commands
 
 ```bash
-make web-build
-make web-typecheck
-make web-seed
-make identity
-make api-db-generate
-make api-db-migrate
-make api-db-check
-make api-db-seed
-make api-openapi-generate
+make run
+make verify
 make api-test
 make api-build
+make web-typecheck
+make web-build
 make format-check
 ```
-
-## Structure rule
-
-Keep each app isolated:
-
-- Web/UI code stays in `web`.
-- Backend API code stays in `api`.
-- Future Python or data services should be added as separate apps/services, not mixed into the Next app.

@@ -1,54 +1,49 @@
-# CHART Keycloak
+# Keycloak
 
-Keycloak is the identity system. CHART remains the policy system.
+Keycloak is the identity system. CHART is the policy system (geography, workspace, roles).
 
 ## Local start
 
 ```bash
-docker compose up -d chart-postgres chart-keycloak
+make identity
+make identity-sync
 ```
 
-Admin console:
+`make identity-sync` re-applies seed groups and users to an existing realm. Run it after changing `chart-realm.json` or after a volume reset.
 
-- URL: `http://localhost:8080`
-- Username: `admin`
-- Password: `admin`
-- Realm: `chart`
+Use `make identity-restart` after changing local theme files.
 
-Seed users:
+Admin console: `http://localhost:8080` — `admin` / `admin` — realm `chart`
 
-- `u1-health-india` / `password`
-- `u2-sector-kenya` / `password`
-- `u3-health-gwalior` / `password`
-- `u4-sector-loitokitok` / `password`
+## Seed users
 
-## Model
+| Username             | Password   |
+| -------------------- | ---------- |
+| `chart-admin`        | `password` |
+| `u1-health-region`   | `password` |
+| `u2-sector-region`   | `password` |
+| `u3-health-district` | `password` |
+| `u4-sector-district` | `password` |
 
-Postgres is shared platform infrastructure. Local and deployed environments use one
-database:
+## Roles
 
-- `chart`: Payload CMS tables, Keycloak internal tables, and CHART-owned Drizzle
-  tables.
+Client roles on `chart-api`:
 
-Roles are Keycloak client roles on `chart-api`:
-
-- `u1_health_lead`
-- `u2_cross_sector_lead`
-- `u3_district_health_officer`
-- `u4_district_cross_sector_officer`
-- `u5_public_visitor`
 - `chart_admin`
+- `content_editor`
+- `health_planning_lead`
+- `cross_sector_planning_lead`
+- `health_implementation_officer`
+- `cross_sector_implementation_officer`
+- `public_viewer`
 
-Geography scope is represented by hierarchical Keycloak groups:
+## Geography groups
 
-- `/india/madhya-pradesh`
-- `/india/madhya-pradesh/gwalior`
-- `/kenya/kajiado`
-- `/kenya/kajiado/loitokitok`
+Geography scope is represented by Keycloak groups. The local realm uses fixture groups; real deployments should load their own.
 
-The API reads `roles` and `groups` from the access token and builds the current user
-context. The app database owns geography metadata, display labels, boundaries, solution
-repository metadata, and future workspace access rules through Drizzle migrations.
-
-The CHART login theme lives in `infra/keycloak/themes/chart` and is mounted into the
-local and deployed Keycloak container.
+```
+/country-a/region-a
+/country-a/region-a/district-a
+/country-b/region-b
+/country-b/region-b/district-c
+```

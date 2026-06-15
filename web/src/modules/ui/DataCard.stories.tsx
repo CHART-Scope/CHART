@@ -5,7 +5,7 @@ import { DataCard } from "./DataCard";
 import { LoadingPlaceholder } from "./LoadingPlaceholder";
 
 const meta = {
-  title: "Design System/DataCard",
+  title: "UI/Data Card",
   component: DataCard,
 } satisfies Meta<typeof DataCard>;
 
@@ -42,6 +42,20 @@ export const WithActions: Story = {
     >
       <p style={{ color: "var(--ink-soft)", lineHeight: 1.6, margin: 0 }}>
         Heat exposure and service readiness summary for the selected geography.
+      </p>
+    </DataCard>
+  ),
+};
+
+export const RepeatedCardHeading: Story = {
+  args: {
+    children: null,
+  },
+  render: () => (
+    <DataCard eyebrow="Step 2" title="Review vulnerability" titleLevel={3}>
+      <p style={{ color: "var(--ink-soft)", lineHeight: 1.6, margin: 0 }}>
+        Used for repeated cards where the page already has a higher-level section
+        heading.
       </p>
     </DataCard>
   ),

@@ -1,0 +1,58 @@
+services:
+  chart-postgres:
+    image: postgres:16-alpine
+    container_name: chart-postgres
+    environment:
+      POSTGRES_DB: chart
+      POSTGRES_USER: chart
+      POSTGRES_PASSWORD: chart
+    ports:
+      - "5432:5432"
+    volumes:
+      - chart-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chart -d chart"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chart-keycloak-postgres:
+    image: postgres:16-alpine
+    container_name: chart-keycloak-postgres
+    environment:
+      POSTGRES_DB: chart_keycloak
+      POSTGRES_USER: chart
+      POSTGRES_PASSWORD: chart
+    volumes:
+      - chart-keycloak-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chart -d chart_keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chart-keycloak:
+    image: quay.io/keycloak/keycloak:26.6.1
+    container_name: chart-keycloak
+    command: ["start-dev", "--import-realm"]
+    depends_on:
+      chart-keycloak-postgres:
+        condition: service_healthy
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://chart-keycloak-postgres:5432/chart_keycloak
+      KC_DB_USERNAME: chart
+      KC_DB_PASSWORD: chart
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./infra/keycloak/chart-realm.json:/opt/keycloak/data/import/chart-realm.json:ro
+      - ./infra/keycloak/themes/chart:/opt/keycloak/themes/chart:ro
+
+volumes:
+  chart-postgres-data:
+  chart-keycloak-postgres-data:

@@ -5,23 +5,24 @@ on:
     paths:
       - ".github/workflows/api.yml"
       - ".github/pull_request_template.md"
+      - ".prettierignore"
       - ".prettierrc.json"
       - "Makefile"
       - "api/**"
-      - "docker-compose.yml"
       - "infra/**"
       - "package.json"
       - "package-lock.json"
   push:
     branches:
       - main
+      - dev
     paths:
       - ".github/workflows/api.yml"
       - ".github/pull_request_template.md"
+      - ".prettierignore"
       - ".prettierrc.json"
       - "Makefile"
       - "api/**"
-      - "docker-compose.yml"
       - "infra/**"
       - "package.json"
       - "package-lock.json"
@@ -68,7 +69,7 @@ jobs:
         run: npm ci
 
       - name: Check API formatting
-        run: npx prettier --check api docker-compose.yml infra package.json package-lock.json
+        run: npx prettier --check api infra package.json package-lock.json
 
       - name: Check migration history
         run: npm run db:check:api

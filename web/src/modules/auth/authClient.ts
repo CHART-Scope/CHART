@@ -1,10 +1,11 @@
 export type ChartRole =
-  | "u1_health_lead"
-  | "u2_cross_sector_lead"
-  | "u3_district_health_officer"
-  | "u4_district_cross_sector_officer"
-  | "u5_public_visitor"
-  | "chart_admin";
+  | "chart_admin"
+  | "content_editor"
+  | "health_planning_lead"
+  | "cross_sector_planning_lead"
+  | "health_implementation_officer"
+  | "cross_sector_implementation_officer"
+  | "public_viewer";
 
 export type GeographyLevel = "country" | "geo_level_1" | "geo_level_2" | "geo_level_3";
 
@@ -25,15 +26,23 @@ export type AuthSession = {
   refreshToken?: string;
 };
 
+export type AuthTokenResponse = {
+  access_token?: string;
+  id_token?: string;
+  refresh_token?: string;
+};
+
 const authStorageKey = "chart.auth.session";
 const legacyPkceStorageKey = "chart.auth.pkce";
 
 export function getStoredAuthSession(): AuthSession | null {
-  if (typeof window === "undefined") {
+  const storage = getBrowserStorage("localStorage");
+
+  if (!storage) {
     return null;
   }
 
-  const rawSession = window.localStorage.getItem(authStorageKey);
+  const rawSession = storage.getItem(authStorageKey);
 
   if (!rawSession) {
     return null;
@@ -42,24 +51,30 @@ export function getStoredAuthSession(): AuthSession | null {
   try {
     return JSON.parse(rawSession) as AuthSession;
   } catch {
-    window.localStorage.removeItem(authStorageKey);
+    storage.removeItem(authStorageKey);
     return null;
   }
 }
 
 export function storeAuthSession(session: AuthSession) {
-  window.localStorage.setItem(authStorageKey, JSON.stringify(session));
+  const storage = getBrowserStorage("localStorage");
+
+  if (!storage) {
+    throw new Error("Browser storage is not available for CHART sign-in.");
+  }
+
+  storage.setItem(authStorageKey, JSON.stringify(session));
 }
 
 export function clearAuthSession() {
-  window.localStorage.removeItem(authStorageKey);
-  window.localStorage.removeItem(legacyPkceStorageKey);
-  window.sessionStorage.removeItem(legacyPkceStorageKey);
+  getBrowserStorage("localStorage")?.removeItem(authStorageKey);
+  getBrowserStorage("localStorage")?.removeItem(legacyPkceStorageKey);
+  getBrowserStorage("sessionStorage")?.removeItem(legacyPkceStorageKey);
 }
 
-export async function startKeycloakSignIn() {
+export function startKeycloakSignIn() {
   clearAuthSession();
-  window.location.assign("/auth/signin");
+  window.location.replace("/auth/signin");
 }
 
 export async function completeKeycloakSignIn(search: string) {
@@ -83,12 +98,12 @@ export async function completeKeycloakSignIn(search: string) {
     throw new Error("CHART sign-in did not return a valid token.");
   }
 
-  const tokens = (await tokenResponse.json()) as {
-    access_token?: string;
-    id_token?: string;
-    refresh_token?: string;
-  };
+  const tokens = (await tokenResponse.json()) as AuthTokenResponse;
 
+  return storeTokenSession(tokens);
+}
+
+export async function storeTokenSession(tokens: AuthTokenResponse) {
   if (!tokens.access_token) {
     throw new Error("CHART sign-in response is missing an access token.");
   }
@@ -107,16 +122,13 @@ export async function completeKeycloakSignIn(search: string) {
   return session;
 }
 
-export function signOutOfKeycloak() {
-  const session = getStoredAuthSession();
-  const logoutUrl = buildKeycloakLogoutUrl(session?.idToken);
-
+export function signOutOfKeycloak(returnTo = "/") {
   clearAuthSession();
-  window.location.assign(logoutUrl);
+  window.location.assign(`/auth/signout?returnTo=${encodeURIComponent(returnTo)}`);
 }
 
 async function fetchCurrentUser(accessToken?: string) {
-  const response = await fetch(`${getApiBaseUrl()}/auth/me`, {
+  const response = await fetch("/api/chart/auth/me", {
     headers: accessToken
       ? {
           authorization: `Bearer ${accessToken}`,
@@ -133,37 +145,14 @@ async function fetchCurrentUser(accessToken?: string) {
   return (await response.json()) as CurrentUserContext;
 }
 
-function getApiBaseUrl() {
-  return process.env.NEXT_PUBLIC_CHART_API_URL ?? "http://127.0.0.1:3200";
-}
-
-function getKeycloakBaseUrl() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_URL ?? "http://127.0.0.1:8080";
-}
-
-function getKeycloakRealm() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_REALM ?? "chart";
-}
-
-function getKeycloakClientId() {
-  return process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID ?? "chart-web";
-}
-
-function buildKeycloakLogoutUrl(idToken?: string) {
-  const url = new URL(
-    `${getKeycloakBaseUrl()}/realms/${getKeycloakRealm()}/protocol/openid-connect/logout`,
-  );
-
-  const params = new URLSearchParams({
-    client_id: getKeycloakClientId(),
-    post_logout_redirect_uri: `${window.location.origin}/`,
-  });
-
-  if (idToken) {
-    params.set("id_token_hint", idToken);
+function getBrowserStorage(kind: "localStorage" | "sessionStorage") {
+  if (typeof window === "undefined") {
+    return null;
   }
 
-  url.search = params.toString();
-
-  return url.toString();
+  try {
+    return window[kind] ?? null;
+  } catch {
+    return null;
+  }
 }

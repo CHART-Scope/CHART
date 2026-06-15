@@ -3,40 +3,128 @@ name: App Deploy
 on:
   push:
     branches:
-      - main
+      - dev
     paths:
       - ".github/workflows/app-deploy.yml"
       - "api/**"
-      - "docker-compose.yml"
+      - ".prettierignore"
+      - ".prettierrc.json"
       - "infra/**"
       - "package.json"
       - "package-lock.json"
       - "web/**"
   workflow_dispatch:
+    inputs:
+      public_host:
+        description: "Optional public hostname for browser URLs, such as dev.example.org. Defaults to AWS_APP_PUBLIC_HOST or AWS_APP_HOST."
+        required: false
+        type: string
+
+env:
+  DEPLOY_BRANCH: dev
 
 concurrency:
-  group: chart-app-deploy-${{ github.ref }}
+  group: chart-app-deploy-dev
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  validate:
+    name: Validate deploy candidate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: chart
+          POSTGRES_USER: chart
+          POSTGRES_PASSWORD: chart
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chart -d chart"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://chart:chart@127.0.0.1:5432/chart
+    steps:
+      - name: Check out deploy branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_BRANCH }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npx prettier --check .github README.md api infra web/src web/.storybook web/*.json web/*.mjs web/*.ts package.json
+
+      - name: Check API migrations
+        run: npm run db:check:api
+
+      - name: Typecheck API
+        run: npm run typecheck:api
+
+      - name: Test API
+        run: npm run test:api
+
+      - name: Build API
+        run: npm run build:api
+
+      - name: Typecheck web
+        run: npm run typecheck:web
+
+      - name: Build web
+        run: npm run build:web
+
+      - name: Build API image
+        run: docker build -f api/Dockerfile -t chart-api:ci .
+
+      - name: Build web image
+        run: docker build -f web/Dockerfile -t chart-web:ci .
+
   deploy:
     name: Deploy app
+    needs: validate
     runs-on: ubuntu-latest
+    environment: dev
+    env:
+      AWS_APP_HOST: ${{ secrets.AWS_APP_HOST }}
+      AWS_APP_PUBLIC_HOST: ${{ secrets.AWS_APP_PUBLIC_HOST }}
+      AWS_APP_SSH_KEY: ${{ secrets.AWS_APP_SSH_KEY }}
+      AWS_APP_USER: ${{ secrets.AWS_APP_USER }}
     steps:
+      - name: Validate deploy secrets
+        run: |
+          missing=0
+          for name in AWS_APP_HOST AWS_APP_SSH_KEY AWS_APP_USER; do
+            if [ -z "${!name}" ]; then
+              echo "::error title=Missing deploy secret::$name is required for EC2 deploy"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
       - name: Deploy app on EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.AWS_APP_HOST }}
-          username: ${{ secrets.AWS_APP_USER }}
-          key: ${{ secrets.AWS_APP_SSH_KEY }}
+          host: ${{ env.AWS_APP_HOST }}
+          username: ${{ env.AWS_APP_USER }}
+          key: ${{ env.AWS_APP_SSH_KEY }}
           script: |
             set -euo pipefail
 
             APP_DIR="${APP_DIR:-/opt/chart}"
-            BRANCH="${{ github.ref_name }}"
+            BRANCH="${{ env.DEPLOY_BRANCH }}"
 
             if [ -d "$APP_DIR/.git" ]; then
               git -C "$APP_DIR" reset --hard
@@ -50,4 +138,44 @@ jobs:
               git clone --branch "$BRANCH" https://github.com/CHART-Scope/CHART.git "$APP_DIR"
             fi
 
-            PUBLIC_HOST="${{ secrets.AWS_APP_HOST }}" bash "$APP_DIR/infra/aws/deploy-app.sh"
+            PUBLIC_HOST="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
+            PUBLIC_HOST="$PUBLIC_HOST" bash "$APP_DIR/infra/aws/deploy-app.sh"
+
+      - name: Verify public app remains reachable
+        run: |
+          public_host="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
+          base_url="http://${public_host}"
+
+          for attempt in $(seq 1 12); do
+            web_status="$(curl -fsS -o /dev/null -w "%{http_code}" "$base_url/" || true)"
+            api_body="$(curl -fsS "$base_url/chart-api/health" || true)"
+            keycloak_status="$(curl -fsS -o /dev/null -w "%{http_code}" "$base_url/identity/realms/chart" || true)"
+
+            if [ "$web_status" != "200" ] || [ "$api_body" != '{"status":"ok"}' ] || [ "$keycloak_status" != "200" ]; then
+              echo "::error title=Public smoke check failed::attempt ${attempt}: web=${web_status:-000} api=${api_body:-empty} keycloak=${keycloak_status:-000}"
+              exit 1
+            fi
+
+            echo "Public smoke check ${attempt}/12 passed."
+            sleep 10
+          done
+
+      - name: Dump EC2 diagnostics on failure
+        if: failure()
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.AWS_APP_HOST }}
+          username: ${{ env.AWS_APP_USER }}
+          key: ${{ env.AWS_APP_SSH_KEY }}
+          script: |
+            set -uo pipefail
+
+            docker ps -a --filter "name=chart-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            ss -ltnp || true
+
+            for container in chart-proxy chart-web chart-api chart-keycloak chart-postgres chart-keycloak-postgres; do
+              if docker ps -a --format "{{.Names}}" | grep -qx "$container"; then
+                echo "===== $container logs ====="
+                docker logs --tail 120 "$container" || true
+              fi
+            done

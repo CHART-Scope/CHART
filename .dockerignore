@@ -23,5 +23,4 @@ out
 .env
 .env.*
 api/openapi.yaml
-web/public/imported-airtable
 web/chart-cms.db

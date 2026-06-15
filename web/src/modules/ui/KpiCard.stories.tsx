@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { KpiCard } from "./KpiCard";
 
 const meta = {
-  title: "Design System/KpiCard",
+  title: "UI/KPI Card",
   component: KpiCard,
   args: {
     label: "Heat risk index",

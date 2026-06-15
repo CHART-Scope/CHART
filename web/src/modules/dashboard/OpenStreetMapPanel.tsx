@@ -1,83 +1,103 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import type { DashboardZone, HealthPost } from "../../content/dashboard";
+import type { GeographyRecord } from "../../lib/geographyClient";
 
-type MapLayer = "heat" | "flood" | "population" | "composite";
+import "./OpenStreetMapPanel.css";
 
-type OpenStreetMapPanelProps = {
-  layer: MapLayer;
-  zones: DashboardZone[];
-  healthPosts: HealthPost[];
-  selectedZoneId: string;
-  onSelectZone: (zoneId: string) => void;
-  boundary: [number, number][];
+type MarkerDefinition = {
+  position: [number, number];
+  label?: string;
+  color?: string;
 };
 
-function getLevelColor(level: DashboardZone["level"]) {
-  if (level === "crit") {
-    return "#E86B6B";
-  }
+type OpenStreetMapPanelProps = {
+  selectedGeography?: GeographyRecord;
+  center?: [number, number];
+  bounds?: [[number, number], [number, number]];
+  markers?: MarkerDefinition[];
+  className?: string;
+};
 
-  if (level === "high") {
-    return "#F0936B";
-  }
+type LookupState = "idle" | "loading" | "found" | "not-found" | "error";
 
-  if (level === "med") {
-    return "#EFB85A";
-  }
+type NominatimResult = {
+  display_name?: string;
+  boundingbox?: [string, string, string, string];
+  lat?: string;
+  lon?: string;
+};
 
-  return "#6CBB8A";
+const mapAttribution = "&copy; OpenStreetMap contributors";
+
+function titleCase(value: string) {
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
 }
 
-function getRadius(zone: DashboardZone, layer: MapLayer) {
-  if (layer === "population") {
-    return Math.max(10, Math.sqrt(zone.population) * 0.09);
-  }
-
-  if (layer === "heat") {
-    return Math.max(10, zone.heat * 0.42);
-  }
-
-  if (layer === "flood") {
-    return Math.max(10, zone.flood * 0.42);
-  }
-
-  return Math.max(10, ((zone.heat + zone.mnch) / 2) * 0.42);
+function pathPartToPlaceName(pathPart: string) {
+  return titleCase(pathPart.replace(/-/g, " "));
 }
 
-function getLayerValue(zone: DashboardZone, layer: MapLayer) {
-  if (layer === "population") {
-    return `${Math.round(zone.population / 1000)}k`;
+function searchQueryForGeography(geography: GeographyRecord) {
+  const selectedName = geography.name.toLowerCase();
+  const ancestorNames = geography.path
+    .split("/")
+    .filter(Boolean)
+    .map(pathPartToPlaceName)
+    .reverse()
+    .filter((part) => part.toLowerCase() !== selectedName);
+
+  return [geography.name, ...ancestorNames].join(", ");
+}
+
+async function lookupGeography(
+  geography: GeographyRecord,
+  signal: AbortSignal,
+): Promise<NominatimResult | undefined> {
+  const params = new URLSearchParams({
+    q: searchQueryForGeography(geography),
+    format: "jsonv2",
+    limit: "1",
+  });
+
+  if (geography.countryCode.length === 2) {
+    params.set("countrycodes", geography.countryCode.toLowerCase());
   }
 
-  if (layer === "heat") {
-    return String(zone.heat);
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+    { signal },
+  );
+
+  if (!response.ok) {
+    throw new Error("OpenStreetMap lookup failed.");
   }
 
-  if (layer === "flood") {
-    return String(zone.flood);
-  }
+  const results = (await response.json()) as NominatimResult[];
 
-  return String(Math.round((zone.heat + zone.mnch) / 2));
+  return results[0];
 }
 
 export function OpenStreetMapPanel({
-  layer,
-  zones,
-  healthPosts,
-  selectedZoneId,
-  onSelectZone,
-  boundary,
+  selectedGeography,
+  center,
+  bounds,
+  markers,
+  className,
 }: OpenStreetMapPanelProps) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
-  const layerGroupRef = useRef<import("leaflet").LayerGroup | null>(null);
+  const layerRef = useRef<import("leaflet").LayerGroup | null>(null);
+  const [lookupState, setLookupState] = useState<LookupState>("idle");
+  const showRiskLegend = markers && markers.length > 0;
 
   useEffect(() => {
     let isMounted = true;
-    let mapInstance: import("leaflet").Map | null = null;
 
     async function initializeMap() {
       if (!mapElementRef.current || mapRef.current) {
@@ -91,49 +111,21 @@ export function OpenStreetMapPanel({
       }
 
       const map = leaflet.map(mapElementRef.current, {
-        center: [26.17, 78.2],
-        zoom: 10,
+        center: center ?? [20, 0],
+        zoom: 2,
         zoomControl: true,
         scrollWheelZoom: true,
       });
 
       leaflet
         .tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: "&copy; OpenStreetMap contributors",
+          attribution: mapAttribution,
           maxZoom: 19,
         })
         .addTo(map);
 
-      leaflet
-        .polygon(boundary, {
-          color: "#E86B6B",
-          weight: 2,
-          opacity: 0.75,
-          fillColor: "#E86B6B",
-          fillOpacity: 0.03,
-          dashArray: "6,4",
-        })
-        .addTo(map);
-
-      healthPosts.forEach((post) => {
-        leaflet
-          .circleMarker([post.lat, post.lng], {
-            radius: 6,
-            color: "#ffffff",
-            weight: 2,
-            fillColor: "#0EA5A5",
-            fillOpacity: 1,
-          })
-          .addTo(map)
-          .bindTooltip(post.name, {
-            direction: "top",
-            offset: [0, -8],
-          });
-      });
-
       mapRef.current = map;
-      layerGroupRef.current = leaflet.layerGroup().addTo(map);
-      mapInstance = map;
+      layerRef.current = leaflet.layerGroup().addTo(map);
 
       requestAnimationFrame(() => {
         map.invalidateSize();
@@ -150,109 +142,187 @@ export function OpenStreetMapPanel({
         mapRef.current = null;
       }
 
-      layerGroupRef.current = null;
-      mapInstance = null;
+      layerRef.current = null;
     };
-  }, [boundary, healthPosts]);
+  }, [center]);
 
+  // Handle direct bounds/center props (skip Nominatim lookup)
   useEffect(() => {
-    let isMounted = true;
-
-    async function renderZoneLayer() {
-      if (!layerGroupRef.current) {
-        return;
-      }
-
-      const leaflet = await import("leaflet");
-
-      if (!isMounted || !layerGroupRef.current) {
-        return;
-      }
-
-      layerGroupRef.current.clearLayers();
-
-      zones.forEach((zone) => {
-        const color = getLevelColor(zone.level);
-        const radius = getRadius(zone, layer);
-
-        leaflet
-          .circleMarker([zone.lat, zone.lng], {
-            radius: radius * 2.4,
-            color,
-            weight: 0,
-            fillColor: color,
-            fillOpacity: 0.11,
-            interactive: false,
-          })
-          .addTo(layerGroupRef.current as import("leaflet").LayerGroup);
-
-        leaflet
-          .circleMarker([zone.lat, zone.lng], {
-            radius: radius * 1.5,
-            color,
-            weight: 0,
-            fillColor: color,
-            fillOpacity: 0.22,
-            interactive: false,
-          })
-          .addTo(layerGroupRef.current as import("leaflet").LayerGroup);
-
-        const core = leaflet
-          .circleMarker([zone.lat, zone.lng], {
-            radius,
-            color: selectedZoneId === zone.id ? "#111827" : "#ffffff",
-            weight: selectedZoneId === zone.id ? 2.4 : 1.5,
-            fillColor: color,
-            fillOpacity: 0.8,
-          })
-          .addTo(layerGroupRef.current as import("leaflet").LayerGroup);
-
-        core.bindTooltip(zone.name, {
-          direction: "top",
-          offset: [0, -radius - 2],
-        });
-        core.bindPopup(
-          `<div class="map-popup-title">${zone.name}</div>
-           <div class="map-popup-row"><span>Layer value</span><b>${getLayerValue(
-             zone,
-             layer,
-           )}</b></div>
-           <div class="map-popup-row"><span>Heat</span><b>${zone.heat}</b></div>
-           <div class="map-popup-row"><span>Flood</span><b>${zone.flood}</b></div>
-           <div class="map-popup-row"><span>MNCH</span><b>${zone.mnch}</b></div>`,
-        );
-        core.on("click", () => onSelectZone(zone.id));
-      });
+    if (!mapRef.current || !layerRef.current) {
+      return;
     }
 
-    void renderZoneLayer();
+    if (!bounds && !center && !markers) {
+      return;
+    }
+
+    const leaflet = require("leaflet") as typeof import("leaflet");
+
+    if (bounds) {
+      const leafletBounds = leaflet.latLngBounds(bounds[0], bounds[1]);
+      mapRef.current.fitBounds(leafletBounds, { animate: true, padding: [28, 28] });
+    } else if (center) {
+      mapRef.current.setView(center, 8, { animate: true });
+    }
+
+    if (markers && layerRef.current) {
+      // Clear previous markers only if using direct marker mode
+      for (const marker of markers) {
+        leaflet
+          .circleMarker(marker.position, {
+            radius: 7,
+            color: "#ffffff",
+            weight: 2,
+            fillColor: marker.color ?? "#185E2B",
+            fillOpacity: 1,
+          })
+          .addTo(layerRef.current)
+          .bindTooltip(marker.label ?? "", {
+            direction: "top",
+            offset: [0, -8],
+          });
+      }
+    }
+  }, [bounds, center, markers]);
+
+  // Handle geography-based lookup (existing behavior)
+  useEffect(() => {
+    // Skip Nominatim lookup when direct coordinates are provided
+    if (center || bounds) {
+      return;
+    }
+
+    if (!selectedGeography || !mapRef.current || !layerRef.current) {
+      setLookupState(selectedGeography ? "loading" : "idle");
+      return;
+    }
+
+    const controller = new AbortController();
+    let isMounted = true;
+    let didTimeout = false;
+    const timeoutId = window.setTimeout(() => {
+      didTimeout = true;
+      controller.abort();
+    }, 8000);
+
+    async function renderSelectedGeography() {
+      if (!mapRef.current || !layerRef.current || !selectedGeography) {
+        return;
+      }
+
+      setLookupState("loading");
+      layerRef.current.clearLayers();
+
+      try {
+        const leaflet = await import("leaflet");
+        const result = await lookupGeography(selectedGeography, controller.signal);
+
+        if (!isMounted || !mapRef.current || !layerRef.current) {
+          return;
+        }
+
+        if (!result?.boundingbox) {
+          setLookupState("not-found");
+          return;
+        }
+
+        const [south, north, west, east] = result.boundingbox.map(Number);
+        const leafletBounds = leaflet.latLngBounds([south, west], [north, east]);
+
+        leaflet
+          .rectangle(leafletBounds, {
+            color: "#185E2B",
+            weight: 2,
+            fillColor: "#5FB96F",
+            fillOpacity: 0.12,
+          })
+          .addTo(layerRef.current);
+
+        if (result.lat && result.lon) {
+          leaflet
+            .circleMarker([Number(result.lat), Number(result.lon)], {
+              radius: 7,
+              color: "#ffffff",
+              weight: 2,
+              fillColor: "#185E2B",
+              fillOpacity: 1,
+            })
+            .addTo(layerRef.current)
+            .bindTooltip(selectedGeography.name, {
+              direction: "top",
+              offset: [0, -8],
+            })
+            .openTooltip();
+        }
+
+        mapRef.current.fitBounds(leafletBounds, {
+          animate: true,
+          padding: [28, 28],
+          maxZoom: 8,
+        });
+        setLookupState("found");
+      } catch (error) {
+        if (isMounted && (!controller.signal.aborted || didTimeout)) {
+          setLookupState("error");
+        }
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    void renderSelectedGeography();
 
     return () => {
       isMounted = false;
+      window.clearTimeout(timeoutId);
+      controller.abort();
     };
-  }, [layer, onSelectZone, selectedZoneId, zones]);
+  }, [selectedGeography, center, bounds]);
 
   return (
-    <div className="map-panel">
+    <div className={`map-panel${className ? ` ${className}` : ""}`}>
       <div className="map-canvas" ref={mapElementRef} />
       <div className="map-legend">
-        <div className="map-legend-title">Risk level</div>
-        <div className="map-legend-row">
-          <span className="map-legend-dot crit" />
-          Critical
-        </div>
-        <div className="map-legend-row">
-          <span className="map-legend-dot high" />
-          High
-        </div>
-        <div className="map-legend-row">
-          <span className="map-legend-dot med" />
-          Medium
-        </div>
+        <div className="map-legend-title">Map data</div>
         <div className="map-legend-row">
           <span className="map-legend-dot low" />
-          Low
+          OpenStreetMap
         </div>
+        <div className="map-legend-row">
+          <span className="map-legend-line" />
+          Selected geography
+        </div>
+        {showRiskLegend ? (
+          <>
+            <div className="map-legend-row">
+              <span className="map-legend-dot crit" />
+              Critical
+            </div>
+            <div className="map-legend-row">
+              <span className="map-legend-dot high" />
+              High
+            </div>
+            <div className="map-legend-row">
+              <span className="map-legend-dot med" />
+              Moderate
+            </div>
+            <div className="map-legend-row">
+              <span className="map-legend-dot low" />
+              Low
+            </div>
+          </>
+        ) : null}
+      </div>
+      <div className="map-status-card">
+        {lookupState === "idle" ? "Select a configured geography to locate it." : null}
+        {lookupState === "loading" ? "Looking up geography in OpenStreetMap..." : null}
+        {lookupState === "found" ? "Showing OpenStreetMap match." : null}
+        {lookupState === "not-found"
+          ? "OpenStreetMap could not locate this geography name."
+          : null}
+        {lookupState === "error"
+          ? "OpenStreetMap lookup failed. Try again when network access is available."
+          : null}
       </div>
     </div>
   );

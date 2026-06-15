@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { getSetupStatus } from "../../lib/setupClient";
 import {
   getStoredAuthSession,
   signOutOfKeycloak,
@@ -10,27 +11,64 @@ import {
 } from "./authClient";
 
 type RequireAuthProps = {
-  children: (session: AuthSession, signOut: () => void) => ReactNode;
+  children: (session: AuthSession, signOut: (returnTo?: string) => void) => ReactNode;
 };
 
 export function RequireAuth({ children }: RequireAuthProps) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isChecking, setIsChecking] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
-    const storedSession = getStoredAuthSession();
+    async function checkAccess() {
+      const storedSession = getStoredAuthSession();
 
-    if (!storedSession) {
-      void startKeycloakSignIn();
+      if (!storedSession) {
+        const setupStatus = await getSetupStatus();
+
+        if (
+          setupStatus.requiresOnboarding &&
+          window.location.pathname !== "/onboarding"
+        ) {
+          window.location.assign("/onboarding");
+          return;
+        }
+
+        redirectToSignIn();
+        return;
+      }
+
+      setSession(storedSession);
+      setIsChecking(false);
+
+      const setupStatus = await getSetupStatus();
+
+      if (
+        setupStatus.requiresOnboarding &&
+        window.location.pathname !== "/onboarding"
+      ) {
+        window.location.assign("/onboarding");
+      }
+    }
+
+    checkAccess().catch(() => {
+      setError("CHART setup status could not be checked.");
+      setIsChecking(false);
+    });
+  }, []);
+
+  function redirectToSignIn() {
+    if (hasRedirectedRef.current) {
       return;
     }
 
-    setSession(storedSession);
-    setIsChecking(false);
-  }, []);
+    hasRedirectedRef.current = true;
+    startKeycloakSignIn();
+  }
 
-  function signOut() {
-    signOutOfKeycloak();
+  function signOut(returnTo?: string) {
+    signOutOfKeycloak(returnTo);
   }
 
   if (isChecking || !session) {
@@ -40,8 +78,8 @@ export function RequireAuth({ children }: RequireAuthProps) {
           <span className="section-kicker">CHART secure workspace</span>
           <h1>Opening CHART sign in</h1>
           <p>
-            CHART is sending you to the secure sign-in service for your role and
-            geography scope.
+            {error ??
+              "CHART is sending you to the secure sign-in service for your role and geography scope."}
           </p>
         </section>
       </main>

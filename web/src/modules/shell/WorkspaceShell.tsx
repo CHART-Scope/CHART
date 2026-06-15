@@ -1,27 +1,49 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useState, type ReactNode } from "react";
+
+import type { CurrentUserContext } from "../auth/authClient";
+import {
+  canManageContent,
+  formatGeographyPath,
+  formatRole,
+  getUserProfile,
+  userInitials,
+} from "../auth/userContext";
+import type { ChartRoute } from "../routes/types";
+import { Button } from "../ui/Button";
+
+import "./WorkspaceShell.css";
 
 type WorkspaceShellProps = {
-  activeRoute: "dashboard" | "cms";
+  activeRoute: "dashboard" | "setup";
   pageTitle: string;
-  crumb: string;
-  onNavigate: (route: "landing" | "dashboard" | "cms") => void;
-  onSignOut?: () => void;
+  pageSubtitle?: string;
+  crumb?: string;
+  onNavigate: (route: ChartRoute) => void;
+  currentUser?: CurrentUserContext;
+  onSignOut?: (returnTo?: string) => void;
   children: ReactNode;
 };
 
 export function WorkspaceShell({
   activeRoute,
   pageTitle,
+  pageSubtitle,
   crumb,
   onNavigate,
+  currentUser,
   onSignOut,
   children,
 }: WorkspaceShellProps) {
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const today = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
   }).format(new Date());
+  const profile = currentUser ? getUserProfile(currentUser) : undefined;
+  const userCanManageContent = currentUser ? canManageContent(currentUser) : false;
 
   return (
     <div className="workspace-shell">
@@ -32,7 +54,7 @@ export function WorkspaceShell({
           onClick={() => onNavigate("landing")}
         >
           CHART
-          <small>Toolkit</small>
+          <small>v1</small>
         </button>
 
         <div className="workspace-section-label">Workspace</div>
@@ -42,32 +64,57 @@ export function WorkspaceShell({
           onClick={() => onNavigate("dashboard")}
         >
           <span className="workspace-dot" />
-          <span>Dashboard</span>
+          <span>My dashboard</span>
         </button>
         <button
-          className={`workspace-item ${activeRoute === "cms" ? "active" : ""}`}
+          className="workspace-item disabled"
           type="button"
-          onClick={() => onNavigate("cms")}
+          title="Coming soon"
+          disabled
         >
           <span className="workspace-dot" />
-          <span>Content studio</span>
+          <span>My plans</span>
         </button>
 
-        <div className="workspace-section-label">Public</div>
+        <div className="workspace-section-label">CHART Toolkit</div>
         <button
           className="workspace-item"
           type="button"
-          onClick={() => onNavigate("landing")}
+          onClick={() => onNavigate("solutions")}
         >
           <span className="workspace-dot public" />
-          <span>Landing page</span>
+          <span>Action repository</span>
         </button>
 
+        {userCanManageContent ? (
+          <>
+            <div className="workspace-section-label">Admin</div>
+            <button
+              className={`workspace-item ${activeRoute === "setup" ? "active" : ""}`}
+              type="button"
+              onClick={() => onNavigate("setup")}
+            >
+              <span className="workspace-dot" />
+              <span>Content studio</span>
+            </button>
+          </>
+        ) : null}
+
         <div className="workspace-sidebar-foot">
-          Shared planning for climate-health teams. Public resources stay open; scoped
-          planning stays inside the workspace.
+          <button
+            className="workspace-item"
+            type="button"
+            onClick={() => onNavigate("landing")}
+          >
+            <span className="workspace-dot public" />
+            <span>Public site</span>
+          </button>
           {onSignOut ? (
-            <button className="workspace-signout" type="button" onClick={onSignOut}>
+            <button
+              className="workspace-signout"
+              type="button"
+              onClick={() => onSignOut()}
+            >
               Sign out
             </button>
           ) : null}
@@ -76,18 +123,61 @@ export function WorkspaceShell({
 
       <div className="workspace-main">
         <header className="workspace-topbar">
-          <div>
-            <div className="workspace-crumb">{crumb}</div>
-            <div className="workspace-title">{pageTitle}</div>
+          <div className="workspace-topbar-heading">
+            {crumb ? <div className="workspace-crumb">{crumb}</div> : null}
+            <h1>{pageTitle}</h1>
+            {pageSubtitle ? <p>{pageSubtitle}</p> : null}
           </div>
           <div className="workspace-topbar-right">
-            <div className="workspace-date">{today}</div>
-            {onSignOut ? (
-              <button className="topbar-signout" type="button" onClick={onSignOut}>
-                Sign out
-              </button>
+            {currentUser ? (
+              <span className="workspace-welcome">Welcome, {currentUser.username}</span>
             ) : null}
-            <div className="workspace-avatar">AB</div>
+            <div className="workspace-date">{today}</div>
+            <Button compact disabled variant="ghost">
+              Customize
+            </Button>
+            {currentUser ? (
+              <div className="workspace-profile-menu">
+                <button
+                  aria-expanded={isProfileOpen}
+                  className="workspace-avatar-button"
+                  type="button"
+                  onClick={() => setIsProfileOpen((value) => !value)}
+                >
+                  <span className="workspace-avatar">{userInitials(currentUser)}</span>
+                  <span className="workspace-avatar-copy">
+                    <strong>{currentUser.username}</strong>
+                    <small>{formatRole(currentUser.roles[0])}</small>
+                  </span>
+                </button>
+
+                {isProfileOpen ? (
+                  <div className="profile-popover">
+                    <span className="section-kicker">Signed in profile</span>
+                    <h3>{profile?.roleLabel}</h3>
+                    <div className="profile-fact">
+                      <span>Active geography</span>
+                      <strong>
+                        {formatGeographyPath(
+                          currentUser.activeGeographyId ??
+                            currentUser.geographyScopes[0],
+                        )}
+                      </strong>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        onNavigate("setup");
+                      }}
+                    >
+                      Open profile setup
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="workspace-avatar">CH</div>
+            )}
           </div>
         </header>
 

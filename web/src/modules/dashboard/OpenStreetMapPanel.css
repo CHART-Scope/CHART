@@ -1,0 +1,103 @@
+/* OpenStreetMapPanel styles — extracted from styles.css */
+
+.map-panel {
+  position: relative;
+  height: 30rem;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.map-canvas {
+  width: 100%;
+  height: 100%;
+  background: #e5e9ec;
+}
+
+.map-legend {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 500;
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.8rem;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-md);
+}
+
+.map-status-card {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 500;
+  max-width: min(24rem, calc(100% - 2rem));
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-md);
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.map-legend-title {
+  margin-bottom: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.map-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.84rem;
+  color: var(--ink-soft);
+}
+
+.map-legend-dot {
+  display: inline-flex;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+}
+
+.map-legend-dot.crit {
+  background: var(--red);
+}
+
+.map-legend-dot.high {
+  background: #f0936b;
+}
+
+.map-legend-dot.med {
+  background: #efb85a;
+}
+
+.map-legend-dot.low {
+  background: #6cbb8a;
+}
+
+.map-legend-line {
+  width: 1.1rem;
+  border-top: 2px dashed var(--red);
+}
+
+.map-popup-title {
+  margin-bottom: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.map-popup-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
