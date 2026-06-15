@@ -9,7 +9,6 @@ on:
       - "api/**"
       - ".prettierignore"
       - ".prettierrc.json"
-      - "docker-compose.yml"
       - "infra/**"
       - "package.json"
       - "package-lock.json"
@@ -67,7 +66,7 @@ jobs:
         run: npm ci
 
       - name: Check formatting
-        run: npx prettier --check .github README.md api infra web/src web/.storybook web/*.json web/*.mjs web/*.ts docker-compose.yml package.json
+        run: npx prettier --check .github README.md api infra web/src web/.storybook web/*.json web/*.mjs web/*.ts package.json
 
       - name: Check API migrations
         run: npm run db:check:api

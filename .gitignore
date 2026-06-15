@@ -32,7 +32,7 @@ chart-repository/public/uploads/
 outputs/
 
 # local docs and notes
-docs/
+data/
 data/
 outputs/
 web/public/uploads/

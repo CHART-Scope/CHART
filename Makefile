@@ -109,7 +109,7 @@ api-openapi-generate:
 	$(NPM) run openapi:generate:api
 
 identity: check-docker
-	$(DOCKER) compose up -d chart-postgres chart-keycloak-postgres chart-keycloak
+	$(DOCKER) compose -f infra/docker-compose.yml up -d chart-postgres chart-keycloak-postgres chart-keycloak
 
 identity-wait:
 	@printf "Waiting for local Keycloak"
@@ -128,12 +128,12 @@ identity-sync:
 	$(NPM) run identity:sync
 
 identity-restart: check-docker
-	$(DOCKER) compose restart chart-keycloak
+	$(DOCKER) compose -f infra/docker-compose.yml restart chart-keycloak
 	$(MAKE) identity-wait
 	$(MAKE) identity-sync
 
 identity-down: check-docker
-	$(DOCKER) compose stop chart-keycloak
+	$(DOCKER) compose -f infra/docker-compose.yml stop chart-keycloak
 
 chart-repo: chart-repo-install chart-repo-db chart-repo-db-wait
 	cd $(CHART_REPOSITORY_DIR) && $(NPM) run dev
