@@ -1002,7 +1002,10 @@ function SetupCompleteSuccess({
   onOpenDashboard: () => void;
 }) {
   return (
-    <section className="onboarding-complete-success" aria-labelledby="setup-complete-title">
+    <section
+      className="onboarding-complete-success"
+      aria-labelledby="setup-complete-title"
+    >
       <span className="onboarding-success-mark" aria-hidden="true" />
       <span className="section-kicker">Setup complete</span>
       <h1 id="setup-complete-title">Welcome to CHART</h1>
