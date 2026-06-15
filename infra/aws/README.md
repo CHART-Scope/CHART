@@ -29,6 +29,49 @@ Optional:
 
 - `AWS_APP_PUBLIC_HOST`: browser-facing hostname. Use this for a subdomain.
 
+## EC2 prerequisites
+
+- Docker installed and running.
+- Port 80 open in the EC2 security group.
+- The deploy SSH key's public key in `/home/<AWS_APP_USER>/.ssh/authorized_keys`.
+
+## Ops
+
+**Check container status:**
+
+```bash
+docker ps -a --filter "name=chart-"
+```
+
+**Tail logs:**
+
+```bash
+docker logs chart-web --tail 50
+docker logs chart-api --tail 50
+docker logs chart-proxy --tail 50
+```
+
+**Reset a user to re-experience onboarding:**
+
+```bash
+docker exec -it chart-postgres psql -U chart -d chart \
+  -c "DELETE FROM users WHERE email = 'chart-admin@example.org';"
+```
+
+**Full wipe and redeploy:**
+
+```bash
+docker rm -f chart-proxy chart-web chart-api chart-keycloak chart-keycloak-postgres chart-postgres
+docker volume rm chart-postgres-data chart-keycloak-postgres-data
+PUBLIC_HOST=<host> bash /opt/chart/infra/aws/deploy-app.sh
+```
+
+**Find the Keycloak admin password:**
+
+```bash
+grep KEYCLOAK_ADMIN_PASSWORD /opt/chart-env/chart.env
+```
+
 ## Workflows
 
 - `API`: API checks only.

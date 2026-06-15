@@ -9,7 +9,6 @@ on:
       - ".prettierrc.json"
       - "Makefile"
       - "api/**"
-      - "docker-compose.yml"
       - "infra/**"
       - "package.json"
       - "package-lock.json"
@@ -24,7 +23,6 @@ on:
       - ".prettierrc.json"
       - "Makefile"
       - "api/**"
-      - "docker-compose.yml"
       - "infra/**"
       - "package.json"
       - "package-lock.json"
@@ -71,7 +69,7 @@ jobs:
         run: npm ci
 
       - name: Check API formatting
-        run: npx prettier --check api docker-compose.yml infra package.json package-lock.json
+        run: npx prettier --check api infra package.json package-lock.json
 
       - name: Check migration history
         run: npm run db:check:api
