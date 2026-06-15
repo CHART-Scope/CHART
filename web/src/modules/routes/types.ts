@@ -3,6 +3,8 @@ export type ChartRoute =
   | "dashboard"
   | "setup"
   | "solutions"
+  | "models"
+  | "vra"
   | "onboarding"
   | "auth"
   | "plans";

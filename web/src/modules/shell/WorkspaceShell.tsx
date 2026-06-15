@@ -11,6 +11,7 @@ import {
   userInitials,
 } from "../auth/userContext";
 import type { ChartRoute } from "../routes/types";
+import { Button } from "../ui/Button";
 
 import "./WorkspaceShell.css";
 
@@ -132,9 +133,9 @@ export function WorkspaceShell({
               <span className="workspace-welcome">Welcome, {currentUser.username}</span>
             ) : null}
             <div className="workspace-date">{today}</div>
-            <button className="ghost-button" type="button" disabled>
+            <Button compact disabled variant="ghost">
               Customize
-            </button>
+            </Button>
             {currentUser ? (
               <div className="workspace-profile-menu">
                 <button
@@ -163,16 +164,14 @@ export function WorkspaceShell({
                         )}
                       </strong>
                     </div>
-                    <button
-                      className="primary-button"
-                      type="button"
+                    <Button
                       onClick={() => {
                         setIsProfileOpen(false);
                         onNavigate("setup");
                       }}
                     >
                       Open profile setup
-                    </button>
+                    </Button>
                   </div>
                 ) : null}
               </div>

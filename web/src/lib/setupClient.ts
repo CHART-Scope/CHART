@@ -18,8 +18,21 @@ export type SetupStatus = {
 export type CompleteSetupInput = {
   countryCode: string;
   countryName: string;
+  focusAreaIds?: string[];
+  geographies?: SetupGeographyInput[];
   geographyLevelLabel: string;
   hazardIds: string[];
+  healthAreaIds?: string[];
+};
+
+export type SetupGeographyInput = {
+  id: string;
+  level: "country" | "geo_level_1" | "geo_level_2" | "geo_level_3";
+  levelLabel: string;
+  name: string;
+  parentId?: string;
+  path: string;
+  sortOrder?: number;
 };
 
 export type BootstrapSetupInput = CompleteSetupInput & {
@@ -148,6 +161,8 @@ function setupErrorMessage(errorCode: string | undefined) {
       return "First setup is already locked. Sign in as a CHART administrator to update setup.";
     case "SETUP_COUNTRY_REQUIRED":
       return "Choose the country and geography level for this CHART deployment.";
+    case "SETUP_GEOGRAPHY_INVALID":
+      return "Choose a valid geography for this CHART deployment.";
     case "SETUP_FORBIDDEN":
       return "Only a CHART administrator can change setup.";
     case "SETUP_HAZARD_INVALID":

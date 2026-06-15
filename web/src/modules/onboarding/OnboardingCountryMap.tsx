@@ -10,7 +10,13 @@ type CountryBounds = {
 };
 
 type OnboardingCountryMapProps = {
+  bounds?: CountryBounds | null;
   countryName: string;
+  marker?: {
+    label: string;
+    lat: number;
+    lon: number;
+  } | null;
 };
 
 type NominatimCountryResult = {
@@ -22,7 +28,11 @@ type NominatimCountryResult = {
 
 const mapAttribution = "&copy; OpenStreetMap contributors";
 
-export function OnboardingCountryMap({ countryName }: OnboardingCountryMapProps) {
+export function OnboardingCountryMap({
+  bounds = null,
+  countryName,
+  marker = null,
+}: OnboardingCountryMapProps) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const layerRef = useRef<import("leaflet").LayerGroup | null>(null);
@@ -45,8 +55,8 @@ export function OnboardingCountryMap({ countryName }: OnboardingCountryMapProps)
       const map = leaflet.map(mapElementRef.current, {
         center: [15, 10],
         zoom: 2,
-        scrollWheelZoom: true,
-        zoomControl: true,
+        scrollWheelZoom: false,
+        zoomControl: false,
       });
 
       leaflet
@@ -83,23 +93,27 @@ export function OnboardingCountryMap({ countryName }: OnboardingCountryMapProps)
     let isMounted = true;
 
     async function renderCountry() {
-      if (!mapReady || !countryName.trim() || !mapRef.current || !layerRef.current) {
+      if (!mapReady || !mapRef.current || !layerRef.current) {
         return;
       }
 
-      const [leaflet, bounds] = await Promise.all([
+      const [leaflet, loadedBounds] = await Promise.all([
         import("leaflet"),
-        loadCountryBounds(countryName),
+        bounds
+          ? Promise.resolve(bounds)
+          : countryName.trim()
+            ? loadCountryBounds(countryName)
+            : Promise.resolve(null),
       ]);
 
-      if (!isMounted || !bounds || !mapRef.current || !layerRef.current) {
+      if (!isMounted || !loadedBounds || !mapRef.current || !layerRef.current) {
         return;
       }
 
       layerRef.current.clearLayers();
 
-      const southWest: [number, number] = [bounds.latMin, bounds.lonMin];
-      const northEast: [number, number] = [bounds.latMax, bounds.lonMax];
+      const southWest: [number, number] = [loadedBounds.latMin, loadedBounds.lonMin];
+      const northEast: [number, number] = [loadedBounds.latMax, loadedBounds.lonMax];
       const leafletBounds = leaflet.latLngBounds(southWest, northEast);
 
       leaflet
@@ -113,8 +127,26 @@ export function OnboardingCountryMap({ countryName }: OnboardingCountryMapProps)
         })
         .addTo(layerRef.current);
 
+      if (marker) {
+        leaflet
+          .circleMarker([marker.lat, marker.lon], {
+            color: "#16431F",
+            fillColor: "#2E9449",
+            fillOpacity: 0.88,
+            radius: 7,
+            weight: 2,
+          })
+          .bindTooltip(marker.label, {
+            direction: "top",
+            offset: [0, -8],
+            opacity: 0.92,
+            permanent: false,
+          })
+          .addTo(layerRef.current);
+      }
+
       mapRef.current.fitBounds(leafletBounds, {
-        maxZoom: 6,
+        maxZoom: marker ? 8 : 6,
         padding: [24, 24],
       });
     }
@@ -124,7 +156,7 @@ export function OnboardingCountryMap({ countryName }: OnboardingCountryMapProps)
     return () => {
       isMounted = false;
     };
-  }, [countryName, mapReady]);
+  }, [bounds, countryName, mapReady, marker]);
 
   return (
     <div className="onboarding-osm-card">

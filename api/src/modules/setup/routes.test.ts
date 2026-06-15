@@ -91,6 +91,17 @@ test("POST /setup/complete completes onboarding for the signed-in admin", async 
       assert.deepEqual(input, {
         countryCode: "GB",
         countryName: "United Kingdom",
+        geographies: [
+          {
+            id: "geo-gb-england-london",
+            level: "geo_level_2",
+            levelLabel: "district",
+            name: "London",
+            parentId: "geo-gb-england",
+            path: "/united-kingdom/england/london",
+            sortOrder: 10,
+          },
+        ],
         geographyLevelLabel: "county",
         hazardIds: ["hazard-extreme-heat"],
       } satisfies CompleteSetupInput);
@@ -132,6 +143,17 @@ test("POST /setup/complete completes onboarding for the signed-in admin", async 
     payload: {
       countryCode: "GB",
       countryName: "United Kingdom",
+      geographies: [
+        {
+          id: "geo-gb-england-london",
+          level: "geo_level_2",
+          levelLabel: "district",
+          name: "London",
+          parentId: "geo-gb-england",
+          path: "/united-kingdom/england/london",
+          sortOrder: 10,
+        },
+      ],
       geographyLevelLabel: "county",
       hazardIds: ["hazard-extreme-heat"],
     },

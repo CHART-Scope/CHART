@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 
-import { count, eq, sql } from "drizzle-orm";
+import { count, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../../db/client.js";
 import {
   countryGeoConfig,
   geographies,
   setupState,
+  type GeographyLevelValue,
   type SetupSelectedHazard,
   workspaceMembers,
   workspaces,
@@ -20,11 +21,18 @@ import type {
   BootstrapSetupInput,
   BootstrapSetupResult,
   CompleteSetupInput,
+  SetupGeographyInput,
   SetupOptions,
   SetupStatus,
 } from "./types.js";
 
 const setupId = "default";
+const geographyLevelOrder: GeographyLevelValue[] = [
+  "country",
+  "geo_level_1",
+  "geo_level_2",
+  "geo_level_3",
+];
 
 export interface SetupService {
   getStatus(): Promise<SetupStatus>;
@@ -60,18 +68,23 @@ export function createSetupService(): SetupService {
       const adminInput = normalizeAdminInput(input.admin);
       const countrySlug = normalizeSlug(setupInput.countryName);
       const groupPath = `/${countrySlug}`;
+      const groupPaths =
+        setupInput.geographies.length > 0
+          ? uniqueValues(setupInput.geographies.map((geography) => geography.path))
+          : [groupPath];
       const adminUser = await createBootstrapAdminUser({
         ...adminInput,
-        groupPath,
+        groupPaths,
       });
+      const activeGeography = setupInput.geographies[0];
       const nextSetupStatus = await completeSetupForContext(setupInput, {
         userId: adminUser.userId,
         username: adminUser.username,
         email: adminUser.email,
         roles: ["chart_admin", "content_editor"],
-        geographyScopes: [groupPath],
-        activeGeographyId: groupPath,
-        geographyLevel: "country",
+        geographyScopes: groupPaths,
+        activeGeographyId: activeGeography?.path ?? groupPath,
+        geographyLevel: activeGeography?.level ?? "country",
       });
 
       return {
@@ -144,6 +157,7 @@ async function completeSetupForContext(
   const countryName = input.countryName.trim();
   const geographyLevelLabel = input.geographyLevelLabel.trim();
   const hazardIds = uniqueValues(input.hazardIds);
+  const setupGeographies = input.geographies ?? [];
 
   if (!countryCode || !countryName || !geographyLevelLabel) {
     throw new SetupError("SETUP_COUNTRY_REQUIRED", 400);
@@ -162,20 +176,9 @@ async function completeSetupForContext(
   await db.transaction(async (tx) => {
     await tx
       .insert(countryGeoConfig)
-      .values([
-        {
-          countryCode,
-          levelKey: "country",
-          levelLabel: "Country",
-          sortOrder: 0,
-        },
-        {
-          countryCode,
-          levelKey: "geo_level_1",
-          levelLabel: geographyLevelLabel,
-          sortOrder: 10,
-        },
-      ])
+      .values(
+        buildCountryGeoConfigRows(countryCode, geographyLevelLabel, setupGeographies),
+      )
       .onConflictDoUpdate({
         target: [countryGeoConfig.countryCode, countryGeoConfig.levelKey],
         set: {
@@ -186,9 +189,8 @@ async function completeSetupForContext(
         },
       });
 
-    await tx
-      .insert(geographies)
-      .values({
+    await upsertGeographyRows([
+      {
         id: rootGeographyId,
         countryCode,
         level: "country",
@@ -196,19 +198,41 @@ async function completeSetupForContext(
         name: countryName,
         path: `/${countrySlug}`,
         sortOrder: 0,
-      })
-      .onConflictDoUpdate({
-        target: geographies.id,
-        set: {
-          countryCode: sql`excluded.country_code`,
-          level: sql`excluded.level`,
-          levelLabel: sql`excluded.level_label`,
-          name: sql`excluded.name`,
-          path: sql`excluded.path`,
-          sortOrder: sql`excluded.sort_order`,
-          updatedAt: sql`now()`,
-        },
-      });
+      },
+      ...setupGeographies.map((geography) => ({
+        id: geography.id,
+        countryCode,
+        level: geography.level,
+        levelLabel: geography.levelLabel,
+        name: geography.name,
+        parentId: geography.parentId,
+        path: geography.path,
+        sortOrder: geography.sortOrder ?? 0,
+      })),
+    ]);
+
+    async function upsertGeographyRows(rows: (typeof geographies.$inferInsert)[]) {
+      if (rows.length === 0) {
+        return;
+      }
+
+      await tx
+        .insert(geographies)
+        .values(rows)
+        .onConflictDoUpdate({
+          target: geographies.id,
+          set: {
+            countryCode: sql`excluded.country_code`,
+            level: sql`excluded.level`,
+            levelLabel: sql`excluded.level_label`,
+            name: sql`excluded.name`,
+            parentId: sql`excluded.parent_id`,
+            path: sql`excluded.path`,
+            sortOrder: sql`excluded.sort_order`,
+            updatedAt: sql`now()`,
+          },
+        });
+    }
   });
 
   const rootGeographyRows = await db
@@ -216,6 +240,22 @@ async function completeSetupForContext(
     .from(geographies)
     .where(eq(geographies.id, rootGeographyId))
     .limit(1);
+  const selectedGeographyRows =
+    setupGeographies.length > 0
+      ? await db
+          .select()
+          .from(geographies)
+          .where(
+            inArray(
+              geographies.id,
+              setupGeographies.map((geography) => geography.id),
+            ),
+          )
+      : [];
+  const userGeographyRows =
+    selectedGeographyRows.length > 0 ? selectedGeographyRows : rootGeographyRows;
+  const workspaceGeographyId =
+    getDeepestGeographyId(selectedGeographyRows) ?? rootGeographyId;
 
   await persistUserProjection({
     userId: context.userId,
@@ -223,7 +263,7 @@ async function completeSetupForContext(
     email: context.email,
     displayName: context.username,
     roles: context.roles,
-    geographies: rootGeographyRows,
+    geographies: userGeographyRows,
     source: "onboarding",
   });
 
@@ -235,7 +275,7 @@ async function completeSetupForContext(
         name: `${countryName} CHART setup`,
         planningCycle: new Date().getUTCFullYear().toString(),
         status: "active",
-        geographyId: rootGeographyId,
+        geographyId: workspaceGeographyId,
         createdByUserId: context.userId,
         ownerUserId: context.userId,
       })
@@ -340,19 +380,95 @@ async function readWorkspaceMemberCount() {
   return Number(rows[0]?.total ?? 0);
 }
 
+function buildCountryGeoConfigRows(
+  countryCode: string,
+  geographyLevelLabel: string,
+  setupGeographies: SetupGeographyInput[],
+) {
+  const levelLabels = new Map<GeographyLevelValue, string>([
+    ["country", "Country"],
+    ["geo_level_1", geographyLevelLabel],
+  ]);
+
+  for (const geography of setupGeographies) {
+    levelLabels.set(geography.level, geography.levelLabel);
+  }
+
+  return [...levelLabels.entries()]
+    .sort(
+      ([firstLevel], [secondLevel]) =>
+        geographyLevelOrder.indexOf(firstLevel) -
+        geographyLevelOrder.indexOf(secondLevel),
+    )
+    .map(([levelKey, levelLabel], index) => ({
+      countryCode,
+      levelKey,
+      levelLabel,
+      sortOrder: index * 10,
+    }));
+}
+
+function getDeepestGeographyId(rows: (typeof geographies.$inferSelect)[]) {
+  return [...rows].sort(
+    (first, second) =>
+      geographyLevelOrder.indexOf(second.level) -
+        geographyLevelOrder.indexOf(first.level) || first.sortOrder - second.sortOrder,
+  )[0]?.id;
+}
+
 function assertSetupAdmin(context: CurrentUserContext) {
   if (!context.roles.includes("chart_admin")) {
     throw new SetupError("SETUP_FORBIDDEN", 403);
   }
 }
 
-function normalizeSetupInput(input: CompleteSetupInput): CompleteSetupInput {
+function normalizeSetupInput(input: CompleteSetupInput): CompleteSetupInput & {
+  geographies: SetupGeographyInput[];
+} {
   return {
     countryCode: input.countryCode.trim().toUpperCase(),
     countryName: input.countryName.trim(),
+    focusAreaIds: uniqueValues(input.focusAreaIds ?? []),
+    geographies: normalizeSetupGeographies(input.geographies ?? []),
     geographyLevelLabel: input.geographyLevelLabel.trim(),
     hazardIds: uniqueValues(input.hazardIds),
+    healthAreaIds: uniqueValues(input.healthAreaIds ?? []),
   };
+}
+
+function normalizeSetupGeographies(input: SetupGeographyInput[]) {
+  const normalizedRows = input
+    .map((geography) => ({
+      id: geography.id.trim(),
+      level: geography.level,
+      levelLabel: geography.levelLabel.trim(),
+      name: geography.name.trim(),
+      parentId: geography.parentId?.trim(),
+      path: normalizeGeographyPath(geography.path),
+      sortOrder: geography.sortOrder,
+    }))
+    .filter((geography) => geography.level !== "country");
+
+  for (const geography of normalizedRows) {
+    if (
+      !geography.id ||
+      !geography.name ||
+      !geography.levelLabel ||
+      !geography.path.startsWith("/") ||
+      !geographyLevelOrder.includes(geography.level)
+    ) {
+      throw new SetupError("SETUP_GEOGRAPHY_INVALID", 400);
+    }
+  }
+
+  return [
+    ...new Map(normalizedRows.map((geography) => [geography.id, geography])).values(),
+  ].sort(
+    (first, second) =>
+      geographyLevelOrder.indexOf(first.level) -
+        geographyLevelOrder.indexOf(second.level) ||
+      (first.sortOrder ?? 0) - (second.sortOrder ?? 0),
+  );
 }
 
 function normalizeAdminInput(input: BootstrapSetupInput["admin"]) {
@@ -377,6 +493,15 @@ function normalizeSlug(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function normalizeGeographyPath(value: string) {
+  const parts = value
+    .split("/")
+    .map((part) => normalizeSlug(part))
+    .filter(Boolean);
+
+  return `/${parts.join("/")}`;
 }
 
 async function listSetupHazards(): Promise<SetupSelectedHazard[]> {
