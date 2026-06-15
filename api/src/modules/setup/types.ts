@@ -25,8 +25,21 @@ export type SetupOptions = {
 export type CompleteSetupInput = {
   countryCode: string;
   countryName: string;
+  focusAreaIds?: string[];
+  geographies?: SetupGeographyInput[];
   geographyLevelLabel: string;
   hazardIds: string[];
+  healthAreaIds?: string[];
+};
+
+export type SetupGeographyInput = {
+  id: string;
+  level: "country" | "geo_level_1" | "geo_level_2" | "geo_level_3";
+  levelLabel: string;
+  name: string;
+  parentId?: string;
+  path: string;
+  sortOrder?: number;
 };
 
 export type BootstrapSetupInput = CompleteSetupInput & {
@@ -50,6 +63,7 @@ export type BootstrapSetupResult = {
 export type SetupErrorCode =
   | "SETUP_FORBIDDEN"
   | "SETUP_COUNTRY_REQUIRED"
+  | "SETUP_GEOGRAPHY_INVALID"
   | "SETUP_HAZARD_REQUIRED"
   | "SETUP_HAZARD_INVALID"
   | "SETUP_BOOTSTRAP_LOCKED"
@@ -84,6 +98,23 @@ export const setupHazardSchema = {
   properties: {
     id: { type: "string" },
     label: { type: "string" },
+  },
+} as const;
+
+const setupGeographySchema = {
+  type: "object",
+  required: ["id", "level", "levelLabel", "name", "path"],
+  properties: {
+    id: { type: "string", minLength: 2 },
+    level: {
+      type: "string",
+      enum: ["country", "geo_level_1", "geo_level_2", "geo_level_3"],
+    },
+    levelLabel: { type: "string", minLength: 2 },
+    name: { type: "string", minLength: 1 },
+    parentId: { type: "string", minLength: 2 },
+    path: { type: "string", minLength: 2 },
+    sortOrder: { type: "number" },
   },
 } as const;
 
@@ -122,10 +153,22 @@ export const completeSetupBodySchema = {
   properties: {
     countryCode: { type: "string", minLength: 2 },
     countryName: { type: "string", minLength: 2 },
+    focusAreaIds: {
+      type: "array",
+      items: { type: "string" },
+    },
+    geographies: {
+      type: "array",
+      items: setupGeographySchema,
+    },
     geographyLevelLabel: { type: "string", minLength: 2 },
     hazardIds: {
       type: "array",
       minItems: 1,
+      items: { type: "string" },
+    },
+    healthAreaIds: {
+      type: "array",
       items: { type: "string" },
     },
   },

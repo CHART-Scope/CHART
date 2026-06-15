@@ -8,7 +8,7 @@ type KeycloakUserInput = {
   email: string;
   username: string;
   password: string;
-  groupPath: string;
+  groupPaths: string[];
 };
 
 export type CreatedAdminUser = {
@@ -24,7 +24,7 @@ export async function createBootstrapAdminUser(input: KeycloakUserInput) {
       email: input.email,
       username: input.username,
       password: input.password,
-      groupPaths: [input.groupPath],
+      groupPaths: input.groupPaths,
       roles: ["chart_admin", "content_editor"],
     });
   } catch (error) {
