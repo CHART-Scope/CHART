@@ -19,7 +19,9 @@ type OnboardingIconId =
   | "infectious-disease"
   | "nutrition"
   | "health-facilities"
-  | "emergency-preparedness";
+  | "emergency-preparedness"
+  | "heat-stroke"
+  | "cardiovascular-disease";
 
 type OnboardingIconProps = Omit<
   ImgHTMLAttributes<HTMLImageElement>,
@@ -67,6 +69,11 @@ const iconSources: Record<OnboardingIconId, string> = {
   other: new URL("./assets/icons/other.png", import.meta.url).toString(),
   "water-sanitation": new URL(
     "./assets/icons/water-sanitation.png",
+    import.meta.url,
+  ).toString(),
+  "heat-stroke": new URL("./assets/icons/extreme-heat.png", import.meta.url).toString(),
+  "cardiovascular-disease": new URL(
+    "./assets/icons/health.png",
     import.meta.url,
   ).toString(),
 };
