@@ -119,6 +119,8 @@ const healthDevelopmentOptions = [
   { id: "nutrition", label: "Nutrition" },
   { id: "health-facilities", label: "Health facilities" },
   { id: "emergency-preparedness", label: "Emergency preparedness" },
+  { id: "heat-stroke", label: "Heat stroke prediction" },
+  { id: "cardiovascular-disease", label: "Cardiovascular disease prediction" },
 ] as const;
 
 const geographyLevelOrder: OnboardingGeographyLevel[] = [
