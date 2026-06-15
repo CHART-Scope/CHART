@@ -15,9 +15,13 @@ const config: StorybookConfig = {
       entryFileNames: "assets/[name].js",
     };
     const existingOutput = config.build?.rollupOptions?.output;
+    const base = process.env.STORYBOOK_BASE_URL
+      ? `${process.env.STORYBOOK_BASE_URL}/`
+      : "/";
 
     return {
       ...config,
+      base,
       build: {
         ...config.build,
         rollupOptions: {
