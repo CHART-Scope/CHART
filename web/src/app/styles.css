@@ -2933,6 +2933,19 @@ button {
   text-transform: uppercase;
 }
 
+.onboarding-readonly-change {
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--green-deep);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-decoration: underline;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 .onboarding-focus-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
