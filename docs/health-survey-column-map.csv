@@ -1,0 +1,38 @@
+issue,normalized_field,record_family,source_column_candidates,type,required_for,required,derivation_or_notes,status
+#148,country,all,"dataset metadata",string,source_traceability,yes,"Use dataset country, not respondent-entered text.",draft
+#148,survey_id,all,"dataset metadata",string,source_traceability,yes,"Stable identifier such as India DHS 2019-21 / Kenya DHS 2022.",draft
+#148,survey_year,all,"dataset metadata; v007",integer,source_traceability,yes,"Survey/wave year. For birth-level modeling, birth date fields are separate.",draft_needs_r_confirmation
+#148,record_id,child_or_birth,"caseid + bidx; v001 + v002 + v003 + bidx",string,row_identity,yes,"Must be deterministic but must not expose respondent IDs in published fixtures.",draft_needs_r_confirmation
+#148,cluster_id,child_or_birth,"v001",integer,climate_join,yes,"DHS cluster ID; should join to GPS file through DHSCLUST after country/survey checks.",draft_needs_r_confirmation
+#148,household_id,child_or_birth,"v002",integer,row_identity,no,"Useful for uniqueness checks. Do not publish respondent-level IDs.",draft_needs_r_confirmation
+#148,respondent_id,child_or_birth,"v003",integer,row_identity,no,"Useful for uniqueness checks. Do not publish respondent-level IDs.",draft_needs_r_confirmation
+#148,child_index,child_or_birth,"bidx; bord",integer,row_identity,yes,"Birth/child index inside mother's birth history. Exact field depends on BR/KR file.",draft_needs_r_confirmation
+#148,source_file_family,all,"BR; KR; IR; GE",string,source_traceability,yes,"Record which DHS/NFHS recode family produced each field.",draft
+#148,admin1_code,child_or_birth,"v024; sstate; ADM1DHS",string,geography,no,"Administrative region/state/province. Exact India NFHS state variable may differ.",draft_needs_r_confirmation
+#148,admin1_name,gps,"DHSREGNA; ADM1NAME",string,geography,no,"Use GPS/admin metadata when available; verify country-specific naming.",draft_needs_r_confirmation
+#148,urban_rural,child_or_birth,"v025",category,covariate,no,"Residence category.",draft_needs_r_confirmation
+#148,latitude_displaced,gps,"LATNUM",float,climate_join,conditional,"Restricted GPS cluster latitude; displaced for privacy and not official facility coordinates.",draft_needs_access_confirmation
+#148,longitude_displaced,gps,"LONGNUM",float,climate_join,conditional,"Restricted GPS cluster longitude; displaced for privacy and not official facility coordinates.",draft_needs_access_confirmation
+#148,climate_join_key,derived,"cluster_id; admin1_code; admin2_code",string,climate_join,yes,"Decide cluster-level vs admin-level join with MaQueens/Satish before implementation.",blocked_pending_model_decision
+#148,birth_month,child_or_birth,"b1",integer,outcome_timing,yes,"Month of child's birth.",draft_needs_r_confirmation
+#148,birth_year,child_or_birth,"b2",integer,outcome_timing,yes,"Year of child's birth.",draft_needs_r_confirmation
+#148,birth_cmc,child_or_birth,"b3",integer,outcome_timing,yes,"Century month code for birth date; likely easiest for pregnancy/exposure windows.",draft_needs_r_confirmation
+#148,child_sex,child_or_birth,"b4",category,covariate,no,"Used in MaQueens models if confirmed.",draft_needs_r_confirmation
+#148,child_alive,child_or_birth,"b5",boolean,mortality_extension,conditional,"Required only if infant/neonatal mortality stays in scope.",blocked_pending_outcome_decision
+#148,age_at_death_raw,child_or_birth,"b6; b7",mixed,mortality_extension,conditional,"Only for mortality outcome. DHS age-at-death encoding must be confirmed from R workflow/recode docs.",blocked_pending_outcome_decision
+#148,birth_weight_g,child_or_birth,"m19; m19_1; country-specific birthweight variable",integer,low_birth_weight,yes,"Measured/reported birth weight in grams. Exact source variable must be confirmed from MaQueens workflow.",draft_needs_r_confirmation
+#148,low_birth_weight,derived,"birth_weight_g",boolean,low_birth_weight,yes,"Derive as birth_weight_g < 2500 after excluding missing/not-weighed/special codes.",draft_needs_filter_confirmation
+#148,birth_weight_status,derived,"m19 special codes; source labels",category,quality_flags,yes,"Flag valid, missing, not weighed, don't know, implausible, or excluded records.",draft_needs_filter_confirmation
+#148,mother_age,individual_or_child,"v012; v013",integer,covariate,no,"Mother's age or age band. Confirm exact model covariates.",draft_needs_r_confirmation
+#148,mother_education,individual_or_child,"v106; v149",category,covariate,no,"Maternal education variable. Confirm exact model covariates.",draft_needs_r_confirmation
+#148,wealth_index,individual_or_child,"v190",category,covariate,no,"Household wealth index. Confirm exact model covariates.",draft_needs_r_confirmation
+#148,sample_weight,child_or_birth,"v005",float,survey_design,conditional,"Usually divide by 1,000,000 for analysis. Confirm whether model uses weights.",draft_needs_r_confirmation
+#148,primary_sampling_unit,child_or_birth,"v021; v001",integer,survey_design,conditional,"Needed if model uses complex survey design.",draft_needs_r_confirmation
+#148,strata,child_or_birth,"v022; v023",integer,survey_design,conditional,"Needed if model uses complex survey design.",draft_needs_r_confirmation
+#148,interview_cmc,child_or_birth,"v008",integer,recency_filters,no,"May be used for age/filter checks.",draft_needs_r_confirmation
+#148,exposure_start_cmc,derived,"birth_cmc",integer,climate_join,conditional,"Derived pregnancy exposure window start if low birth weight model uses trimester/month lags.",blocked_pending_model_decision
+#148,exposure_end_cmc,derived,"birth_cmc",integer,climate_join,conditional,"Derived pregnancy exposure window end if low birth weight model uses trimester/month lags.",blocked_pending_model_decision
+#148,exposure_months,derived,"birth_cmc",array,climate_join,conditional,"List of month keys to join against climate metrics. Exact lag structure depends on MaQueens workflow.",blocked_pending_model_decision
+#148,denominator_population,aggregate,"birth count; eligible births",integer,aggregate_outputs,conditional,"Only needed for monthly/admin aggregate outputs; individual-level extraction may not include this row field.",draft_needs_output_shape_confirmation
+#148,data_status,derived,"access status; extraction flags",category,quality_flags,yes,"Example values: extracted, blocked_missing_source, blocked_unconfirmed_column, excluded_by_filter.",draft
+#148,quality_flags,derived,"missingness; special codes; join checks",array,quality_flags,yes,"Must make missing/invalid fields visible rather than silently dropping them.",draft
