@@ -42,3 +42,4 @@ web/public/uploads/
 .DS_Store
 .claude
 build-storybook.log
+.backlog
