@@ -12,6 +12,7 @@ type CountryBounds = {
 type OnboardingCountryMapProps = {
   bounds?: CountryBounds | null;
   countryName: string;
+  geographyLabel?: string;
   marker?: {
     label: string;
     lat: number;
@@ -31,6 +32,7 @@ const mapAttribution = "&copy; OpenStreetMap contributors";
 export function OnboardingCountryMap({
   bounds = null,
   countryName,
+  geographyLabel = "",
   marker = null,
 }: OnboardingCountryMapProps) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
@@ -101,9 +103,11 @@ export function OnboardingCountryMap({
         import("leaflet"),
         bounds
           ? Promise.resolve(bounds)
-          : countryName.trim()
-            ? loadCountryBounds(countryName)
-            : Promise.resolve(null),
+          : geographyLabel.trim()
+            ? loadGeographyBounds(geographyLabel, countryName)
+            : countryName.trim()
+              ? loadCountryBounds(countryName)
+              : Promise.resolve(null),
       ]);
 
       if (!isMounted || !loadedBounds || !mapRef.current || !layerRef.current) {
@@ -146,7 +150,7 @@ export function OnboardingCountryMap({
       }
 
       mapRef.current.fitBounds(leafletBounds, {
-        maxZoom: marker ? 8 : 6,
+        maxZoom: geographyLabel ? 10 : 6,
         padding: [24, 24],
       });
     }
@@ -156,13 +160,33 @@ export function OnboardingCountryMap({
     return () => {
       isMounted = false;
     };
-  }, [bounds, countryName, mapReady, marker]);
+  }, [bounds, countryName, geographyLabel, mapReady, marker]);
 
   return (
     <div className="onboarding-osm-card">
       <div ref={mapElementRef} className="onboarding-osm-map" />
     </div>
   );
+}
+
+async function loadGeographyBounds(
+  geographyName: string,
+  countryName: string,
+): Promise<CountryBounds | null> {
+  const q = countryName ? `${geographyName}, ${countryName}` : geographyName;
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/search?${new URLSearchParams({ q, format: "jsonv2", limit: "1" })}`,
+  );
+  if (!response.ok) return null;
+  const [result] = (await response.json()) as NominatimCountryResult[];
+  const box = result?.boundingbox;
+  if (!box) return null;
+  return {
+    latMin: Number(box[0]),
+    latMax: Number(box[1]),
+    lonMin: Number(box[2]),
+    lonMax: Number(box[3]),
+  };
 }
 
 async function loadCountryBounds(countryName: string): Promise<CountryBounds | null> {

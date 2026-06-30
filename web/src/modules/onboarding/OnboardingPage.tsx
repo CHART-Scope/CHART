@@ -312,13 +312,14 @@ export function OnboardingPage({
   const mapBounds =
     primarySelectedGeography?.bounds ??
     selectedParentGeography?.bounds ??
-    selectedCountryConfig?.bounds ??
     null;
   const mapMarker =
     primarySelectedGeography?.marker ??
     selectedParentGeography?.marker ??
     selectedCountryConfig?.marker ??
     null;
+  const mapGeographyLabel =
+    selectedGeographies[0]?.label ?? selectedParentGeography?.label ?? "";
   const hazardOptions = options?.hazards ?? [];
   const selectedHazardLabels = hazardOptions
     .filter((hazard) => selectedHazardIds.includes(hazard.id))
@@ -747,7 +748,7 @@ export function OnboardingPage({
                       }))}
                       placeholder={
                         selectedCountry
-                          ? "Choose the level you work at"
+                          ? "Choose the administrative level you work at"
                           : "Select a country first"
                       }
                       value={selectedJurisdictionLevelId}
@@ -778,6 +779,11 @@ export function OnboardingPage({
                       onGeographyQueryChange={setGeographyQuery}
                       onGeographySelect={(geographyId) => {
                         setSelectedGeographyIds([geographyId]);
+                        setGeographyQuery("");
+                      }}
+                      onParentGeographyClear={() => {
+                        setSelectedParentGeographyId("");
+                        setSelectedGeographyIds([]);
                         setGeographyQuery("");
                       }}
                       onParentGeographyQueryChange={setParentGeographyQuery}
@@ -964,6 +970,7 @@ export function OnboardingPage({
                   <OnboardingCountryMap
                     bounds={mapBounds}
                     countryName={selectedCountry?.name ?? ""}
+                    geographyLabel={mapGeographyLabel}
                     marker={mapMarker}
                   />
                   <div className="onboarding-map-context">
@@ -1075,6 +1082,7 @@ function SpecificGeographySection({
   selectedParentGeographyId,
   onGeographyQueryChange,
   onGeographySelect,
+  onParentGeographyClear,
   onParentGeographyQueryChange,
   onParentGeographySelect,
 }: {
@@ -1089,6 +1097,7 @@ function SpecificGeographySection({
   selectedParentGeographyId: string;
   onGeographyQueryChange: (query: string) => void;
   onGeographySelect: (geographyId: string) => void;
+  onParentGeographyClear: () => void;
   onParentGeographyQueryChange: (query: string) => void;
   onParentGeographySelect: (geographyId: string) => void;
 }) {
@@ -1129,22 +1138,42 @@ function SpecificGeographySection({
       </div>
       <div
         className={
-          selectedJurisdictionLevel.parentLevelId
+          selectedJurisdictionLevel.parentLevelId && !selectedParentGeographyId
             ? "onboarding-geography-stack two-column"
             : "onboarding-geography-stack"
         }
       >
         {selectedJurisdictionLevel.parentLevelId ? (
-          <SearchableSelect
-            emptyLabel={`No matching ${parentLevelLabel.toLowerCase()}.`}
-            label={parentLevelLabel}
-            options={parentGeographyOptions.map(toSearchableOption)}
-            placeholder={`Search ${parentLevelLabel.toLowerCase()}`}
-            query={parentGeographyQuery}
-            selectedId={selectedParentGeographyId}
-            onQueryChange={onParentGeographyQueryChange}
-            onSelect={onParentGeographySelect}
-          />
+          selectedParentGeographyId ? (
+            <div className="ui-searchable-select">
+              <span className="ui-text-input-label">{parentLevelLabel}</span>
+              <div className="onboarding-readonly-value">
+                <strong>
+                  {parentGeographyOptions.find(
+                    (o) => o.id === selectedParentGeographyId,
+                  )?.label ?? selectedParentGeographyId}
+                </strong>
+                <button
+                  className="onboarding-readonly-change"
+                  type="button"
+                  onClick={onParentGeographyClear}
+                >
+                  Change
+                </button>
+              </div>
+            </div>
+          ) : (
+            <SearchableSelect
+              emptyLabel={`No matching ${parentLevelLabel.toLowerCase()}.`}
+              label={parentLevelLabel}
+              options={parentGeographyOptions.map(toSearchableOption)}
+              placeholder={`Search ${parentLevelLabel.toLowerCase()}`}
+              query={parentGeographyQuery}
+              selectedId={selectedParentGeographyId}
+              onQueryChange={onParentGeographyQueryChange}
+              onSelect={onParentGeographySelect}
+            />
+          )
         ) : null}
         <SearchableSelect
           emptyLabel={

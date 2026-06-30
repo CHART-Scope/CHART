@@ -185,8 +185,8 @@ export const countryOnboardingConfigs: Record<string, CountryOnboardingConfig> =
       { id: "country", label: "National", pluralLabel: "National" },
       {
         id: "geo_level_1",
-        label: "State / Union Territory",
-        pluralLabel: "States / UTs",
+        label: "State",
+        pluralLabel: "States",
       },
       {
         id: "geo_level_2",
@@ -208,7 +208,7 @@ export const countryOnboardingConfigs: Record<string, CountryOnboardingConfig> =
       ...createGeographies({
         countryCode: "in",
         level: "geo_level_1",
-        levelLabel: "State / Union Territory",
+        levelLabel: "State",
         names: indiaStateNames,
       }).map((geography) =>
         geography.id === "in-madhya-pradesh"
