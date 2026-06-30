@@ -6,7 +6,7 @@ import "./styles.css";
 
 export const metadata: Metadata = {
   title: "CHART",
-  description: "Climate Health Adaptation Resource Toolkit",
+  description: "Climate x Health Adaptation and Resilience Tool",
 };
 
 export default function RootLayout({ children }: { children?: React.ReactNode }) {
