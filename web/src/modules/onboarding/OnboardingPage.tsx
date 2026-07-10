@@ -310,9 +310,7 @@ export function OnboardingPage({
   const primarySelectedGeography =
     selectedGeographies[0] ?? selectedParentGeography ?? countryGeography;
   const mapBounds =
-    primarySelectedGeography?.bounds ??
-    selectedParentGeography?.bounds ??
-    null;
+    primarySelectedGeography?.bounds ?? selectedParentGeography?.bounds ?? null;
   const mapMarker =
     primarySelectedGeography?.marker ??
     selectedParentGeography?.marker ??
