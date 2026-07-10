@@ -5,7 +5,7 @@ ARG TARGETARCH
 WORKDIR /app
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates curl libcurl4-openssl-dev libsodium-dev unzip \
+  && apt-get install -y --no-install-recommends ca-certificates curl libcurl4-openssl-dev libicu-dev libsodium-dev unzip \
   && case "$TARGETARCH" in \
     amd64) aws_cli_arch=x86_64 ;; \
     arm64) aws_cli_arch=aarch64 ;; \
