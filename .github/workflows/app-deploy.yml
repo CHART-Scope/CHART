@@ -12,6 +12,7 @@ on:
       - "infra/**"
       - "package.json"
       - "package-lock.json"
+      - "pipelines/LBW_demo/**"
       - "web/**"
   workflow_dispatch:
     inputs:
