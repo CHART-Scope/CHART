@@ -121,6 +121,7 @@ jobs:
           host: ${{ env.AWS_APP_HOST }}
           username: ${{ env.AWS_APP_USER }}
           key: ${{ env.AWS_APP_SSH_KEY }}
+          command_timeout: 30m
           script: |
             set -euo pipefail
 
