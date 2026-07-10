@@ -5,7 +5,7 @@ ARG TARGETARCH
 WORKDIR /app
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates curl libcurl4-openssl-dev libicu-dev libsodium-dev unzip \
+  && apt-get install -y --no-install-recommends ca-certificates curl libcurl4-openssl-dev libicu-dev libsodium-dev unzip zlib1g-dev \
   && case "$TARGETARCH" in \
     amd64) aws_cli_arch=x86_64 ;; \
     arm64) aws_cli_arch=aarch64 ;; \
@@ -16,7 +16,7 @@ RUN apt-get update \
   && /tmp/aws/install \
   && rm -rf /tmp/aws /tmp/awscliv2.zip /var/lib/apt/lists/*
 
-RUN R -q -e 'install.packages(c("dlnm", "plumber", "jsonlite"), repos = "https://cloud.r-project.org")'
+RUN R -q -e 'packages <- c("dlnm", "plumber", "jsonlite"); install.packages(packages, repos = "https://cloud.r-project.org"); if (!all(vapply(packages, requireNamespace, logical(1), quietly = TRUE))) stop("Required R packages failed to install")'
 
 COPY inference/ ./inference/
 COPY web/ ./web/
