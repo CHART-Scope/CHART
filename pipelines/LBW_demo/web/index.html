@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LBW temperature-association demo — Madhya Pradesh</title>
+<title>LBW temperature association | Madhya Pradesh</title>
 <style>
   :root { --bg:#f7f6f2; --ink:#1c1c1e; --muted:#6b6b70; --accent:#0080aa; --hot:#b42318; --cool:#0071b1; --warn:#9a6700; --card:#fff; --line:#e6e2d9; }
   * { box-sizing:border-box }
@@ -21,6 +21,12 @@
   .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .lag-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
   .lag-row label { text-transform:none; letter-spacing:normal; margin-top:0; white-space:nowrap; }
+  .temperature-entry { margin-top:8px; padding:13px; border:1px solid #cae2e8; border-radius:8px; background:#f4fafb; }
+  .temperature-entry p { margin:0 0 9px; color:#42626a; font-size:12px; }
+  .temperature-quick-fill { display:flex; flex-wrap:wrap; gap:7px; }
+  .temperature-chip { border:1px solid #92bec9; border-radius:999px; padding:6px 11px; background:#fff; color:#075d75; font:600 13px/1 inherit; cursor:pointer; }
+  .temperature-chip:hover, .temperature-chip:focus-visible, .temperature-chip[aria-pressed="true"] { border-color:#007b9f; background:#007b9f; color:#fff; outline:none; }
+  .temperature-reset { border:0; padding:5px 2px; background:transparent; color:#42626a; font:inherit; font-size:12px; text-decoration:underline; cursor:pointer; }
   .radios { display:flex; gap:6px; }
   .radios label { flex:1; margin:0; padding:8px 10px; border:1px solid var(--line); border-radius:6px; text-align:center; cursor:pointer; color:var(--ink); text-transform:none; letter-spacing:normal; }
   .radios input { display:none }
@@ -51,7 +57,7 @@
 </head>
 <body>
 <header>
-  <h1>Low birth weight &amp; temperature — Madhya Pradesh</h1>
+  <h1>Low birth weight and temperature | Madhya Pradesh</h1>
   <p>Assess a three-month maximum-temperature profile with model <code id="model-file">…</code></p>
 </header>
 
@@ -89,6 +95,16 @@
       <div><label for="lag0">Latest</label><input id="lag0" type="number" step="0.1" inputmode="decimal" placeholder="e.g. 37.2"></div>
       <div><label for="lag1">Middle</label><input id="lag1" type="number" step="0.1" inputmode="decimal" placeholder="e.g. 36.8"></div>
       <div><label for="lag2">Earliest</label><input id="lag2" type="number" step="0.1" inputmode="decimal" placeholder="e.g. 35.4"></div>
+    </div>
+    <div class="temperature-entry">
+      <p><b>Quick-fill for testing:</b> choose a value to populate all three months, then adjust individual values as needed.</p>
+      <div class="temperature-quick-fill" aria-label="Quick-fill temperatures">
+        <button class="temperature-chip" type="button" data-temperature="25" aria-pressed="false">25 °C</button>
+        <button class="temperature-chip" type="button" data-temperature="30" aria-pressed="false">30 °C</button>
+        <button class="temperature-chip" type="button" data-temperature="35" aria-pressed="false">35 °C</button>
+        <button class="temperature-chip" type="button" data-temperature="40" aria-pressed="false">40 °C</button>
+        <button class="temperature-reset" type="button" id="clear-temperatures">Clear values</button>
+      </div>
     </div>
     <p class="hint">Enter the monthly mean of daily maximum 2 m temperature. Provide the three months in latest-to-earliest order.</p>
     <details>
@@ -151,6 +167,12 @@ function numericInput(id) {
   return value === "" ? null : Number(value);
 }
 
+function clearTemperatureChipSelection() {
+  document.querySelectorAll("[data-temperature]").forEach(button => {
+    button.setAttribute("aria-pressed", "false");
+  });
+}
+
 async function predict() {
   const tmaxLag = [numericInput("#lag0"), numericInput("#lag1"), numericInput("#lag2")];
   const ref = numericInput("#ref-temp");
@@ -211,6 +233,22 @@ function render(result) {
 }
 
 $("#go").onclick = predict;
+document.querySelectorAll("[data-temperature]").forEach(button => {
+  button.addEventListener("click", () => {
+    const temperature = button.dataset.temperature;
+    ["#lag0", "#lag1", "#lag2"].forEach(inputId => {
+      $(inputId).value = temperature;
+    });
+    clearTemperatureChipSelection();
+    button.setAttribute("aria-pressed", "true");
+  });
+});
+$("#clear-temperatures").onclick = () => {
+  ["#lag0", "#lag1", "#lag2"].forEach(inputId => {
+    $(inputId).value = "";
+  });
+  clearTemperatureChipSelection();
+};
 document.querySelectorAll("input[name=tri]").forEach(input => {
   input.addEventListener("change", updatePeriodHelp);
 });
