@@ -62,7 +62,7 @@
     </div>
 
     <div class="label-with-info">
-      <label for="division">Madhya Pradesh division</label>
+      <label for="division">Madhya Pradesh model area (division)</label>
       <span class="tooltip">
         <button type="button" class="info-button" aria-label="Explain divisions">i</button>
         <span class="tooltip-text">The model was fitted separately for each division. This selection chooses the matching division-specific temperature relationship.</span>
@@ -114,6 +114,8 @@
 
 <script>
 const $ = selector => document.querySelector(selector);
+const apiBasePath = window.location.pathname.replace(/\/ui\/?$/, "");
+const apiPath = path => `${apiBasePath}${path}`;
 
 const periodText = {
   1: "Last 3 months (T3): enter values from latest to earliest within this period.",
@@ -129,8 +131,8 @@ function updatePeriodHelp() {
 async function boot() {
   try {
     const [health, divisionData] = await Promise.all([
-      fetch("/health").then(response => response.json()),
-      fetch("/divisions").then(response => response.json()),
+      fetch(apiPath("/health")).then(response => response.json()),
+      fetch(apiPath("/divisions")).then(response => response.json()),
     ]);
     $("#model-file").textContent = health.model;
     divisionData.divisions.forEach(division => {
@@ -168,7 +170,7 @@ async function predict() {
   };
 
   try {
-    const response = await fetch("/predict", {
+    const response = await fetch(apiPath("/predict"), {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(body)
