@@ -37,6 +37,7 @@ data/
 outputs/
 web/public/uploads/
 .local/
+pipelines/LBW_demo/model/
 
 # OS files
 .DS_Store
