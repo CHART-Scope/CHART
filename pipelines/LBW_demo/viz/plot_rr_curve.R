@@ -16,9 +16,13 @@ script_dir <- function() {
   normalizePath(".", mustWork = FALSE)
 }
 demo_root  <- normalizePath(file.path(script_dir(), ".."), mustWork = FALSE)
-MODEL_PATH <- Sys.getenv("LBW_MODEL",
-                        unset = file.path(demo_root, "model",
-                                          "MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds"))
+MODEL_PATH <- Sys.getenv(
+  "LBW_MODEL_DIVISION",
+  unset = Sys.getenv(
+    "LBW_MODEL",
+    unset = file.path(demo_root, "model", "MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds")
+  )
+)
 
 args <- commandArgs(trailingOnly = TRUE)
 DIV  <- if (length(args) >= 1) args[1] else "Gwalior"

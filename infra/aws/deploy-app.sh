@@ -77,7 +77,14 @@ fi
 
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(random_secret)}"
 KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-$(random_secret)}"
-LBW_MODEL_S3_URI="${LBW_MODEL_S3_URI:-}"
+LBW_MODEL_DIVISION_S3_URI="${LBW_MODEL_DIVISION_S3_URI:-${LBW_MODEL_S3_URI:-}}"
+LBW_MODEL_STATE_S3_URI="${LBW_MODEL_STATE_S3_URI:-}"
+LBW_ENABLED=""
+if [ -n "$LBW_MODEL_DIVISION_S3_URI" ] && [ -n "$LBW_MODEL_STATE_S3_URI" ]; then
+  LBW_ENABLED=1
+elif [ -n "$LBW_MODEL_DIVISION_S3_URI" ]; then
+  echo "LBW container disabled: set LBW_MODEL_STATE_S3_URI alongside LBW_MODEL_DIVISION_S3_URI."
+fi
 
 cat >"$ENV_FILE" <<EOF
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
@@ -96,13 +103,15 @@ KEYCLOAK_WEB_CLIENT_ID=chart-web
 CHART_API_INTERNAL_URL=http://$API_CONTAINER:3200
 CHART_CORS_ORIGINS=http://$PUBLIC_HOST
 CHART_WEB_ORIGIN=http://$PUBLIC_HOST
-LBW_MODEL_S3_URI=$LBW_MODEL_S3_URI
+LBW_MODEL_DIVISION_S3_URI=$LBW_MODEL_DIVISION_S3_URI
+LBW_MODEL_STATE_S3_URI=$LBW_MODEL_STATE_S3_URI
+LBW_MODEL_S3_URI=$LBW_MODEL_DIVISION_S3_URI
 EOF
 
 chmod 600 "$ENV_FILE"
 
 LBW_NGINX_LOCATION=""
-if [ -n "$LBW_MODEL_S3_URI" ]; then
+if [ -n "$LBW_ENABLED" ]; then
   LBW_NGINX_LOCATION="$(cat <<EOF
     location = /lbw {
       return 302 /lbw/ui/;
@@ -190,7 +199,7 @@ chmod 600 "$PROXY_CONFIG_FILE"
 echo "Building CHART images before restarting live containers..."
 docker build -f "$APP_DIR/api/Dockerfile" -t "$API_IMAGE" "$APP_DIR"
 docker build -f "$APP_DIR/web/Dockerfile" -t "$WEB_IMAGE" "$APP_DIR"
-if [ -n "$LBW_MODEL_S3_URI" ]; then
+if [ -n "$LBW_ENABLED" ]; then
   docker build \
     -f "$APP_DIR/pipelines/LBW_demo/Dockerfile" \
     -t "$LBW_IMAGE" \
@@ -317,12 +326,13 @@ docker run -d \
   -e PORT=3100 \
   "$WEB_IMAGE" >/dev/null
 
-if [ -n "$LBW_MODEL_S3_URI" ]; then
+if [ -n "$LBW_ENABLED" ]; then
   docker run -d \
     --name "$LBW_CONTAINER" \
     --network "$NETWORK" \
     --restart unless-stopped \
-    -e LBW_MODEL_S3_URI="$LBW_MODEL_S3_URI" \
+    -e LBW_MODEL_DIVISION_S3_URI="$LBW_MODEL_DIVISION_S3_URI" \
+    -e LBW_MODEL_STATE_S3_URI="$LBW_MODEL_STATE_S3_URI" \
     -v chart-lbw-model:/models \
     "$LBW_IMAGE" >/dev/null
 fi
@@ -338,13 +348,13 @@ docker run -d \
 wait_for_command "CHART web" curl -fsS "http://127.0.0.1/"
 wait_for_command "CHART API through proxy" curl -fsS "http://127.0.0.1/chart-api/health"
 wait_for_command "Keycloak through proxy" curl -fsS "http://127.0.0.1/identity/realms/chart"
-if [ -n "$LBW_MODEL_S3_URI" ]; then
+if [ -n "$LBW_ENABLED" ]; then
   wait_for_command "LBW inference through proxy" curl -fsS "http://127.0.0.1/lbw/health"
 fi
 
 echo "CHART is running at http://$PUBLIC_HOST"
 echo "CHART API is running at http://$PUBLIC_HOST/chart-api"
 echo "CHART sign-in is running at http://$PUBLIC_HOST/identity"
-if [ -n "$LBW_MODEL_S3_URI" ]; then
+if [ -n "$LBW_ENABLED" ]; then
   echo "LBW inference is running at http://$PUBLIC_HOST/lbw/ui/"
 fi
