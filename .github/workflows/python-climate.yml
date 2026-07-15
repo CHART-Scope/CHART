@@ -1,0 +1,98 @@
+name: Python Climate
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/python-climate.yml"
+      - "backend/**"
+      - "orchestration/**"
+      - "pipelines/era5_heat/**"
+      - "docs/climate-api.md"
+      - "docs/data-pipeline.md"
+      - "docs/openapi/climate.json"
+      - "Makefile"
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - ".github/workflows/python-climate.yml"
+      - "backend/**"
+      - "orchestration/**"
+      - "pipelines/era5_heat/**"
+      - "docs/climate-api.md"
+      - "docs/data-pipeline.md"
+      - "docs/openapi/climate.json"
+      - "Makefile"
+  workflow_dispatch:
+
+concurrency:
+  group: chart-python-climate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Python climate workflow
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: chart
+          POSTGRES_USER: chart
+          POSTGRES_PASSWORD: chart
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chart -d chart"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://chart:chart@127.0.0.1:5432/chart
+      ERA5_USE_FIXTURE: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/pyproject.toml
+            orchestration/pyproject.toml
+            pipelines/era5_heat/pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e './backend[dev]' -e './pipelines/era5_heat[dev]' -e ./orchestration
+          python -m pip install black==25.1.0 mypy==1.19.1 ruff==0.14.10
+
+      - name: Check lint and formatting
+        run: |
+          ruff check backend orchestration
+          black --check backend orchestration
+
+      - name: Check types
+        run: mypy backend/chart orchestration/src --ignore-missing-imports --no-error-summary
+
+      - name: Apply Alembic migrations
+        working-directory: backend
+        run: alembic upgrade head
+
+      - name: Run tests
+        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests -q
+
+      - name: Validate Dagster definitions
+        run: python -c 'import dagster as dg; from chart_pipeline.definitions import defs; dg.Definitions.validate_loadable(defs)'
+
+      - name: Verify OpenAPI contract is in sync
+        run: |
+          python -m chart.api.export_openapi --output /tmp/climate-openapi.json
+          diff -u docs/openapi/climate.json /tmp/climate-openapi.json
