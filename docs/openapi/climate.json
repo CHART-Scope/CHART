@@ -2,10 +2,204 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CHART Climate API",
-    "description": "\nPython climate API for CHART.\n\nReads observed ERA5 monthly facts from Postgres (`district_climate`), previews whether\ndata is ready for a standard timeframe, and optionally bridges to the LBW inference\nservice for Madhya Pradesh.\n\n**Interactive docs**\n- Swagger UI: `/docs`\n- ReDoc: `/redoc`\n- OpenAPI JSON: `/openapi.json`\n\n**Related services**\n- LBW inference (R/Plumber): `LBW_SERVICE_URL`, default `http://127.0.0.1:8000`\n- CHART Fastify API (auth, workspaces): port `3200`, docs at `/api`\n",
+    "description": "\nPython climate API for CHART.\n\nReads observed ERA5 monthly facts from Postgres (`district_climate`), previews whether\ndata is ready for a standard timeframe, and optionally bridges to the LBW inference\nservice for Madhya Pradesh.\n\n**Interactive docs**\n- Swagger UI: `/docs`\n- ReDoc: `/redoc`\n- OpenAPI JSON: `/openapi.json`\n\n**Related services**\n- LBW inference (R/Plumber): `LBW_SERVICE_URL`, default `http://127.0.0.1:8000`\n- Keycloak: bearer-token identity provider for auth and prediction routes\n- CHART Fastify API (routes awaiting migration): port `3200`, docs at `/api`\n",
     "version": "0.1.0"
   },
   "paths": {
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Resolve the current user role and geography context",
+        "operationId": "get_current_user_auth_me_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "activeGeography",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Activegeography"
+            }
+          },
+          {
+            "name": "X-Chart-Active-Geography",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Chart-Active-Geography"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUserContext"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Keycloak token required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geography is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Auth configuration error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/geography-access": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Check whether the current user can read a geography path",
+        "operationId": "get_geography_access_auth_geography_access_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Geography"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeographyAccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Geography is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Keycloak token required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Geography is out of scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Auth configuration error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -168,6 +362,16 @@
               }
             }
           },
+          "401": {
+            "description": "Keycloak token required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "202": {
             "description": "Prediction queued in Dagster.",
             "content": {
@@ -188,7 +392,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/climate/prediction-requests/{request_id}": {
@@ -198,6 +407,11 @@
         ],
         "summary": "Read a queued or completed prediction request",
         "operationId": "get_prediction_request_status_climate_prediction_requests__request_id__get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "request_id",
@@ -216,6 +430,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PredictionRequestStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Keycloak token required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -246,6 +470,19 @@
   },
   "components": {
     "schemas": {
+      "AuthErrorResponse": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "AuthErrorResponse"
+      },
       "Availability": {
         "properties": {
           "location_slug": {
@@ -396,6 +633,73 @@
         ],
         "title": "Availability"
       },
+      "CurrentUserContext": {
+        "properties": {
+          "userId": {
+            "type": "string",
+            "title": "Userid"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "geographyScopes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Geographyscopes"
+          },
+          "activeGeographyId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activegeographyid"
+          },
+          "geographyLevel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geographylevel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "userId",
+          "username",
+          "roles",
+          "geographyScopes"
+        ],
+        "title": "CurrentUserContext"
+      },
       "ErrorResponse": {
         "properties": {
           "error": {
@@ -413,6 +717,29 @@
           "error"
         ],
         "title": "ErrorResponse"
+      },
+      "GeographyAccessResponse": {
+        "properties": {
+          "canAccess": {
+            "type": "boolean",
+            "title": "Canaccess"
+          },
+          "geographyPath": {
+            "type": "string",
+            "title": "Geographypath"
+          },
+          "userId": {
+            "type": "string",
+            "title": "Userid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "canAccess",
+          "geographyPath",
+          "userId"
+        ],
+        "title": "GeographyAccessResponse"
       },
       "HTTPValidationError": {
         "properties": {
@@ -1220,12 +1547,23 @@
         ],
         "title": "ValidationError"
       }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "description": "Keycloak access token",
+        "scheme": "bearer"
+      }
     }
   },
   "tags": [
     {
       "name": "system",
       "description": "Health and service metadata."
+    },
+    {
+      "name": "auth",
+      "description": "Keycloak user and geography access context."
     },
     {
       "name": "climate",

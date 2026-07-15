@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Iterator
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from chart.api.app import app
+from chart.auth.schemas import CurrentUserContext
+from chart.auth.service import require_current_user
 from chart.climate.schemas import (
     Availability,
     MonthValue,
@@ -20,6 +23,20 @@ from chart.climate.service import ClimateServiceError
 @pytest.fixture
 def client() -> TestClient:
     return TestClient(app)
+
+
+@pytest.fixture
+def authenticated_client() -> Iterator[TestClient]:
+    app.dependency_overrides[require_current_user] = lambda: CurrentUserContext(
+        user_id="test-user",
+        username="test-user",
+        roles=["health_planning_lead"],
+        geography_scopes=["/country-b/region-b"],
+    )
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.pop(require_current_user, None)
 
 
 def test_list_locations(client: TestClient) -> None:
@@ -47,7 +64,7 @@ def test_preview_seasonal_is_not_available(client: TestClient) -> None:
     assert response.json()["availability"]["pull_required"] is False
 
 
-def test_predict_without_outcome(client: TestClient) -> None:
+def test_predict_without_outcome(authenticated_client: TestClient) -> None:
     preview_body = PreviewResponse(
         location={
             "slug": "madhya-pradesh",
@@ -94,7 +111,7 @@ def test_predict_without_outcome(client: TestClient) -> None:
             prediction=None,
             prediction_note="No outcome requested.",
         )
-        response = client.post(
+        response = authenticated_client.post(
             "/climate/predict",
             json={"location_slug": "madhya-pradesh", "timeframe_id": "exposure_3m"},
         )
@@ -103,12 +120,12 @@ def test_predict_without_outcome(client: TestClient) -> None:
     assert response.json()["prediction"] is None
 
 
-def test_predict_maps_service_error(client: TestClient) -> None:
+def test_predict_maps_service_error(authenticated_client: TestClient) -> None:
     with patch(
         "chart.api.app.submit_prediction",
         side_effect=ClimateServiceError("CLIMATE_DATA_NOT_READY", 409),
     ):
-        response = client.post(
+        response = authenticated_client.post(
             "/climate/predict",
             json={
                 "location_slug": "madhya-pradesh",
@@ -122,7 +139,7 @@ def test_predict_maps_service_error(client: TestClient) -> None:
 
 
 def test_predict_returns_accepted_when_climate_pull_is_queued(
-    client: TestClient,
+    authenticated_client: TestClient,
 ) -> None:
     with patch(
         "chart.api.app.submit_prediction",
@@ -136,7 +153,7 @@ def test_predict_returns_accepted_when_climate_pull_is_queued(
             message="Prediction is queued for background processing.",
         ),
     ):
-        response = client.post(
+        response = authenticated_client.post(
             "/climate/predict",
             json={
                 "location_slug": "madhya-pradesh",
@@ -150,6 +167,19 @@ def test_predict_returns_accepted_when_climate_pull_is_queued(
     assert response.json()["request_id"] == 12
     assert response.json()["stage"] == "queued"
     assert response.json()["status_url"] == "/climate/prediction-requests/12"
+
+
+def test_prediction_routes_require_keycloak_token(client: TestClient) -> None:
+    predict_response = client.post(
+        "/climate/predict",
+        json={"location_slug": "madhya-pradesh", "timeframe_id": "exposure_3m"},
+    )
+    status_response = client.get("/climate/prediction-requests/12")
+
+    assert predict_response.status_code == 401
+    assert predict_response.json() == {"error": "AUTH_TOKEN_REQUIRED"}
+    assert predict_response.headers["WWW-Authenticate"] == "Bearer"
+    assert status_response.status_code == 401
 
 
 def test_format_month_helper() -> None:

@@ -30,11 +30,16 @@ New engine endpoints belong in this Python service.
 | Method | Path                                | Purpose                                          |
 | ------ | ----------------------------------- | ------------------------------------------------ |
 | `GET`  | `/health`                           | Service health                                   |
+| `GET`  | `/auth/me`                          | Keycloak user, role, and geography context       |
+| `GET`  | `/auth/geography-access`            | Check geography scope from the Keycloak token    |
 | `GET`  | `/climate/locations`                | Supported `location_slug` values                 |
 | `GET`  | `/climate/timeframes`               | Standard `timeframe_id` values                   |
 | `POST` | `/climate/preview`                  | Check data availability + return series          |
 | `POST` | `/climate/predict`                  | Preview or enqueue an LBW prediction             |
 | `GET`  | `/climate/prediction-requests/{id}` | Poll queued/running prediction status and result |
+
+Prediction submission and status polling require a Keycloak access token. Location,
+timeframe, and preview endpoints remain public.
 
 ## Request parameters
 
@@ -125,17 +130,22 @@ Background failures are returned by the status endpoint with `status: "failed"` 
 
 ## Environment variables
 
-| Variable          | Default                 | Purpose                       |
-| ----------------- | ----------------------- | ----------------------------- |
-| `DATABASE_URL`    | —                       | Postgres (`district_climate`) |
-| `LBW_SERVICE_URL` | `http://127.0.0.1:8000` | LBW Plumber API               |
-| `HOST`            | `127.0.0.1`             | Bind address                  |
-| `PORT`            | `3210`                  | Listen port                   |
+| Variable                       | Default                                  | Purpose                            |
+| ------------------------------ | ---------------------------------------- | ---------------------------------- |
+| `DATABASE_URL`                 | —                                        | Postgres (`district_climate`)      |
+| `LBW_SERVICE_URL`              | `http://127.0.0.1:8000`                  | LBW Plumber API                    |
+| `KEYCLOAK_ISSUER_URL`          | `http://127.0.0.1:8080/realms/chart`     | Required token issuer              |
+| `KEYCLOAK_CLIENT_ID`           | `chart-api`                              | Client role namespace              |
+| `KEYCLOAK_JWKS_URL`            | `<issuer>/protocol/openid-connect/certs` | Internal signing-key endpoint      |
+| `KEYCLOAK_CLOCK_SKEW_SECONDS`  | `30`                                     | Token timestamp tolerance          |
+| `HOST`                         | `127.0.0.1`                              | Bind address                       |
+| `PORT`                         | `3210`                                   | Listen port                        |
 
 ## Example
 
 ```bash
 curl -s http://127.0.0.1:3210/climate/predict \
+  -H 'authorization: Bearer <keycloak-access-token>' \
   -H 'content-type: application/json' \
   -d '{
     "location_slug": "madhya-pradesh",

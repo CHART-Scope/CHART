@@ -18,3 +18,19 @@ export function getChartApiBaseUrl(request: NextRequest) {
 
   return `${requestOrigin}/chart-api`;
 }
+
+export function getChartPythonApiBaseUrl(request: NextRequest) {
+  const configuredUrl = process.env.CHART_PYTHON_API_INTERNAL_URL;
+
+  if (configuredUrl) {
+    return trimTrailingSlash(configuredUrl);
+  }
+
+  const requestOrigin = getRequestOrigin(request);
+
+  if (isLocalOrigin(requestOrigin)) {
+    return process.env.CHART_LOCAL_PYTHON_API_URL ?? "http://127.0.0.1:3210";
+  }
+
+  return `${requestOrigin}/chart-api`;
+}

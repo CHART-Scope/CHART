@@ -4,10 +4,13 @@ import json
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from chart.auth.routes import router as auth_router
+from chart.auth.schemas import CurrentUserContext
+from chart.auth.service import require_current_user
 from chart.climate.schemas import (
     ErrorResponse,
     HealthResponse,
@@ -42,13 +45,18 @@ service for Madhya Pradesh.
 
 **Related services**
 - LBW inference (R/Plumber): `LBW_SERVICE_URL`, default `http://127.0.0.1:8000`
-- CHART Fastify API (auth, workspaces): port `3200`, docs at `/api`
+- Keycloak: bearer-token identity provider for auth and prediction routes
+- CHART Fastify API (routes awaiting migration): port `3200`, docs at `/api`
 """
 
 OPENAPI_TAGS = [
     {
         "name": "system",
         "description": "Health and service metadata.",
+    },
+    {
+        "name": "auth",
+        "description": "Keycloak user and geography access context.",
     },
     {
         "name": "climate",
@@ -64,6 +72,7 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
 )
+app.include_router(auth_router)
 
 
 @app.get("/health", tags=["system"], response_model=HealthResponse)
@@ -135,13 +144,17 @@ def post_preview(request: PreviewRequest) -> PreviewResponse:
             "model": ErrorResponse,
             "description": "Invalid request or unsupported outcome.",
         },
+        401: {"model": ErrorResponse, "description": "Keycloak token required."},
         202: {
             "model": PredictionAcceptedResponse,
             "description": "Prediction queued in Dagster.",
         },
     },
 )
-def post_predict(request: PredictRequest) -> PredictResponse | JSONResponse:
+def post_predict(
+    request: PredictRequest,
+    _user: CurrentUserContext = Depends(require_current_user),
+) -> PredictResponse | JSONResponse:
     try:
         result = submit_prediction(request)
         if isinstance(result, PredictionAcceptedResponse):
@@ -161,10 +174,14 @@ def post_predict(request: PredictRequest) -> PredictResponse | JSONResponse:
     response_model=PredictionRequestStatusResponse,
     summary="Read a queued or completed prediction request",
     responses={
-        404: {"model": ErrorResponse, "description": "Prediction request not found."}
+        401: {"model": ErrorResponse, "description": "Keycloak token required."},
+        404: {"model": ErrorResponse, "description": "Prediction request not found."},
     },
 )
-def get_prediction_request_status(request_id: int) -> PredictionRequestStatusResponse:
+def get_prediction_request_status(
+    request_id: int,
+    _user: CurrentUserContext = Depends(require_current_user),
+) -> PredictionRequestStatusResponse:
     try:
         return get_prediction_request(request_id)
     except ClimateServiceError as error:
@@ -179,7 +196,9 @@ def _http_error(error: ClimateServiceError) -> HTTPException:
 def http_exception_handler(_request, exc: HTTPException):
     detail = exc.detail if isinstance(exc.detail, str) else "REQUEST_FAILED"
     return JSONResponse(
-        status_code=exc.status_code, content=ErrorResponse(error=detail).model_dump()
+        status_code=exc.status_code,
+        content=ErrorResponse(error=detail).model_dump(),
+        headers=exc.headers,
     )
 
 
