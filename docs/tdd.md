@@ -547,6 +547,7 @@ erDiagram
 | Entity | Fields (types) | Notes |
 |---|---|---|
 | `data_source` | id, name, kind, cadence, geography_id, user_added(bool), last_refreshed_at | Registry of built-in + user-added sources. `cadence`+`last_refreshed_at` drive refresh; `user_added` = BYO hook. |
+| `prediction_request` | id, request_key, geography, timeframe, request_payload, status, stage, dagster_run_id, climate_run_id, result_payload, error_code | Durable API-to-Dagster handoff. `request_key` coalesces duplicate user requests; completed R results remain queryable. |
 | `geography` | id, country, name | Kajiado, MP. |
 | `admin_unit` | id, geography_id, level, code, boundary `geometry(MultiPolygon,4326)` | Spatial spine; spatial index for zonal stats. |
 | `climate_run` | id, data_source_id, tier, input_hash(SHA-256), scenario, resolution, data_label | `input_hash` = idempotency + reproducibility. |
@@ -741,7 +742,7 @@ flowchart LR
 ```
 - `health_impact` is a **multi-dimensional partitioned asset** (geo × scenario × horizon) — new climate re-materializes only affected partitions. Lineage = provenance, free.
 - `fitted_model` is an **external asset** (produced in R); publishing a new one marks downstream `health_impact` stale.
-- **Refresh modes:** projections static (materialize once); climate monthly (schedule / freshness policy); on-demand geography (app triggers a partition run via Dagster API — never blocks the request, serves last-good).
+- **Refresh modes:** projections static (materialize once); climate monthly (schedule / freshness policy); on-demand prediction (app writes a durable Postgres request, a Dagster sensor launches one idempotent job, and the job pulls only missing climate data).
 - **Same scheduler, different job shape by source:** only the `raw_climate` adapter differs — ERA5 is a bounded direct read from AWS Open Data (no waiting state), seasonal/projections use the async CDS poll. One-adapter swap, not a pipeline change; asset graph, partitions, freshness identical.
 
 > **Why keep an orchestrator (decided):** the pipeline has real DAG structure (pull → downscale → zonal → project, partitioned by geography × scenario × horizon, fitted model as external input), so backfills and freshness tracking come free rather than hand-built. Cost is two long-lived services (webserver + daemon) to run/secure — accepted; that batch work is what an orchestrator is for. Revisit only if the pipeline shrinks to a single trivial step. Compute stays in the engine, so this is a wrapper choice, not lock-in.
