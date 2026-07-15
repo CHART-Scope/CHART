@@ -7,6 +7,17 @@ node_modules/
 **/coverage/
 *.tsbuildinfo
 
+**/__pycache__/
+**/*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+orchestration/.dagster_home/
+orchestration/.logs_queue/
+orchestration/logs/
+orchestration/storage/
+
 data/
 docs/
 web/payload-types.ts

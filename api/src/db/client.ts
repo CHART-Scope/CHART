@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 const databaseUrl =
-  process.env.DATABASE_URL ?? "postgres://chart:chart@127.0.0.1:5432/chart";
+  process.env.DATABASE_URL ?? "postgres://chart:chart@127.0.0.1:5434/chart";
 
 type DatabaseClient = ReturnType<typeof postgres>;
 type Database = ReturnType<typeof drizzle>;

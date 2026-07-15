@@ -1,0 +1,1235 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CHART Climate API",
+    "description": "\nPython climate API for CHART.\n\nReads observed ERA5 monthly facts from Postgres (`district_climate`), previews whether\ndata is ready for a standard timeframe, and optionally bridges to the LBW inference\nservice for Madhya Pradesh.\n\n**Interactive docs**\n- Swagger UI: `/docs`\n- ReDoc: `/redoc`\n- OpenAPI JSON: `/openapi.json`\n\n**Related services**\n- LBW inference (R/Plumber): `LBW_SERVICE_URL`, default `http://127.0.0.1:8000`\n- CHART Fastify API (auth, workspaces): port `3200`, docs at `/api`\n",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/climate/locations": {
+      "get": {
+        "tags": [
+          "climate"
+        ],
+        "summary": "List supported geographies",
+        "description": "Returns MVP geography presets that can be used as `location_slug`.",
+        "operationId": "get_locations_climate_locations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/climate/timeframes": {
+      "get": {
+        "tags": [
+          "climate"
+        ],
+        "summary": "List standard timeframes",
+        "description": "Returns the canonical timeframe ids used by preview and predict.",
+        "operationId": "get_timeframes_climate_timeframes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeframeListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/climate/preview": {
+      "post": {
+        "tags": [
+          "climate"
+        ],
+        "summary": "Preview climate data availability",
+        "operationId": "post_preview_climate_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid location or timeframe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/climate/predict": {
+      "post": {
+        "tags": [
+          "climate"
+        ],
+        "summary": "Preview climate data or enqueue an LBW prediction",
+        "operationId": "post_predict_climate_predict_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PredictResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PredictionAcceptedResponse"
+                    }
+                  ],
+                  "title": "Response Post Predict Climate Predict Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or unsupported outcome.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Prediction queued in Dagster.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionAcceptedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/climate/prediction-requests/{request_id}": {
+      "get": {
+        "tags": [
+          "climate"
+        ],
+        "summary": "Read a queued or completed prediction request",
+        "operationId": "get_prediction_request_status_climate_prediction_requests__request_id__get",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionRequestStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Prediction request not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Availability": {
+        "properties": {
+          "location_slug": {
+            "type": "string",
+            "enum": [
+              "madhya-pradesh",
+              "kajiado"
+            ],
+            "title": "Location Slug"
+          },
+          "timeframe_id": {
+            "type": "string",
+            "enum": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ],
+            "title": "Timeframe Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "partial",
+              "missing",
+              "stale",
+              "not_available"
+            ],
+            "title": "Status",
+            "description": "`ready` = enough months for the request; `partial`/`missing` = ingest or widen window; `stale` = data older than monthly cadence; `not_available` = tier not built yet."
+          },
+          "months_requested": {
+            "type": "integer",
+            "title": "Months Requested",
+            "description": "Months needed for this timeframe."
+          },
+          "months_found": {
+            "type": "integer",
+            "title": "Months Found",
+            "description": "Months found in `district_climate` for the request."
+          },
+          "missing_months": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Months",
+            "description": "Requested months with no stored value."
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start",
+            "description": "First month returned in `series`, if any."
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End",
+            "description": "Last month returned in `series`, if any."
+          },
+          "last_refreshed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Refreshed At",
+            "description": "ISO timestamp from `data_source.last_refreshed_at` for this geography."
+          },
+          "climate_run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Climate Run Id",
+            "description": "Postgres `climate_run.id` backing the series."
+          },
+          "data_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Label",
+            "description": "Provenance label for the run (`sample`, `reanalysis`, etc.)."
+          },
+          "pull_required": {
+            "type": "boolean",
+            "title": "Pull Required",
+            "description": "When true, run the suggested materialisation command before predicting."
+          },
+          "pull_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pull Hint",
+            "description": "Shell hint to refresh data, e.g. `PRESET=madhya-pradesh make climate-materialize`.",
+            "examples": [
+              "PRESET=madhya-pradesh make climate-materialize"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "location_slug",
+          "timeframe_id",
+          "status",
+          "months_requested",
+          "months_found",
+          "missing_months",
+          "period_start",
+          "period_end",
+          "last_refreshed_at",
+          "climate_run_id",
+          "data_label",
+          "pull_required",
+          "pull_hint"
+        ],
+        "title": "Availability"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "Stable machine-readable error code.",
+            "examples": [
+              "CLIMATE_DATA_NOT_READY",
+              "LBW_NOT_AVAILABLE_FOR_LOCATION"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status",
+            "description": "Service health status."
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "HealthResponse"
+      },
+      "LbwOutcome": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "lbw",
+            "title": "Type",
+            "description": "Health outcome model to run. Only `lbw` is supported today."
+          },
+          "trimester": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "title": "Trimester",
+            "description": "Pregnancy trimester window for the LBW model. 1 = latest trimester (T3), 2 = middle (T2), 3 = earliest (T1)."
+          },
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area",
+            "description": "LBW geography within Madhya Pradesh. Use `Madhya Pradesh` for the state model or a division name (e.g. `Gwalior`). Defaults to whole state.",
+            "examples": [
+              "Madhya Pradesh",
+              "Gwalior"
+            ]
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref",
+            "description": "Reference temperature in \u00b0C. Omit to use the model default for the chosen area.",
+            "examples": [
+              27.0
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "trimester"
+        ],
+        "title": "LbwOutcome",
+        "description": "Optional health outcome to score after climate data is available.",
+        "examples": [
+          {
+            "area": "Madhya Pradesh",
+            "trimester": 1,
+            "type": "lbw"
+          },
+          {
+            "area": "Gwalior",
+            "ref": 27.0,
+            "trimester": 1,
+            "type": "lbw"
+          }
+        ]
+      },
+      "LbwPrediction": {
+        "properties": {
+          "area": {
+            "type": "string",
+            "title": "Area"
+          },
+          "geography_level": {
+            "type": "string",
+            "title": "Geography Level",
+            "description": "`state` or `division` in the LBW model bundle."
+          },
+          "trimester": {
+            "type": "integer",
+            "title": "Trimester"
+          },
+          "tmax_lag": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Tmax Lag",
+            "description": "Three monthly mean temperatures in \u00b0C, most recent month first (lag0, lag1, lag2)."
+          },
+          "ref_temp": {
+            "type": "number",
+            "title": "Ref Temp",
+            "description": "Reference temperature in \u00b0C used for the odds ratio."
+          },
+          "odds_ratio": {
+            "type": "number",
+            "title": "Odds Ratio",
+            "description": "Modelled odds ratio vs the reference temperature profile."
+          },
+          "ci95_low": {
+            "type": "number",
+            "title": "Ci95 Low"
+          },
+          "ci95_high": {
+            "type": "number",
+            "title": "Ci95 High"
+          },
+          "on_training_support": {
+            "type": "boolean",
+            "title": "On Training Support",
+            "description": "Whether all supplied temperatures fall within the model training range."
+          },
+          "model_file": {
+            "type": "string",
+            "title": "Model File",
+            "description": "LBW model bundle filename used for scoring."
+          }
+        },
+        "type": "object",
+        "required": [
+          "area",
+          "geography_level",
+          "trimester",
+          "tmax_lag",
+          "ref_temp",
+          "odds_ratio",
+          "ci95_low",
+          "ci95_high",
+          "on_training_support",
+          "model_file"
+        ],
+        "title": "LbwPrediction"
+      },
+      "LocationListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LocationResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "LocationListResponse"
+      },
+      "LocationResponse": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "enum": [
+              "madhya-pradesh",
+              "kajiado"
+            ],
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level",
+            "description": "Admin level for the MVP bbox unit (`state`, `county`, \u2026)."
+          },
+          "supports_lbw_prediction": {
+            "type": "boolean",
+            "title": "Supports Lbw Prediction",
+            "description": "Whether the LBW inference bridge is available for this location."
+          },
+          "lbw_areas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lbw Areas",
+            "description": "LBW model areas when `supports_lbw_prediction` is true (MP state + divisions)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "country",
+          "level",
+          "supports_lbw_prediction"
+        ],
+        "title": "LocationResponse"
+      },
+      "MonthValue": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month",
+            "description": "Calendar month (`YYYY-MM`).",
+            "examples": [
+              "2024-12"
+            ]
+          },
+          "tmax_monthly_mean_c": {
+            "type": "number",
+            "title": "Tmax Monthly Mean C",
+            "description": "Monthly mean of daily maximum 2 m temperature (\u00b0C) for the admin bbox.",
+            "examples": [
+              29.1
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "tmax_monthly_mean_c"
+        ],
+        "title": "MonthValue"
+      },
+      "PredictRequest": {
+        "properties": {
+          "location_slug": {
+            "type": "string",
+            "enum": [
+              "madhya-pradesh",
+              "kajiado"
+            ],
+            "title": "Location Slug",
+            "description": "Geography preset slug. Must be one of the supported MVP locations.",
+            "examples": [
+              "madhya-pradesh",
+              "kajiado"
+            ]
+          },
+          "timeframe_id": {
+            "type": "string",
+            "enum": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ],
+            "title": "Timeframe Id",
+            "description": "Standard timeframe. Use `exposure_3m` for LBW prediction; `seasonal` and `projection` are catalogued but not ingested yet.",
+            "examples": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ]
+          },
+          "end_month": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Month",
+            "description": "Optional anchor month (`YYYY-MM`). The API walks backward from this month for rolling windows. Defaults to the latest month stored in Postgres.",
+            "examples": [
+              "2024-12"
+            ]
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LbwOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When set to `lbw`, the API uses the last three monthly mean temperatures from Postgres and calls the LBW inference service. Omit for preview-only."
+          }
+        },
+        "type": "object",
+        "required": [
+          "location_slug",
+          "timeframe_id"
+        ],
+        "title": "PredictRequest",
+        "description": "Preview climate coverage and optionally run an LBW prediction.",
+        "examples": [
+          {
+            "location_slug": "madhya-pradesh",
+            "outcome": {
+              "trimester": 1,
+              "type": "lbw"
+            },
+            "timeframe_id": "exposure_3m"
+          }
+        ]
+      },
+      "PredictResponse": {
+        "properties": {
+          "location": {
+            "$ref": "#/components/schemas/LocationResponse"
+          },
+          "timeframe": {
+            "$ref": "#/components/schemas/TimeframeResponse"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/MonthValue"
+            },
+            "type": "array",
+            "title": "Series",
+            "description": "Monthly temperature series for the requested timeframe (may be empty)."
+          },
+          "prediction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LbwPrediction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "LBW result when `outcome.type=lbw` and climate data is ready."
+          },
+          "prediction_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prediction Note",
+            "description": "Human-readable note when no outcome was requested or prediction was skipped."
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id",
+            "description": "Durable prediction request id when this result was persisted."
+          },
+          "request_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "running",
+                  "completed",
+                  "failed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Status",
+            "description": "Background state when a persisted prediction request is associated with the result."
+          }
+        },
+        "type": "object",
+        "required": [
+          "location",
+          "timeframe",
+          "availability",
+          "series"
+        ],
+        "title": "PredictResponse"
+      },
+      "PredictionAcceptedResponse": {
+        "properties": {
+          "request_id": {
+            "type": "integer",
+            "title": "Request Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running"
+            ],
+            "title": "Status"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "preparing_climate",
+              "predicting",
+              "completed",
+              "failed"
+            ],
+            "title": "Stage"
+          },
+          "location_slug": {
+            "type": "string",
+            "enum": [
+              "madhya-pradesh",
+              "kajiado"
+            ],
+            "title": "Location Slug"
+          },
+          "timeframe_id": {
+            "type": "string",
+            "enum": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ],
+            "title": "Timeframe Id"
+          },
+          "status_url": {
+            "type": "string",
+            "title": "Status Url"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "status",
+          "stage",
+          "location_slug",
+          "timeframe_id",
+          "status_url",
+          "message"
+        ],
+        "title": "PredictionAcceptedResponse"
+      },
+      "PredictionRequestStatusResponse": {
+        "properties": {
+          "request_id": {
+            "type": "integer",
+            "title": "Request Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "preparing_climate",
+              "predicting",
+              "completed",
+              "failed"
+            ],
+            "title": "Stage"
+          },
+          "location_slug": {
+            "type": "string",
+            "enum": [
+              "madhya-pradesh",
+              "kajiado"
+            ],
+            "title": "Location Slug"
+          },
+          "timeframe_id": {
+            "type": "string",
+            "enum": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ],
+            "title": "Timeframe Id"
+          },
+          "dagster_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dagster Run Id"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PredictResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "status",
+          "stage",
+          "location_slug",
+          "timeframe_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PredictionRequestStatusResponse"
+      },
+      "PreviewRequest": {
+        "properties": {
+          "location_slug": {
+            "type": "string",
+            "enum": [
+              "madhya-pradesh",
+              "kajiado"
+            ],
+            "title": "Location Slug",
+            "description": "Geography preset slug. Must be one of the supported MVP locations.",
+            "examples": [
+              "madhya-pradesh",
+              "kajiado"
+            ]
+          },
+          "timeframe_id": {
+            "type": "string",
+            "enum": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ],
+            "title": "Timeframe Id",
+            "description": "Standard timeframe. Use `exposure_3m` for LBW prediction; `seasonal` and `projection` are catalogued but not ingested yet.",
+            "examples": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ]
+          },
+          "end_month": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Month",
+            "description": "Optional anchor month (`YYYY-MM`). The API walks backward from this month for rolling windows. Defaults to the latest month stored in Postgres.",
+            "examples": [
+              "2024-12"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "location_slug",
+          "timeframe_id"
+        ],
+        "title": "PreviewRequest",
+        "description": "Check whether observed climate data exists for a location and timeframe.",
+        "examples": [
+          {
+            "location_slug": "madhya-pradesh",
+            "timeframe_id": "exposure_3m"
+          },
+          {
+            "end_month": "2024-12",
+            "location_slug": "kajiado",
+            "timeframe_id": "recent_12m"
+          }
+        ]
+      },
+      "PreviewResponse": {
+        "properties": {
+          "location": {
+            "$ref": "#/components/schemas/LocationResponse"
+          },
+          "timeframe": {
+            "$ref": "#/components/schemas/TimeframeResponse"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/MonthValue"
+            },
+            "type": "array",
+            "title": "Series",
+            "description": "Monthly temperature series for the requested timeframe (may be empty)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "location",
+          "timeframe",
+          "availability",
+          "series"
+        ],
+        "title": "PreviewResponse"
+      },
+      "TimeframeListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TimeframeResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "TimeframeListResponse"
+      },
+      "TimeframeResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ],
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "horizon": {
+            "type": "string",
+            "enum": [
+              "short",
+              "medium",
+              "long"
+            ],
+            "title": "Horizon",
+            "description": "User-facing horizon group: short = observed monthly, medium = seasonal, long = projection."
+          },
+          "resolution": {
+            "type": "string",
+            "title": "Resolution",
+            "description": "Native resolution for the tier (`monthly`, `seasonal`, `annual`)."
+          },
+          "month_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month Count",
+            "description": "Rolling month window when applicable. `null` means use the full ingested window."
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "observed",
+              "seasonal",
+              "projection"
+            ],
+            "title": "Tier"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "description",
+          "horizon",
+          "resolution",
+          "month_count",
+          "tier"
+        ],
+        "title": "TimeframeResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "system",
+      "description": "Health and service metadata."
+    },
+    {
+      "name": "climate",
+      "description": "Location catalog, timeframe catalog, preview, and predict."
+    }
+  ]
+}
