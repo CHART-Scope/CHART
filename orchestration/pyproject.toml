@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chart-pipeline"
+version = "0.1.0"
+description = "Dagster orchestration for CHART climate ingestion."
+requires-python = ">=3.11"
+dependencies = [
+  "dagster>=1.7",
+  "dagster-webserver>=1.7",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.dagster]
+module_name = "chart_pipeline.definitions"

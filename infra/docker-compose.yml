@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: chart
       POSTGRES_PASSWORD: chart
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - chart-postgres-data:/var/lib/postgresql/data
     healthcheck:

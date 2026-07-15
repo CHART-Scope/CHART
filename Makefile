@@ -6,7 +6,7 @@ DRIZZLE_JOURNAL := api/drizzle/meta/_journal.json
 CHART_REPOSITORY_DIR := chart-repository
 CHART_REPOSITORY_COMPOSE := $(DOCKER) compose -f $(CHART_REPOSITORY_DIR)/docker-compose.yml
 
-.PHONY: all help install run verify local-setup check-docker identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build api api-build api-start api-test api-typecheck db-generate db-migrate db-check db-seed api-db-generate api-db-migrate api-db-check api-db-seed api-openapi-generate identity identity-sync identity-restart identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check ensure-drizzle-journal
+.PHONY: all help install run verify local-setup check-docker identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build api api-build api-start api-test api-typecheck db-generate db-migrate db-check db-seed api-db-generate api-db-migrate api-db-check api-db-seed api-openapi-generate identity identity-sync identity-restart identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check ensure-drizzle-journal climate-postgres climate-postgres-wait migrate dev climate-materialize climate-api climate-openapi era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev
 
 help:
 	@printf "\nCHART commands\n"
@@ -26,6 +26,12 @@ help:
 	@printf "  make api-test       Run API tests\n"
 	@printf "  make web-typecheck  Typecheck the web app\n"
 	@printf "  make format-check   Check formatting\n\n"
+	@printf "Climate prediction commands\n"
+	@printf "  make migrate             Start Postgres and run Alembic migrations\n"
+	@printf "  make dev                 Run Dagster with fixture climate data\n"
+	@printf "  make climate-api         Run the Python climate API on :3210\n"
+	@printf "  make climate-materialize Materialise one geography partition\n"
+	@printf "  make climate-openapi     Export docs/openapi/climate.json\n\n"
 	@printf "Chart repository commands\n"
 	@printf "  make chart-repo         Start repository Postgres, then run Payload on :3300\n"
 	@printf "  make chart-repo-db      Start repository Postgres only\n"
@@ -186,3 +192,65 @@ format:
 
 format-check:
 	$(NPM) run format:check
+
+ERA5_DIR := pipelines/era5_heat
+ORCH_DIR := orchestration
+BACKEND_DIR := backend
+CLIMATE_OUT := data/climate
+PYTHON ?= python3.11
+UV := $(shell command -v uv 2>/dev/null)
+CHART_DATABASE_URL ?= postgresql+psycopg://chart:chart@127.0.0.1:5434/chart
+
+climate-postgres: check-docker
+	$(DOCKER) compose -f infra/docker-compose.yml up -d chart-postgres
+
+climate-postgres-wait: climate-postgres
+	@printf "Waiting for chart Postgres"
+	@for attempt in $$(seq 1 60); do \
+		if docker exec chart-postgres pg_isready -U chart -d chart >/dev/null 2>&1; then \
+			printf " ready\n"; exit 0; \
+		fi; \
+		printf "."; sleep 1; \
+	done; \
+	printf "\nTimed out waiting for chart Postgres\n"; \
+	exit 1
+
+migrate: climate-migrate
+
+dev: climate-install
+	@mkdir -p $(ORCH_DIR)/.dagster_home
+	cd $(ORCH_DIR) && ERA5_USE_FIXTURE=1 DATABASE_URL="$(CHART_DATABASE_URL)" \
+	  LBW_SERVICE_URL="$${LBW_SERVICE_URL:-http://127.0.0.1:8000}" \
+	  DAGSTER_HOME=$(CURDIR)/$(ORCH_DIR) \
+	  $(PYTHON) -m dagster dev -m chart_pipeline.definitions
+
+climate-materialize: climate-install
+	cd $(ORCH_DIR) && ERA5_USE_FIXTURE=1 DATABASE_URL="$(CHART_DATABASE_URL)" \
+	  $(PYTHON) -m dagster asset materialize -m chart_pipeline.definitions \
+	  --select era5_observed_climate --partition "$${PRESET:-madhya-pradesh}"
+
+era5-fixture: climate-install
+	@mkdir -p "$(CLIMATE_OUT)"
+	$(PYTHON) -c 'from pathlib import Path; from era5_heat import fixture_demo; from era5_heat.io import output_paths, write_json, write_table; df, meta = fixture_demo("madhya-pradesh", years=5, end_year=2024); outdir = Path("$(CLIMATE_OUT)"); table, meta_path = output_paths(outdir, "madhya-pradesh", meta["window"]["start_year"], meta["window"]["end_year"], "csv"); write_table(df, table, "csv"); write_json(meta, meta_path); print(table); print(meta_path)'
+
+climate-install:
+	@if [ -n "$(UV)" ]; then \
+		$(UV) pip install -e '$(BACKEND_DIR)[dev]' -e $(ERA5_DIR)[dev] -e $(ORCH_DIR); \
+	else \
+		$(PYTHON) -m pip install -e '$(BACKEND_DIR)[dev]' -e $(ERA5_DIR)[dev] -e $(ORCH_DIR); \
+	fi
+
+climate-api: climate-install
+	DATABASE_URL="$(CHART_DATABASE_URL)" LBW_SERVICE_URL="$${LBW_SERVICE_URL:-http://127.0.0.1:8000}" \
+	  $(PYTHON) -m chart
+
+climate-openapi: climate-install
+	@mkdir -p docs/openapi
+	$(PYTHON) -m chart.api.export_openapi --output docs/openapi/climate.json
+
+climate-migrate: climate-install climate-postgres-wait
+	cd $(BACKEND_DIR) && DATABASE_URL="$(CHART_DATABASE_URL)" alembic upgrade head
+
+climate-db-migrate: climate-migrate
+
+dagster-dev: dev
