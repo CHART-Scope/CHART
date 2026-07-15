@@ -9,7 +9,9 @@ description = "Dagster orchestration for CHART climate ingestion."
 requires-python = ">=3.11"
 dependencies = [
   "dagster>=1.7",
+  "dagster-postgres>=0.23",
   "dagster-webserver>=1.7",
+  "psycopg2-binary>=2.9",
 ]
 
 [tool.setuptools.packages.find]
