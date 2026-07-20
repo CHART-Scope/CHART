@@ -1,5 +1,4 @@
 from .base import Base
-from .climate_load import load_era5_monthly_frame
 from .models import (
     AdminUnit,
     ClimateRun,
@@ -22,5 +21,4 @@ __all__ = [
     "Provenance",
     "get_engine",
     "get_session_factory",
-    "load_era5_monthly_frame",
 ]

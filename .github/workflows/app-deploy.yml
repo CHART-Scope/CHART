@@ -129,6 +129,13 @@ jobs:
       - name: Build Python prediction image
         run: docker build -f backend/Dockerfile -t chart-python:ci .
 
+      - name: Create Dagster database
+        run: |
+          docker run --rm --network host \
+            -e PGPASSWORD=chart \
+            postgres:16-alpine \
+            createdb -h 127.0.0.1 -U chart chart_dagster
+
       - name: Validate Python prediction image
         run: |
           docker run --rm chart-python:ci python -c 'from chart.api.app import app; assert "/auth/me" in app.openapi()["paths"]'
@@ -138,7 +145,7 @@ jobs:
             -e DAGSTER_POSTGRES_PORT=5432 \
             -e DAGSTER_POSTGRES_USER=chart \
             -e DAGSTER_POSTGRES_PASSWORD=chart \
-            -e DAGSTER_POSTGRES_DB=chart \
+            -e DAGSTER_POSTGRES_DB=chart_dagster \
             chart-python:ci dagster instance info
 
       - name: Build web image

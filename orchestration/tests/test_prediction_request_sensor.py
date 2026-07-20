@@ -102,11 +102,10 @@ def test_prediction_job_pulls_missing_climate_before_retrying() -> None:
 
 def test_prediction_job_records_missing_cds_configuration() -> None:
     run_config = _run_config()
-    run_config["ops"]["process_prediction_request"]["config"][
-        "use_fixture"
-    ] = False
+    run_config["ops"]["process_prediction_request"]["config"]["use_fixture"] = False
 
     with (
+        patch.dict("os.environ", {"ERA5_USE_FIXTURE": "0"}),
         patch("chart_pipeline.definitions.mark_prediction_request_running"),
         patch("chart_pipeline.definitions.set_prediction_request_stage"),
         patch(
