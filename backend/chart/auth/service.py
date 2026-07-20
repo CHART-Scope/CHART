@@ -85,8 +85,8 @@ def verify_keycloak_token(token: str, config: AuthConfig) -> CurrentUserContext:
             key,
             algorithms=["RS256"],
             issuer=config.issuer_url,
+            audience=config.client_id,
             leeway=config.clock_skew_seconds,
-            options={"verify_aud": False},
         )
     except (OSError, PyJWKClientError, PyJWTError, ValueError) as error:
         raise _auth_error("AUTH_TOKEN_INVALID", 401) from error

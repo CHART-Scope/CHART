@@ -15,25 +15,27 @@ Standard to hold while building: *could a developer build from this?* Prose is m
 
 1. [Overview](#1-overview)
 2. [Architecture](#2-architecture)
-3. [Frontend & UI](#3-frontend--ui)
-4. [Engine & repository layout](#4-engine--repository-layout)
+3. [Frontend & UI](#3-frontend-ui)
+4. [Engine & repository layout](#4-engine-repository-layout)
 5. [Requirements](#5-requirements)
 6. [Data flows](#6-data-flows)
 7. [Data model](#7-data-model)
 8. [API surface](#8-api-surface)
-9. [Technology & infrastructure](#9-technology--infrastructure)
+9. [Technology & infrastructure](#9-technology-infrastructure)
 10. [Cross-cutting concerns](#10-cross-cutting-concerns)
-11. [Startup & self-host resilience](#11-startup--self-host-resilience)
-12. [Risks & open questions](#12-risks--open-questions)
+11. [Startup & self-host resilience](#11-startup-self-host-resilience)
+12. [Risks & open questions](#12-risks-open-questions)
 13. [Suggested build order](#13-suggested-build-order)
 
 ---
 
 ## 1. Overview
 
-CHART is a **React/TypeScript frontend** in front of a **single Python backend** (FastAPI, a modular monolith). The backend does double duty: an **app/API layer** (login, geography scoping, workspaces, catalog, content, solution curation — the concerns a BFF would hold) and the **engine** (the science). They are modules in one Python codebase with enforced boundaries, sharing one Postgres via SQLAlchemy. The frontend calls the backend over HTTP and holds no business logic. A worker process runs the batch science.
+CHART is a **React/TypeScript frontend** in front of a **single Python core backend** (FastAPI, a modular monolith). The backend does double duty: an **app/API layer** (login, geography scoping, workspaces, catalog — the concerns a BFF would hold) and the **engine** (the science). They are modules in one Python codebase with enforced boundaries, sharing one Postgres via SQLAlchemy. The frontend calls the backend over HTTP and holds no business logic. A worker process runs the batch science. The standalone `chart-repository` Payload service remains an optional authoring system that publishes reviewed content through an HTTP API or public snapshot; CHART core does not import it or depend on it to boot.
 
 > **App layer, one language.** The application layer is being consolidated into Python (FastAPI) rather than kept as a separate Node/Fastify service — there is little the app layer needs that FastAPI does not do natively (OpenAPI generation, OIDC/Keycloak, CRUD), and one backend language removes the TS↔Python contract and dual-ORM overhead. A Fastify/Drizzle app exists today and is being **retired gradually** into Python via the API seam (see §4 migration path). The **frontend stays TypeScript** (React) — the one place a JS ecosystem clearly wins.
+
+> **No Next.js BFF.** Next route handlers may forward browser credentials to the Python API during migration, but they do not own business workflows, authorization policy, or database tables. Keycloak role + geography enforcement and all application persistence live in Python.
 
 **The two analytical halves, kept distinct:**
 
@@ -49,7 +51,7 @@ CHART is a **React/TypeScript frontend** in front of a **single Python backend**
 - **Open DHS data stored freely; restricted country data kept only as scripts + outputs, never raw.**
 - **AGPL-3.0, deployable on any infrastructure** (laptop, Scope cloud, government self-host).
 
-**Auth up front:** Keycloak issues each user a **role + geography**; the Python app layer enforces them on every request (a Kajiado officer never sees MP data). Scope content editors authenticate the same way and reach a curation/admin surface in the app layer. One identity system, role-gated surfaces.
+**Auth up front:** Keycloak issues each user a **role + geography**; the Python app layer enforces them on every request (a Kajiado officer never sees MP data). Keycloak may broker the Scope Google Workspace or a Microsoft Entra tenant, while CHART continues to trust only Keycloak-issued tokens. An upstream SSO login proves identity but does not grant a CHART role or geography. Content-authoring access is separately enforced by the repository service. One identity system, role-gated surfaces.
 
 ---
 
@@ -70,10 +72,9 @@ flowchart TB
   end
   subgraph backend["Python backend - FastAPI modular monolith"]
     api["App API - login check, geography scoping, catalog, workspaces"]
-    content["content + solutions - curation + admin"]
     pred["predictive - heat health impact"]
     vra["vra - AR5 vulnerability"]
-    sol["solutions - reviewed actions"]
+    sol["solution-repository adapter"]
   end
   subgraph workers["Background workers + review"]
     ingest["Ingestion + ETL"]
@@ -84,7 +85,7 @@ flowchart TB
   subgraph stores["Stores"]
     pg[("PostgreSQL + PostGIS")]
     obj[("Object store")]
-    kb[("Knowledge repo")]
+    kb[("Published solution repository")]
   end
   subgraph climate["Climate sources - by time horizon"]
     forecast["Forecast + reanalysis - ERA5 via AWS Open Data"]
@@ -101,13 +102,11 @@ flowchart TB
   officer --> pages
   director --> pages
   pages --> api
-  editor --> api
+  editor --> kb
   api --> kc
-  api --> content
   api --> pred
   api --> vra
   api --> sol
-  content --> review
   pred --> pg
   vra --> pg
   sol --> kb
@@ -124,6 +123,7 @@ flowchart TB
   proj --> pg
   extract --> review
   review --> kb
+  kb --> api
 ```
 
 ### What each component does
@@ -133,16 +133,16 @@ flowchart TB
 - **Keycloak** — identity: role + geography, login, user approval/seeding (enforced by the app layer).
 
 **Python backend (FastAPI modular monolith)** — one codebase, two module groups behind enforced import boundaries:
-- *App/API modules* — **auth** (verify Keycloak session, read role + geography, scope every request), **workspaces**, **users**, **geographies**, **hazards/catalog**, **content + solutions curation** (the authoring/admin surface for solutions + learning content that Payload used to hold), serving the OpenAPI contract to the frontend.
-- *Engine modules* — **predictive** (applies stored fitted curve to climate → RR → attributable fraction → attributable numbers, with CIs + ensemble spread; never fits); **vra** (AR5 proxy indicators, per geography; data-driven + elicited; versions each assessment; own hazard component, separate from predictive); **solutions** (serves reviewed actions, filtered by hazard/outcome/sector); **ingestion**, **review**, **shared**.
+- *App/API modules* — **auth** (verify Keycloak session, read role + geography, scope every request), **workspaces**, **users**, **geographies**, **hazards/catalog**, and a **solution-repository adapter** that reads reviewed public content, serving the OpenAPI contract to the frontend.
+- *Engine modules* — **predictive** (applies stored fitted curve to climate → RR → attributable fraction → attributable numbers, with CIs + ensemble spread; never fits); **vra** (AR5 proxy indicators, per geography; data-driven + elicited; versions each assessment; own hazard component, separate from predictive); **ingestion**, **review**, and **shared**.
 
 **Data plane (Dagster) + review**
 - **Ingestion + ETL** — pull each source (async CDS poll or ERA5 Open Data read), land raw in object store (idempotent on hash), downscale, zonal-stats to per-district values.
 - **Projection** — apply model across scenario × horizon, ensemble mean + spread, write health-impact maps.
-- **Evidence extractor** — Destiny + local LLM → structured draft actions.
-- **SME review** — approve/edit/reject; only approval publishes.
+- **Evidence extractor** — repository-side extraction → structured draft actions.
+- **SME review** — repository-side approve/edit/reject; only approval publishes.
 
-**Stores** — PostgreSQL + PostGIS (all config + data + district climate + app tables; one schema owned by SQLAlchemy/Alembic); object store (raw + downscaled scratch climate); knowledge repo (reviewed actions, tables in Postgres; only `reviewed` served).
+**Stores** — PostgreSQL + PostGIS (all CHART config + data + district climate + app tables; one schema owned by SQLAlchemy/Alembic); object store (raw + downscaled scratch climate and fitted-model artefacts); standalone solution repository (reviewed public content only).
 
 **Sources** — climate three tiers (forecast ERA5/ECMWF, seasonal Copernicus, projections ISIMIP→EZMIE); Expert Analytics downscaling; DHS; GIS boundaries; bring-your-own.
 
@@ -174,17 +174,12 @@ Story hierarchy mirrors this: `primitives/ composites/ layouts/ pages/`. Compone
 
 ## 4. Engine & repository layout
 
-**Monorepo.** One clone; a React/TypeScript frontend + a Python backend (app + engine) + Dagster, sharing the contract and deploying together.
+**Monorepo.** Preserve the repository's existing top-level names; a mass rename adds no product value. One clone contains the React/TypeScript frontend + Python backend (app + engine) + Dagster, sharing the contract and deploying together.
 
 ```
-chart/                              # monorepo root
-├─ frontend/                        # React / TypeScript app (SPA or Next.js used as frontend only)
-│  ├─ src/
-│  │  ├─ pages/ (or app/)            #   public: landing, learning hub — authed: onboarding, planning, dashboard
-│  │  ├─ components/                #   Storybook library: primitives/ composites/ layouts/ pages/
-│  │  ├─ lib/api-client/            #   typed client GENERATED from the OpenAPI contract
-│  │  └─ theme/tokens.ts            #   brand tokens — imported by app AND Storybook
-│  └─ package.json
+CHART/                              # monorepo root
+├─ web/                             # Next/React frontend only; no database-owning BFF
+│  └─ src/lib/api-client/           # typed client GENERATED from the OpenAPI contract
 │
 ├─ backend/                         # Python — installable package "chart" (FastAPI modular monolith)
 │  ├─ chart/
@@ -193,10 +188,9 @@ chart/                              # monorepo root
 │  │  ├─ workspaces/                #   workspace CRUD (onboarding output)
 │  │  ├─ users/                     #   user + role management
 │  │  ├─ geographies/  hazards/     #   catalog + selector data (availability flags)
-│  │  ├─ content/                   #   curated content + solution authoring/admin (was Payload)
+│  │  ├─ solution_repository/       #   adapter for reviewed public snapshots/API
 │  │  ├─ predictive/                #   erf.py (apply fitted model), service.py
 │  │  ├─ vra/                       #   composite.py, service.py
-│  │  ├─ solutions/                 #   extractor.py, service.py
 │  │  ├─ ingestion/                 #   adapters/ (era5_opendata, cds, dhs, worldpop…), zonal.py
 │  │  ├─ review/                    #   service.py
 │  │  └─ shared/                    #   db/ (SQLAlchemy + Alembic — SOLE schema owner), provenance, config
@@ -212,19 +206,20 @@ chart/                              # monorepo root
 │  └─ pyproject.toml                # depends on ../backend
 │
 ├─ contracts/openapi.yaml           # backend ↔ frontend seam (generates the TS client)
-├─ deploy/                          # all-in-one Dockerfile + docker-compose.yml + .env.example + k8s/ (Helm)
+├─ infra/                           # local Compose, AWS handoff, and CHART-owned K8s manifests
+├─ pipelines/                       # fitted-model and focused data-processing code
+├─ chart-repository/                # optional standalone Payload authoring service
 ├─ docs/                            # MkDocs Material site (see §10)
-│  ├─ technical-design-document.md  #   this document — for contributors
-│  ├─ deploy/                       #   operator + self-host guide — for governments
 │  └─ api-reference.md              #   rendered from the OpenAPI contract, not hand-written
 ├─ mkdocs.yml                       # docs site config (Material theme, mermaid, openapi plugin)
-├─ README.md  ·  justfile
+├─ Makefile · README.md
 ```
 
 ### Seam rules
-- **One Python backend, two module groups.** App/API modules (`auth`, `workspaces`, `users`, `geographies`, `hazards`, `content`, `solutions` API) and engine modules (`predictive`, `vra`, `ingestion`, `review`) live in the same package. `chart.api` mounts them; Dagster imports the engine modules for batch. Compute lives in the modules with **no FastAPI or Dagster imports**; routers and Dagster assets are thin wrappers.
-- **The OpenAPI contract** (`contracts/openapi.yaml`) is the seam between the Python backend and the React frontend: the backend implements it, `frontend/src/lib/api-client/` is generated from it. `just contract` keeps them in sync.
+- **One Python core backend, two module groups.** App/API modules (`auth`, `workspaces`, `users`, `geographies`, `hazards`, solution-repository adapter) and engine modules (`predictive`, `vra`, `ingestion`, `review`) live in the same package. `chart.api` mounts them; Dagster imports the engine modules for batch. Compute lives in the modules with **no FastAPI or Dagster imports**; routers and Dagster assets are thin wrappers.
+- **The OpenAPI contract** (`contracts/openapi.yaml`) is the seam between the Python backend and React: the backend implements it, `web/src/lib/api-client/` is generated from it. `make contract` keeps them in sync.
 - **SQLAlchemy + Alembic is the sole schema owner** — every table (app and engine) is defined and migrated in `chart/shared/db`. No second ORM owns or migrates the schema.
+- **Repository content stays across an HTTP/snapshot seam.** `chart-repository/` owns its Payload schema, media, review workflow, and repository auth. Python reads only its published API/snapshot; CHART core remains bootable when the repository is unavailable.
 
 ### Module dependency rule (import-linter, in CI)
 ```ini
@@ -250,9 +245,9 @@ forbidden_modules = chart.predictive.erf   # import service.py, never internals
 ### Migration path (retiring Fastify into Python, strangler-style)
 A Fastify/Drizzle app layer exists today. It is being replaced module-by-module by the Python app modules above, using the OpenAPI contract as the stable seam so the frontend never notices which language serves a given endpoint:
 1. Stand up the Python `chart.api` alongside Fastify, both behind the same contract.
-2. Move one module at a time, easiest first — `geographies`, `hazards` (read-mostly) → `workspaces`, `users`, `solutions/content` → `auth` (Keycloak/session) last.
+2. Auth moved first by product decision so new Python routes can enforce the final policy from their first release. Continue with `geographies`, `hazards` (read-mostly) → `workspaces`, `users` → analytical reads and repository adapters.
 3. For each: implement in Python, point the frontend's generated client at the Python endpoint, delete the Fastify module.
-4. When the last module moves, remove Fastify + Drizzle entirely; SQLAlchemy/Alembic already owns the schema, so there is no data-layer cutover.
+4. Delete Fastify + Drizzle only after route, data, authorization, and frontend parity tests pass for every migrated module. Temporary breakage and deletion without a parity gate are rejected.
 > Do the moves **between deliverables, not mid-feature**, and finish — a half-migrated state that keeps both stacks alive indefinitely is the failure mode to avoid.
 
 ### Model fitting → platform handoff
@@ -262,25 +257,20 @@ Fitting is **offline R work by the modeler**, one model per geography. The platf
 Goal: **clone → one command → a working app with data in it.** Everything runs in containers locally (MinIO for S3, a Postgres/PostGIS container).
 
 ```bash
-# first run
-git clone … && cd chart
-just bootstrap        # copy .env.example → .env, install deps (uv + npm), pull images
-just up               # bring stack up, run migrations, seed demo data
-# → http://localhost:3000  (seeded so the dashboard shows data)
+# first run and migrations
+make install
+make services
+make migrate
 
 # everyday
-just frontend         # React dev server (hot reload)
-just storybook        # component library, no backend needed
-just backend          # FastAPI app (uvicorn --reload) — app API + engine
-just dagster          # Dagster dev UI — materialise assets by hand
-just contract         # regenerate the typed frontend client from OpenAPI
-just docs             # serve the MkDocs Material site locally (live reload)
-just migrate  ·  just seed
-just test  ·  just lint   # pytest + ruff + mypy + import-linter ; frontend unit tests
-just down
+make web             # React dev server
+make climate-api     # FastAPI app API + current engine routes
+make dagster-dev     # Dagster UI + daemon in development
+make docs-serve      # MkDocs
+make verify
 ```
 
-**`just up` starts:** Postgres+PostGIS, MinIO, Keycloak (dev realm: two roles + a test officer), the Python backend (FastAPI app API + engine), the React frontend, Dagster (webserver + daemon). Preflight gate validates config, migrations run, seed loads open DHS sample + sample climate + demo workspace. `MAIL_TRANSPORT=log` by default (no SMTP needed).
+The Makefile remains the command surface; introducing a second task runner is unnecessary. The target local stack is Postgres+PostGIS, MinIO, Keycloak, Python, React, and Dagster. Preflight validates config and migrations before serving.
 
 **Tooling:** `uv` (Python), `npm`/`pnpm` (frontend); `ruff` + `mypy` + `pytest` + import-linter in CI; Storybook for backend-free frontend work. Local mirrors prod: same images under Compose here, k3s/EKS there, or `k3d` locally to exercise Kubernetes. Self-hoster runs the same three commands — only `.env` differs.
 
@@ -326,7 +316,7 @@ just down
 
 ### Documentation
 - **Functional:** publish one docs site (MkDocs + Material) covering system design (contributors) and deployment/operation (self-hosting governments); ship an **operator deployment guide** with a runnable path per target — local (a single all-in-one demo image *and* `docker compose up` with bring-your-own-database), AWS (reference), other clouds (Azure/GCP), Kubernetes at scale; API reference **generated from the OpenAPI contract**, never hand-written.
-- **Non-functional:** CI fails if the contract, generated client, or docs site drift from code; deploy docs reference the *actual* `deploy/` artifacts and CI smoke-tests `compose up` health so they can't drift; internal-API interactive docs (Swagger/ReDoc) cluster-internal only; docs versioned per release, built in CI like the app.
+- **Non-functional:** CI fails if the contract, generated client, or docs site drift from code; deploy docs reference the actual `infra/` and platform-repository artifacts and CI smoke-tests local Compose health so they cannot drift; internal-API interactive docs (Swagger/ReDoc) are cluster-internal only; docs are versioned per release and built in CI like the app.
 
 ---
 
@@ -479,11 +469,45 @@ sequenceDiagram
 ```
 Entities: **R** `WORKSPACE`, `HEALTH_IMPACT`, `ADMIN_UNIT`, `SOLUTION` · **×** no writes.
 
+### 6.7 Explicit on-demand prediction
+Dashboard reads remain precomputed as in §6.6. An explicit user prediction is different: it may enqueue missing climate preparation and model application, but the HTTP request never waits for that work.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant U as User
+  participant FE as React frontend
+  participant API as Python API
+  participant PG as PostgreSQL
+  participant DG as Dagster sensor + job
+  participant MOD as Deterministic R model
+  U->>FE: Request prediction
+  FE->>API: POST prediction with Keycloak token
+  API->>API: Enforce role + geography
+  API->>PG: Get/create by idempotency key
+  API-->>FE: 202 + request id + status URL
+  DG->>PG: Claim queued request
+  alt climate missing
+    DG->>DG: Pull only the missing climate partition
+    DG->>PG: Persist climate run
+  end
+  DG->>MOD: Apply fitted model
+  MOD-->>DG: Statistical result + uncertainty
+  DG->>PG: Persist deterministic result
+  FE->>API: Poll status URL
+  API->>API: Enforce role + geography again
+  API-->>FE: stage + deterministic result
+```
+
+- PostgreSQL is the durable request/state store; Dagster is the executor. Redis or another queue is not required for this workflow.
+- Duplicate requests coalesce on the versioned request key; an in-flight duplicate returns the same request and status URL.
+- Optional plain-language explanation inference, including model choice, safety validation, and hardware sizing, is deferred to a dedicated design and deployment change. It must never alter or block the deterministic result.
+
 ---
 
 ## 7. Data model
 
-Anchored on `admin_unit` (geographic spine) and `provenance` (every ingested artefact). **Config** (`indicator_definition`, `indicator_weight`, `erf_parameters`) separate from **data** (`indicator_value`, `health_impact`, `covariate`, `district_climate`). Raw microdata absent by design. Curated content (learning videos, pages) lives in a `content` table owned by the app layer, in the same SQLAlchemy-managed schema.
+Anchored on `admin_unit` (geographic spine) and `provenance` (every ingested artefact). **Config** (`indicator_definition`, `indicator_weight`, `erf_parameters`) is separate from **data** (`indicator_value`, `health_impact`, `covariate`, `district_climate`). Raw microdata is absent by design. Published solution/content records remain owned by the standalone repository and cross into CHART through the adapter; they are not a second CHART ORM schema.
 
 ```mermaid
 erDiagram
@@ -503,10 +527,7 @@ erDiagram
   INDICATOR_DEFINITION ||--o{ INDICATOR_VALUE : defines
   INDICATOR_VALUE }o--|| PROVENANCE : tracked_by
   VRA_ASSESSMENT ||--o{ INDICATOR_VALUE : snapshots
-  VRA_ASSESSMENT }o--o{ SOLUTION : recommends
   INDICATOR_WEIGHT }o--|| VRA_ASSESSMENT : weights
-  SOLUTION }o--|| PROVENANCE : tracked_by
-  REVIEW_EVENT }o--|| SOLUTION : gates
   WORKSPACE }o--|| USER : owned_by
   WORKSPACE }o--|| ADMIN_UNIT : scoped_to
   USER }o--|| ROLE : holds
@@ -533,9 +554,6 @@ erDiagram
 | `indicator_definition` | 1 → many | `indicator_value` | defines what each value measures |
 | `indicator_weight` | many → 1 | `vra_assessment` | weights applied in an assessment |
 | `vra_assessment` | 1 → many | `indicator_value` | snapshots the values it used |
-| `vra_assessment` | many ↔ many | `solution` | recommends candidate actions |
-| `review_event` | many → 1 | `solution` | gates publish (only approval serves) |
-| `solution` | many → 1 | `provenance` | source + license tracked |
 | `health_impact` | many → 1 | `provenance` | source + climate run tracked |
 | `indicator_value` | many → 1 | `provenance` | source tracked |
 | `workspace` | many → 1 | `user` | owned by a user |
@@ -559,8 +577,6 @@ erDiagram
 | `indicator_value` | id, admin_unit_id, indicator_code, value, normalised_milli, data_label | Data-driven + elicited. |
 | `indicator_weight` | id, domain, weight_milli, framework_version | Per-domain or per-indicator (**open**). |
 | `vra_assessment` | id, admin_unit_id, framework_version, version, composite_milli | Versioned; re-run creates new version. |
-| `solution` | id, title, hazard, outcome, status(`pending_review`/`reviewed`/`rejected`) | Only `reviewed` served; only a `review_event` sets it. |
-| `review_event` | id, solution_id, reviewer, decision, reason, at | Audit trail. |
 | `workspace` | id, country, admin_level, sectors(jsonb) | Onboarding output; parameterises pages. |
 | `user` | id, keycloak_sub | Identity via Keycloak. |
 | `role` | id, name | e.g. State Nodal Officer, County Director. |
@@ -572,7 +588,7 @@ erDiagram
 
 ## 8. API surface
 
-One Python backend, two route groups. **App API** — public, Keycloak-scoped routes the React frontend calls (auth, workspaces, catalog, content, analytical reads). **Engine calls** — the app modules call the engine modules **in-process** (same monolith, not over a network); the routes below marked *engine/admin* are private, admin-only, and not exposed to the public. The OpenAPI contract generates the frontend's typed client.
+One Python backend, two route groups. **App API** — public, Keycloak-scoped routes the React frontend calls (auth, workspaces, catalog, repository-backed content, analytical reads). **Engine calls** — the app modules call the engine modules **in-process** (same monolith, not over a network); the routes below marked *engine/admin* are private, admin-only, and not exposed to the public. The OpenAPI contract generates the frontend's typed client.
 
 ### App API — auth & workspace
 | Method | Path | Purpose |
@@ -586,7 +602,7 @@ One Python backend, two route groups. **App API** — public, Keycloak-scoped ro
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/catalog/hazards` · `/health-domains` · `/outcomes` | Selector tiles with `availability` flags. |
-| GET | `/api/content/learning-hub` · `/api/content/pages/:slug` | App-managed curated content. |
+| GET | `/api/content/learning-hub` · `/api/content/pages/:slug` | Reviewed repository content through the Python adapter. |
 
 ### App API — analytical reads (served by the engine modules in-process)
 | Method | Path | Purpose |
@@ -596,6 +612,12 @@ One Python backend, two route groups. **App API** — public, Keycloak-scoped ro
 | GET | `/api/districts/:id?outcome=&scenario=&horizon=` | RR, attributable fraction, attributable numbers, each with CIs. |
 | GET | `/api/solutions?hazard=&outcome=&sector=` | Reviewed actions only. |
 | POST | `/api/vra/:adminUnit/assessments` | Create a VRA assessment version. |
+
+### App API — on-demand prediction
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/climate/predict` | Get/create one idempotent prediction request; returns a result immediately when already complete, otherwise `202`. |
+| GET | `/climate/prediction-requests/:id` | Poll stage, Dagster run id, and deterministic result; always geography-scoped. |
 
 ### Engine / admin routes (private, not public)
 | Method | Path | Purpose |
@@ -617,14 +639,13 @@ One Python backend, two route groups. **App API** — public, Keycloak-scoped ro
 | Frontend | React / TypeScript (Storybook) | UI only; calls the Python API over HTTP; shared types via the generated client. |
 | Component workshop | Storybook + MapLibre GL | Isolated components; open self-hostable map tiles. |
 | Backend (app + engine) | Python FastAPI, one modular monolith (SQLAlchemy 2.0) | App/API layer + engine as modules in one process; import-linter seams; one language removes the TS↔Python contract + dual-ORM overhead. |
-| Content + curation | App-layer module (was Payload) | Content/solution authoring lives in the Python app, not a separate Next.js-native CMS. |
+| Content + curation | Optional standalone Payload repository | Owns authoring, media, review, and repository auth; publishes reviewed API/snapshots that Python adapts. |
 | Auth | Keycloak (OIDC) | Role + geography claims, enforced by the app layer on every request; editors are role-gated. |
-| Engine | Modules within the backend | predictive/VRA/solutions/ingestion; import-linter seams for a later split. |
+| Engine | Modules within the backend | predictive/VRA/ingestion; import-linter seams for a later split. |
 | Datastore | PostgreSQL + PostGIS (SQLAlchemy 2.0, Alembic) | Relational + spatial + JSONB in one; zonal stats in PostGIS. |
 | Object store | S3-compatible (MinIO self-host) | Swappable raster/tile landing. |
 | Data plane / jobs | Dagster — assets, partitions, schedules, freshness | Partitioned (geo × scenario × horizon) with lineage + backfills. Compute stays in engine. |
 | Climate ingest | Copernicus CDS async client; Expert Analytics downscale | CDS is submit→poll→download; a Dagster asset, never on a request. |
-| Extraction | Local LLM (~8B) for document extraction | Sensitive docs on-prem; output is a draft caught by SME review. |
 | Tooling | uv, ruff, mypy, pytest; pydantic-settings | Fast, typed; config from env, no secrets in code. |
 | Deploy | Containers: Compose on VPS → k3s → EKS | Same images across tiers. |
 | License | AGPL-3.0 | Network-copyleft keeps hosted forks open. |
@@ -643,8 +664,8 @@ flowchart TB
     subgraph vpc["VPC"]
       subgraph pub["Public subnet - EC2 running k3s (single node)"]
         ingress["k3s ingress - routing + egress allowlist"]
-        web["React frontend + Python backend"]
-        eng["Python engine - FastAPI"]
+        web["React frontend"]
+        eng["Python backend + engine - FastAPI"]
         dag["Dagster - daemon + webserver"]
         kc["Keycloak"]
         eso["External Secrets Operator"]
@@ -660,7 +681,6 @@ flowchart TB
   ingress --> web
   ingress --> kc
   web --> eng
-  web --> rds
   eng --> rds
   dag --> rds
   dag --> s3
@@ -669,9 +689,22 @@ flowchart TB
   eso --> web
 ```
 
-- App in **public subnet** behind ALB (TLS via free auto-rotating ACM cert, rate-limit). DB in **private subnet**, reachable only via security group — never internet-exposed.
+- Single-node k3s compute in a **public subnet** behind the ALB (TLS via free auto-rotating ACM cert, rate-limit), matching the current reusable module. Only the load balancer exposes application routes; administration uses SSM rather than SSH. RDS remains in **private subnets**, reachable only through its security group and never internet-exposed.
 - **k3s now, EKS later:** EKS bills ~€45/mo control plane + per-GB NAT gateway — enterprise tax for scale the MVP lacks. k3s on one EC2 gives orchestration, GitOps, TLS rotation, and **per-namespace egress allowlist** (a compromised container can't exfiltrate secrets) cheaply. Switch to EKS when >2 instances or a paying customer needs managed hosting.
 - **AWS Open Data:** ERA5/Copernicus is free to download there — but (1) verify same variables/resolution/version by diffing a slice; (2) it's a per-source fast path, ISIMIP/IMD still need their own adapters.
+
+### Scope infrastructure reuse decision
+
+CHART reuses the proven platform pattern in the existing `halla-health-infra` repository instead of maintaining a second hand-written EC2 deployment. Reuse is at the **provisioning boundary**, not by sharing Halla's live application runtime:
+
+| Owner | Responsibility |
+|---|---|
+| Scope infrastructure repository | OpenTofu/Terragrunt modules, VPC, ALB, Route 53, EC2/k3s, RDS, S3, IAM, SSM/Secrets Manager, cluster bootstrap, Flux, cert-manager, External Secrets. |
+| CHART repository | Container images, migrations, OpenAPI contract, CHART Kubernetes base/overlays or Helm values, resource requests, health checks, Dagster definitions, and end-to-end smoke tests. |
+
+Before CHART consumes the Halla modules, parameterise the remaining Halla-specific values: project/tag prefix, permissions-boundary name, SSM/secret path, DNS names, Flux owner/repository/path, CPU architecture/AMI, instance type, and data-volume size. Do not copy Halla application manifests or point CHART at Halla production databases. Sandbox may reuse the existing AWS account/bootstrap roles, but CHART gets separate state paths, names, RDS database, S3 buckets, namespace, and compute lifecycle.
+
+The first CHART hosted stack is a **separate single-node k3s deployment** built from those generic modules. This avoids coupling Halla availability or upgrades to CHART while retaining the tested security and recovery model.
 
 ### Deployment tiers (same containers)
 | Tier | Orchestration | When |
@@ -683,10 +716,10 @@ flowchart TB
 
 ### Two ways to get it running
 CHART is several containers (app, engine, Dagster, Keycloak) + Postgres + object store, so two documented entry points:
-- **Single all-in-one image (try / evaluate):** one image bundling every service — `docker run` and click around in minutes, no Compose, no cloud. *Evaluation only* — no independent scaling, data ephemeral unless a volume is mounted; a deliberate extra build (combined `Dockerfile` in `deploy/`) kept because a five-minute eval path matters for adoption.
+- **Single all-in-one image (try / evaluate):** one image bundling every service — `docker run` and click around in minutes, no Compose, no cloud. *Evaluation only* — no independent scaling, data ephemeral unless a volume is mounted; a deliberate extra build under `infra/` is kept only if the five-minute eval path is actively maintained and smoke-tested.
 - **`docker compose up` with prebuilt images (real local / small self-host):** the honest multi-container shape, each service its own container, published to the registry. Bring your own Postgres/object store via `.env` or use the bundled ones. Same Compose file the dev workflow uses.
 
-> **Deploy artifacts are the docs' source of truth.** `deploy/` holds the real combined `Dockerfile`, `docker-compose.yml`, and `k8s/` Helm charts the operator guide (§10) points at; CI smoke-tests that `compose up` reaches healthy preflight, so "how to deploy" can't drift from what ships.
+> **Deploy artifacts are the docs' source of truth.** CHART's `infra/` holds local Compose and CHART-owned Kubernetes workload definitions; the shared infrastructure repository holds tested AWS/OpenTofu modules and cluster bootstrap. CI validates both sides of that contract and smoke-tests that deployed health and one prediction flow work.
 
 ### Delivery: GitOps pull model + secrets
 ```mermaid
@@ -711,7 +744,7 @@ flowchart LR
   ssm --> eso
   eso --> app
 ```
-**Pull, not push:** CI builds → pushes image to GHCR → updates config tag; Flux inside the cluster pulls. GitHub never gets access into the cluster. Sandbox and production are separate accounts/paths with a promote step. Secrets: Parameter Store (manual, cheap — tokens) + Secrets Manager (auto-rotate — RDS password), synced by External Secrets Operator. No secret in the repo.
+**Pull, not push:** CHART CI builds → pushes immutable images to GHCR → updates a reviewed CHART manifest/tag. Flux inside the cluster pulls the desired state. GitHub never receives inbound cluster credentials. Sandbox and production are separate state/config paths with a promote step. Secrets: Parameter Store (manual static values) + Secrets Manager (AWS-managed/rotating values), synced by External Secrets Operator. No secret value is stored in Git, even encrypted.
 
 ---
 
@@ -719,7 +752,7 @@ flowchart LR
 
 - **Security:** Keycloak role + geography claims enforced by the app layer on every route; engine module queries geography-scoped. Open DHS stored freely; restricted data as scripts/outputs only. TLS in transit, encryption at rest, secrets from env. Engine/admin routes private. k3s per-namespace egress allowlist.
 - **Scalability:** small (two geographies, monthly-ish cadence, precomputed reads). The backend scales as a web tier; the engine's heavy batch (zonal stats, projection) scales by adding worker instances. No sharding, no broker.
-- **Cost:** floor is one VPS + storage; self-hostable. Variable cost at the edge (CDS/EA egress) rate-limited. AWS Open Data softens climate egress.
+- **Cost:** floor is one node + RDS/S3; self-hostable. Choose compute size from measured Python, Dagster, Keycloak, and R-model usage. Variable cost at the edge (CDS/EA egress) is rate-limited. AWS Open Data softens climate egress.
 - **Observability:** correlation id per ingest/score/projection/review; per-source job success/failure; audit trail of review decisions. Headline signal: **last successful run per source**.
 - **Resilience:** CDS async submit→poll→download, backoff; persistent failure keeps last-good map and shows "not available yet" (no fabricated proxy). Idempotent on `input_hash`, per-source isolation. Extractor produces drafts only. The frontend serves last-good cached reads on a brief backend blip; writes fail closed.
 
@@ -763,16 +796,16 @@ For a DPG the docs are part of the product — governments read them before runn
 | Build MkDocs with `--strict` | no broken nav, missing pages, dead internal links |
 | Link-check external references | operator/deploy docs don't rot |
 
-On merge to `main`, CI publishes the site (Read the Docs or static behind the load balancer) — same GitOps discipline as the app. Net: a change not reflected in the contract + docs **fails the build**, so the reference can't drift. Build work: `mkdocs.yml` + `docs/` tree (§4), an OpenAPI-render plugin, a `just docs` target, and the CI job above.
+On merge to `main`, CI publishes the site (Read the Docs or static behind the load balancer) — same GitOps discipline as the app. Net: a change not reflected in the contract + docs **fails the build**, so the reference cannot drift. Build work: `mkdocs.yml` + `docs/` tree (§4), an OpenAPI-render plugin, a `make docs-build` target, and the CI job above.
 
 ### Operator & deployment guide (what the docs must cover)
 "How do I run this?" asked at four levels. The docs carry a runnable, tested path for each — local + AWS as MVP musts, the portability rungs documented-as-supported and built when a real deployer needs them (adopt-when-demanded, as with EKS).
 
 | Rung | What the deployer does | Artifact | Priority |
 |---|---|---|---|
-| Try / evaluate | Pull the single all-in-one image, `docker run`, click around in minutes | combined `Dockerfile` | **MVP must** |
-| Local / small self-host | `docker compose up` with prebuilt images; connect own Postgres/object store via `.env` | `docker-compose.yml` | **MVP must** |
-| AWS (reference) | k3s on EC2 + RDS + S3 + GitOps, step by step (§9 topology) | `k8s/` Helm + guide | **MVP must** |
+| Try / evaluate | Pull the single all-in-one image, `docker run`, click around in minutes | combined `infra/` image if maintained | **MVP should** |
+| Local / small self-host | `docker compose up` with prebuilt images; connect own Postgres/object store via `.env` | `infra/docker-compose.yml` | **MVP must** |
+| AWS (reference) | k3s on EC2 + RDS + S3 + GitOps, step by step (§9 topology) | shared OpenTofu modules + CHART `infra/k8s/` workloads | **MVP must** |
 | Other cloud (Azure, GCP) | Same contract — a Postgres, an S3-compatible bucket, a container host; AWS is the worked example, this documents the mapping | portability notes + Helm | documented; built when needed |
 | Kubernetes at scale | Helm into a real cluster; Dagster K8s run launcher (per-run pods); scale engine workers for many geographies | `k8s/` Helm + values | documented; built when needed |
 
@@ -814,6 +847,8 @@ Principle: **fail loud, fail early, fail with a fix.** Preflight gate before the
 | HIGH | **Scenario & source alignment** predictive vs VRA | Predictive = ISIMIP/CMIP under **SSP**; VRA hazard = **IMD** under **RCP 4.5/8.5**. Different frameworks/sources risk inconsistent climate stories. CEEW (Vanya) to confirm. |
 | HIGH | Legal data-processing entity (Scope vs government) | One source interface supports both. Build proceeds while legal resolves. |
 | HIGH | **Zonal aggregation method** (`district_climate.agg_method`) | Area-weighted mean vs centroid vs interpolation, at what resolution. McQueens can answer from R code. Blocks `zonal.py`. |
+| HIGH | Prediction geography authorization during Python migration | Bearer authentication alone is insufficient. Submission and status lookup must map `location_slug`/request rows to Keycloak geography claims, with denial tests, before production. |
+| HIGH | Shared-infrastructure coupling | Reuse Halla's modules and AWS bootstrap, not its live workload/database. CHART requires separate state, names, stores, namespace, and compute lifecycle. |
 | MED | VRA ↔ predictive integration | Presented **separately** for MVP (CEEW position); full fusion beyond this year. |
 | MED | VRA methodology (CEEW-owned, pending) | Chosen: IPCC AR5, country-specific indicators. Open: spatial scale, static vs dynamic, composite vs normalisation, Delphi vs PCA weighting. |
 | MED | Policy counterfactual ("cut temp 5° → LBW prevented") | Scoped deferred, but McQueens frames as natural ERF output. Confirm MVP vs later. |
@@ -832,15 +867,13 @@ Principle: **fail loud, fail early, fail with a fix.** Preflight gate before the
 
 A pragmatic sequence to get from empty repo to a demoable MVP:
 
-1. **Scaffolding & tooling** — monorepo layout, `justfile`, `docker-compose.yml` (Postgres/PostGIS, MinIO, Keycloak), `.env.example`, preflight gate, `just up` bringing up an empty-but-healthy stack. Stand up the **MkDocs Material site** (`mkdocs.yml` + `docs/`) and the CI drift checks (§10) early, so docs and API reference are generated-and-guarded from commit one.
-2. **Data model + migrations** — SQLAlchemy models in `chart/shared/db`, Alembic migrations, the entities in §7. Seed script (open DHS sample, GIS boundaries, demo workspace).
-3. **Backend skeleton + OpenAPI contract** — FastAPI `chart/api` mounting the app modules, the endpoints in §8, `contracts/openapi.yaml`, generate the frontend client.
-4. **Frontend component library in Storybook** — the §3 components against mock data; tokens; no backend needed. Runs in parallel with 2–3.
-5. **Ingestion (one climate tier first)** — `ingestion/adapters/` (ERA5 Open Data read, or CDS async submit→poll→download), `zonal.py` (after the aggregation-method decision), landing raw in MinIO + `district_climate`. Wrap as a Dagster asset.
-6. **Predictive apply-path** — `predictive/erf.py` applying a published fitted curve (use McQueens' reference model + MP DHS data) → `health_impact`. The `POST /internal/models` handoff.
-7. **Frontend + app-API wiring** — React pages consume the generated client; Keycloak session + geography scoping enforced in the app layer; the dashboard reads precomputed maps (§6.6).
-8. **Content + solutions + review** — the app `content`/`solutions` modules, the extractor draft path, SME review gate, serve reviewed actions.
-9. **VRA module** — once CEEW confirms indicators/methodology; parallel output on the dashboard.
-10. **Deploy** — Compose → k3s on EC2 with GitOps (Flux) + External Secrets, per §9.
+1. **Reconcile and protect the migration** — update this TDD, `AGENTS.md`, and Backlog; remove the Next-BFF plan; require geography authorization and parity before deleting Fastify.
+2. **Merge the authenticated prediction stack** — Python Keycloak verification, idempotent Postgres request, Dagster sensor/job, missing-climate preparation, deterministic R result, status polling, tests.
+3. **Provision the hosted proof** — generalise the tested Halla OpenTofu modules, create separate CHART state/RDS/S3/k3s resources, and bootstrap Flux + External Secrets.
+4. **Ship immutable workloads** — CI builds versioned CHART images; CHART manifests deploy web, Python, Dagster, Keycloak, R inference, and migrations. No builds or handwritten `.env` files on the host.
+5. **Prove one end-to-end production flow** — authenticated request → durable row → Dagster run → missing data pulled once → deterministic result → status API → database and UI evidence.
+6. **Complete the scientific/data-model gap** — `erf_parameters`, `health_impact`, attributable metrics, Kajiado fitted curve, PostGIS boundaries, and the generated frontend client.
+7. **Continue the Python strangler** — geographies/hazards, workspaces/users, analytical reads, then remove Fastify/Drizzle after parity.
+8. **VRA** — wait for the CEEW methodology decision; keep it parallel to predictive.
 
-> Start where the value + certainty are highest: **1 → 2 → 3 → 6** gets a real health-impact number on screen for MP (the showcase spine). VRA (9) waits on CEEW; ingestion (5) waits on the zonal-aggregation answer — both can be stubbed with seeded data meanwhile. If a Fastify app already exists, treat step 3 as the start of the strangler migration (§4) rather than a greenfield build.
+> The immediate showcase path is **1 → 2 → 3 → 4 → 5**. Optional explanation inference and its hardware plan are a separate follow-up after the deterministic production flow is measured.

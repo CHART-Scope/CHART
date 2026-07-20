@@ -2,13 +2,15 @@
 
 ## Stack
 
-| Layer    | Tech             | Port (internal) |
-| -------- | ---------------- | --------------- |
-| Web      | Next.js 15       | 3100            |
-| API      | Fastify          | 3200            |
-| Identity | Keycloak 26      | 8080            |
-| Database | Postgres 16 (×2) | 5432            |
-| Proxy    | nginx            | **80 (public)** |
+| Layer         | Tech                  | Port (internal) |
+| ------------- | --------------------- | --------------- |
+| Web           | Next.js               | 3100            |
+| Legacy API    | Fastify               | 3200            |
+| Python API    | FastAPI               | 3210            |
+| Orchestration | Dagster               | 3000            |
+| Identity      | Keycloak 26           | 8080            |
+| Database      | Postgres 16 (one host) | 5432            |
+| Proxy         | nginx                 | **80 (public)** |
 
 ## Container layout
 
@@ -17,10 +19,17 @@ graph TD
     Browser([Browser]) -->|":80"| proxy[nginx\nchart-proxy]
     proxy -->|/| web[Next.js\nchart-web :3100]
     proxy -->|/chart-api/| api[Fastify API\nchart-api :3200]
+    proxy -->|/chart-api/auth/ + /climate/| py[Python API\nchart-climate-api :3210]
     proxy -->|/identity/| kc[Keycloak\nchart-keycloak :8080]
     web -.->|server-side calls| api
-    api --> db[(chart\nPostgres :5432)]
-    kc --> kcdb[(chart_keycloak\nPostgres :5432)]
+    web -.->|auth + climate| py
+    api --> pg[(Postgres server :5432)]
+    py --> pg
+    dagster[Dagster daemon + UI] --> pg
+    kc --> pg
+    pg --- appdb[(chart)]
+    pg --- dagsterdb[(chart_dagster)]
+    pg --- kcdb[(chart_keycloak)]
 ```
 
 All containers share a Docker bridge network (`chart-net`). Only nginx binds a public port.
@@ -37,4 +46,6 @@ All containers share a Docker bridge network (`chart-net`). Only nginx binds a p
 - Keycloak runs in `start-dev` mode — cold starts are slow (~30 s). This is expected.
 - Secrets (DB password, Keycloak admin password) are auto-generated on first deploy and persisted in `/opt/chart-env/chart.env`.
 - The solution repository is loaded from `CHART_REPOSITORY_URL` if set; otherwise the bundled snapshot in `api/src/services/chart-repository/seed-data/seed.json` is used.
-- App tables (`chart` DB) are owned by Drizzle. Keycloak tables (`chart_keycloak` DB) are owned by Keycloak. Keep them separate.
+- The `chart`, `chart_dagster`, and `chart_keycloak` logical databases share one
+  Postgres server. Keycloak uses its own database role and never writes to CHART
+  application tables.

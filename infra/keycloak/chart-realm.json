@@ -48,26 +48,26 @@
   },
   "groups": [
     {
-      "name": "country-a",
+      "name": "india",
       "attributes": {
-        "country_code": ["CTA"],
+        "country_code": ["IND"],
         "geo_level": ["country"]
       },
       "subGroups": [
         {
-          "name": "region-a",
+          "name": "madhya-pradesh",
           "attributes": {
-            "country_code": ["CTA"],
+            "country_code": ["IND"],
             "geo_level": ["geo_level_1"],
-            "level_label": ["region"]
+            "level_label": ["state"]
           },
           "subGroups": [
             {
-              "name": "district-a",
+              "name": "bhopal",
               "attributes": {
-                "country_code": ["CTA"],
+                "country_code": ["IND"],
                 "geo_level": ["geo_level_2"],
-                "level_label": ["district"]
+                "level_label": ["division"]
               }
             }
           ]
@@ -75,26 +75,26 @@
       ]
     },
     {
-      "name": "country-b",
+      "name": "kenya",
       "attributes": {
-        "country_code": ["CTB"],
+        "country_code": ["KEN"],
         "geo_level": ["country"]
       },
       "subGroups": [
         {
-          "name": "region-b",
+          "name": "kajiado",
           "attributes": {
-            "country_code": ["CTB"],
+            "country_code": ["KEN"],
             "geo_level": ["geo_level_1"],
-            "level_label": ["region"]
+            "level_label": ["county"]
           },
           "subGroups": [
             {
-              "name": "district-c",
+              "name": "kajiado-central",
               "attributes": {
-                "country_code": ["CTB"],
+                "country_code": ["KEN"],
                 "geo_level": ["geo_level_2"],
-                "level_label": ["district"]
+                "level_label": ["sub-county"]
               }
             }
           ]
@@ -130,6 +130,18 @@
             "access.token.claim": "true",
             "userinfo.token.claim": "true"
           }
+        },
+        {
+          "name": "chart-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "chart-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
         }
       ]
     },
@@ -152,7 +164,7 @@
       "email": "chart-admin@example.org",
       "firstName": "CHART",
       "lastName": "Admin",
-      "groups": ["/country-a"],
+      "groups": ["/india/madhya-pradesh", "/kenya/kajiado"],
       "clientRoles": {
         "chart-api": ["chart_admin", "content_editor"]
       },
@@ -170,7 +182,7 @@
       "email": "u1-health-region@example.org",
       "firstName": "U1",
       "lastName": "Health Region",
-      "groups": ["/country-a/region-a"],
+      "groups": ["/india/madhya-pradesh"],
       "clientRoles": {
         "chart-api": ["health_planning_lead"]
       },
@@ -188,7 +200,7 @@
       "email": "u2-sector-region@example.org",
       "firstName": "U2",
       "lastName": "Sector Region",
-      "groups": ["/country-b/region-b"],
+      "groups": ["/kenya/kajiado"],
       "clientRoles": {
         "chart-api": ["cross_sector_planning_lead"]
       },
@@ -206,7 +218,7 @@
       "email": "u3-health-district@example.org",
       "firstName": "U3",
       "lastName": "Health District",
-      "groups": ["/country-a/region-a/district-a"],
+      "groups": ["/india/madhya-pradesh/bhopal"],
       "clientRoles": {
         "chart-api": ["health_implementation_officer"]
       },
@@ -224,7 +236,7 @@
       "email": "u4-sector-district@example.org",
       "firstName": "U4",
       "lastName": "Sector District",
-      "groups": ["/country-b/region-b/district-c"],
+      "groups": ["/kenya/kajiado/kajiado-central"],
       "clientRoles": {
         "chart-api": ["cross_sector_implementation_officer"]
       },

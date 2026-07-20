@@ -9,6 +9,7 @@ node_modules/
 
 **/__pycache__/
 **/*.egg-info/
+**/.cache/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
@@ -20,6 +21,9 @@ orchestration/storage/
 
 data/
 docs/
+pipelines/era5_heat/README.md
+pipelines/LBW_demo/README.md
+pipelines/LBW_demo/web/index.html
 web/payload-types.ts
 web/src/app/(payload)/admin/importMap.ts
 chart-repository/payload-types.ts

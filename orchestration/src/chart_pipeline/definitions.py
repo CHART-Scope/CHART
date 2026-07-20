@@ -62,6 +62,8 @@ def _prepare_era5_climate(
             preset_slug, years=config.years, end_year=config.end_year
         )
     else:
+        if not _cds_credentials_available():
+            raise ClimateServiceError("CLIMATE_INGEST_NOT_CONFIGURED", 503)
         context.log.info(
             "Downloading ERA5 for %s (%s-%s)",
             preset.name,
@@ -117,6 +119,15 @@ def _prepare_era5_climate(
         )
 
     return metadata
+
+
+def _cds_credentials_available() -> bool:
+    if os.getenv("CDSAPI_KEY"):
+        return True
+    credentials_file = Path(
+        os.getenv("CDSAPI_RC", Path.home() / ".cdsapirc")
+    ).expanduser()
+    return credentials_file.is_file()
 
 
 @dg.asset(
