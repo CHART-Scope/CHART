@@ -19,6 +19,7 @@ async function main() {
 
   await syncRealmSettings(token, realmSeed);
   await ensureClientRoles(token, realmSeed.roles?.client ?? {});
+  await ensureClientProtocolMappers(token, realmSeed.clients ?? []);
   await ensureGroups(token, realmSeed.groups ?? []);
   await importUsers(token, realmSeed.users ?? []);
 
@@ -45,14 +46,25 @@ async function getAdminToken() {
     username: adminUsername,
     password: adminPassword,
   });
-  const response = await fetchJson(
-    `${keycloakUrl}/realms/${adminRealm}/protocol/openid-connect/token`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body,
-    },
-  );
+  let response;
+  try {
+    response = await fetchJson(
+      `${keycloakUrl}/realms/${adminRealm}/protocol/openid-connect/token`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body,
+      },
+    );
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("invalid_grant")) {
+      throw new Error(
+        "Local Keycloak rejected the configured admin credentials. " +
+          "If this is disposable development data, run: make identity-reset CONFIRM=1",
+      );
+    }
+    throw error;
+  }
 
   if (!response.access_token) {
     throw new Error("Keycloak admin token response did not include an access token.");
@@ -118,6 +130,42 @@ async function upsertClientRole(token, clientUuid, role) {
     headers: jsonHeaders(token),
     body: JSON.stringify({ ...role, name: role.name }),
   });
+}
+
+async function ensureClientProtocolMappers(token, clients) {
+  for (const clientSeed of clients) {
+    const mappers = clientSeed.protocolMappers ?? [];
+    if (mappers.length === 0) {
+      continue;
+    }
+
+    const client = await getClient(token, clientSeed.clientId);
+    const mapperUrl = `${keycloakUrl}/admin/realms/${targetRealm}/clients/${client.id}/protocol-mappers/models`;
+    const existingMappers = await fetchJson(mapperUrl, {
+      headers: authHeaders(token),
+    });
+
+    for (const mapper of mappers) {
+      const existing = existingMappers.find(
+        (candidate) => candidate.name === mapper.name,
+      );
+
+      if (!existing) {
+        await fetchOk(mapperUrl, {
+          method: "POST",
+          headers: jsonHeaders(token),
+          body: JSON.stringify(mapper),
+        });
+        continue;
+      }
+
+      await fetchOk(`${mapperUrl}/${existing.id}`, {
+        method: "PUT",
+        headers: jsonHeaders(token),
+        body: JSON.stringify({ ...mapper, id: existing.id }),
+      });
+    }
+  }
 }
 
 async function ensureGroups(token, groups, parentId) {

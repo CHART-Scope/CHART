@@ -98,3 +98,34 @@ def test_prediction_job_pulls_missing_climate_before_retrying() -> None:
         (42, "predicting"),
     ]
     fail_mock.assert_not_called()
+
+
+def test_prediction_job_records_missing_cds_configuration() -> None:
+    run_config = _run_config()
+    run_config["ops"]["process_prediction_request"]["config"][
+        "use_fixture"
+    ] = False
+
+    with (
+        patch("chart_pipeline.definitions.mark_prediction_request_running"),
+        patch("chart_pipeline.definitions.set_prediction_request_stage"),
+        patch(
+            "chart_pipeline.definitions.complete_prediction_request",
+            side_effect=ClimateServiceError("CLIMATE_DATA_NOT_READY", 409),
+        ),
+        patch(
+            "chart_pipeline.definitions._cds_credentials_available",
+            return_value=False,
+        ),
+        patch("chart_pipeline.definitions.fail_prediction_request") as fail_mock,
+    ):
+        result = prediction_request_job.execute_in_process(
+            run_config=run_config,
+            raise_on_error=False,
+        )
+
+    assert not result.success
+    fail_mock.assert_called_once_with(
+        42,
+        error_code="CLIMATE_INGEST_NOT_CONFIGURED",
+    )

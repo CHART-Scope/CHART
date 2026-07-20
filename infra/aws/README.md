@@ -10,7 +10,15 @@ The workflow:
 4. runs `infra/aws/deploy-app.sh`.
 
 The script runs Docker containers for Postgres, Keycloak, the Fastify API, web,
-LBW inference, the Python climate API, the Dagster webserver and daemon, and nginx.
+the Python API, the Dagster webserver and daemon, and nginx. LBW inference is
+started when both model URIs are configured.
+Database migrations run in order on deploy:
+
+1. Drizzle (`npm run db:migrate:api`) via the API image
+2. API seed (`npm run db:seed:api`)
+3. Alembic (`alembic upgrade head`) via the Python image
+4. Dagster instance storage migrations
+
 Only nginx is public:
 
 - `/`: Next web app
@@ -18,7 +26,7 @@ Only nginx is public:
 - `/chart-api/*`: remaining Fastify API routes
 - `/climate/*`: Python climate and prediction API
 - `/climate-api/health`: Python API health check
-- `/lbw/*`: LBW inference API
+- `/lbw/*`: LBW inference API, when configured
 - `/identity`: Keycloak
 
 Dagster binds to `127.0.0.1:3000` on the EC2 host and is not exposed by nginx.
@@ -31,14 +39,24 @@ Required:
 - `AWS_APP_USER`: EC2 SSH user.
 - `AWS_APP_SSH_KEY`: private SSH key. Its public key must be in
   `/home/<AWS_APP_USER>/.ssh/authorized_keys`.
-- `CDSAPI_URL`: Copernicus CDS API URL.
-- `CDSAPI_KEY`: Copernicus CDS API key.
-- `LBW_MODEL_DIVISION_S3_URI`: private S3 URI for the division model bundle.
-- `LBW_MODEL_STATE_S3_URI`: private S3 URI for the state model bundle.
 
 Optional:
 
 - `AWS_APP_PUBLIC_HOST`: browser-facing hostname. Use this for a subdomain.
+- `CDSAPI_URL`: defaults to `https://cds.climate.copernicus.eu/api`.
+- `CDSAPI_KEY`: deployment credential used only by Dagster for live ERA5 downloads.
+- `LBW_MODEL_DIVISION_S3_URI`: private S3 URI for the division model bundle.
+- `LBW_MODEL_STATE_S3_URI`: private S3 URI for the state model bundle. Configure both
+  LBW model URIs together.
+
+The core app deploys without the optional prediction integrations. Existing climate
+data remains readable. A missing-climate request reports
+`CLIMATE_INGEST_NOT_CONFIGURED` when no CDS key is available, while LBW processing
+reports `LBW_SERVICE_NOT_CONFIGURED` when its model service is disabled. CHART users
+never provide these deployment credentials.
+
+`CDSAPI_KEY` is written to `/opt/chart-env/prediction-worker.env` and passed only to
+the Dagster webserver and daemon. It is not passed to Next, Fastify, or the Python API.
 
 ## EC2 prerequisites
 
@@ -89,17 +107,6 @@ The response is either a cached `200` result or a `202` containing `request_id` 
 `status_url`. Poll `http://<host><status_url>` with the same bearer token until it
 completes. Deployment health checks never submit this request automatically.
 
-The repository verifier performs the same authenticated request, polls Dagster,
-and checks the persisted database row. The token must include one of the prediction
-roles and a geography group that contains `/india/madhya-pradesh`:
-
-```bash
-export CHART_ACCESS_TOKEN='<keycloak-access-token>'
-python backend/scripts/verify_on_demand_prediction.py \
-  --api-url http://<host> \
-  --dagster-ui-url http://127.0.0.1:3000
-```
-
 **Reset a user to re-experience onboarding:**
 
 ```bash
@@ -110,10 +117,16 @@ docker exec -it chart-postgres psql -U chart -d chart \
 **Full wipe and redeploy:**
 
 ```bash
-docker rm -f chart-proxy chart-web chart-api chart-climate-api chart-dagster-webserver chart-dagster-daemon chart-lbw chart-keycloak chart-keycloak-postgres chart-postgres
-docker volume rm chart-postgres-data chart-keycloak-postgres-data chart-dagster-storage chart-climate-data
+docker rm -f chart-proxy chart-web chart-api chart-climate-api chart-dagster-webserver chart-dagster-daemon chart-lbw chart-keycloak chart-postgres
+docker volume rm chart-postgres-data chart-dagster-storage chart-climate-data
 PUBLIC_HOST=<host> bash /opt/chart/infra/aws/deploy-app.sh
 ```
+
+Keycloak uses the `chart_keycloak` logical database and dedicated database role on
+`chart-postgres`. On the first consolidated deployment, the script transactionally
+migrates an existing standalone Keycloak database before starting Keycloak. The
+legacy `chart-keycloak-postgres-data` volume remains available for rollback and can
+be removed manually after confirming sign-in and SSO configuration.
 
 **Find the Keycloak admin password:**
 

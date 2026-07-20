@@ -34,6 +34,7 @@ def signed_token(monkeypatch: pytest.MonkeyPatch):
             "preferred_username": "verified-health-lead",
             "email": "lead@example.org",
             "iss": issuer,
+            "aud": "chart-api",
             "exp": now + timedelta(minutes=5),
             "groups": ["/country-b/region-b"],
             "resource_access": {"chart-api": {"roles": ["health_planning_lead"]}},
@@ -96,6 +97,18 @@ def test_auth_me_rejects_invalid_issuer(client: TestClient, signed_token) -> Non
         headers={
             "Authorization": f"Bearer {signed_token(iss='http://wrong.test/realms/chart')}"
         },
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {"error": "AUTH_TOKEN_INVALID"}
+
+
+def test_auth_me_rejects_token_for_another_audience(
+    client: TestClient, signed_token
+) -> None:
+    response = client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {signed_token(aud='another-api')}"},
     )
 
     assert response.status_code == 401

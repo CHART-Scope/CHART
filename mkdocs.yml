@@ -1,0 +1,66 @@
+site_name: CHART
+site_description: Climate-health planning platform documentation
+site_url: https://chart.example.org
+repo_url: https://github.com/scope/CHART
+repo_name: scope/CHART
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: teal
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+    - content.code.copy
+    - content.tabs.link
+
+plugins:
+  - search
+  - swagger-ui-tag
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+
+nav:
+  - Home: index.md
+  - Python backend:
+      - Overview: python-backend.md
+      - Climate API: climate-api.md
+      - OpenAPI reference: api-reference.md
+  - Data pipeline: data-pipeline.md
+  - Architecture: architecture.md
+  - Technical design (draft): tdd.md
+  - Legacy TypeScript API: legacy-fastify-api.md
+
+extra:
+  generator: false

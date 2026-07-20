@@ -40,6 +40,12 @@ chart-repository/payload-types.ts
 chart-repository/public/uploads/
 outputs/
 
+# mkdocs build output
+site/
+
+# copied openapi for docs site (source: api/openapi.yaml)
+docs/openapi/fastify.yaml
+
 # local docs and notes
 data/
 data/
@@ -47,6 +53,7 @@ outputs/
 web/public/uploads/
 .local/
 pipelines/LBW_demo/model/
+pipelines/inference/models/
 
 # OS files
 .DS_Store

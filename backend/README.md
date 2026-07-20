@@ -7,8 +7,11 @@ Start with the **climate spine** tables in `chart/shared/db/models.py` (TDD §7)
 ```bash
 export DATABASE_URL=postgresql+psycopg://chart:chart@localhost:5434/chart
 pip install -e backend
-cd backend && alembic upgrade head
+backend/scripts/migrate.sh
 ```
+
+CI runs the same Alembic step after Drizzle migrations on every `main`/`dev` API workflow push.
+Deploy to EC2 (`dev` branch) runs Drizzle migrate, then `backend/Dockerfile` Alembic migrate, then seed.
 
 Orchestration docs: `orchestration/README.md`.
 
