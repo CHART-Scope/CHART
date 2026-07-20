@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { getChartApiBaseUrl } from "./chartApi";
+import { getChartPythonApiBaseUrl } from "./chartApi";
 import { corsJson } from "./cors";
 
 type CurrentUserContext = {
@@ -76,7 +76,7 @@ async function resolveCurrentUser(
   request: NextRequest,
   authorization: string,
 ): Promise<CurrentUserResult> {
-  const userResponse = await fetch(`${getChartApiBaseUrl(request)}/auth/me`, {
+  const userResponse = await fetch(`${getChartPythonApiBaseUrl(request)}/auth/me`, {
     cache: "no-store",
     headers: { authorization },
   });

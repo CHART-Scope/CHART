@@ -1,17 +1,34 @@
 name: App Deploy
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/app-deploy.yml"
+      - ".dockerignore"
+      - "api/**"
+      - "backend/**"
+      - "infra/**"
+      - "orchestration/**"
+      - "package.json"
+      - "package-lock.json"
+      - "pipelines/era5_heat/**"
+      - "pipelines/LBW_demo/**"
+      - "web/**"
   push:
     branches:
       - dev
     paths:
       - ".github/workflows/app-deploy.yml"
+      - ".dockerignore"
       - "api/**"
+      - "backend/**"
       - ".prettierignore"
       - ".prettierrc.json"
       - "infra/**"
+      - "orchestration/**"
       - "package.json"
       - "package-lock.json"
+      - "pipelines/era5_heat/**"
       - "pipelines/LBW_demo/**"
       - "web/**"
   workflow_dispatch:
@@ -25,7 +42,7 @@ env:
   DEPLOY_BRANCH: dev
 
 concurrency:
-  group: chart-app-deploy-dev
+  group: chart-app-deploy-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -53,12 +70,12 @@ jobs:
       DATABASE_URL: postgres://chart:chart@127.0.0.1:5432/chart
     steps:
       - name: Check out deploy branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
-          ref: ${{ env.DEPLOY_BRANCH }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || env.DEPLOY_BRANCH }}
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -68,6 +85,9 @@ jobs:
 
       - name: Check formatting
         run: npx prettier --check .github README.md api infra web/src web/.storybook web/*.json web/*.mjs web/*.ts package.json
+
+      - name: Check deploy script syntax
+        run: bash -n infra/aws/deploy-app.sh
 
       - name: Check API migrations
         run: npm run db:check:api
@@ -93,9 +113,24 @@ jobs:
       - name: Build web image
         run: docker build -f web/Dockerfile -t chart-web:ci .
 
+      - name: Build Python prediction image
+        run: docker build -f backend/Dockerfile -t chart-python:ci .
+
+      - name: Validate Python prediction image
+        run: |
+          docker run --rm chart-python:ci python -c 'import dagster as dg; from chart_pipeline.definitions import defs; dg.Definitions.validate_loadable(defs)'
+          docker run --rm --network host \
+            -e DAGSTER_POSTGRES_HOST=127.0.0.1 \
+            -e DAGSTER_POSTGRES_PORT=5432 \
+            -e DAGSTER_POSTGRES_USER=chart \
+            -e DAGSTER_POSTGRES_PASSWORD=chart \
+            -e DAGSTER_POSTGRES_DB=chart \
+            chart-python:ci dagster instance info
+
   deploy:
     name: Deploy app
     needs: validate
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: dev
     env:
@@ -103,11 +138,15 @@ jobs:
       AWS_APP_PUBLIC_HOST: ${{ secrets.AWS_APP_PUBLIC_HOST }}
       AWS_APP_SSH_KEY: ${{ secrets.AWS_APP_SSH_KEY }}
       AWS_APP_USER: ${{ secrets.AWS_APP_USER }}
+      CDSAPI_KEY: ${{ secrets.CDSAPI_KEY }}
+      CDSAPI_URL: ${{ secrets.CDSAPI_URL }}
+      LBW_MODEL_DIVISION_S3_URI: ${{ secrets.LBW_MODEL_DIVISION_S3_URI }}
+      LBW_MODEL_STATE_S3_URI: ${{ secrets.LBW_MODEL_STATE_S3_URI }}
     steps:
       - name: Validate deploy secrets
         run: |
           missing=0
-          for name in AWS_APP_HOST AWS_APP_SSH_KEY AWS_APP_USER; do
+          for name in AWS_APP_HOST AWS_APP_SSH_KEY AWS_APP_USER CDSAPI_KEY CDSAPI_URL LBW_MODEL_DIVISION_S3_URI LBW_MODEL_STATE_S3_URI; do
             if [ -z "${!name}" ]; then
               echo "::error title=Missing deploy secret::$name is required for EC2 deploy"
               missing=1
@@ -116,12 +155,13 @@ jobs:
           exit "$missing"
 
       - name: Deploy app on EC2
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ env.AWS_APP_HOST }}
           username: ${{ env.AWS_APP_USER }}
           key: ${{ env.AWS_APP_SSH_KEY }}
           command_timeout: 30m
+          envs: CDSAPI_KEY,CDSAPI_URL,LBW_MODEL_DIVISION_S3_URI,LBW_MODEL_STATE_S3_URI
           script: |
             set -euo pipefail
 
@@ -151,10 +191,11 @@ jobs:
           for attempt in $(seq 1 12); do
             web_status="$(curl -fsS -o /dev/null -w "%{http_code}" "$base_url/" || true)"
             api_body="$(curl -fsS "$base_url/chart-api/health" || true)"
+            climate_body="$(curl -fsS "$base_url/climate-api/health" || true)"
             keycloak_status="$(curl -fsS -o /dev/null -w "%{http_code}" "$base_url/identity/realms/chart" || true)"
 
-            if [ "$web_status" != "200" ] || [ "$api_body" != '{"status":"ok"}' ] || [ "$keycloak_status" != "200" ]; then
-              echo "::error title=Public smoke check failed::attempt ${attempt}: web=${web_status:-000} api=${api_body:-empty} keycloak=${keycloak_status:-000}"
+            if [ "$web_status" != "200" ] || [ "$api_body" != '{"status":"ok"}' ] || [ "$climate_body" != '{"status":"ok"}' ] || [ "$keycloak_status" != "200" ]; then
+              echo "::error title=Public smoke check failed::attempt ${attempt}: web=${web_status:-000} api=${api_body:-empty} climate=${climate_body:-empty} keycloak=${keycloak_status:-000}"
               exit 1
             fi
 
@@ -164,7 +205,7 @@ jobs:
 
       - name: Dump EC2 diagnostics on failure
         if: failure()
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ env.AWS_APP_HOST }}
           username: ${{ env.AWS_APP_USER }}
@@ -175,7 +216,7 @@ jobs:
             docker ps -a --filter "name=chart-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             ss -ltnp || true
 
-            for container in chart-proxy chart-web chart-api chart-keycloak chart-postgres chart-keycloak-postgres; do
+            for container in chart-proxy chart-web chart-api chart-climate-api chart-dagster-webserver chart-dagster-daemon chart-lbw chart-keycloak chart-postgres chart-keycloak-postgres; do
               if docker ps -a --format "{{.Names}}" | grep -qx "$container"; then
                 echo "===== $container logs ====="
                 docker logs --tail 120 "$container" || true

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { getChartApiBaseUrl } from "@/lib/chartApi";
+import { getChartPythonApiBaseUrl } from "@/lib/chartApi";
 
 export const runtime = "nodejs";
 
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     headers.set("x-chart-active-geography", activeGeography);
   }
 
-  const response = await fetch(`${getChartApiBaseUrl(request)}/auth/me`, {
+  const response = await fetch(`${getChartPythonApiBaseUrl(request)}/auth/me`, {
     cache: "no-store",
     headers,
   });

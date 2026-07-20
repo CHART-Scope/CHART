@@ -12,14 +12,19 @@ KEYCLOAK_CONTAINER="${KEYCLOAK_CONTAINER:-chart-keycloak}"
 API_CONTAINER="${API_CONTAINER:-chart-api}"
 WEB_CONTAINER="${WEB_CONTAINER:-chart-web}"
 LBW_CONTAINER="${LBW_CONTAINER:-chart-lbw}"
+CLIMATE_API_CONTAINER="${CLIMATE_API_CONTAINER:-chart-climate-api}"
+DAGSTER_WEBSERVER_CONTAINER="${DAGSTER_WEBSERVER_CONTAINER:-chart-dagster-webserver}"
+DAGSTER_DAEMON_CONTAINER="${DAGSTER_DAEMON_CONTAINER:-chart-dagster-daemon}"
 PROXY_CONTAINER="${PROXY_CONTAINER:-chart-proxy}"
 
 DB_NAME="${DB_NAME:-chart}"
+DAGSTER_DB_NAME="chart_dagster"
 KEYCLOAK_DB_NAME="${KEYCLOAK_DB_NAME:-chart_keycloak}"
 DB_USER="${DB_USER:-chart}"
 API_IMAGE="${API_IMAGE:-chart-api:latest}"
 WEB_IMAGE="${WEB_IMAGE:-chart-web:latest}"
 LBW_IMAGE="${LBW_IMAGE:-chart-lbw:latest}"
+PYTHON_IMAGE="${PYTHON_IMAGE:-chart-python:latest}"
 PROXY_CONFIG_FILE="${PROXY_CONFIG_FILE:-$ENV_DIR/nginx.conf}"
 
 random_secret() {
@@ -69,27 +74,49 @@ fi
 
 mkdir -p "$ENV_DIR"
 
+DEPLOY_CDSAPI_KEY="${CDSAPI_KEY:-}"
+DEPLOY_CDSAPI_URL="${CDSAPI_URL:-}"
+DEPLOY_LBW_MODEL_DIVISION_S3_URI="${LBW_MODEL_DIVISION_S3_URI:-}"
+DEPLOY_LBW_MODEL_STATE_S3_URI="${LBW_MODEL_STATE_S3_URI:-}"
+
 if [ -f "$ENV_FILE" ]; then
   set -a
+  # shellcheck source=/dev/null
   . "$ENV_FILE"
   set +a
 fi
 
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(random_secret)}"
 KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-$(random_secret)}"
-LBW_MODEL_DIVISION_S3_URI="${LBW_MODEL_DIVISION_S3_URI:-${LBW_MODEL_S3_URI:-}}"
-LBW_MODEL_STATE_S3_URI="${LBW_MODEL_STATE_S3_URI:-}"
-LBW_ENABLED=""
-if [ -n "$LBW_MODEL_DIVISION_S3_URI" ] && [ -n "$LBW_MODEL_STATE_S3_URI" ]; then
-  LBW_ENABLED=1
-elif [ -n "$LBW_MODEL_DIVISION_S3_URI" ]; then
-  echo "LBW container disabled: set LBW_MODEL_STATE_S3_URI alongside LBW_MODEL_DIVISION_S3_URI."
-fi
+CDSAPI_KEY="${DEPLOY_CDSAPI_KEY:-${CDSAPI_KEY:-}}"
+CDSAPI_URL="${DEPLOY_CDSAPI_URL:-${CDSAPI_URL:-}}"
+LBW_MODEL_DIVISION_S3_URI="${DEPLOY_LBW_MODEL_DIVISION_S3_URI:-${LBW_MODEL_DIVISION_S3_URI:-${LBW_MODEL_S3_URI:-}}}"
+LBW_MODEL_STATE_S3_URI="${DEPLOY_LBW_MODEL_STATE_S3_URI:-${LBW_MODEL_STATE_S3_URI:-}}"
+
+for name in CDSAPI_KEY CDSAPI_URL LBW_MODEL_DIVISION_S3_URI LBW_MODEL_STATE_S3_URI; do
+  if [ -z "${!name}" ]; then
+    echo "Set $name before deploying the prediction services." >&2
+    exit 1
+  fi
+done
+
+PYTHON_DATABASE_URL="postgresql+psycopg://$DB_USER:$POSTGRES_PASSWORD@$DB_CONTAINER:5432/$DB_NAME"
 
 cat >"$ENV_FILE" <<EOF
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 KEYCLOAK_ADMIN_PASSWORD=$KEYCLOAK_ADMIN_PASSWORD
 DATABASE_URL=postgres://$DB_USER:$POSTGRES_PASSWORD@$DB_CONTAINER:5432/$DB_NAME
+PYTHON_DATABASE_URL=$PYTHON_DATABASE_URL
+DAGSTER_HOME=/opt/dagster/dagster_home
+DAGSTER_POSTGRES_HOST=$DB_CONTAINER
+DAGSTER_POSTGRES_PORT=5432
+DAGSTER_POSTGRES_USER=$DB_USER
+DAGSTER_POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+DAGSTER_POSTGRES_DB=$DAGSTER_DB_NAME
+CLIMATE_OUTPUT_DIR=/opt/chart/data/climate
+ERA5_USE_FIXTURE=0
+CDSAPI_URL=$CDSAPI_URL
+CDSAPI_KEY=$CDSAPI_KEY
 KEYCLOAK_ISSUER_URL=http://$PUBLIC_HOST/identity/realms/chart
 KEYCLOAK_CLIENT_ID=chart-api
 KEYCLOAK_JWKS_URL=http://$KEYCLOAK_CONTAINER:8080/identity/realms/chart/protocol/openid-connect/certs
@@ -101,34 +128,16 @@ KEYCLOAK_ADMIN_USERNAME=admin
 KEYCLOAK_REALM=chart
 KEYCLOAK_WEB_CLIENT_ID=chart-web
 CHART_API_INTERNAL_URL=http://$API_CONTAINER:3200
+CHART_PYTHON_API_INTERNAL_URL=http://$CLIMATE_API_CONTAINER:3210
 CHART_CORS_ORIGINS=http://$PUBLIC_HOST
 CHART_WEB_ORIGIN=http://$PUBLIC_HOST
 LBW_MODEL_DIVISION_S3_URI=$LBW_MODEL_DIVISION_S3_URI
 LBW_MODEL_STATE_S3_URI=$LBW_MODEL_STATE_S3_URI
 LBW_MODEL_S3_URI=$LBW_MODEL_DIVISION_S3_URI
+LBW_SERVICE_URL=http://$LBW_CONTAINER:8000
 EOF
 
 chmod 600 "$ENV_FILE"
-
-LBW_NGINX_LOCATION=""
-if [ -n "$LBW_ENABLED" ]; then
-  LBW_NGINX_LOCATION="$(cat <<EOF
-    location = /lbw {
-      return 302 /lbw/ui/;
-    }
-
-    location /lbw/ {
-      proxy_pass http://$LBW_CONTAINER:8000/;
-      proxy_read_timeout 120s;
-      proxy_set_header Host \$host;
-      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Host \$host;
-      proxy_set_header X-Forwarded-Port \$server_port;
-      proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-EOF
-)"
-fi
 
 cat >"$PROXY_CONFIG_FILE" <<EOF
 events {}
@@ -178,7 +187,47 @@ http {
       proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
-$LBW_NGINX_LOCATION
+    location /chart-api/auth/ {
+      proxy_pass http://$CLIMATE_API_CONTAINER:3210/auth/;
+      proxy_set_header Host \$host;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host \$host;
+      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location = /climate-api/health {
+      proxy_pass http://$CLIMATE_API_CONTAINER:3210/health;
+      proxy_set_header Host \$host;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host \$host;
+      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /climate/ {
+      proxy_pass http://$CLIMATE_API_CONTAINER:3210;
+      proxy_read_timeout 30s;
+      proxy_set_header Host \$host;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host \$host;
+      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location = /lbw {
+      return 302 /lbw/ui/;
+    }
+
+    location /lbw/ {
+      proxy_pass http://$LBW_CONTAINER:8000/;
+      proxy_read_timeout 120s;
+      proxy_set_header Host \$host;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host \$host;
+      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header X-Forwarded-Proto \$scheme;
+    }
 
     location / {
       proxy_pass http://$WEB_CONTAINER:3100;
@@ -199,16 +248,25 @@ chmod 600 "$PROXY_CONFIG_FILE"
 echo "Building CHART images before restarting live containers..."
 docker build -f "$APP_DIR/api/Dockerfile" -t "$API_IMAGE" "$APP_DIR"
 docker build -f "$APP_DIR/web/Dockerfile" -t "$WEB_IMAGE" "$APP_DIR"
-if [ -n "$LBW_ENABLED" ]; then
-  docker build \
-    -f "$APP_DIR/pipelines/LBW_demo/Dockerfile" \
-    -t "$LBW_IMAGE" \
-    "$APP_DIR/pipelines/LBW_demo"
-fi
+docker build -f "$APP_DIR/backend/Dockerfile" -t "$PYTHON_IMAGE" "$APP_DIR"
+docker build \
+  -f "$APP_DIR/pipelines/LBW_demo/Dockerfile" \
+  -t "$LBW_IMAGE" \
+  "$APP_DIR/pipelines/LBW_demo"
 
 docker network create "$NETWORK" >/dev/null 2>&1 || true
 
-docker rm -f "$PROXY_CONTAINER" "$WEB_CONTAINER" "$API_CONTAINER" "$LBW_CONTAINER" "$KEYCLOAK_CONTAINER" "$KEYCLOAK_DB_CONTAINER" "$DB_CONTAINER" >/dev/null 2>&1 || true
+docker rm -f \
+  "$PROXY_CONTAINER" \
+  "$WEB_CONTAINER" \
+  "$API_CONTAINER" \
+  "$CLIMATE_API_CONTAINER" \
+  "$DAGSTER_WEBSERVER_CONTAINER" \
+  "$DAGSTER_DAEMON_CONTAINER" \
+  "$LBW_CONTAINER" \
+  "$KEYCLOAK_CONTAINER" \
+  "$KEYCLOAK_DB_CONTAINER" \
+  "$DB_CONTAINER" >/dev/null 2>&1 || true
 
 docker run -d \
   --name "$DB_CONTAINER" \
@@ -222,6 +280,11 @@ docker run -d \
 
 wait_for_command "Postgres" \
   docker exec "$DB_CONTAINER" pg_isready -U "$DB_USER" -d "$DB_NAME"
+
+if ! docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d postgres -Atc \
+  "SELECT 1 FROM pg_database WHERE datname = '$DAGSTER_DB_NAME'" | grep -qx 1; then
+  docker exec "$DB_CONTAINER" createdb -U "$DB_USER" "$DAGSTER_DB_NAME"
+fi
 
 docker run -d \
   --name "$KEYCLOAK_DB_CONTAINER" \
@@ -305,6 +368,17 @@ docker run --rm \
   --env-file "$ENV_FILE" \
   "$API_IMAGE" npm run db:seed:api
 
+docker run --rm \
+  --network "$NETWORK" \
+  --env-file "$ENV_FILE" \
+  -e DATABASE_URL="$PYTHON_DATABASE_URL" \
+  "$PYTHON_IMAGE" alembic upgrade head
+
+docker run --rm \
+  --network "$NETWORK" \
+  --env-file "$ENV_FILE" \
+  "$PYTHON_IMAGE" dagster instance migrate
+
 docker run -d \
   --name "$API_CONTAINER" \
   --network "$NETWORK" \
@@ -326,16 +400,58 @@ docker run -d \
   -e PORT=3100 \
   "$WEB_IMAGE" >/dev/null
 
-if [ -n "$LBW_ENABLED" ]; then
-  docker run -d \
-    --name "$LBW_CONTAINER" \
-    --network "$NETWORK" \
-    --restart unless-stopped \
-    -e LBW_MODEL_DIVISION_S3_URI="$LBW_MODEL_DIVISION_S3_URI" \
-    -e LBW_MODEL_STATE_S3_URI="$LBW_MODEL_STATE_S3_URI" \
-    -v chart-lbw-model:/models \
-    "$LBW_IMAGE" >/dev/null
-fi
+docker run -d \
+  --name "$LBW_CONTAINER" \
+  --network "$NETWORK" \
+  --restart unless-stopped \
+  -e LBW_MODEL_DIVISION_S3_URI="$LBW_MODEL_DIVISION_S3_URI" \
+  -e LBW_MODEL_STATE_S3_URI="$LBW_MODEL_STATE_S3_URI" \
+  -v chart-lbw-model:/models \
+  "$LBW_IMAGE" >/dev/null
+
+wait_for_command "LBW inference" \
+  docker exec "$LBW_CONTAINER" curl -fsS "http://127.0.0.1:8000/health"
+
+docker run -d \
+  --name "$CLIMATE_API_CONTAINER" \
+  --network "$NETWORK" \
+  --restart unless-stopped \
+  --env-file "$ENV_FILE" \
+  -e DATABASE_URL="$PYTHON_DATABASE_URL" \
+  -e HOST=0.0.0.0 \
+  -e PORT=3210 \
+  -p 127.0.0.1:3210:3210 \
+  "$PYTHON_IMAGE" >/dev/null
+
+wait_for_command "CHART climate API" curl -fsS "http://127.0.0.1:3210/health"
+
+docker run -d \
+  --name "$DAGSTER_WEBSERVER_CONTAINER" \
+  --network "$NETWORK" \
+  --restart unless-stopped \
+  --env-file "$ENV_FILE" \
+  -e DATABASE_URL="$PYTHON_DATABASE_URL" \
+  -p 127.0.0.1:3000:3000 \
+  -v chart-dagster-storage:/opt/dagster/storage \
+  -v chart-climate-data:/opt/chart/data/climate \
+  "$PYTHON_IMAGE" \
+  dagster-webserver -h 0.0.0.0 -p 3000 -m chart_pipeline.definitions >/dev/null
+
+wait_for_command "Dagster webserver" curl -fsS "http://127.0.0.1:3000/server_info"
+
+docker run -d \
+  --name "$DAGSTER_DAEMON_CONTAINER" \
+  --network "$NETWORK" \
+  --restart unless-stopped \
+  --env-file "$ENV_FILE" \
+  -e DATABASE_URL="$PYTHON_DATABASE_URL" \
+  -v chart-dagster-storage:/opt/dagster/storage \
+  -v chart-climate-data:/opt/chart/data/climate \
+  "$PYTHON_IMAGE" \
+  dagster-daemon run -m chart_pipeline.definitions >/dev/null
+
+wait_for_command "Dagster daemon" \
+  docker exec "$DAGSTER_DAEMON_CONTAINER" dagster-daemon liveness-check
 
 docker run -d \
   --name "$PROXY_CONTAINER" \
@@ -347,14 +463,13 @@ docker run -d \
 
 wait_for_command "CHART web" curl -fsS "http://127.0.0.1/"
 wait_for_command "CHART API through proxy" curl -fsS "http://127.0.0.1/chart-api/health"
+wait_for_command "CHART climate API through proxy" curl -fsS "http://127.0.0.1/climate-api/health"
 wait_for_command "Keycloak through proxy" curl -fsS "http://127.0.0.1/identity/realms/chart"
-if [ -n "$LBW_ENABLED" ]; then
-  wait_for_command "LBW inference through proxy" curl -fsS "http://127.0.0.1/lbw/health"
-fi
+wait_for_command "LBW inference through proxy" curl -fsS "http://127.0.0.1/lbw/health"
 
 echo "CHART is running at http://$PUBLIC_HOST"
 echo "CHART API is running at http://$PUBLIC_HOST/chart-api"
+echo "CHART climate API is running at http://$PUBLIC_HOST/climate"
+echo "Dagster UI is private at http://127.0.0.1:3000 (use an SSH tunnel)."
 echo "CHART sign-in is running at http://$PUBLIC_HOST/identity"
-if [ -n "$LBW_ENABLED" ]; then
-  echo "LBW inference is running at http://$PUBLIC_HOST/lbw/ui/"
-fi
+echo "LBW inference is running at http://$PUBLIC_HOST/lbw/ui/"

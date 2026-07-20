@@ -20,6 +20,13 @@ out
 **/.next
 **/out
 
+**/__pycache__
+**/*.egg-info
+**/*.py[cod]
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+
 .env
 .env.*
 api/openapi.yaml

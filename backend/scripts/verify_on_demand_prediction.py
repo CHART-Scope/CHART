@@ -14,12 +14,21 @@ from sqlalchemy.orm import Session
 from chart.shared.db.models import PredictionRequestRecord
 
 
-def _json_request(url: str, *, payload: dict | None = None) -> tuple[int, dict]:
+def _json_request(
+    url: str,
+    *,
+    access_token: str,
+    payload: dict | None = None,
+) -> tuple[int, dict]:
     body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
     request = urllib.request.Request(
         url,
         data=body,
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST" if payload is not None else "GET",
     )
     try:
@@ -37,7 +46,19 @@ def main() -> int:
     parser.add_argument("--dagster-ui-url", default="http://127.0.0.1:3000")
     parser.add_argument("--end-month", default="2020-12")
     parser.add_argument("--timeout", type=int, default=120)
+    parser.add_argument(
+        "--access-token",
+        default=os.getenv("CHART_ACCESS_TOKEN"),
+        help="Keycloak access token; defaults to CHART_ACCESS_TOKEN.",
+    )
     args = parser.parse_args()
+
+    if not args.access_token:
+        print(
+            "Set CHART_ACCESS_TOKEN or pass --access-token with a Keycloak token.",
+            file=sys.stderr,
+        )
+        return 2
 
     payload = {
         "location_slug": "madhya-pradesh",
@@ -47,6 +68,7 @@ def main() -> int:
     }
     status_code, response = _json_request(
         f"{args.api_url.rstrip('/')}/climate/predict",
+        access_token=args.access_token,
         payload=payload,
     )
     print(json.dumps(response, indent=2))
@@ -69,7 +91,7 @@ def main() -> int:
     status_url = f"{args.api_url.rstrip('/')}{response['status_url']}"
     latest: dict = response
     while time.monotonic() < deadline:
-        _, latest = _json_request(status_url)
+        _, latest = _json_request(status_url, access_token=args.access_token)
         print(
             f"status={latest['status']} stage={latest['stage']} "
             f"dagster_run_id={latest.get('dagster_run_id')}"
