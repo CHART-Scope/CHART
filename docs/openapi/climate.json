@@ -372,6 +372,16 @@
               }
             }
           },
+          "403": {
+            "description": "Role or geography denied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "202": {
             "description": "Prediction queued in Dagster.",
             "content": {
@@ -436,6 +446,16 @@
           },
           "401": {
             "description": "Keycloak token required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role or geography denied.",
             "content": {
               "application/json": {
                 "schema": {

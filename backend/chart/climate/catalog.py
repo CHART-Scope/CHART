@@ -31,6 +31,7 @@ class Location:
     name: str
     country: str
     level: str
+    geography_path: str
     supports_lbw_prediction: bool
     lbw_areas: tuple[str, ...] = ()
 
@@ -52,6 +53,7 @@ LOCATIONS: dict[ClimateLocationSlug, Location] = {
         name="Madhya Pradesh",
         country="India",
         level="state",
+        geography_path="/india/madhya-pradesh",
         supports_lbw_prediction=True,
         lbw_areas=(
             "Madhya Pradesh",
@@ -72,6 +74,7 @@ LOCATIONS: dict[ClimateLocationSlug, Location] = {
         name="Kajiado",
         country="Kenya",
         level="county",
+        geography_path="/kenya/kajiado",
         supports_lbw_prediction=False,
     ),
 }

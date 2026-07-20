@@ -15,6 +15,7 @@ from chart.climate.schemas import (
     MonthValue,
     PredictResponse,
     PredictionAcceptedResponse,
+    PredictionRequestStatusResponse,
     PreviewResponse,
 )
 from chart.climate.service import ClimateServiceError
@@ -31,12 +32,33 @@ def authenticated_client() -> Iterator[TestClient]:
         user_id="test-user",
         username="test-user",
         roles=["health_planning_lead"],
-        geography_scopes=["/country-b/region-b"],
+        geography_scopes=["/india/madhya-pradesh"],
     )
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(require_current_user, None)
+
+
+def _override_user(*, roles: list[str], geography_scopes: list[str]) -> None:
+    app.dependency_overrides[require_current_user] = lambda: CurrentUserContext(
+        user_id="test-user",
+        username="test-user",
+        roles=roles,
+        geography_scopes=geography_scopes,
+    )
+
+
+def _queued_status() -> PredictionRequestStatusResponse:
+    return PredictionRequestStatusResponse(
+        request_id=12,
+        status="queued",
+        stage="queued",
+        location_slug="madhya-pradesh",
+        timeframe_id="exposure_3m",
+        created_at="2026-07-20T10:00:00+00:00",
+        updated_at="2026-07-20T10:00:00+00:00",
+    )
 
 
 def test_list_locations(client: TestClient) -> None:
@@ -180,6 +202,81 @@ def test_prediction_routes_require_keycloak_token(client: TestClient) -> None:
     assert predict_response.json() == {"error": "AUTH_TOKEN_REQUIRED"}
     assert predict_response.headers["WWW-Authenticate"] == "Bearer"
     assert status_response.status_code == 401
+
+
+def test_predict_rejects_out_of_scope_geography(client: TestClient) -> None:
+    _override_user(
+        roles=["health_planning_lead"],
+        geography_scopes=["/kenya/kajiado"],
+    )
+    try:
+        with patch("chart.api.app.submit_prediction") as submit_mock:
+            response = client.post(
+                "/climate/predict",
+                json={
+                    "location_slug": "madhya-pradesh",
+                    "timeframe_id": "exposure_3m",
+                    "outcome": {"type": "lbw", "trimester": 1},
+                },
+            )
+    finally:
+        app.dependency_overrides.pop(require_current_user, None)
+
+    assert response.status_code == 403
+    assert response.json() == {"error": "GEOGRAPHY_OUT_OF_SCOPE"}
+    submit_mock.assert_not_called()
+
+
+def test_predict_rejects_role_without_prediction_access(client: TestClient) -> None:
+    _override_user(
+        roles=["public_viewer"],
+        geography_scopes=["/india/madhya-pradesh"],
+    )
+    try:
+        with patch("chart.api.app.submit_prediction") as submit_mock:
+            response = client.post(
+                "/climate/predict",
+                json={
+                    "location_slug": "madhya-pradesh",
+                    "timeframe_id": "exposure_3m",
+                    "outcome": {"type": "lbw", "trimester": 1},
+                },
+            )
+    finally:
+        app.dependency_overrides.pop(require_current_user, None)
+
+    assert response.status_code == 403
+    assert response.json() == {"error": "ROLE_NOT_ALLOWED"}
+    submit_mock.assert_not_called()
+
+
+def test_prediction_status_rejects_out_of_scope_geography(
+    client: TestClient,
+) -> None:
+    _override_user(
+        roles=["health_planning_lead"],
+        geography_scopes=["/kenya/kajiado"],
+    )
+    try:
+        with patch(
+            "chart.api.app.get_prediction_request", return_value=_queued_status()
+        ):
+            response = client.get("/climate/prediction-requests/12")
+    finally:
+        app.dependency_overrides.pop(require_current_user, None)
+
+    assert response.status_code == 403
+    assert response.json() == {"error": "GEOGRAPHY_OUT_OF_SCOPE"}
+
+
+def test_prediction_status_allows_matching_geography(
+    authenticated_client: TestClient,
+) -> None:
+    with patch("chart.api.app.get_prediction_request", return_value=_queued_status()):
+        response = authenticated_client.get("/climate/prediction-requests/12")
+
+    assert response.status_code == 200
+    assert response.json()["request_id"] == 12
 
 
 def test_format_month_helper() -> None:

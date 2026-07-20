@@ -10,7 +10,12 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from chart.auth.routes import router as auth_router
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import require_current_user
+from chart.auth.service import (
+    require_any_role,
+    require_current_user,
+    require_geography_access,
+)
+from chart.climate.catalog import LOCATIONS, ClimateLocationSlug
 from chart.climate.schemas import (
     ErrorResponse,
     HealthResponse,
@@ -63,6 +68,16 @@ OPENAPI_TAGS = [
         "description": "Location catalog, timeframe catalog, preview, and predict.",
     },
 ]
+
+PREDICTION_ROLES = frozenset(
+    {
+        "chart_admin",
+        "health_planning_lead",
+        "cross_sector_planning_lead",
+        "health_implementation_officer",
+        "cross_sector_implementation_officer",
+    }
+)
 
 app = FastAPI(
     title="CHART Climate API",
@@ -145,6 +160,7 @@ def post_preview(request: PreviewRequest) -> PreviewResponse:
             "description": "Invalid request or unsupported outcome.",
         },
         401: {"model": ErrorResponse, "description": "Keycloak token required."},
+        403: {"model": ErrorResponse, "description": "Role or geography denied."},
         202: {
             "model": PredictionAcceptedResponse,
             "description": "Prediction queued in Dagster.",
@@ -153,9 +169,10 @@ def post_preview(request: PreviewRequest) -> PreviewResponse:
 )
 def post_predict(
     request: PredictRequest,
-    _user: CurrentUserContext = Depends(require_current_user),
+    user: CurrentUserContext = Depends(require_current_user),
 ) -> PredictResponse | JSONResponse:
     try:
+        _require_prediction_access(user, request.location_slug)
         result = submit_prediction(request)
         if isinstance(result, PredictionAcceptedResponse):
             return JSONResponse(
@@ -175,17 +192,27 @@ def post_predict(
     summary="Read a queued or completed prediction request",
     responses={
         401: {"model": ErrorResponse, "description": "Keycloak token required."},
+        403: {"model": ErrorResponse, "description": "Role or geography denied."},
         404: {"model": ErrorResponse, "description": "Prediction request not found."},
     },
 )
 def get_prediction_request_status(
     request_id: int,
-    _user: CurrentUserContext = Depends(require_current_user),
+    user: CurrentUserContext = Depends(require_current_user),
 ) -> PredictionRequestStatusResponse:
     try:
-        return get_prediction_request(request_id)
+        status = get_prediction_request(request_id)
+        _require_prediction_access(user, status.location_slug)
+        return status
     except ClimateServiceError as error:
         raise _http_error(error) from error
+
+
+def _require_prediction_access(
+    user: CurrentUserContext, location_slug: ClimateLocationSlug
+) -> None:
+    require_any_role(user, PREDICTION_ROLES)
+    require_geography_access(user, LOCATIONS[location_slug].geography_path)
 
 
 def _http_error(error: ClimateServiceError) -> HTTPException:

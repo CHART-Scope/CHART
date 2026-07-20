@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Collection
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Annotated
@@ -116,6 +117,16 @@ def can_read_geography_path(user: CurrentUserContext, requested_path: str) -> bo
         or scope.startswith(f"{requested}/")
         for scope in map(_normalize_geography_path, user.geography_scopes)
     )
+
+
+def require_any_role(user: CurrentUserContext, allowed_roles: Collection[str]) -> None:
+    if not any(role in allowed_roles for role in user.roles):
+        raise _auth_error("ROLE_NOT_ALLOWED", 403)
+
+
+def require_geography_access(user: CurrentUserContext, requested_path: str) -> None:
+    if not can_read_geography_path(user, requested_path):
+        raise _auth_error("GEOGRAPHY_OUT_OF_SCOPE", 403)
 
 
 @lru_cache(maxsize=4)

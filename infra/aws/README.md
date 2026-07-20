@@ -89,6 +89,17 @@ The response is either a cached `200` result or a `202` containing `request_id` 
 `status_url`. Poll `http://<host><status_url>` with the same bearer token until it
 completes. Deployment health checks never submit this request automatically.
 
+The repository verifier performs the same authenticated request, polls Dagster,
+and checks the persisted database row. The token must include one of the prediction
+roles and a geography group that contains `/india/madhya-pradesh`:
+
+```bash
+export CHART_ACCESS_TOKEN='<keycloak-access-token>'
+python backend/scripts/verify_on_demand_prediction.py \
+  --api-url http://<host> \
+  --dagster-ui-url http://127.0.0.1:3000
+```
+
 **Reset a user to re-experience onboarding:**
 
 ```bash
