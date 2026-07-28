@@ -263,6 +263,7 @@ lbw-check:
 		--manifest "$(LBW_MODEL_RELEASE_MANIFEST)" \
 		--division "$(LBW_MODEL_DIVISION)" \
 		--state "$(LBW_MODEL_STATE)"
+	@Rscript $(LBW_DIR)/tests/test_serialization.R
 
 lbw-run: lbw-check
 	@health=$$(curl -fsS "http://127.0.0.1:$(LBW_PORT)/health" 2>/dev/null || true); \

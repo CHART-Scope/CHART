@@ -1,4 +1,4 @@
-FROM rocker/r-ver:4.6.0
+FROM rocker/r-ver:4.6.0 AS runtime
 
 ARG TARGETARCH
 
@@ -31,3 +31,11 @@ ENV LBW_MODEL_DIR=/models
 EXPOSE 8000
 
 CMD ["./start.sh"]
+
+FROM runtime AS test
+
+COPY tests/test_serialization.R ./tests/test_serialization.R
+
+RUN Rscript tests/test_serialization.R
+
+FROM runtime AS final

@@ -19,6 +19,7 @@ script_dir <- function() {
 }
 
 source(file.path(script_dir(), "score.R"))
+source(file.path(script_dir(), "serialization.R"))
 
 demo_root <- normalizePath(file.path(script_dir(), ".."), mustWork = FALSE)
 model_dir <- Sys.getenv("LBW_MODEL_DIR", unset = file.path(demo_root, "model"))
@@ -58,7 +59,7 @@ normalize_area <- function(area) {
   area
 }
 
-json <- plumber::serializer_unboxed_json()
+json <- api_json_serializer()
 
 pr <- plumber::pr() |>
   plumber::pr_set_serializer(json) |>

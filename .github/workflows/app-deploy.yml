@@ -149,6 +149,9 @@ jobs:
             -e DAGSTER_POSTGRES_DB=chart_dagster \
             chart-python:ci dagster instance info
 
+      - name: Validate LBW prediction image
+        run: docker build --target test -f pipelines/LBW_demo/Dockerfile -t chart-lbw:ci pipelines/LBW_demo
+
       - name: Build current frontend image
         run: docker build --build-arg "CHART_BUILD_ID=$GITHUB_SHA" -f new_design/Dockerfile -t chart-new-design:ci .
 
