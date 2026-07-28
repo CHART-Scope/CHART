@@ -20,18 +20,11 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     # Alembic defaults to varchar(32); longer revision ids fail on version stamp.
     op.execute(
-        "ALTER TABLE alembic_version "
-        "ALTER COLUMN version_num TYPE VARCHAR(64)"
+        "ALTER TABLE alembic_version " "ALTER COLUMN version_num TYPE VARCHAR(64)"
     )
-    op.alter_column(
-        "prediction_request", "status", server_default="queued"
-    )
-    op.alter_column(
-        "district_climate", "agg_method", server_default="bbox_mean"
-    )
-    op.alter_column(
-        "model_release", "status", server_default="uploaded"
-    )
+    op.alter_column("prediction_request", "status", server_default="queued")
+    op.alter_column("district_climate", "agg_method", server_default="bbox_mean")
+    op.alter_column("model_release", "status", server_default="uploaded")
 
 
 def downgrade() -> None:

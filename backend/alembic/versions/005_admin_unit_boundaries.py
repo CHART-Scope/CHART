@@ -18,9 +18,22 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # PostGIS defines a public `geography` type. Rename CHART's climate-spine
-    # table first; `geographies` already belongs to the legacy API schema.
-    op.rename_table("geography", "chart_geographies")
+    # Revisions 001-004 originally used `geography`, which conflicts with the
+    # PostGIS type of the same name. Fresh databases already use the corrected
+    # table name; databases that applied the older revisions still need the
+    # one-time rename before PostGIS can be enabled.
+    tables = set(sa.inspect(op.get_bind()).get_table_names())
+    has_legacy_table = "geography" in tables
+    has_current_table = "chart_geographies" in tables
+    if has_legacy_table and has_current_table:
+        raise RuntimeError(
+            "MIGRATION_GEOGRAPHY_TABLE_AMBIGUOUS: both geography tables exist"
+        )
+    if has_legacy_table:
+        op.rename_table("geography", "chart_geographies")
+    elif not has_current_table:
+        raise RuntimeError("MIGRATION_GEOGRAPHY_TABLE_MISSING")
+
     op.execute("CREATE EXTENSION IF NOT EXISTS postgis")
     op.add_column(
         "admin_unit",
@@ -47,4 +60,5 @@ def downgrade() -> None:
     op.drop_column("admin_unit", "boundary_provenance")
     op.drop_column("admin_unit", "boundary")
     # PostGIS is shared infrastructure. A feature migration must never remove it.
-    op.rename_table("chart_geographies", "geography")
+    # Keep the corrected table name: `geography` remains reserved by PostGIS,
+    # and revision 001 now creates `chart_geographies` directly.

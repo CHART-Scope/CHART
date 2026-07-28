@@ -32,9 +32,7 @@ def get_engine(database_url_value: str | None = None) -> Engine:
                 options.update(
                     {
                         "pool_size": int(os.getenv("DATABASE_POOL_SIZE", "10")),
-                        "max_overflow": int(
-                            os.getenv("DATABASE_MAX_OVERFLOW", "10")
-                        ),
+                        "max_overflow": int(os.getenv("DATABASE_MAX_OVERFLOW", "10")),
                         "pool_timeout": int(
                             os.getenv("DATABASE_POOL_TIMEOUT_SECONDS", "15")
                         ),

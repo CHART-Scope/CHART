@@ -41,22 +41,17 @@ def list_users(user: CurrentUserContext) -> list[UserResponse]:
             )
         ):
             roles[user_id].append(role)
-        places: dict[str, list[AppGeography]] = {
-            user_id: [] for user_id in user_ids
-        }
+        places: dict[str, list[AppGeography]] = {user_id: [] for user_id in user_ids}
         for user_id, place in session.execute(
             select(UserGeographyScopeRecord.user_id, AppGeography)
             .join(
                 AppGeography,
-                AppGeography.id
-                == UserGeographyScopeRecord.geography_id,
+                AppGeography.id == UserGeographyScopeRecord.geography_id,
             )
             .where(UserGeographyScopeRecord.user_id.in_(user_ids))
         ):
             places[user_id].append(place)
-        return [
-            _user_response(item, roles[item.id], places[item.id]) for item in users
-        ]
+        return [_user_response(item, roles[item.id], places[item.id]) for item in users]
 
 
 def create_user(input_data: CreateUserInput, actor: CurrentUserContext) -> UserResponse:

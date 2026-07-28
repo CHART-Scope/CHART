@@ -55,9 +55,7 @@ def get_auth_config() -> AuthConfig:
     ).rstrip("/")
     try:
         clock_skew_seconds = int(os.getenv("KEYCLOAK_CLOCK_SKEW_SECONDS", "30"))
-        jwks_timeout_seconds = float(
-            os.getenv("KEYCLOAK_JWKS_TIMEOUT_SECONDS", "5")
-        )
+        jwks_timeout_seconds = float(os.getenv("KEYCLOAK_JWKS_TIMEOUT_SECONDS", "5"))
     except ValueError as error:
         raise _auth_error("AUTH_CONFIG_INVALID", 500) from error
     client_id = os.getenv("KEYCLOAK_CLIENT_ID", "chart-api")
@@ -90,9 +88,7 @@ def require_current_user(
 
 def verify_keycloak_token(token: str, config: AuthConfig) -> CurrentUserContext:
     try:
-        key = _get_signing_key(
-            config.jwks_url, config.jwks_timeout_seconds, token
-        )
+        key = _get_signing_key(config.jwks_url, config.jwks_timeout_seconds, token)
         claims = jwt.decode(
             token,
             key,
@@ -125,8 +121,7 @@ def apply_active_geography(
 def can_read_geography_path(user: CurrentUserContext, requested_path: str) -> bool:
     requested = _normalize_geography_path(requested_path)
     return any(
-        requested == scope
-        or requested.startswith(f"{scope}/")
+        requested == scope or requested.startswith(f"{scope}/")
         for scope in map(_normalize_geography_path, user.geography_scopes)
     )
 

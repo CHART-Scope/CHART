@@ -24,7 +24,13 @@ chart-register-model-release = "chart.model_registry.cli:main"
 chart-bootstrap-mp = "chart.bootstrap:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "httpx>=0.27"]
+dev = [
+  "black==25.1.0",
+  "httpx>=0.27",
+  "mypy==1.19.1",
+  "pytest>=8",
+  "ruff==0.14.10",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

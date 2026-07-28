@@ -499,9 +499,7 @@ class ActiveModelAssignment(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    __table_args__ = (
-        Index("ix_active_model_assignment_release", "model_release_id"),
-    )
+    __table_args__ = (Index("ix_active_model_assignment_release", "model_release_id"),)
 
 
 class ClimateInputWindowRecord(Base):

@@ -64,9 +64,7 @@ def run_single_flight_ingestion(
         if claim.terminal_error_code is not None:
             raise RuntimeError(claim.terminal_error_code)
         if claim.owner_token is not None:
-            stop_heartbeat = _start_heartbeat(
-                claim, session_factory=session_factory
-            )
+            stop_heartbeat = _start_heartbeat(claim, session_factory=session_factory)
             try:
                 run_id = loader()
             except Exception as error:
@@ -132,10 +130,7 @@ def _claim_record(record, session, *, now: datetime) -> IngestionClaim:
             key=record.key,
             completed_run_id=record.result_climate_run_id,
         )
-    if (
-        record.status == "running"
-        and _aware(record.lease_expires_at) > now
-    ):
+    if record.status == "running" and _aware(record.lease_expires_at) > now:
         return IngestionClaim(key=record.key)
     if record.status == "failed":
         failure_age = now - _aware(record.updated_at)
@@ -148,9 +143,7 @@ def _claim_record(record, session, *, now: datetime) -> IngestionClaim:
                 key=record.key,
                 terminal_error_code="CLIMATE_INGESTION_RETRY_EXHAUSTED",
             )
-        retry_after = timedelta(
-            seconds=min(300, 2 ** max(1, record.attempt_count))
-        )
+        retry_after = timedelta(seconds=min(300, 2 ** max(1, record.attempt_count)))
         if failure_age < retry_after:
             return IngestionClaim(key=record.key)
         if failure_age >= reset_after:
@@ -193,9 +186,7 @@ def _start_heartbeat(claim: IngestionClaim, *, session_factory):
                     record.updated_at = now
                     session.commit()
             except Exception:
-                logger.exception(
-                    "Could not heartbeat climate ingestion %s", claim.key
-                )
+                logger.exception("Could not heartbeat climate ingestion %s", claim.key)
 
     thread = threading.Thread(
         target=heartbeat,

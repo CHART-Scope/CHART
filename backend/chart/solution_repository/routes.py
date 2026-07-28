@@ -176,9 +176,7 @@ def _remote(path: str, query: dict | None = None):
     ):
         with _remote_lock:
             _remote_failures += 1
-            threshold = int(
-                os.getenv("CHART_REPOSITORY_CIRCUIT_FAILURES", "3")
-            )
+            threshold = int(os.getenv("CHART_REPOSITORY_CIRCUIT_FAILURES", "3"))
             if _remote_failures >= threshold:
                 _remote_open_until = now + float(
                     os.getenv("CHART_REPOSITORY_CIRCUIT_SECONDS", "30")

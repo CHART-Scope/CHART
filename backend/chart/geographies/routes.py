@@ -54,8 +54,7 @@ def list_geographies() -> list[GeographyResponse]:
                     path=row.path,
                     sortOrder=row.sort_order,
                     supportsPrediction=(
-                        admin_unit is not None
-                        and admin_unit.id in models
+                        admin_unit is not None and admin_unit.id in models
                     ),
                 )
             )

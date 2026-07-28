@@ -3,8 +3,11 @@ from __future__ import annotations
 import os
 import math
 from dataclasses import dataclass
+from typing import Literal, cast
 
 from .providers.lbw_r import LbwProviderError, call_lbw_r
+
+PregnancyWindow = Literal[1, 2, 3]
 
 
 class InferenceError(RuntimeError):
@@ -18,7 +21,7 @@ class InferenceError(RuntimeError):
 class LbwScore:
     area: str
     geography_level: str
-    pregnancy_window: int
+    pregnancy_window: PregnancyWindow
     temperatures_c: tuple[float, float, float]
     reference_temperature_c: float
     odds_ratio: float
@@ -34,7 +37,7 @@ class LbwScore:
 def score_lbw(
     *,
     model_area: str,
-    pregnancy_window: int,
+    pregnancy_window: PregnancyWindow,
     temperatures_c: tuple[float, float, float],
     service_url: str | None = None,
     expected_model_version: str | None = None,
@@ -83,6 +86,9 @@ def score_lbw(
         raise InferenceError(
             "LBW_RESPONSE_INVALID", "tmax_lag must contain exactly three values"
         )
+    if response_window not in (1, 2, 3):
+        raise InferenceError("LBW_RESPONSE_INVALID", "trimester must be 1, 2, or 3")
+    validated_response_window = cast(PregnancyWindow, response_window)
     response_temperatures = (
         raw_temperatures[0],
         raw_temperatures[1],
@@ -101,10 +107,8 @@ def score_lbw(
         raise InferenceError(
             "LBW_RESPONSE_INPUT_MISMATCH", "the scorer did not echo exact inputs"
         )
-    if response_window != pregnancy_window:
-        raise InferenceError(
-            "LBW_RESPONSE_INPUT_MISMATCH", "pregnancy window changed"
-        )
+    if validated_response_window != pregnancy_window:
+        raise InferenceError("LBW_RESPONSE_INPUT_MISMATCH", "pregnancy window changed")
     if odds_ratio <= 0 or ci95_low <= 0 or ci95_high <= 0:
         raise InferenceError(
             "LBW_RESPONSE_INVALID", "odds ratio and interval must be positive"
@@ -114,7 +118,9 @@ def score_lbw(
             "LBW_RESPONSE_INVALID", "confidence interval does not contain estimate"
         )
     if not response_area or not geography_level or not model_file:
-        raise InferenceError("LBW_RESPONSE_INVALID", "identity fields must be non-empty")
+        raise InferenceError(
+            "LBW_RESPONSE_INVALID", "identity fields must be non-empty"
+        )
     if not isinstance(payload.get("on_training_support"), bool):
         raise InferenceError(
             "LBW_RESPONSE_INVALID", "on_training_support must be boolean"
@@ -134,7 +140,7 @@ def score_lbw(
     return LbwScore(
         area=response_area,
         geography_level=geography_level,
-        pregnancy_window=response_window,
+        pregnancy_window=validated_response_window,
         temperatures_c=response_temperatures,
         reference_temperature_c=reference_temperature,
         odds_ratio=odds_ratio,

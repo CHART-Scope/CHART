@@ -43,6 +43,7 @@ from .schemas import (
     HeatSeasonOptionResponse,
     PlanningOptionsResponse,
     PlanningTarget,
+    PregnancyWindow,
     ProjectionPeriod,
     ProjectionScenario,
     ProjectionScenarioOptionResponse,
@@ -198,7 +199,7 @@ def score_prepared_prediction(
     climate_input_window_id: int,
     model_release_id: str,
     expected_model_sha256: str,
-    pregnancy_window: int,
+    pregnancy_window: PregnancyWindow,
     source_as_of: datetime | None = None,
     lbw_service_url: str | None = None,
     planning_target: PlanningTarget = "month",
@@ -487,12 +488,8 @@ def _month_response(
     )
     label = run.data_label.value
     status = "sample" if label == "sample" else "ready"
-    if (
-        run.source_class != "projection"
-        and (
-            run.fresh_until is None
-            or _aware(run.fresh_until) < _aware(current_time)
-        )
+    if run.source_class != "projection" and (
+        run.fresh_until is None or _aware(run.fresh_until) < _aware(current_time)
     ):
         status = "stale"
     return ClimateMonthResponse(

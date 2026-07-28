@@ -145,6 +145,38 @@ def test_score_rejects_a_response_for_different_inputs() -> None:
     assert caught.value.code == "LBW_RESPONSE_INPUT_MISMATCH"
 
 
+def test_score_rejects_an_invalid_response_pregnancy_window() -> None:
+    payload = {
+        "area": "Madhya Pradesh",
+        "geography_level": "state",
+        "trimester": 4,
+        "tmax_lag": [31.0, 30.0, 29.0],
+        "ref_temp": 27.0,
+        "odds_ratio": 1.12,
+        "ci95_low": 1.02,
+        "ci95_high": 1.22,
+        "on_training_support": True,
+        "model_file": "state.rds",
+        "model_version": "1.0.0",
+        "model_sha256": "a" * 64,
+    }
+    with (
+        patch("chart.inference.service.call_lbw_r", return_value=payload),
+        pytest.raises(InferenceError) as caught,
+    ):
+        score_lbw(
+            model_area="Madhya Pradesh",
+            pregnancy_window=1,
+            temperatures_c=(31.0, 30.0, 29.0),
+            service_url="http://lbw.test",
+            expected_model_version="1.0.0",
+            expected_model_sha256="a" * 64,
+        )
+
+    assert caught.value.code == "LBW_RESPONSE_INVALID"
+    assert caught.value.detail == "trimester must be 1, 2, or 3"
+
+
 def test_lbw_provider_reports_an_unavailable_service_clearly() -> None:
     with (
         patch(

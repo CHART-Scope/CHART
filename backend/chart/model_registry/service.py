@@ -4,6 +4,7 @@ import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import cast
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,7 +16,7 @@ from chart.shared.db.models import (
     ModelRelease,
 )
 
-from .schemas import ModelReleaseSpec
+from .schemas import ModelReleaseSpec, PregnancyWindow
 
 
 class ModelRegistryError(ValueError):
@@ -32,7 +33,7 @@ class ActiveModelMapping:
     model_area_name: str
     model_file: str
     artifact_sha256: str
-    validated_pregnancy_windows: tuple[int, ...]
+    validated_pregnancy_windows: tuple[PregnancyWindow, ...]
 
 
 def register_model_release(
@@ -126,10 +127,7 @@ def get_active_model_mapping(
         .join(
             ModelAreaMapping,
             (ModelAreaMapping.model_release_id == ModelRelease.id)
-            & (
-                ModelAreaMapping.admin_unit_id
-                == ActiveModelAssignment.admin_unit_id
-            ),
+            & (ModelAreaMapping.admin_unit_id == ActiveModelAssignment.admin_unit_id),
         )
         .where(
             ActiveModelAssignment.module == module,
@@ -147,7 +145,7 @@ def get_active_model_mapping(
         model_area_name=mapping.model_area_key,
         model_file=mapping.model_file,
         artifact_sha256=_artifact_digest(release, mapping.model_file),
-        validated_pregnancy_windows=tuple(mapping.validated_pregnancy_windows),
+        validated_pregnancy_windows=_validated_pregnancy_windows(mapping),
     )
 
 
@@ -173,10 +171,7 @@ def get_active_model_mappings(
         .join(
             ModelAreaMapping,
             (ModelAreaMapping.model_release_id == ModelRelease.id)
-            & (
-                ModelAreaMapping.admin_unit_id
-                == ActiveModelAssignment.admin_unit_id
-            ),
+            & (ModelAreaMapping.admin_unit_id == ActiveModelAssignment.admin_unit_id),
         )
         .where(
             ActiveModelAssignment.module == module,
@@ -191,9 +186,7 @@ def get_active_model_mappings(
             model_area_name=mapping.model_area_key,
             model_file=mapping.model_file,
             artifact_sha256=_artifact_digest(release, mapping.model_file),
-            validated_pregnancy_windows=tuple(
-                mapping.validated_pregnancy_windows
-            ),
+            validated_pregnancy_windows=_validated_pregnancy_windows(mapping),
         )
         for admin_unit_id, release, mapping in rows
     }
@@ -226,7 +219,7 @@ def get_model_mapping(
         model_area_name=mapping.model_area_key,
         model_file=mapping.model_file,
         artifact_sha256=_artifact_digest(release, mapping.model_file),
-        validated_pregnancy_windows=tuple(mapping.validated_pregnancy_windows),
+        validated_pregnancy_windows=_validated_pregnancy_windows(mapping),
     )
 
 
@@ -256,13 +249,29 @@ def get_model_mappings(
             model_area_name=mapping.model_area_key,
             model_file=mapping.model_file,
             artifact_sha256=_artifact_digest(release, mapping.model_file),
-            validated_pregnancy_windows=tuple(
-                mapping.validated_pregnancy_windows
-            ),
+            validated_pregnancy_windows=_validated_pregnancy_windows(mapping),
         )
         for release, mapping in rows
         if (release.id, mapping.admin_unit_id) in keys
     }
+
+
+def _validated_pregnancy_windows(
+    mapping: ModelAreaMapping,
+) -> tuple[PregnancyWindow, ...]:
+    raw_windows = tuple(mapping.validated_pregnancy_windows or ())
+    if (
+        not raw_windows
+        or len(set(raw_windows)) != len(raw_windows)
+        or any(
+            type(window) is not int or window not in (1, 2, 3) for window in raw_windows
+        )
+    ):
+        raise ModelRegistryError(
+            "MODEL_RELEASE_PREGNANCY_WINDOWS_INVALID",
+            f"{mapping.model_release_id}:{mapping.admin_unit_id}",
+        )
+    return cast(tuple[PregnancyWindow, ...], raw_windows)
 
 
 def _activate_release(session: Session, release: ModelRelease) -> None:

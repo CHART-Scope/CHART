@@ -59,9 +59,7 @@ def _temperature_to_celsius(data: xr.DataArray) -> xr.DataArray:
         "celsius",
     }:
         return data
-    raise ValueError(
-        f"ERA5_TEMPERATURE_UNITS_UNSUPPORTED: {data.attrs.get('units')!r}"
-    )
+    raise ValueError(f"ERA5_TEMPERATURE_UNITS_UNSUPPORTED: {data.attrs.get('units')!r}")
 
 
 def _mask_to_geometry(

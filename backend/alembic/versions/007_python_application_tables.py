@@ -306,9 +306,7 @@ def _validate_application_schema() -> None:
                 f"{sorted(missing)}"
             )
         primary_key = set(
-            inspector.get_pk_constraint(table_name).get(
-                "constrained_columns", []
-            )
+            inspector.get_pk_constraint(table_name).get("constrained_columns", [])
         )
         if primary_key != contract["primary_key"]:
             raise RuntimeError(

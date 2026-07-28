@@ -46,8 +46,7 @@ def test_completed_acquisition_is_reused_without_calling_provider(
     second_loader.assert_not_called()
     with session_factory() as session:
         assert (
-            session.scalar(select(func.count()).select_from(IngestionLeaseRecord))
-            == 1
+            session.scalar(select(func.count()).select_from(IngestionLeaseRecord)) == 1
         )
 
 

@@ -398,9 +398,7 @@ def test_model_cannot_run_before_three_climate_rows_are_saved(session_factory) -
 
 def test_saved_climate_window_is_the_only_input_sent_to_model(session_factory) -> None:
     accepted = submit_prediction(_request(), session_factory=session_factory)
-    lease_token = _claim(
-        session_factory, accepted.request_id, "dagster-test-1"
-    )
+    lease_token = _claim(session_factory, accepted.request_id, "dagster-test-1")
     _seed_three_climate_months(session_factory)
 
     window_id = prepare_prediction_input(
@@ -454,9 +452,7 @@ def test_one_planning_request_scores_all_three_pregnancy_stages(
 ) -> None:
     request = _request().model_copy(update={"pregnancy_windows": (3, 2, 1)})
     accepted = submit_prediction(request, session_factory=session_factory)
-    lease_token = _claim(
-        session_factory, accepted.request_id, "dagster-three-stages"
-    )
+    lease_token = _claim(session_factory, accepted.request_id, "dagster-three-stages")
     _seed_three_climate_months(session_factory)
     prepare_prediction_input(
         accepted.request_id,
@@ -554,9 +550,7 @@ def test_next_heat_season_waits_then_queues_when_forecast_can_cover_it(
 
     assert activated == 1
     assert [item.id for item in queued] == [accepted.request_id]
-    assert queued[0].source_as_of == datetime(
-        2026, 12, 7, tzinfo=timezone.utc
-    )
+    assert queued[0].source_as_of == datetime(2026, 12, 7, tzinfo=timezone.utc)
 
 
 def test_input_selection_ignores_rows_from_an_old_boundary(session_factory) -> None:

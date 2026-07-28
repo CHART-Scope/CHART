@@ -5,7 +5,7 @@ export PATH := $(dir $(NPM)):$(PATH)
 CHART_REPOSITORY_DIR := chart-repository
 CHART_REPOSITORY_COMPOSE := $(DOCKER) compose -f $(CHART_REPOSITORY_DIR)/docker-compose.yml
 
-.PHONY: all help install run verify local-setup check-docker postgres services postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build new-design new-design-build new-design-typecheck identity-sync identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run
+.PHONY: all help install run verify python-check local-setup check-docker postgres services postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build new-design new-design-build new-design-typecheck identity-sync identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run
 
 help:
 	@printf "\nQuick start (climate pipeline)\n"
@@ -45,8 +45,13 @@ all: local-setup verify
 run: local-setup climate-install
 	$(MAKE) -j4 lbw-run climate-api-run dagster-run new-design
 
-verify: climate-install web-typecheck web-build new-design-typecheck new-design-build format-check
+verify: climate-install python-check web-typecheck web-build new-design-typecheck new-design-build format-check
 	$(VENV_PYTHON) -m pytest backend/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests -q
+
+python-check:
+	$(VENV_PYTHON) -m ruff check backend orchestration pipelines/boundaries pipelines/era5_heat/src pipelines/era5_heat/tests pipelines/seasonal_c3s pipelines/isimip_projection
+	$(VENV_PYTHON) -m black --check backend orchestration pipelines/boundaries pipelines/seasonal_c3s pipelines/isimip_projection pipelines/era5_heat/src/era5_heat/__init__.py pipelines/era5_heat/src/era5_heat/aggregate.py pipelines/era5_heat/tests/test_aggregate.py
+	$(VENV_PYTHON) -m mypy backend/chart orchestration/src pipelines/boundaries/src pipelines/era5_heat/src pipelines/seasonal_c3s/src pipelines/isimip_projection/src --ignore-missing-imports --no-error-summary
 
 local-setup: services postgres-wait identity-wait climate-migrate identity-sync
 

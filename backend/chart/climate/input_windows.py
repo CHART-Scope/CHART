@@ -360,10 +360,7 @@ def _has_complete_reanalysis_days(value: DistrictClimate, run: ClimateRun) -> bo
         return True
     if value.observed_days is None or value.expected_days is None:
         return False
-    return (
-        value.expected_days > 0
-        and value.observed_days == value.expected_days
-    )
+    return value.expected_days > 0 and value.observed_days == value.expected_days
 
 
 def _previous_month(value: date) -> date:

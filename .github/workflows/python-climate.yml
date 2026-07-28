@@ -83,13 +83,8 @@ jobs:
           python -m pip install -e './backend[dev]' -e './pipelines/boundaries[dev]' -e './pipelines/era5_heat[dev]' -e './pipelines/seasonal_c3s[dev]' -e './pipelines/isimip_projection[dev]' -e ./orchestration
           python -m pip install black==25.1.0 mypy==1.19.1 ruff==0.14.10
 
-      - name: Check lint and formatting
-        run: |
-          ruff check backend orchestration pipelines/boundaries pipelines/era5_heat/src pipelines/era5_heat/tests pipelines/seasonal_c3s pipelines/isimip_projection
-          black --check backend orchestration pipelines/boundaries pipelines/seasonal_c3s pipelines/isimip_projection pipelines/era5_heat/src/era5_heat/__init__.py pipelines/era5_heat/src/era5_heat/aggregate.py pipelines/era5_heat/tests/test_aggregate.py
-
-      - name: Check types
-        run: mypy backend/chart orchestration/src pipelines/boundaries/src pipelines/era5_heat/src pipelines/seasonal_c3s/src pipelines/isimip_projection/src --ignore-missing-imports --no-error-summary
+      - name: Check formatting, lint, and types
+        run: make python-check
 
       - name: Apply Alembic migrations
         working-directory: backend

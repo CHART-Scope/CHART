@@ -288,8 +288,7 @@ def _safe_extract(archive: zipfile.ZipFile, destination: Path) -> None:
         if member.flag_bits & 0x1:
             raise ValueError("C3S_ARCHIVE_ENCRYPTED")
         if member.file_size and (
-            member.compress_size == 0
-            or member.file_size / member.compress_size > 1000
+            member.compress_size == 0 or member.file_size / member.compress_size > 1000
         ):
             raise ValueError("C3S_ARCHIVE_COMPRESSION_INVALID")
     archive.extractall(destination)

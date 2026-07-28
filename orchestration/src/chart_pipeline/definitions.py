@@ -833,9 +833,7 @@ def _prediction_lease_heartbeat(
     """Keep ownership alive while a provider download blocks the worker."""
 
     stop = threading.Event()
-    interval_seconds = max(
-        5, int(os.getenv("PREDICTION_HEARTBEAT_SECONDS", "60"))
-    )
+    interval_seconds = max(5, int(os.getenv("PREDICTION_HEARTBEAT_SECONDS", "60")))
 
     def maintain_lease() -> None:
         while not stop.wait(interval_seconds):
@@ -871,9 +869,7 @@ def _prediction_lease_heartbeat(
 def _ensure_climate_storage_capacity() -> None:
     output_dir = Path(os.getenv("CLIMATE_OUTPUT_DIR", DEFAULT_OUTDIR))
     output_dir.mkdir(parents=True, exist_ok=True)
-    minimum_free_bytes = max(
-        0, int(os.getenv("CLIMATE_MIN_FREE_BYTES", str(1024**3)))
-    )
+    minimum_free_bytes = max(0, int(os.getenv("CLIMATE_MIN_FREE_BYTES", str(1024**3))))
     if shutil.disk_usage(output_dir).free < minimum_free_bytes:
         raise ClimateServiceError("CLIMATE_STORAGE_CAPACITY_LOW", 503)
 

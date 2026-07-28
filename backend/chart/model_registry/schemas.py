@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+PregnancyWindow = Literal[1, 2, 3]
+
 
 class ModelFileSpec(BaseModel):
     filename: str = Field(min_length=1)
@@ -14,7 +16,7 @@ class ModelAreaSpec(BaseModel):
     place_code: str = Field(min_length=1)
     model_file: str = Field(min_length=1)
     model_area_name: str = Field(min_length=1)
-    validated_pregnancy_windows: tuple[Literal[1, 2, 3], ...] = (1, 2, 3)
+    validated_pregnancy_windows: tuple[PregnancyWindow, ...] = (1, 2, 3)
 
     @model_validator(mode="after")
     def validate_windows(self) -> ModelAreaSpec:

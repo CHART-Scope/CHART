@@ -303,8 +303,7 @@ def _claim_bootstrap(input_data, session_factory) -> str:
         state = session.get(SetupStateRecord, SETUP_ID, with_for_update=True)
         assert state is not None
         member_count = (
-            session.scalar(select(func.count()).select_from(WorkspaceMemberRecord))
-            or 0
+            session.scalar(select(func.count()).select_from(WorkspaceMemberRecord)) or 0
         )
         if state.completed or member_count or state.phase == "requires_admin":
             raise SetupError("SETUP_BOOTSTRAP_LOCKED", 409)
@@ -317,9 +316,7 @@ def _claim_bootstrap(input_data, session_factory) -> str:
                 and state.provisioning_started_at is not None
                 and _aware(state.provisioning_started_at)
                 + timedelta(
-                    seconds=int(
-                        os.getenv("SETUP_PROVISIONING_TIMEOUT_SECONDS", "600")
-                    )
+                    seconds=int(os.getenv("SETUP_PROVISIONING_TIMEOUT_SECONDS", "600"))
                 )
                 > now
             ):
@@ -337,16 +334,10 @@ def _claim_bootstrap(input_data, session_factory) -> str:
         return operation_id
 
 
-def _mark_bootstrap_failed(
-    operation_id: str, error_code: str, session_factory
-) -> None:
+def _mark_bootstrap_failed(operation_id: str, error_code: str, session_factory) -> None:
     with session_factory() as session:
         state = session.get(SetupStateRecord, SETUP_ID, with_for_update=True)
-        if (
-            state is None
-            or state.completed
-            or state.provisioning_token != operation_id
-        ):
+        if state is None or state.completed or state.provisioning_token != operation_id:
             return
         state.phase = "failed"
         state.last_error_code = error_code[:128]

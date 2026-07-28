@@ -28,9 +28,7 @@ def upgrade() -> None:
             server_default="uninitialized",
         ),
     )
-    op.add_column(
-        "setup_state", sa.Column("provisioning_token", sa.String(length=64))
-    )
+    op.add_column("setup_state", sa.Column("provisioning_token", sa.String(length=64)))
     op.add_column(
         "setup_state",
         sa.Column("provisioning_request_hash", sa.String(length=64)),
@@ -39,9 +37,7 @@ def upgrade() -> None:
         "setup_state",
         sa.Column("provisioning_started_at", sa.DateTime(timezone=True)),
     )
-    op.add_column(
-        "setup_state", sa.Column("last_error_code", sa.String(length=128))
-    )
+    op.add_column("setup_state", sa.Column("last_error_code", sa.String(length=128)))
     op.execute(
         "UPDATE setup_state SET phase = CASE WHEN completed THEN 'complete' "
         "ELSE 'uninitialized' END"
@@ -52,16 +48,10 @@ def upgrade() -> None:
         "ON CONFLICT (id) DO NOTHING"
     )
 
-    op.add_column(
-        "climate_run", sa.Column("source_name", sa.String(length=128))
-    )
-    op.add_column(
-        "climate_run", sa.Column("source_version", sa.String(length=128))
-    )
+    op.add_column("climate_run", sa.Column("source_name", sa.String(length=128)))
+    op.add_column("climate_run", sa.Column("source_version", sa.String(length=128)))
     op.add_column("climate_run", sa.Column("source_uri", sa.Text()))
-    op.add_column(
-        "climate_run", sa.Column("source_license", sa.String(length=256))
-    )
+    op.add_column("climate_run", sa.Column("source_license", sa.String(length=256)))
     op.execute(
         """
         UPDATE climate_run AS run
@@ -166,12 +156,8 @@ def upgrade() -> None:
         "prediction_request",
         sa.Column("source_as_of_at", sa.DateTime(timezone=True)),
     )
-    op.add_column(
-        "prediction_request", sa.Column("lease_token", sa.String(length=64))
-    )
-    op.add_column(
-        "prediction_request", sa.Column("lease_owner", sa.String(length=128))
-    )
+    op.add_column("prediction_request", sa.Column("lease_token", sa.String(length=64)))
+    op.add_column("prediction_request", sa.Column("lease_owner", sa.String(length=128)))
     op.add_column(
         "prediction_request",
         sa.Column("lease_expires_at", sa.DateTime(timezone=True)),
@@ -215,9 +201,7 @@ def upgrade() -> None:
         ),
         sa.Column("owner_token", sa.String(length=64), nullable=False),
         sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column(
-            "attempt_count", sa.Integer(), nullable=False, server_default="1"
-        ),
+        sa.Column("attempt_count", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("result_climate_run_id", sa.Integer()),
         sa.Column("error_code", sa.String(length=128)),
         sa.Column(
@@ -249,9 +233,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_ingestion_lease_status_expiry", table_name="ingestion_lease"
-    )
+    op.drop_index("ix_ingestion_lease_status_expiry", table_name="ingestion_lease")
     op.drop_table("ingestion_lease")
 
     op.drop_index("ix_prediction_request_lease", table_name="prediction_request")
@@ -282,12 +264,8 @@ def downgrade() -> None:
     )
     op.drop_table("active_model_assignment")
 
-    op.drop_constraint(
-        "uq_data_source_name_geography", "data_source", type_="unique"
-    )
-    op.drop_index(
-        "ix_district_climate_selection", table_name="district_climate"
-    )
+    op.drop_constraint("uq_data_source_name_geography", "data_source", type_="unique")
+    op.drop_index("ix_district_climate_selection", table_name="district_climate")
     for column in (
         "source_license",
         "source_uri",

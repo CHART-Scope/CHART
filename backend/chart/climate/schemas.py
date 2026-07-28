@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 ProjectionScenario = Literal["ssp126", "ssp370", "ssp585"]
 ProjectionPeriod = Literal["2031-2040"]
+PregnancyWindow = Literal[1, 2, 3]
 PlanningTarget = Literal[
     "month",
     "next_three_months",
@@ -45,11 +46,11 @@ class PredictRequest(PreviewRequest):
     planning_target: PlanningTarget = "month"
     projection_scenario: ProjectionScenario | None = None
     projection_period: ProjectionPeriod | None = None
-    pregnancy_window: Literal[1, 2, 3] = Field(
+    pregnancy_window: PregnancyWindow = Field(
         default=1,
         description="Legacy single model window. New planning requests use pregnancy_windows.",
     )
-    pregnancy_windows: tuple[Literal[1, 2, 3], ...] | None = Field(
+    pregnancy_windows: tuple[PregnancyWindow, ...] | None = Field(
         default=None,
         description=(
             "Pregnancy-stage model windows to calculate from the same three climate "
@@ -73,7 +74,7 @@ class PredictRequest(PreviewRequest):
             raise ValueError("CLIMATE_PROJECTION_FIELDS_NOT_ALLOWED")
         return self
 
-    def selected_pregnancy_windows(self) -> tuple[int, ...]:
+    def selected_pregnancy_windows(self) -> tuple[PregnancyWindow, ...]:
         return self.pregnancy_windows or (self.pregnancy_window,)
 
 
@@ -133,7 +134,7 @@ class LbwPrediction(BaseModel):
 
     area: str
     geography_level: str
-    pregnancy_window: Literal[1, 2, 3]
+    pregnancy_window: PregnancyWindow
     temperatures_c: list[float] = Field(min_length=3, max_length=3)
     reference_temperature_c: float
     odds_ratio: float = Field(gt=0)
@@ -252,7 +253,7 @@ class LongTermProjectionOptionResponse(BaseModel):
 class PlanningOptionsResponse(BaseModel):
     geography_id: str
     source_as_of: date
-    validated_pregnancy_windows: list[Literal[1, 2, 3]]
+    validated_pregnancy_windows: list[PregnancyWindow]
     model_result_mode: Literal["single_association", "pregnancy_windows"]
     custom_min_month: date
     custom_max_month: date

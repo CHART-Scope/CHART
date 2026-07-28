@@ -318,7 +318,7 @@ def reconcile_expired_prediction_requests(
                 record.attempt_count += 1
                 record.error_code = None
                 record.next_attempt_at = current_time + timedelta(
-                    seconds=min(300, 2 ** record.attempt_count)
+                    seconds=min(300, 2**record.attempt_count)
                 )
             _clear_lease(record)
             record.dagster_run_id = None
@@ -922,9 +922,7 @@ def _lease_duration() -> timedelta:
     return timedelta(seconds=int(os.getenv("PREDICTION_LEASE_SECONDS", "3600")))
 
 
-def _owns_lease(
-    record: PredictionRequestRecord, lease_token: str | None
-) -> bool:
+def _owns_lease(record: PredictionRequestRecord, lease_token: str | None) -> bool:
     if record.lease_token is None:
         # Direct service calls in tests and administrative repair tools do not
         # impersonate a leased worker.
