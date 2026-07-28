@@ -161,6 +161,13 @@ To run only the model service:
 make lbw-run
 ```
 
+Local startup reads `model-release.example.json`, verifies both model files
+against its SHA-256 values, and supplies the validated release identity to the R
+service. To run a different model release, set `LBW_MODEL_RELEASE_MANIFEST`,
+`LBW_MODEL_DIVISION`, and `LBW_MODEL_STATE` to a matching manifest and files.
+Startup fails before the other `make run` services launch when the identity is
+missing or either checksum differs.
+
 Open [http://127.0.0.1:8000/ui/](http://127.0.0.1:8000/ui/). Choose either
 **Madhya Pradesh** or a division, enter three temperatures, then estimate.
 

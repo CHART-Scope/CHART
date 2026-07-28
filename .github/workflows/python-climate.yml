@@ -10,6 +10,7 @@ on:
       - "pipelines/era5_heat/**"
       - "pipelines/seasonal_c3s/**"
       - "pipelines/isimip_projection/**"
+      - "pipelines/LBW_demo/**"
       - "docs/climate-api.md"
       - "docs/data-pipeline.md"
       - "docs/openapi/climate.json"
@@ -26,6 +27,7 @@ on:
       - "pipelines/era5_heat/**"
       - "pipelines/seasonal_c3s/**"
       - "pipelines/isimip_projection/**"
+      - "pipelines/LBW_demo/**"
       - "docs/climate-api.md"
       - "docs/data-pipeline.md"
       - "docs/openapi/climate.json"
@@ -91,7 +93,7 @@ jobs:
         run: alembic upgrade head
 
       - name: Run tests
-        run: python -m pytest backend/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests -q
+        run: python -m pytest backend/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/LBW_demo/tests -q
 
       - name: Validate Dagster definitions
         run: python -c 'import dagster as dg; from chart_pipeline.definitions import defs; dg.Definitions.validate_loadable(defs)'

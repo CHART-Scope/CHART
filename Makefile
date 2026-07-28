@@ -42,16 +42,16 @@ help:
 
 all: local-setup verify
 
-run: local-setup climate-install
+run: local-setup climate-install lbw-check
 	$(MAKE) -j4 lbw-run climate-api-run dagster-run new-design
 
 verify: climate-install python-check web-typecheck web-build new-design-typecheck new-design-build format-check
-	$(VENV_PYTHON) -m pytest backend/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests -q
+	$(VENV_PYTHON) -m pytest backend/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/LBW_demo/tests -q
 
 python-check:
-	$(VENV_PYTHON) -m ruff check backend orchestration pipelines/boundaries pipelines/era5_heat/src pipelines/era5_heat/tests pipelines/seasonal_c3s pipelines/isimip_projection
-	$(VENV_PYTHON) -m black --check backend orchestration pipelines/boundaries pipelines/seasonal_c3s pipelines/isimip_projection pipelines/era5_heat/src/era5_heat/__init__.py pipelines/era5_heat/src/era5_heat/aggregate.py pipelines/era5_heat/tests/test_aggregate.py
-	$(VENV_PYTHON) -m mypy backend/chart orchestration/src pipelines/boundaries/src pipelines/era5_heat/src pipelines/seasonal_c3s/src pipelines/isimip_projection/src --ignore-missing-imports --no-error-summary
+	$(VENV_PYTHON) -m ruff check backend orchestration pipelines/boundaries pipelines/era5_heat/src pipelines/era5_heat/tests pipelines/seasonal_c3s pipelines/isimip_projection pipelines/LBW_demo/model_release.py pipelines/LBW_demo/tests
+	$(VENV_PYTHON) -m black --check backend orchestration pipelines/boundaries pipelines/seasonal_c3s pipelines/isimip_projection pipelines/era5_heat/src/era5_heat/__init__.py pipelines/era5_heat/src/era5_heat/aggregate.py pipelines/era5_heat/tests/test_aggregate.py pipelines/LBW_demo/model_release.py pipelines/LBW_demo/tests
+	$(VENV_PYTHON) -m mypy backend/chart orchestration/src pipelines/boundaries/src pipelines/era5_heat/src pipelines/seasonal_c3s/src pipelines/isimip_projection/src pipelines/LBW_demo/model_release.py --ignore-missing-imports --no-error-summary
 
 local-setup: services postgres-wait identity-wait climate-migrate identity-sync
 
@@ -244,6 +244,9 @@ VENV_DIR ?= .venv
 VENV_PYTHON := $(abspath $(VENV_DIR))/bin/python
 DOCS_PORT ?= 8001
 LBW_PORT ?= 8000
+LBW_MODEL_RELEASE_MANIFEST ?= $(abspath $(LBW_DIR)/model-release.example.json)
+LBW_MODEL_DIVISION ?= $(abspath $(LBW_DIR)/model/MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds)
+LBW_MODEL_STATE ?= $(abspath $(LBW_DIR)/model/MP_state_LBW_tmax_DHS2015-21_v1.0.0.rds)
 DAGSTER_PORT ?= 3002
 CHART_DATABASE_URL ?= postgresql+psycopg://chart:chart@127.0.0.1:5434/chart
 migrate: climate-migrate
@@ -256,14 +259,10 @@ lbw-check:
 		printf "Rscript is required for the LBW prediction model.\n"; \
 		exit 1; \
 	fi
-	@for model in \
-		"$(LBW_DIR)/model/MP_state_LBW_tmax_DHS2015-21_v1.0.0.rds" \
-		"$(LBW_DIR)/model/MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds"; do \
-		if [ ! -f "$$model" ]; then \
-			printf "Missing LBW model: %s\n" "$$model"; \
-			exit 1; \
-		fi; \
-	done
+	@$(PYTHON) $(LBW_DIR)/model_release.py \
+		--manifest "$(LBW_MODEL_RELEASE_MANIFEST)" \
+		--division "$(LBW_MODEL_DIVISION)" \
+		--state "$(LBW_MODEL_STATE)"
 
 lbw-run: lbw-check
 	@health=$$(curl -fsS "http://127.0.0.1:$(LBW_PORT)/health" 2>/dev/null || true); \
@@ -276,7 +275,13 @@ lbw-run: lbw-check
 		exit 1; \
 	fi
 	@printf "LBW prediction model: http://127.0.0.1:$(LBW_PORT)\n"
-	cd $(LBW_DIR) && PORT="$(LBW_PORT)" bash run_api.sh
+	cd $(LBW_DIR) && \
+		PORT="$(LBW_PORT)" \
+		PYTHON="$(PYTHON)" \
+		LBW_MODEL_RELEASE_MANIFEST="$(LBW_MODEL_RELEASE_MANIFEST)" \
+		LBW_MODEL_DIVISION="$(LBW_MODEL_DIVISION)" \
+		LBW_MODEL_STATE="$(LBW_MODEL_STATE)" \
+		bash run_api.sh
 
 dagster-run:
 	@mkdir -p $(ORCH_DIR)/.dagster_home

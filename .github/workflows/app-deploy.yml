@@ -119,7 +119,7 @@ jobs:
         run: backend/scripts/migrate.sh
 
       - name: Test Python API and data flow
-        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests -q
+        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests pipelines/LBW_demo/tests -q
 
       - name: Typecheck current frontend
         run: npm run typecheck:new-design
