@@ -1,27 +1,37 @@
-name: Python API
+name: API
 
 on:
   pull_request:
     paths:
       - ".github/workflows/api.yml"
-      - "backend/**"
-      - "orchestration/**"
-      - "pipelines/**"
-      - "infra/**"
+      - ".github/pull_request_template.md"
+      - ".prettierignore"
+      - ".prettierrc.json"
       - "Makefile"
+      - "api/**"
+      - "backend/**"
+      - "infra/**"
+      - "package.json"
+      - "package-lock.json"
   push:
-    branches: [main, dev]
+    branches:
+      - main
+      - dev
     paths:
       - ".github/workflows/api.yml"
-      - "backend/**"
-      - "orchestration/**"
-      - "pipelines/**"
-      - "infra/**"
+      - ".github/pull_request_template.md"
+      - ".prettierignore"
+      - ".prettierrc.json"
       - "Makefile"
+      - "api/**"
+      - "backend/**"
+      - "infra/**"
+      - "package.json"
+      - "package-lock.json"
   workflow_dispatch:
 
 concurrency:
-  group: chart-python-api-${{ github.ref }}
+  group: chart-api-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -29,37 +39,82 @@ permissions:
 
 jobs:
   validate:
+    name: Validate API
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgis/postgis:16-3.5
+        image: postgres:16-alpine
         env:
           POSTGRES_DB: chart
           POSTGRES_USER: chart
           POSTGRES_PASSWORD: chart
-        ports: ["5432:5432"]
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd "pg_isready -U chart -d chart"
-          --health-interval 10s --health-timeout 5s --health-retries 5
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://chart:chart@127.0.0.1:5432/chart
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check API formatting
+        run: npx prettier --check api infra package.json package-lock.json
+
+      - name: Check migration history
+        run: npm run db:check:api
+
+      - name: Verify schema and migrations are in sync
+        run: |
+          npm run db:generate:api
+          if [ -n "$(git status --porcelain api/drizzle)" ]; then
+            git status --short api/drizzle
+            exit 1
+          fi
+
+      - name: Verify OpenAPI contract is in sync
+        run: |
+          npm run openapi:generate:api
+          test -s api/openapi.yaml
+
+      - name: Typecheck API
+        run: npm run typecheck:api
+
+      - name: Test API
+        run: npm run test:api
+
+      - name: Apply API migrations
+        run: npm run db:migrate:api
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: pip
-      - name: Install application and data packages
-        run: >-
-          python -m pip install -e 'backend[dev]' -e 'pipelines/era5_heat[dev]'
-          -e 'pipelines/seasonal_c3s[dev]' -e 'pipelines/boundaries[dev]'
-          -e 'pipelines/isimip_projection[dev]'
-          -e orchestration
-      - name: Apply the only application migration chain
+
+      - name: Install backend package
+        run: python -m pip install -e 'backend[dev]'
+
+      - name: Apply Alembic migrations
         env:
           DATABASE_URL: postgresql+psycopg://chart:chart@127.0.0.1:5432/chart
         run: backend/scripts/migrate.sh
-      - name: Test API, orchestration, and source adapters
+
+      - name: Test backend
         env:
           DATABASE_URL: postgresql+psycopg://chart:chart@127.0.0.1:5432/chart
-        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests pipelines/LBW_demo/tests -q
-      - name: Check deploy script
-        run: bash -n infra/aws/deploy-app.sh
+        run: python -m pytest backend/tests -q
+
+      - name: Build API
+        run: npm run build:api

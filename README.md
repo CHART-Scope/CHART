@@ -2,50 +2,53 @@
 
 CHART is a climate-health planning platform.
 
-## What runs
+This repo contains the core app:
 
-- `new_design`: the connected Next planning interface.
-- `web`: the older Next application shell kept during the UI migration.
-- `backend`: the single FastAPI application API and analytical engine.
-- `orchestration`: Dagster jobs that fetch climate data before running a model.
-- `pipelines`: climate adapters, boundaries, and versioned model runtimes.
-- `infra`: local and EC2 deployment.
+- `web`: Next app for the public site, onboarding, dashboard, map UI, and solution repository UI.
+- `api`: Fastify API for auth context, setup, users, workspaces, geographies, hazards, and solutions.
+- `infra/docker-compose.yml`: local Postgres and Keycloak.
 
-The old Fastify service is no longer installed, started, deployed, or allowed to
-migrate the CHART database. Python and Alembic now own the application API and
-database.
+The solution repository is consumed through `CHART_REPOSITORY_URL` when available.
+If it is unset, the API uses the bundled snapshot in
+`api/src/services/chart-repository/seed-data/seed.json`.
 
-## Run locally
+## Run Locally
 
 ```bash
 make install
 make run
 ```
 
-Open:
+Open the web app at `http://127.0.0.1:3100`.
 
-- Planning app: `http://127.0.0.1:3200/plan`
-- Python API docs: `http://127.0.0.1:3210/docs`
-- Dagster: `http://127.0.0.1:3002`
-- R prediction model health: `http://127.0.0.1:8000/health`
-- Keycloak: `http://127.0.0.1:8080`
+## Routes
 
-The planning page lets an authorised MP user plan the next three months, save the
-next hot season, or explore long-term heat. It shows the real climate values and
-sources plus only the low-birth-weight model results validated for the selected
-place. The current state-wide release shows one population association without
-claiming a pregnancy-stage result. Saved plans and results survive reloads.
+Local development:
 
-## Useful commands
+- `http://127.0.0.1:3100`: web app
+- `http://127.0.0.1:3200/api`: API docs
+- `http://127.0.0.1:8080`: Keycloak
+
+Deployed app:
+
+- `http://<host>/`: web app
+- `http://<host>/chart-api`: API
+- `http://<host>/identity`: Keycloak
+
+## Configuration
+
+- `CHART_REPOSITORY_URL`: hosted solution repository API.
+- `CHART_REPOSITORY_SNAPSHOT_FILE`: optional local snapshot override.
+- `CHART_GEOGRAPHY_SEED_FILE`: optional geography seed override.
+
+## Useful Commands
 
 ```bash
-make migrate
-make climate-api
-make dagster-run
-make lbw-run
-make new-design
+make run
 make verify
+make api-test
+make api-build
+make web-typecheck
+make web-build
+make format-check
 ```
-
-Adding a place or model: [docs/add-geography-and-model.md](docs/add-geography-and-model.md).
-The current design and remaining work are in [docs/tdd.md](docs/tdd.md).

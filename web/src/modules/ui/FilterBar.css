@@ -1,6 +1,0 @@
-.filter-bar {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  margin-bottom: var(--space-lg);
-}

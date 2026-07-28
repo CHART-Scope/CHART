@@ -13,7 +13,6 @@ dependencies = [
   "netcdf4>=1.6",
   "pandas>=2.0",
   "numpy>=1.26",
-  "shapely>=2.0",
   "matplotlib>=3.8",
 ]
 

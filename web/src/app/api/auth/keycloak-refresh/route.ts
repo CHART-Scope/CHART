@@ -1,19 +1,26 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { buildKeycloakTokenUrl, getKeycloakClientId } from "@/lib/keycloak";
+import {
+  clearSessionCookies,
+  idTokenCookieName,
+  type KeycloakTokenResponse,
+  publicTokenResponse,
+  refreshTokenCookieName,
+  setSessionCookies,
+} from "@/lib/authTokens";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  const refreshToken = await readRefreshToken(request);
-
+  const refreshToken = request.cookies.get(refreshTokenCookieName)?.value;
   if (!refreshToken) {
-    return NextResponse.json({ error: "AUTH_REFRESH_TOKEN_REQUIRED" }, { status: 400 });
+    return NextResponse.json({ error: "AUTH_SESSION_REQUIRED" }, { status: 401 });
   }
 
-  let tokenResponse: Response;
+  let response: Response;
   try {
-    tokenResponse = await fetch(buildKeycloakTokenUrl(request), {
+    response = await fetch(buildKeycloakTokenUrl(request), {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -21,27 +28,45 @@ export async function POST(request: NextRequest) {
         client_id: getKeycloakClientId(),
         refresh_token: refreshToken,
       }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(keycloakTimeoutMilliseconds()),
     });
   } catch {
-    return NextResponse.json({ error: "AUTH_IDENTITY_UNAVAILABLE" }, { status: 502 });
+    return NextResponse.json({ error: "AUTH_PROVIDER_UNAVAILABLE" }, { status: 503 });
   }
-
-  if (!tokenResponse.ok) {
-    return NextResponse.json({ error: "AUTH_SESSION_EXPIRED" }, { status: 401 });
+  if (!response.ok) {
+    if (response.status >= 500) {
+      return NextResponse.json({ error: "AUTH_PROVIDER_UNAVAILABLE" }, { status: 503 });
+    }
+    const expired = NextResponse.json(
+      { error: "AUTH_SESSION_EXPIRED" },
+      { status: 401 },
+    );
+    clearSessionCookies(expired);
+    return expired;
   }
-
-  return NextResponse.json(await tokenResponse.json(), {
-    headers: { "Cache-Control": "no-store" },
+  const tokens = await readTokens(response);
+  const publicTokens = publicTokenResponse(tokens);
+  if (!publicTokens) {
+    return NextResponse.json({ error: "AUTH_REFRESH_INVALID" }, { status: 502 });
+  }
+  const refreshed = NextResponse.json(publicTokens, {
+    headers: { "cache-control": "no-store" },
   });
+  setSessionCookies(refreshed, request, tokens);
+  if (!tokens.id_token) refreshed.cookies.delete(idTokenCookieName);
+  return refreshed;
 }
 
-async function readRefreshToken(request: NextRequest) {
+async function readTokens(response: Response): Promise<KeycloakTokenResponse> {
   try {
-    const body = (await request.json()) as { refreshToken?: unknown };
-    return typeof body.refreshToken === "string" && body.refreshToken
-      ? body.refreshToken
-      : null;
+    return (await response.json()) as KeycloakTokenResponse;
   } catch {
-    return null;
+    return {};
   }
+}
+
+function keycloakTimeoutMilliseconds() {
+  const configured = Number(process.env.KEYCLOAK_TIMEOUT_MILLISECONDS ?? 10_000);
+  return Number.isFinite(configured) && configured > 0 ? configured : 10_000;
 }

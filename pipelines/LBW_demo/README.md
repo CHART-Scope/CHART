@@ -17,8 +17,7 @@ model/MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds
     Division bundle: 10 Madhya Pradesh divisions × 3 pregnancy windows
 
 model/MP_state_LBW_tmax_DHS2015-21_v1.0.0.rds
-    State bundle: one original whole-Madhya-Pradesh model plus two locally
-    reconstructed blocks that are not approved for state-stage reporting
+    State bundle: whole Madhya Pradesh × 3 pregnancy windows
 
 model/Dlnlm_Objs_source.rds
     Source artifact for the original whole-MP Sem01 fit (packaging input only)
@@ -69,9 +68,7 @@ Division path:
   reference default = division-specific 25th percentile of training temperatures
 
 State path:
-  one original pooled MP fit is approved for current CHART use
-  two reconstructed blocks remain disabled pending original model-team exports
-  and written pregnancy-window mapping
+  fit on all MP births pooled together for each pregnancy window
   reference default = fixed 27 C (original whole-state analysis)
 ```
 
@@ -148,25 +145,11 @@ The `trimester` is a model-window identifier:
 
 Requires R 4.0+ and Python 3.6+.
 
-From the repository root, the normal full-app command starts this service with
-the web app, Python API, and Dagster:
-
 ```bash
-make run
+cd pipelines/LBW_demo
+bash setup.sh
+bash run_api.sh
 ```
-
-To run only the model service:
-
-```bash
-make lbw-run
-```
-
-Local startup reads `model-release.example.json`, verifies both model files
-against its SHA-256 values, and supplies the validated release identity to the R
-service. To run a different model release, set `LBW_MODEL_RELEASE_MANIFEST`,
-`LBW_MODEL_DIVISION`, and `LBW_MODEL_STATE` to a matching manifest and files.
-Startup fails before the other `make run` services launch when the identity is
-missing or either checksum differs.
 
 Open [http://127.0.0.1:8000/ui/](http://127.0.0.1:8000/ui/). Choose either
 **Madhya Pradesh** or a division, enter three temperatures, then estimate.

@@ -19,7 +19,6 @@ script_dir <- function() {
 }
 
 source(file.path(script_dir(), "score.R"))
-source(file.path(script_dir(), "serialization.R"))
 
 demo_root <- normalizePath(file.path(script_dir(), ".."), mustWork = FALSE)
 model_dir <- Sys.getenv("LBW_MODEL_DIR", unset = file.path(demo_root, "model"))
@@ -33,19 +32,9 @@ state_path <- Sys.getenv(
 )
 port <- as.integer(Sys.getenv("PORT", "8000"))
 host <- Sys.getenv("HOST", "127.0.0.1")
-model_release_id <- Sys.getenv("LBW_MODEL_RELEASE_ID")
-model_version <- Sys.getenv("LBW_MODEL_VERSION")
-division_sha256 <- tolower(Sys.getenv("LBW_MODEL_DIVISION_SHA256"))
-state_sha256 <- tolower(Sys.getenv("LBW_MODEL_STATE_SHA256"))
 
 if (!file.exists(division_path)) stop("Division model file not found: ", division_path)
 if (!file.exists(state_path)) stop("State model file not found: ", state_path)
-if (!nzchar(model_release_id) || !nzchar(model_version)) {
-  stop("LBW model release identity is required")
-}
-if (!grepl("^[0-9a-f]{64}$", division_sha256) || !grepl("^[0-9a-f]{64}$", state_sha256)) {
-  stop("LBW model SHA-256 values are required")
-}
 
 division_store <- load_division_bundle(division_path)
 state_store <- load_state_bundle(state_path)
@@ -59,7 +48,7 @@ normalize_area <- function(area) {
   area
 }
 
-json <- api_json_serializer()
+json <- plumber::serializer_unboxed_json()
 
 pr <- plumber::pr() |>
   plumber::pr_set_serializer(json) |>
@@ -68,11 +57,9 @@ pr <- plumber::pr() |>
       status = "ok",
       region = "MP",
       models = list(
-        state = list(file = basename(state_path), sha256 = state_sha256),
-        division = list(file = basename(division_path), sha256 = division_sha256)
+        state = basename(state_path),
+        division = basename(division_path)
       ),
-      model_release_id = model_release_id,
-      model_version = model_version,
       areas = length(division_store$divisions) + 1
     )
   }, serializer = json) |>
@@ -105,10 +92,7 @@ pr <- plumber::pr() |>
         area = area,
         trimester = body$trimester,
         tmax_lag = body$tmax_lag,
-        ref = if (!is.null(body$ref)) body$ref else NULL,
-        model_version = model_version,
-        division_sha256 = division_sha256,
-        state_sha256 = state_sha256
+        ref = if (!is.null(body$ref)) body$ref else NULL
       )
     }, error = function(error) {
       res$status <- 400

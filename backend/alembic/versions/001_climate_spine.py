@@ -30,7 +30,7 @@ def upgrade() -> None:
     data_label.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
-        "chart_geographies",
+        "geography",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("slug", sa.String(length=64), nullable=False),
         sa.Column("country", sa.String(length=64), nullable=False),
@@ -41,10 +41,7 @@ def upgrade() -> None:
         "admin_unit",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column(
-            "geography_id",
-            sa.Integer(),
-            sa.ForeignKey("chart_geographies.id"),
-            nullable=False,
+            "geography_id", sa.Integer(), sa.ForeignKey("geography.id"), nullable=False
         ),
         sa.Column("level", sa.String(length=32), nullable=False),
         sa.Column("code", sa.String(length=64), nullable=False),
@@ -64,7 +61,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=128), nullable=False),
         sa.Column("kind", sa.String(length=64), nullable=False),
         sa.Column("cadence", sa.String(length=64)),
-        sa.Column("geography_id", sa.Integer(), sa.ForeignKey("chart_geographies.id")),
+        sa.Column("geography_id", sa.Integer(), sa.ForeignKey("geography.id")),
     )
     op.create_table(
         "provenance",
@@ -147,5 +144,5 @@ def downgrade() -> None:
     op.drop_table("provenance")
     op.drop_table("data_source")
     op.drop_table("admin_unit")
-    op.drop_table("chart_geographies")
+    op.drop_table("geography")
     data_label.drop(op.get_bind(), checkfirst=True)

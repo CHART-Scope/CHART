@@ -1,0 +1,150 @@
+.frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--surface-app);
+  font-family: var(--font-body);
+}
+
+.frame.bounded {
+  min-height: 720px;
+  max-width: 1180px;
+  margin: 0 auto;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+
+.topbar {
+  flex-shrink: 0;
+  height: 42px;
+  background: var(--surface-inverse);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+}
+
+.logo {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--fs-body-lg);
+  color: var(--color-lime);
+  letter-spacing: var(--ls-mono);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sep {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 13px;
+}
+
+.tagline {
+  font-size: var(--fs-caption);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.account {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: var(--fs-caption);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--surface-inverse);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition:
+    width 0.2s ease,
+    padding 0.2s ease,
+    opacity 0.15s ease;
+}
+.sidebar.collapsed {
+  width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  opacity: 0;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.navitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  font-size: var(--fs-body);
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: inherit;
+}
+.navitem:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.navitem.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-white);
+}
+.navitem.active :global(svg) {
+  color: var(--color-lime);
+}
+
+.settings {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  font-size: var(--fs-body);
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  font-family: inherit;
+}
+.settings:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.settings:disabled {
+  display: none;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.page {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px 36px;
+}
