@@ -23,7 +23,6 @@ import {
   storeTokenSession,
   type AuthSession,
 } from "../auth/authClient";
-import { PublicAuthAction } from "../auth/PublicAuthAction";
 import type { ChartRoute } from "../routes/types";
 import { Button } from "../ui/Button";
 import { OptionCard } from "../ui/OptionCard";

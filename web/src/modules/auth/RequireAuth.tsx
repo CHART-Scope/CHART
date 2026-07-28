@@ -20,7 +20,6 @@ type RequireAuthProps = {
 export function RequireAuth({ children }: RequireAuthProps) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isChecking, setIsChecking] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
@@ -109,8 +108,8 @@ export function RequireAuth({ children }: RequireAuthProps) {
           <span className="section-kicker">CHART secure workspace</span>
           <h1>Opening CHART sign in</h1>
           <p>
-            {error ??
-              "CHART is sending you to the secure sign-in service for your role and geography scope."}
+            CHART is sending you to the secure sign-in service for your role and
+            geography scope.
           </p>
         </section>
       </main>

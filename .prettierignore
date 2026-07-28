@@ -2,6 +2,7 @@ node_modules/
 **/node_modules/
 
 **/.next/
+**/storybook-static/
 **/dist/
 **/build/
 **/coverage/
