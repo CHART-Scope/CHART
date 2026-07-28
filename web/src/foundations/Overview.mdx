@@ -1,0 +1,37 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Foundations/Overview" />
+
+# CHART Design System
+
+**v0.1 (draft)** — compiled from the three existing CHART prototypes
+(onboarding flow, Kenya / Kajiado app mockup, India / Madhya Pradesh MNCH use case).
+
+This Storybook is the working reference for the CHART design system.
+Everything here reads from a single set of CSS custom properties in
+`src/styles/tokens.css` — swap the tokens and the entire system updates.
+
+## Sections
+
+- **Foundations** — colors, typography, radius & elevation. Tokens only.
+- **Primitives** — every reusable component (Button, Panel, Chip, Stepper, …).
+- **Composites** — feature-level assemblies (onboarding wizard, planning workspace).
+- **Pages** — full-screen story surfaces used for design review.
+
+## Update loop
+
+The design will keep evolving. When it does:
+
+1. **Token change** — edit `src/styles/tokens.css`. Every component and this
+   Storybook update automatically.
+2. **New component** — add `src/components/<Name>/{Name.tsx, Name.module.css,
+Name.stories.tsx, index.ts}`. Follow the existing folder pattern.
+3. **Component tweak** — edit the `.tsx` or `.module.css`. Stories pick it up.
+
+## Rules
+
+- Never hardcode a color, font-family, or spacing value inside a component —
+  always use `var(--…)`.
+- Chips (categorical tint) and precision badges (outlined meta-confidence) look
+  similar but are **two distinct components**. Don't collapse them.
+- Cards / panels have no shadow at rest. Modals are the only elevated surface.

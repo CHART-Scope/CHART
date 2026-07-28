@@ -12,7 +12,6 @@ export function buildKeycloakAuthorizeUrl(input: {
   const url = new URL(
     `${getKeycloakBrowserBaseUrl(input.origin)}/realms/${getKeycloakRealm()}/protocol/openid-connect/auth`,
   );
-
   url.search = new URLSearchParams({
     client_id: getKeycloakClientId(),
     code_challenge: input.challenge,
@@ -22,27 +21,27 @@ export function buildKeycloakAuthorizeUrl(input: {
     scope: "openid profile email",
     state: input.state,
   }).toString();
-
   return url;
 }
 
-export function buildKeycloakLogoutUrl(request: NextRequest) {
+export function buildKeycloakLogoutUrl(request: NextRequest, idToken?: string) {
   const origin = getRequestOrigin(request);
-  const returnTo = getSafeReturnPath(request.nextUrl.searchParams.get("returnTo"));
+  const returnTo = safeReturnPath(request.nextUrl.searchParams.get("returnTo"));
   const url = new URL(
     `${getKeycloakBrowserBaseUrl(origin)}/realms/${getKeycloakRealm()}/protocol/openid-connect/logout`,
   );
-
-  url.search = new URLSearchParams({
+  const parameters = new URLSearchParams({
     client_id: getKeycloakClientId(),
     post_logout_redirect_uri: `${origin}${returnTo}`,
-  }).toString();
-
+  });
+  if (idToken) parameters.set("id_token_hint", idToken);
+  url.search = parameters.toString();
   return url;
 }
 
 export function buildKeycloakTokenUrl(request: NextRequest) {
-  return `${getKeycloakServerBaseUrl(request)}/realms/${getKeycloakRealm()}/protocol/openid-connect/token`;
+  const origin = getRequestOrigin(request);
+  return `${getKeycloakServerBaseUrl(origin)}/realms/${getKeycloakRealm()}/protocol/openid-connect/token`;
 }
 
 export function getKeycloakClientId() {
@@ -60,42 +59,25 @@ function getKeycloakRealm() {
 }
 
 function getKeycloakBrowserBaseUrl(origin: string) {
-  const configuredUrl =
+  const configured =
     process.env.KEYCLOAK_BROWSER_URL ?? process.env.NEXT_PUBLIC_KEYCLOAK_URL;
-
-  if (configuredUrl) {
-    return trimTrailingSlash(configuredUrl);
-  }
-
-  if (isLocalOrigin(origin)) {
-    return process.env.KEYCLOAK_LOCAL_URL ?? "http://127.0.0.1:8080";
-  }
-
-  return `${origin}/identity`;
+  if (configured) return trimTrailingSlash(configured);
+  return isLocalOrigin(origin)
+    ? (process.env.KEYCLOAK_LOCAL_URL ?? "http://127.0.0.1:8080")
+    : `${origin}/identity`;
 }
 
-function getKeycloakServerBaseUrl(request: NextRequest) {
-  const requestOrigin = getRequestOrigin(request);
-  const configuredUrl =
+function getKeycloakServerBaseUrl(origin: string) {
+  const configured =
     process.env.KEYCLOAK_SERVER_URL ??
     process.env.KEYCLOAK_BROWSER_URL ??
     process.env.NEXT_PUBLIC_KEYCLOAK_URL;
-
-  if (configuredUrl) {
-    return trimTrailingSlash(configuredUrl);
-  }
-
-  if (isLocalOrigin(requestOrigin)) {
-    return process.env.KEYCLOAK_LOCAL_URL ?? "http://127.0.0.1:8080";
-  }
-
-  return `${requestOrigin}/identity`;
+  if (configured) return trimTrailingSlash(configured);
+  return isLocalOrigin(origin)
+    ? (process.env.KEYCLOAK_LOCAL_URL ?? "http://127.0.0.1:8080")
+    : `${origin}/identity`;
 }
 
-function getSafeReturnPath(returnTo: string | null) {
-  if (!returnTo || !returnTo.startsWith("/") || returnTo.startsWith("//")) {
-    return "/";
-  }
-
-  return returnTo;
+function safeReturnPath(value: string | null) {
+  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/plan";
 }

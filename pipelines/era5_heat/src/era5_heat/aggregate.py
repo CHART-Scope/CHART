@@ -5,18 +5,16 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import xarray as xr
-from shapely import intersects_xy
-from shapely.geometry import shape
 
 
-def to_daily_tmax_c(ds: xr.Dataset, *, geometry: dict | None = None) -> pd.Series:
-    """Hourly t2m (K) -> area-level daily Tmax (C).
+def to_daily_tmax_c(ds: xr.Dataset) -> pd.Series:
+    """Hourly t2m (K) over a bbox -> district-level daily Tmax (C).
 
-    Resamples each grid cell to daily max, keeps cell centres inside the selected
-    map outline when supplied, then takes a cos(latitude) weighted mean.
+    Resamples each grid cell to daily max, then takes a cos(lat)
+    area-weighted mean across the bbox to produce a single 1D series.
     """
     var = "t2m" if "t2m" in ds else _first_temperature_var(ds)
-    t2m_c = _temperature_to_celsius(ds[var])
+    t2m_c = ds[var] - 273.15
 
     lat_dim = _find_dim(t2m_c, ("latitude", "lat", "y"))
     lon_dim = _find_dim(t2m_c, ("longitude", "lon", "x"))
@@ -24,69 +22,16 @@ def to_daily_tmax_c(ds: xr.Dataset, *, geometry: dict | None = None) -> pd.Serie
 
     daily_max_grid = t2m_c.resample({time_dim: "1D"}).max()
 
-    if geometry is not None:
-        daily_max_grid = _mask_to_geometry(
-            daily_max_grid,
-            geometry=geometry,
-            lat_dim=lat_dim,
-            lon_dim=lon_dim,
-        )
-
-    latitude = daily_max_grid[lat_dim]
-    weights = xr.DataArray(
-        np.cos(np.deg2rad(latitude.values)),
-        coords={lat_dim: latitude},
-        dims=(lat_dim,),
-        name="weights",
+    weights = np.cos(np.deg2rad(daily_max_grid[lat_dim]))
+    weights.name = "weights"
+    district_daily = (
+        daily_max_grid.weighted(weights).mean((lat_dim, lon_dim))
     )
-    district_daily = daily_max_grid.weighted(weights).mean((lat_dim, lon_dim))
 
     series = district_daily.to_pandas()
     series.index = pd.to_datetime(series.index)
     series.name = "tmax_c"
     return series.astype("float64")
-
-
-def _temperature_to_celsius(data: xr.DataArray) -> xr.DataArray:
-    units = str(data.attrs.get("units") or "").strip().lower().replace("°", "deg")
-    if units in {"k", "kelvin"}:
-        return data - 273.15
-    if units in {
-        "c",
-        "degc",
-        "degree_celsius",
-        "degrees_celsius",
-        "celsius",
-    }:
-        return data
-    raise ValueError(f"ERA5_TEMPERATURE_UNITS_UNSUPPORTED: {data.attrs.get('units')!r}")
-
-
-def _mask_to_geometry(
-    grid: xr.DataArray,
-    *,
-    geometry: dict,
-    lat_dim: str,
-    lon_dim: str,
-) -> xr.DataArray:
-    area = shape(geometry)
-    if area.is_empty or not area.is_valid:
-        raise ValueError("ERA5_AREA_GEOMETRY_INVALID")
-
-    longitudes, latitudes = np.meshgrid(
-        grid[lon_dim].to_numpy(),
-        grid[lat_dim].to_numpy(),
-    )
-    mask = intersects_xy(area, longitudes, latitudes)
-    if not bool(mask.any()):
-        raise ValueError("ERA5_AREA_HAS_NO_GRID_CENTRES")
-    return grid.where(
-        xr.DataArray(
-            mask,
-            coords={lat_dim: grid[lat_dim], lon_dim: grid[lon_dim]},
-            dims=(lat_dim, lon_dim),
-        )
-    )
 
 
 def monthly_aggregate(daily: pd.Series) -> pd.DataFrame:
@@ -117,12 +62,7 @@ def monthly_quality(daily: pd.Series) -> pd.DataFrame:
     """Monthly completeness checks for a daily Tmax series."""
     if daily.empty:
         return pd.DataFrame(
-            columns=[
-                "observed_days",
-                "expected_days",
-                "completeness_pct",
-                "quality_flag",
-            ],
+            columns=["observed_days", "expected_days", "completeness_pct", "quality_flag"],
             index=pd.DatetimeIndex([], name="month"),
         )
 
@@ -162,8 +102,7 @@ def heatwave_days_per_month(
     """
     if daily.empty:
         return pd.Series(
-            dtype="int32",
-            index=pd.DatetimeIndex([], name="month"),
+            dtype="int32", index=pd.DatetimeIndex([], name="month"),
             name="heatwave_days",
         )
     hot = (daily >= threshold_c).astype("int8")

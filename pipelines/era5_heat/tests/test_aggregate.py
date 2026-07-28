@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 import xarray as xr
 
 from era5_heat.aggregate import (
@@ -26,13 +25,10 @@ def test_runs_only_count_when_length_ge_min_run():
     # Cool days separate the runs. Cool = 20 C, Hot = 36 C, threshold 35.
     cool = [20.0] * 2
     s = _daily(
-        [36.0]
-        + cool  # 1-day run -> 0 counted
-        + [36.0, 36.0]
-        + cool  # 2-day run -> 0 counted
-        + [36.0, 36.0, 36.0]
-        + cool  # 3-day run -> 3 counted
-        + [36.0, 36.0, 36.0, 36.0, 36.0]  # 5-day run -> 5 counted
+        [36.0] + cool                       # 1-day run -> 0 counted
+        + [36.0, 36.0] + cool               # 2-day run -> 0 counted
+        + [36.0, 36.0, 36.0] + cool         # 3-day run -> 3 counted
+        + [36.0, 36.0, 36.0, 36.0, 36.0]    # 5-day run -> 5 counted
     )
     counts = heatwave_days_per_month(s, threshold_c=35.0, min_run=3)
     assert int(counts.sum()) == 3 + 5
@@ -69,14 +65,7 @@ def test_all_hot_month_counts_every_day():
 def test_empty_all_cool_month_returns_zero_for_that_month():
     s = _daily([20.0] * 31, start="2024-07-01")
     df = build_monthly_frame(s, district="x", threshold_c=35.0, min_run=3)
-    assert (
-        int(
-            df.loc[
-                df["month"] == pd.Timestamp("2024-07-01").date(), "heatwave_days"
-            ].iloc[0]
-        )
-        == 0
-    )
+    assert int(df.loc[df["month"] == pd.Timestamp("2024-07-01").date(), "heatwave_days"].iloc[0]) == 0
 
 
 def test_monthly_quality_flags_partial_month():
@@ -100,15 +89,9 @@ def test_build_monthly_frame_schema():
     s = _daily([20.0, 36.0, 36.0, 36.0, 20.0])
     df = build_monthly_frame(s, district="Testville", threshold_c=35.0, min_run=3)
     assert list(df.columns) == [
-        "district",
-        "month",
-        "tmax_monthly_max_c",
-        "tmax_monthly_mean_c",
-        "heatwave_days",
-        "observed_days",
-        "expected_days",
-        "completeness_pct",
-        "quality_flag",
+        "district", "month", "tmax_monthly_max_c",
+        "tmax_monthly_mean_c", "heatwave_days", "observed_days",
+        "expected_days", "completeness_pct", "quality_flag",
     ]
     assert (df["district"] == "Testville").all()
     assert df["heatwave_days"].dtype == np.int32
@@ -143,7 +126,6 @@ def test_to_daily_tmax_c_from_in_memory_xarray():
         {"t2m": (("time", "latitude", "longitude"), data_k)},
         coords={"time": times, "latitude": lats, "longitude": lons},
     )
-    ds["t2m"].attrs["units"] = "K"
 
     series = to_daily_tmax_c(ds)
     assert len(series) == 2
@@ -153,47 +135,3 @@ def test_to_daily_tmax_c_from_in_memory_xarray():
         expected = (tmax_c_per_cell[day] * w[:, None]).sum() / (w.sum() * 2)
         # Two lon cells with equal weight per lat row -> divide by 2.
         np.testing.assert_allclose(series.iloc[day], expected, rtol=1e-9)
-
-
-def test_to_daily_tmax_c_rejects_unknown_units():
-    dataset = xr.Dataset(
-        {"t2m": (("time", "latitude", "longitude"), np.ones((1, 1, 1)))},
-        coords={
-            "time": pd.date_range("2024-06-01", periods=1, freq="h"),
-            "latitude": [10.0],
-            "longitude": [20.0],
-        },
-    )
-    dataset["t2m"].attrs["units"] = "mystery"
-
-    with pytest.raises(ValueError, match="ERA5_TEMPERATURE_UNITS_UNSUPPORTED"):
-        to_daily_tmax_c(dataset)
-
-
-def test_to_daily_tmax_c_uses_only_grid_centres_inside_area():
-    times = pd.date_range("2024-06-01", periods=24, freq="h")
-    lats = np.array([10.0, 11.0])
-    lons = np.array([20.0, 21.0])
-    data_k = np.full((24, 2, 2), 280.0)
-    data_k[12] = np.array([[303.15, 313.15], [323.15, 333.15]])
-    ds = xr.Dataset(
-        {"t2m": (("time", "latitude", "longitude"), data_k)},
-        coords={"time": times, "latitude": lats, "longitude": lons},
-    )
-    ds["t2m"].attrs["units"] = "kelvin"
-    geometry = {
-        "type": "Polygon",
-        "coordinates": [
-            [
-                [19.5, 9.5],
-                [20.5, 9.5],
-                [20.5, 10.5],
-                [19.5, 10.5],
-                [19.5, 9.5],
-            ]
-        ],
-    }
-
-    series = to_daily_tmax_c(ds, geometry=geometry)
-
-    assert series.iloc[0] == pytest.approx(30.0)

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-from chart.geographies.catalog import MP_LBW_MODEL_AREAS
 from typing import Literal
 
 ClimateLocationSlug = Literal["madhya-pradesh", "kajiado"]
@@ -57,7 +55,19 @@ LOCATIONS: dict[ClimateLocationSlug, Location] = {
         level="state",
         geography_path="/india/madhya-pradesh",
         supports_lbw_prediction=True,
-        lbw_areas=MP_LBW_MODEL_AREAS,
+        lbw_areas=(
+            "Madhya Pradesh",
+            "Bhopal",
+            "Chambal",
+            "Gwalior",
+            "Indore",
+            "Jabalpur",
+            "Narmadapuram",
+            "Rewa",
+            "Sagar",
+            "Shahdol",
+            "Ujjain",
+        ),
     ),
     "kajiado": Location(
         slug="kajiado",

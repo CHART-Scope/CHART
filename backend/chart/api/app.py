@@ -2,101 +2,221 @@ from __future__ import annotations
 
 import json
 import os
-from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
-from sqlalchemy import text
 
 from chart.auth.routes import router as auth_router
-from chart.climate.routes import router as climate_router
-from chart.climate.schemas import ErrorResponse, HealthResponse
-from chart.geographies.routes import router as geographies_router
-from chart.setup.routes import router as setup_router
-from chart.solution_repository.hazards import router as hazards_router
-from chart.solution_repository.routes import router as solutions_router
-from chart.shared.db.session import dispose_engines, get_session_factory
-from chart.users.routes import router as users_router
-from chart.workspaces.routes import router as workspaces_router
+from chart.auth.schemas import CurrentUserContext
+from chart.auth.service import (
+    require_any_role,
+    require_current_user,
+    require_geography_access,
+)
+from chart.climate.catalog import LOCATIONS, ClimateLocationSlug
+from chart.climate.schemas import (
+    ErrorResponse,
+    HealthResponse,
+    LocationListResponse,
+    PredictRequest,
+    PredictResponse,
+    PredictionAcceptedResponse,
+    PredictionRequestStatusResponse,
+    PreviewRequest,
+    PreviewResponse,
+    TimeframeListResponse,
+)
+from chart.climate.requests import get_prediction_request, submit_prediction
+from chart.climate.service import (
+    ClimateServiceError,
+    list_locations,
+    list_timeframes,
+    preview,
+)
 
 API_DESCRIPTION = """
-The single CHART application API.
+Python climate API for CHART.
 
-It owns place selection, climate source tracking, data preparation requests and
-model predictions. Swagger is available at `/docs` and ReDoc at `/redoc`.
+Reads observed ERA5 monthly facts from Postgres (`district_climate`), previews whether
+data is ready for a standard timeframe, and optionally bridges to the LBW inference
+service for Madhya Pradesh.
+
+**Interactive docs**
+- Swagger UI: `/docs`
+- ReDoc: `/redoc`
+- OpenAPI JSON: `/openapi.json`
+
+**Related services**
+- LBW inference (R/Plumber): `LBW_SERVICE_URL`, default `http://127.0.0.1:8000`
+- Keycloak: bearer-token identity provider for auth and prediction routes
+- CHART Fastify API (routes awaiting migration): port `3200`, docs at `/api`
 """
 
+OPENAPI_TAGS = [
+    {
+        "name": "system",
+        "description": "Health and service metadata.",
+    },
+    {
+        "name": "auth",
+        "description": "Keycloak user and geography access context.",
+    },
+    {
+        "name": "climate",
+        "description": "Location catalog, timeframe catalog, preview, and predict.",
+    },
+]
 
-@asynccontextmanager
-async def lifespan(_app: FastAPI):
-    yield
-    dispose_engines()
-
+PREDICTION_ROLES = frozenset(
+    {
+        "chart_admin",
+        "health_planning_lead",
+        "cross_sector_planning_lead",
+        "health_implementation_officer",
+        "cross_sector_implementation_officer",
+    }
+)
 
 app = FastAPI(
-    title="CHART API",
-    version="0.2.0",
+    title="CHART Climate API",
+    version="0.1.0",
     description=API_DESCRIPTION,
+    openapi_tags=OPENAPI_TAGS,
     docs_url=None,
     redoc_url=None,
-    lifespan=lifespan,
 )
 app.include_router(auth_router)
-app.include_router(geographies_router)
-app.include_router(climate_router)
-app.include_router(setup_router)
-app.include_router(hazards_router)
-app.include_router(solutions_router)
-app.include_router(users_router)
-app.include_router(workspaces_router)
-
-
-@app.get("/live", tags=["system"], response_model=HealthResponse)
-def live() -> HealthResponse:
-    return HealthResponse(status="ok")
-
-
-@app.get("/ready", tags=["system"], response_model=HealthResponse)
-def ready() -> HealthResponse:
-    """Verify required durable state before accepting production traffic."""
-
-    try:
-        with get_session_factory()() as session:
-            session.execute(text("SELECT 1"))
-            revision = session.scalar(text("SELECT version_num FROM alembic_version"))
-            if revision != "013_systemic_safety":
-                raise RuntimeError(f"database revision is {revision!r}")
-            if (
-                os.getenv("CHART_REQUIRE_ACTIVE_MODEL", "0") == "1"
-                or os.getenv("INFERENCE_LBW_BASE_URL", "").strip()
-            ):
-                assignments = session.scalar(
-                    text("SELECT count(*) FROM active_model_assignment")
-                )
-                if not assignments:
-                    raise RuntimeError("no active model assignment")
-    except Exception as error:
-        raise HTTPException(status_code=503, detail="SERVICE_NOT_READY") from error
-    return HealthResponse(status="ok")
 
 
 @app.get("/health", tags=["system"], response_model=HealthResponse)
 def health() -> HealthResponse:
-    """Compatibility alias for readiness; use /live for process liveness."""
-
-    return ready()
+    return HealthResponse(status="ok")
 
 
 @app.get("/docs", include_in_schema=False)
 def swagger_ui() -> HTMLResponse:
-    return get_swagger_ui_html(openapi_url="/openapi.json", title="CHART API")
+    return get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title="CHART Climate API — Swagger",
+    )
 
 
 @app.get("/redoc", include_in_schema=False)
 def redoc_ui() -> HTMLResponse:
-    return get_redoc_html(openapi_url="/openapi.json", title="CHART API")
+    return get_redoc_html(
+        openapi_url="/openapi.json",
+        title="CHART Climate API — ReDoc",
+    )
+
+
+@app.get(
+    "/climate/locations",
+    tags=["climate"],
+    response_model=LocationListResponse,
+    summary="List supported geographies",
+    description="Returns MVP geography presets that can be used as `location_slug`.",
+)
+def get_locations() -> LocationListResponse:
+    return LocationListResponse(**list_locations())
+
+
+@app.get(
+    "/climate/timeframes",
+    tags=["climate"],
+    response_model=TimeframeListResponse,
+    summary="List standard timeframes",
+    description="Returns the canonical timeframe ids used by preview and predict.",
+)
+def get_timeframes() -> TimeframeListResponse:
+    return TimeframeListResponse(**list_timeframes())
+
+
+@app.post(
+    "/climate/preview",
+    tags=["climate"],
+    response_model=PreviewResponse,
+    summary="Preview climate data availability",
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid location or timeframe."},
+    },
+)
+def post_preview(request: PreviewRequest) -> PreviewResponse:
+    try:
+        return preview(request)
+    except ClimateServiceError as error:
+        raise _http_error(error) from error
+
+
+@app.post(
+    "/climate/predict",
+    tags=["climate"],
+    response_model=PredictResponse | PredictionAcceptedResponse,
+    summary="Preview climate data or enqueue an LBW prediction",
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "Invalid request or unsupported outcome.",
+        },
+        401: {"model": ErrorResponse, "description": "Keycloak token required."},
+        403: {"model": ErrorResponse, "description": "Role or geography denied."},
+        202: {
+            "model": PredictionAcceptedResponse,
+            "description": "Prediction queued in Dagster.",
+        },
+    },
+)
+def post_predict(
+    request: PredictRequest,
+    user: CurrentUserContext = Depends(require_current_user),
+) -> PredictResponse | JSONResponse:
+    try:
+        _require_prediction_access(user, request.location_slug)
+        result = submit_prediction(request)
+        if isinstance(result, PredictionAcceptedResponse):
+            return JSONResponse(
+                status_code=202,
+                content=result.model_dump(mode="json"),
+                headers={"Retry-After": "3"},
+            )
+        return result
+    except ClimateServiceError as error:
+        raise _http_error(error) from error
+
+
+@app.get(
+    "/climate/prediction-requests/{request_id}",
+    tags=["climate"],
+    response_model=PredictionRequestStatusResponse,
+    summary="Read a queued or completed prediction request",
+    responses={
+        401: {"model": ErrorResponse, "description": "Keycloak token required."},
+        403: {"model": ErrorResponse, "description": "Role or geography denied."},
+        404: {"model": ErrorResponse, "description": "Prediction request not found."},
+    },
+)
+def get_prediction_request_status(
+    request_id: int,
+    user: CurrentUserContext = Depends(require_current_user),
+) -> PredictionRequestStatusResponse:
+    try:
+        status = get_prediction_request(request_id)
+        _require_prediction_access(user, status.location_slug)
+        return status
+    except ClimateServiceError as error:
+        raise _http_error(error) from error
+
+
+def _require_prediction_access(
+    user: CurrentUserContext, location_slug: ClimateLocationSlug
+) -> None:
+    require_any_role(user, PREDICTION_ROLES)
+    require_geography_access(user, LOCATIONS[location_slug].geography_path)
+
+
+def _http_error(error: ClimateServiceError) -> HTTPException:
+    return HTTPException(status_code=error.status_code, detail=error.code)
 
 
 @app.exception_handler(HTTPException)

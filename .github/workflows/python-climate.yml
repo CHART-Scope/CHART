@@ -6,11 +6,7 @@ on:
       - ".github/workflows/python-climate.yml"
       - "backend/**"
       - "orchestration/**"
-      - "pipelines/boundaries/**"
       - "pipelines/era5_heat/**"
-      - "pipelines/seasonal_c3s/**"
-      - "pipelines/isimip_projection/**"
-      - "pipelines/LBW_demo/**"
       - "docs/climate-api.md"
       - "docs/data-pipeline.md"
       - "docs/openapi/climate.json"
@@ -23,11 +19,7 @@ on:
       - ".github/workflows/python-climate.yml"
       - "backend/**"
       - "orchestration/**"
-      - "pipelines/boundaries/**"
       - "pipelines/era5_heat/**"
-      - "pipelines/seasonal_c3s/**"
-      - "pipelines/isimip_projection/**"
-      - "pipelines/LBW_demo/**"
       - "docs/climate-api.md"
       - "docs/data-pipeline.md"
       - "docs/openapi/climate.json"
@@ -47,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgis/postgis:16-3.5
+        image: postgres:16-alpine
         env:
           POSTGRES_DB: chart
           POSTGRES_USER: chart
@@ -74,26 +66,28 @@ jobs:
           cache-dependency-path: |
             backend/pyproject.toml
             orchestration/pyproject.toml
-            pipelines/boundaries/pyproject.toml
             pipelines/era5_heat/pyproject.toml
-            pipelines/seasonal_c3s/pyproject.toml
-            pipelines/isimip_projection/pyproject.toml
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e './backend[dev]' -e './pipelines/boundaries[dev]' -e './pipelines/era5_heat[dev]' -e './pipelines/seasonal_c3s[dev]' -e './pipelines/isimip_projection[dev]' -e ./orchestration
+          python -m pip install -e './backend[dev]' -e './pipelines/era5_heat[dev]' -e ./orchestration
           python -m pip install black==25.1.0 mypy==1.19.1 ruff==0.14.10
 
-      - name: Check formatting, lint, and types
-        run: make python-check VENV_PYTHON=python
+      - name: Check lint and formatting
+        run: |
+          ruff check backend orchestration
+          black --check backend orchestration
+
+      - name: Check types
+        run: mypy backend/chart orchestration/src --ignore-missing-imports --no-error-summary
 
       - name: Apply Alembic migrations
         working-directory: backend
         run: alembic upgrade head
 
       - name: Run tests
-        run: python -m pytest backend/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/LBW_demo/tests -q
+        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests -q
 
       - name: Validate Dagster definitions
         run: python -c 'import dagster as dg; from chart_pipeline.definitions import defs; dg.Definitions.validate_loadable(defs)'

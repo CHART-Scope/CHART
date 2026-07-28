@@ -1,6 +1,10 @@
-import { countryOptions } from "../../lib/countries";
-import { OnboardingRoutePage } from "../../modules/routes/OnboardingRoutePage";
+"use client";
 
-export default function Page() {
-  return <OnboardingRoutePage countryOptions={countryOptions} />;
+import { useRouter } from "next/navigation";
+
+import { OnboardingFlow } from "@/features/onboarding";
+
+export default function OnboardingPage() {
+  const router = useRouter();
+  return <OnboardingFlow onLaunch={() => router.push("/plan")} />;
 }

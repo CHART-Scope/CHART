@@ -7,12 +7,11 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import date
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from chart.shared.db.models import ClimateInputWindowRecord, PredictionRequestRecord
+from chart.shared.db.models import PredictionRequestRecord
 
 
 def _json_request(
@@ -45,12 +44,7 @@ def main() -> int:
     )
     parser.add_argument("--api-url", default="http://127.0.0.1:3210")
     parser.add_argument("--dagster-ui-url", default="http://127.0.0.1:3000")
-    parser.add_argument("--geography-id", default="geo-in-madhya-pradesh")
-    parser.add_argument(
-        "--planning-date",
-        default=date.today().replace(day=1).isoformat(),
-        help="Planning month as YYYY-MM-DD; the day is ignored.",
-    )
+    parser.add_argument("--end-month", default="2020-12")
     parser.add_argument("--timeout", type=int, default=120)
     parser.add_argument(
         "--access-token",
@@ -67,10 +61,10 @@ def main() -> int:
         return 2
 
     payload = {
-        "geography_id": args.geography_id,
-        "planning_date": args.planning_date,
-        "outcome": "lbw",
-        "pregnancy_window": 1,
+        "location_slug": "madhya-pradesh",
+        "timeframe_id": "exposure_3m",
+        "end_month": args.end_month,
+        "outcome": {"type": "lbw", "trimester": 1},
     }
     status_code, response = _json_request(
         f"{args.api_url.rstrip('/')}/climate/predict",
@@ -127,20 +121,11 @@ def main() -> int:
         if record is None or record.result_payload is None:
             print("Completed request has no persisted result.", file=sys.stderr)
             return 1
-        input_window = session.get(
-            ClimateInputWindowRecord, record.climate_input_window_id
-        )
-        if input_window is None:
-            print("Completed request has no saved climate input.", file=sys.stderr)
-            return 1
         prediction = record.result_payload.get("prediction") or {}
         print(
             "Database result: "
             f"request_id={record.id} status={record.status} "
-            f"dagster_run_id={record.dagster_run_id} "
-            f"climate_input_window_id={input_window.id} "
-            f"input_hash={input_window.input_hash} "
-            f"model_release_id={record.model_release_id} "
+            f"climate_run_id={record.climate_run_id} "
             f"odds_ratio={prediction.get('odds_ratio')}"
         )
     return 0

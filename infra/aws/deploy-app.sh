@@ -5,16 +5,15 @@ APP_DIR="${APP_DIR:-/opt/chart}"
 ENV_DIR="${ENV_DIR:-/opt/chart-env}"
 ENV_FILE="${ENV_FILE:-$ENV_DIR/chart.env}"
 PREDICTION_ENV_FILE="${PREDICTION_ENV_FILE:-$ENV_DIR/prediction-worker.env}"
-WEB_ENV_FILE="${WEB_ENV_FILE:-$ENV_DIR/web.env}"
-DAGSTER_ENV_FILE="${DAGSTER_ENV_FILE:-$ENV_DIR/dagster.env}"
 NETWORK="${NETWORK:-chart-net}"
 
 DB_CONTAINER="${DB_CONTAINER:-chart-postgres}"
 LEGACY_KEYCLOAK_DB_CONTAINER="${LEGACY_KEYCLOAK_DB_CONTAINER:-chart-keycloak-postgres}"
 KEYCLOAK_CONTAINER="${KEYCLOAK_CONTAINER:-chart-keycloak}"
 API_CONTAINER="${API_CONTAINER:-chart-api}"
-WEB_CONTAINER="${WEB_CONTAINER:-chart-new-design}"
+WEB_CONTAINER="${WEB_CONTAINER:-chart-web}"
 LBW_CONTAINER="${LBW_CONTAINER:-chart-lbw}"
+CLIMATE_API_CONTAINER="${CLIMATE_API_CONTAINER:-chart-climate-api}"
 DAGSTER_WEBSERVER_CONTAINER="${DAGSTER_WEBSERVER_CONTAINER:-chart-dagster-webserver}"
 DAGSTER_DAEMON_CONTAINER="${DAGSTER_DAEMON_CONTAINER:-chart-dagster-daemon}"
 PROXY_CONTAINER="${PROXY_CONTAINER:-chart-proxy}"
@@ -24,7 +23,8 @@ DAGSTER_DB_NAME="chart_dagster"
 KEYCLOAK_DB_NAME="${KEYCLOAK_DB_NAME:-chart_keycloak}"
 KEYCLOAK_DB_USER="chart_keycloak"
 DB_USER="${DB_USER:-chart}"
-WEB_IMAGE="${WEB_IMAGE:-chart-new-design:latest}"
+API_IMAGE="${API_IMAGE:-chart-api:latest}"
+WEB_IMAGE="${WEB_IMAGE:-chart-web:latest}"
 LBW_IMAGE="${LBW_IMAGE:-chart-lbw:latest}"
 PYTHON_IMAGE="${PYTHON_IMAGE:-chart-python:latest}"
 PROXY_CONFIG_FILE="${PROXY_CONFIG_FILE:-$ENV_DIR/nginx.conf}"
@@ -36,17 +36,6 @@ random_secret() {
   fi
 
   date +%s%N | sha256sum | cut -c 1-48
-}
-
-read_env_value() {
-  local file="$1"
-  local key="$2"
-  local line
-  if [ ! -f "$file" ]; then
-    return
-  fi
-  line="$(grep -m 1 "^${key}=" "$file" 2>/dev/null || true)"
-  printf "%s" "${line#*=}"
 }
 
 detect_public_host() {
@@ -121,9 +110,6 @@ migrate_legacy_keycloak_database() {
 }
 
 PUBLIC_HOST="$(detect_public_host)"
-PUBLIC_SCHEME="${PUBLIC_SCHEME:-https}"
-TLS_TERMINATED_UPSTREAM="${TLS_TERMINATED_UPSTREAM:-0}"
-ALLOW_INSECURE_HTTP="${ALLOW_INSECURE_HTTP:-0}"
 
 if [ -z "$PUBLIC_HOST" ]; then
   echo "Set PUBLIC_HOST to the public host or IP used by browsers." >&2
@@ -134,49 +120,6 @@ if [[ "$PUBLIC_HOST" == http://* || "$PUBLIC_HOST" == https://* || "$PUBLIC_HOST
   echo "Set PUBLIC_HOST to a bare hostname or IP without a scheme or path." >&2
   exit 1
 fi
-if [[ ! "$PUBLIC_HOST" =~ ^[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]]; then
-  echo "PUBLIC_HOST contains invalid characters." >&2
-  exit 1
-fi
-if [[ "$PUBLIC_HOST" == *:* ]]; then
-  PUBLIC_PORT="${PUBLIC_HOST##*:}"
-  if [ "$PUBLIC_PORT" -lt 1 ] || [ "$PUBLIC_PORT" -gt 65535 ]; then
-    echo "PUBLIC_HOST contains an invalid port." >&2
-    exit 1
-  fi
-fi
-for identifier in "$DB_NAME" "$DAGSTER_DB_NAME" "$KEYCLOAK_DB_NAME" "$DB_USER" "$KEYCLOAK_DB_USER"; do
-  if [[ ! "$identifier" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-    echo "Database names and users must be safe PostgreSQL identifiers." >&2
-    exit 1
-  fi
-done
-for docker_name in \
-  "$NETWORK" "$DB_CONTAINER" "$LEGACY_KEYCLOAK_DB_CONTAINER" \
-  "$KEYCLOAK_CONTAINER" "$API_CONTAINER" "$WEB_CONTAINER" "$LBW_CONTAINER" \
-  "$DAGSTER_WEBSERVER_CONTAINER" "$DAGSTER_DAEMON_CONTAINER" "$PROXY_CONTAINER"; do
-  if [[ ! "$docker_name" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
-    echo "Docker network and container names contain invalid characters." >&2
-    exit 1
-  fi
-done
-
-if [ "$PUBLIC_SCHEME" != "https" ] && [ "$PUBLIC_SCHEME" != "http" ]; then
-  echo "PUBLIC_SCHEME must be https or http." >&2
-  exit 1
-fi
-if [ "$PUBLIC_SCHEME" = "http" ] && [ "$ALLOW_INSECURE_HTTP" != "1" ]; then
-  echo "Plain HTTP is disabled. Configure TLS or explicitly set ALLOW_INSECURE_HTTP=1 for an isolated development deployment." >&2
-  exit 1
-fi
-if [ "$PUBLIC_SCHEME" = "https" ] && [ "$TLS_TERMINATED_UPSTREAM" != "1" ]; then
-  if [ ! -r "${TLS_CERT_FILE:-}" ] || [ ! -r "${TLS_KEY_FILE:-}" ]; then
-    echo "HTTPS requires readable TLS_CERT_FILE and TLS_KEY_FILE, or TLS_TERMINATED_UPSTREAM=1 behind an HTTPS load balancer." >&2
-    exit 1
-  fi
-fi
-
-PUBLIC_ORIGIN="$PUBLIC_SCHEME://$PUBLIC_HOST"
 
 mkdir -p "$ENV_DIR"
 
@@ -184,69 +127,28 @@ DEPLOY_CDSAPI_KEY="${CDSAPI_KEY:-}"
 DEPLOY_CDSAPI_URL="${CDSAPI_URL:-}"
 DEPLOY_LBW_MODEL_DIVISION_S3_URI="${LBW_MODEL_DIVISION_S3_URI:-}"
 DEPLOY_LBW_MODEL_STATE_S3_URI="${LBW_MODEL_STATE_S3_URI:-}"
-DEPLOY_INFERENCE_LLM_ENABLED="${INFERENCE_LLM_ENABLED:-}"
-DEPLOY_INFERENCE_LLM_BASE_URL="${INFERENCE_LLM_BASE_URL:-}"
-DEPLOY_INFERENCE_LLM_MODEL="${INFERENCE_LLM_MODEL:-}"
-DEPLOY_INFERENCE_LLM_API_KEY="${INFERENCE_LLM_API_KEY:-}"
 
-PERSISTED_POSTGRES_PASSWORD="$(read_env_value "$ENV_FILE" POSTGRES_PASSWORD)"
-PERSISTED_KEYCLOAK_ADMIN_PASSWORD="$(
-  read_env_value "$ENV_FILE" KEYCLOAK_ADMIN_PASSWORD
-)"
-PERSISTED_CHART_BOOTSTRAP_TOKEN="$(
-  read_env_value "$ENV_FILE" CHART_BOOTSTRAP_TOKEN
-)"
-PERSISTED_CDSAPI_KEY="$(read_env_value "$PREDICTION_ENV_FILE" CDSAPI_KEY)"
-PERSISTED_CDSAPI_URL="$(read_env_value "$PREDICTION_ENV_FILE" CDSAPI_URL)"
-PERSISTED_LBW_MODEL_DIVISION_S3_URI="$(
-  read_env_value "$PREDICTION_ENV_FILE" LBW_MODEL_DIVISION_S3_URI
-)"
-PERSISTED_LBW_MODEL_STATE_S3_URI="$(
-  read_env_value "$PREDICTION_ENV_FILE" LBW_MODEL_STATE_S3_URI
-)"
-PERSISTED_LBW_MODEL_S3_URI="$(
-  read_env_value "$PREDICTION_ENV_FILE" LBW_MODEL_S3_URI
-)"
-PERSISTED_INFERENCE_LLM_ENABLED="$(
-  read_env_value "$PREDICTION_ENV_FILE" INFERENCE_LLM_ENABLED
-)"
-PERSISTED_INFERENCE_LLM_BASE_URL="$(
-  read_env_value "$PREDICTION_ENV_FILE" INFERENCE_LLM_BASE_URL
-)"
-PERSISTED_INFERENCE_LLM_MODEL="$(
-  read_env_value "$PREDICTION_ENV_FILE" INFERENCE_LLM_MODEL
-)"
-PERSISTED_INFERENCE_LLM_API_KEY="$(
-  read_env_value "$PREDICTION_ENV_FILE" INFERENCE_LLM_API_KEY
-)"
-
-POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-${PERSISTED_POSTGRES_PASSWORD:-$(random_secret)}}"
-KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-${PERSISTED_KEYCLOAK_ADMIN_PASSWORD:-$(random_secret)}}"
-CHART_BOOTSTRAP_TOKEN="${CHART_BOOTSTRAP_TOKEN:-${PERSISTED_CHART_BOOTSTRAP_TOKEN:-$(random_secret)}}"
-KEYCLOAK_DB_PASSWORD="$(random_secret)"
-CDSAPI_KEY="${DEPLOY_CDSAPI_KEY:-$PERSISTED_CDSAPI_KEY}"
-CDSAPI_URL="${DEPLOY_CDSAPI_URL:-${PERSISTED_CDSAPI_URL:-https://cds.climate.copernicus.eu/api}}"
-LBW_MODEL_DIVISION_S3_URI="${DEPLOY_LBW_MODEL_DIVISION_S3_URI:-${PERSISTED_LBW_MODEL_DIVISION_S3_URI:-$PERSISTED_LBW_MODEL_S3_URI}}"
-LBW_MODEL_STATE_S3_URI="${DEPLOY_LBW_MODEL_STATE_S3_URI:-$PERSISTED_LBW_MODEL_STATE_S3_URI}"
-INFERENCE_LLM_ENABLED="${DEPLOY_INFERENCE_LLM_ENABLED:-${PERSISTED_INFERENCE_LLM_ENABLED:-false}}"
-INFERENCE_LLM_BASE_URL="${DEPLOY_INFERENCE_LLM_BASE_URL:-$PERSISTED_INFERENCE_LLM_BASE_URL}"
-INFERENCE_LLM_MODEL="${DEPLOY_INFERENCE_LLM_MODEL:-$PERSISTED_INFERENCE_LLM_MODEL}"
-INFERENCE_LLM_API_KEY="${DEPLOY_INFERENCE_LLM_API_KEY:-$PERSISTED_INFERENCE_LLM_API_KEY}"
-
-for name in \
-  POSTGRES_PASSWORD KEYCLOAK_ADMIN_PASSWORD CHART_BOOTSTRAP_TOKEN \
-  CDSAPI_KEY CDSAPI_URL LBW_MODEL_DIVISION_S3_URI LBW_MODEL_STATE_S3_URI \
-  INFERENCE_LLM_BASE_URL INFERENCE_LLM_MODEL INFERENCE_LLM_API_KEY; do
-  value="${!name}"
-  if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
-    echo "$name must be a single-line environment value." >&2
-    exit 1
-  fi
-done
-if [[ ! "$POSTGRES_PASSWORD" =~ ^[A-Za-z0-9._~-]+$ ]]; then
-  echo "POSTGRES_PASSWORD must be URL-safe because it is embedded in database URLs." >&2
-  exit 1
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$ENV_FILE"
+  set +a
 fi
+
+if [ -f "$PREDICTION_ENV_FILE" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$PREDICTION_ENV_FILE"
+  set +a
+fi
+
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(random_secret)}"
+KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-$(random_secret)}"
+KEYCLOAK_DB_PASSWORD="$(random_secret)"
+CDSAPI_KEY="${DEPLOY_CDSAPI_KEY:-${CDSAPI_KEY:-}}"
+CDSAPI_URL="${DEPLOY_CDSAPI_URL:-${CDSAPI_URL:-https://cds.climate.copernicus.eu/api}}"
+LBW_MODEL_DIVISION_S3_URI="${DEPLOY_LBW_MODEL_DIVISION_S3_URI:-${LBW_MODEL_DIVISION_S3_URI:-${LBW_MODEL_S3_URI:-}}}"
+LBW_MODEL_STATE_S3_URI="${DEPLOY_LBW_MODEL_STATE_S3_URI:-${LBW_MODEL_STATE_S3_URI:-}}"
 
 LBW_ENABLED=""
 LBW_SERVICE_URL=""
@@ -276,100 +178,58 @@ DAGSTER_POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 DAGSTER_POSTGRES_DB=$DAGSTER_DB_NAME
 CLIMATE_OUTPUT_DIR=/opt/chart/data/climate
 ERA5_USE_FIXTURE=0
-KEYCLOAK_ISSUER_URL=$PUBLIC_ORIGIN/identity/realms/chart
+KEYCLOAK_ISSUER_URL=http://$PUBLIC_HOST/identity/realms/chart
 KEYCLOAK_CLIENT_ID=chart-api
 KEYCLOAK_JWKS_URL=http://$KEYCLOAK_CONTAINER:8080/identity/realms/chart/protocol/openid-connect/certs
 KEYCLOAK_CLOCK_SKEW_SECONDS=30
 KEYCLOAK_SERVER_URL=http://$KEYCLOAK_CONTAINER:8080/identity
-KEYCLOAK_BROWSER_URL=$PUBLIC_ORIGIN/identity
+KEYCLOAK_BROWSER_URL=http://$PUBLIC_HOST/identity
 KEYCLOAK_ADMIN_URL=http://$KEYCLOAK_CONTAINER:8080/identity
 KEYCLOAK_ADMIN_USERNAME=admin
 KEYCLOAK_REALM=chart
 KEYCLOAK_WEB_CLIENT_ID=chart-web
-CHART_API_INTERNAL_URL=http://$API_CONTAINER:3210
-CHART_PYTHON_API_INTERNAL_URL=http://$API_CONTAINER:3210
-CHART_CORS_ORIGINS=$PUBLIC_ORIGIN
-CHART_WEB_ORIGIN=$PUBLIC_ORIGIN
-CHART_BOOTSTRAP_TOKEN=$CHART_BOOTSTRAP_TOKEN
-CHART_REQUIRE_ACTIVE_MODEL=${LBW_ENABLED:-0}
+CHART_API_INTERNAL_URL=http://$API_CONTAINER:3200
+CHART_PYTHON_API_INTERNAL_URL=http://$CLIMATE_API_CONTAINER:3210
+CHART_CORS_ORIGINS=http://$PUBLIC_HOST
+CHART_WEB_ORIGIN=http://$PUBLIC_HOST
 EOF
 
 chmod 600 "$ENV_FILE"
-
-cat >"$WEB_ENV_FILE" <<EOF
-CHART_API_INTERNAL_URL=http://$API_CONTAINER:3210
-CHART_PYTHON_API_INTERNAL_URL=http://$API_CONTAINER:3210
-CHART_WEB_ORIGIN=$PUBLIC_ORIGIN
-KEYCLOAK_BROWSER_URL=$PUBLIC_ORIGIN/identity
-KEYCLOAK_SERVER_URL=http://$KEYCLOAK_CONTAINER:8080/identity
-KEYCLOAK_REALM=chart
-KEYCLOAK_WEB_CLIENT_ID=chart-web
-EOF
-
-chmod 600 "$WEB_ENV_FILE"
-
-cat >"$DAGSTER_ENV_FILE" <<EOF
-PYTHON_DATABASE_URL=$PYTHON_DATABASE_URL
-DAGSTER_HOME=/opt/dagster/dagster_home
-DAGSTER_POSTGRES_HOST=$DB_CONTAINER
-DAGSTER_POSTGRES_PORT=5432
-DAGSTER_POSTGRES_USER=$DB_USER
-DAGSTER_POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-DAGSTER_POSTGRES_DB=$DAGSTER_DB_NAME
-CLIMATE_OUTPUT_DIR=/opt/chart/data/climate
-ERA5_USE_FIXTURE=0
-EOF
-
-chmod 600 "$DAGSTER_ENV_FILE"
 
 cat >"$PREDICTION_ENV_FILE" <<EOF
 CDSAPI_URL=$CDSAPI_URL
 CDSAPI_KEY=$CDSAPI_KEY
 LBW_SERVICE_URL=$LBW_SERVICE_URL
-INFERENCE_STATISTICAL_PROVIDER=lbw_r
-INFERENCE_LBW_BASE_URL=$LBW_SERVICE_URL
-INFERENCE_LLM_ENABLED=$INFERENCE_LLM_ENABLED
-INFERENCE_LLM_BASE_URL=$INFERENCE_LLM_BASE_URL
-INFERENCE_LLM_MODEL=$INFERENCE_LLM_MODEL
-INFERENCE_LLM_API_KEY=$INFERENCE_LLM_API_KEY
-INFERENCE_LLM_TIMEOUT_SECONDS=10
 EOF
 
 chmod 600 "$PREDICTION_ENV_FILE"
 
-NGINX_LISTEN="listen 80;"
-NGINX_REDIRECT_SERVER=""
-PROXY_PORT_ARGS=(-p 80:80)
-PROXY_TLS_ARGS=()
-if [ "$PUBLIC_SCHEME" = "https" ] && [ "$TLS_TERMINATED_UPSTREAM" != "1" ]; then
-  NGINX_LISTEN="$(cat <<EOF
-    listen 443 ssl;
-    ssl_certificate /etc/nginx/tls/cert.pem;
-    ssl_certificate_key /etc/nginx/tls/key.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
+LBW_NGINX_LOCATION=""
+if [ -n "$LBW_ENABLED" ]; then
+  LBW_NGINX_LOCATION="$(cat <<EOF
+    location = /lbw {
+      return 302 /lbw/ui/;
+    }
+
+    location /lbw/ {
+      proxy_pass http://$LBW_CONTAINER:8000/;
+      proxy_read_timeout 120s;
+      proxy_set_header Host \$host;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host \$host;
+      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header X-Forwarded-Proto \$scheme;
+    }
 EOF
 )"
-  NGINX_REDIRECT_SERVER="$(cat <<EOF
-  server {
-    listen 80;
-    return 301 https://\$host\$request_uri;
-  }
-EOF
-)"
-  PROXY_PORT_ARGS+=(-p 443:443)
-  PROXY_TLS_ARGS+=(
-    -v "$TLS_CERT_FILE:/etc/nginx/tls/cert.pem:ro"
-    -v "$TLS_KEY_FILE:/etc/nginx/tls/key.pem:ro"
-  )
 fi
 
 cat >"$PROXY_CONFIG_FILE" <<EOF
 events {}
 
 http {
-$NGINX_REDIRECT_SERVER
   server {
-$NGINX_LISTEN
+    listen 80;
     client_max_body_size 25m;
 
     location = /identity {
@@ -382,63 +242,74 @@ $NGINX_LISTEN
       proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
       proxy_set_header X-Forwarded-Host \$host;
       proxy_set_header X-Forwarded-Port \$server_port;
-      proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
+      proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     location = /chart-api {
-      proxy_pass http://$API_CONTAINER:3210/docs;
+      proxy_pass http://$API_CONTAINER:3200/api;
       proxy_set_header Host \$host;
       proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
       proxy_set_header X-Forwarded-Host \$host;
       proxy_set_header X-Forwarded-Port \$server_port;
-      proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
+      proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     location = /chart-api/ {
-      proxy_pass http://$API_CONTAINER:3210/docs;
+      proxy_pass http://$API_CONTAINER:3200/api;
       proxy_set_header Host \$host;
       proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
       proxy_set_header X-Forwarded-Host \$host;
       proxy_set_header X-Forwarded-Port \$server_port;
-      proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
+      proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     location /chart-api/ {
-      proxy_pass http://$API_CONTAINER:3210/;
+      proxy_pass http://$API_CONTAINER:3200/;
       proxy_set_header Host \$host;
       proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
       proxy_set_header X-Forwarded-Host \$host;
       proxy_set_header X-Forwarded-Port \$server_port;
-      proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
+      proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /chart-api/auth/ {
+      proxy_pass http://$CLIMATE_API_CONTAINER:3210/auth/;
+      proxy_set_header Host \$host;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Host \$host;
+      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     location = /climate-api/health {
-      proxy_pass http://$API_CONTAINER:3210/health;
+      proxy_pass http://$CLIMATE_API_CONTAINER:3210/health;
       proxy_set_header Host \$host;
       proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
       proxy_set_header X-Forwarded-Host \$host;
       proxy_set_header X-Forwarded-Port \$server_port;
-      proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
+      proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     location /climate/ {
-      proxy_pass http://$API_CONTAINER:3210;
+      proxy_pass http://$CLIMATE_API_CONTAINER:3210;
       proxy_read_timeout 30s;
       proxy_set_header Host \$host;
       proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
       proxy_set_header X-Forwarded-Host \$host;
       proxy_set_header X-Forwarded-Port \$server_port;
-      proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
+      proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
+$LBW_NGINX_LOCATION
+
     location / {
-      proxy_pass http://$WEB_CONTAINER:3200;
+      proxy_pass http://$WEB_CONTAINER:3100;
       proxy_http_version 1.1;
       proxy_set_header Host \$host;
       proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
       proxy_set_header X-Forwarded-Host \$host;
       proxy_set_header X-Forwarded-Port \$server_port;
-      proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
+      proxy_set_header X-Forwarded-Proto \$scheme;
       proxy_set_header Upgrade \$http_upgrade;
       proxy_set_header Connection "upgrade";
     }
@@ -448,27 +319,14 @@ EOF
 chmod 600 "$PROXY_CONFIG_FILE"
 
 echo "Building CHART images before restarting live containers..."
-docker build \
-  --build-arg "CHART_BUILD_ID=$(git -C "$APP_DIR" rev-parse HEAD)" \
-  -f "$APP_DIR/new_design/Dockerfile" \
-  -t "$WEB_IMAGE" \
-  "$APP_DIR"
+docker build -f "$APP_DIR/api/Dockerfile" -t "$API_IMAGE" "$APP_DIR"
+docker build -f "$APP_DIR/web/Dockerfile" -t "$WEB_IMAGE" "$APP_DIR"
 docker build -f "$APP_DIR/backend/Dockerfile" -t "$PYTHON_IMAGE" "$APP_DIR"
 if [ -n "$LBW_ENABLED" ]; then
   docker build \
     -f "$APP_DIR/pipelines/LBW_demo/Dockerfile" \
     -t "$LBW_IMAGE" \
     "$APP_DIR/pipelines/LBW_demo"
-
-  MODEL_METADATA="$(
-    docker run --rm "$PYTHON_IMAGE" python -c \
-      'import json; p=json.load(open("/app/pipelines/LBW_demo/model-release.example.json")); f={x["filename"]:x["sha256"] for x in p["model_files"]}; d=next(x for x in f if "_division_" in x); s=next(x for x in f if "_state_" in x); print("\t".join((p["id"],p["version"],f[d],f[s])))'
-  )"
-  IFS=$'\t' read -r \
-    LBW_MODEL_RELEASE_ID \
-    LBW_MODEL_VERSION \
-    LBW_MODEL_DIVISION_SHA256 \
-    LBW_MODEL_STATE_SHA256 <<<"$MODEL_METADATA"
 fi
 
 docker network create "$NETWORK" >/dev/null 2>&1 || true
@@ -477,6 +335,7 @@ docker rm -f \
   "$PROXY_CONTAINER" \
   "$WEB_CONTAINER" \
   "$API_CONTAINER" \
+  "$CLIMATE_API_CONTAINER" \
   "$DAGSTER_WEBSERVER_CONTAINER" \
   "$DAGSTER_DAEMON_CONTAINER" \
   "$LBW_CONTAINER" \
@@ -491,7 +350,7 @@ docker run -d \
   -e POSTGRES_USER="$DB_USER" \
   -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
   -v chart-postgres-data:/var/lib/postgresql/data \
-  postgis/postgis:16-3.5 >/dev/null
+  postgres:16-alpine >/dev/null
 
 wait_for_command "Postgres" \
   docker exec "$DB_CONTAINER" pg_isready -U "$DB_USER" -d "$DB_NAME"
@@ -534,13 +393,13 @@ docker run -d \
   -e KC_DB_PASSWORD="$KEYCLOAK_DB_PASSWORD" \
   -e KC_HTTP_ENABLED=true \
   -e KC_HTTP_RELATIVE_PATH=/identity \
-  -e KC_HOSTNAME="$PUBLIC_ORIGIN/identity" \
-  -e KC_HOSTNAME_STRICT=true \
+  -e KC_HOSTNAME="http://$PUBLIC_HOST/identity" \
+  -e KC_HOSTNAME_STRICT=false \
   -e KC_PROXY_HEADERS=xforwarded \
   -v "$APP_DIR/infra/keycloak/chart-realm.json:/opt/keycloak/data/import/chart-realm.json:ro" \
   -v "$APP_DIR/infra/keycloak/themes/chart:/opt/keycloak/themes/chart:ro" \
   quay.io/keycloak/keycloak:26.6.1 \
-  start --optimized --import-realm >/dev/null
+  start-dev --import-realm >/dev/null
 
 wait_for_command "Keycloak" curl -fsS "http://127.0.0.1:8080/identity/realms/chart"
 
@@ -552,7 +411,7 @@ docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh config credentials 
 
 docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh update realms/chart \
   -s loginTheme=chart \
-  -s sslRequired=external >/dev/null
+  -s sslRequired=none >/dev/null
 
 WEB_CLIENT_UUID="$(
   docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh get clients \
@@ -566,9 +425,9 @@ WEB_CLIENT_UUID="$(
 docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh update \
   "clients/$WEB_CLIENT_UUID" \
   -r chart \
-  -s "redirectUris=[\"$PUBLIC_ORIGIN/*\",\"http://localhost:3200/*\",\"http://127.0.0.1:3200/*\"]" \
-  -s "attributes={\"post.logout.redirect.uris\":\"$PUBLIC_ORIGIN##$PUBLIC_ORIGIN/*##http://localhost:3200##http://localhost:3200/*##http://127.0.0.1:3200##http://127.0.0.1:3200/*\"}" \
-  -s "webOrigins=[\"$PUBLIC_ORIGIN\"]" >/dev/null
+  -s "redirectUris=[\"http://$PUBLIC_HOST/*\",\"http://localhost:3100/*\",\"http://127.0.0.1:3100/*\"]" \
+  -s "attributes={\"post.logout.redirect.uris\":\"http://$PUBLIC_HOST##http://$PUBLIC_HOST/*##http://localhost:3100##http://localhost:3100/*##http://127.0.0.1:3100##http://127.0.0.1:3100/*\"}" \
+  -s 'webOrigins=["+"]' >/dev/null
 
 docker run --rm \
   --network "$NETWORK" \
@@ -583,31 +442,38 @@ docker run --rm \
 docker run --rm \
   --network "$NETWORK" \
   --env-file "$ENV_FILE" \
-  -e DATABASE_URL="$PYTHON_DATABASE_URL" \
-  "$PYTHON_IMAGE" alembic upgrade head
+  "$API_IMAGE" npm run db:migrate:api
 
-BOOTSTRAP_MODEL_ARG=""
-if [ -n "$LBW_ENABLED" ]; then
-  BOOTSTRAP_MODEL_ARG="--activate-model"
-fi
+docker run --rm \
+  --network "$NETWORK" \
+  --env-file "$ENV_FILE" \
+  "$API_IMAGE" npm run db:seed:api
+
 docker run --rm \
   --network "$NETWORK" \
   --env-file "$ENV_FILE" \
   -e DATABASE_URL="$PYTHON_DATABASE_URL" \
-  "$PYTHON_IMAGE" chart-bootstrap-mp \
-    --source-manifest /app/pipelines/boundaries/manifests/mp_model_areas_v1.json \
-    --crosswalk /app/pipelines/boundaries/data/mp_district_division_crosswalk.csv \
-    --model-release /app/pipelines/LBW_demo/model-release.example.json \
-    $BOOTSTRAP_MODEL_ARG
+  "$PYTHON_IMAGE" alembic upgrade head
 
 docker run --rm \
   --network "$NETWORK" \
-  --env-file "$DAGSTER_ENV_FILE" \
-  -e DATABASE_URL="$PYTHON_DATABASE_URL" \
+  --env-file "$ENV_FILE" \
   "$PYTHON_IMAGE" dagster instance migrate
 
 docker run -d \
   --name "$API_CONTAINER" \
+  --network "$NETWORK" \
+  --restart unless-stopped \
+  --env-file "$ENV_FILE" \
+  -e HOST=0.0.0.0 \
+  -e PORT=3200 \
+  -p 127.0.0.1:3200:3200 \
+  "$API_IMAGE" >/dev/null
+
+wait_for_command "CHART API" curl -fsS "http://127.0.0.1:3200/health"
+
+docker run -d \
+  --name "$CLIMATE_API_CONTAINER" \
   --network "$NETWORK" \
   --restart unless-stopped \
   --env-file "$ENV_FILE" \
@@ -617,15 +483,15 @@ docker run -d \
   -p 127.0.0.1:3210:3210 \
   "$PYTHON_IMAGE" >/dev/null
 
-wait_for_command "CHART API" curl -fsS "http://127.0.0.1:3210/ready"
+wait_for_command "CHART climate API" curl -fsS "http://127.0.0.1:3210/health"
 
 docker run -d \
   --name "$WEB_CONTAINER" \
   --network "$NETWORK" \
   --restart unless-stopped \
-  --env-file "$WEB_ENV_FILE" \
+  --env-file "$ENV_FILE" \
   -e HOSTNAME=0.0.0.0 \
-  -e PORT=3200 \
+  -e PORT=3100 \
   "$WEB_IMAGE" >/dev/null
 
 if [ -n "$LBW_ENABLED" ]; then
@@ -635,10 +501,6 @@ if [ -n "$LBW_ENABLED" ]; then
     --restart unless-stopped \
     -e LBW_MODEL_DIVISION_S3_URI="$LBW_MODEL_DIVISION_S3_URI" \
     -e LBW_MODEL_STATE_S3_URI="$LBW_MODEL_STATE_S3_URI" \
-    -e LBW_MODEL_DIVISION_SHA256="$LBW_MODEL_DIVISION_SHA256" \
-    -e LBW_MODEL_STATE_SHA256="$LBW_MODEL_STATE_SHA256" \
-    -e LBW_MODEL_RELEASE_ID="$LBW_MODEL_RELEASE_ID" \
-    -e LBW_MODEL_VERSION="$LBW_MODEL_VERSION" \
     -v chart-lbw-model:/models \
     "$LBW_IMAGE" >/dev/null
 
@@ -650,7 +512,7 @@ docker run -d \
   --name "$DAGSTER_WEBSERVER_CONTAINER" \
   --network "$NETWORK" \
   --restart unless-stopped \
-  --env-file "$DAGSTER_ENV_FILE" \
+  --env-file "$ENV_FILE" \
   --env-file "$PREDICTION_ENV_FILE" \
   -e DATABASE_URL="$PYTHON_DATABASE_URL" \
   -p 127.0.0.1:3000:3000 \
@@ -665,7 +527,7 @@ docker run -d \
   --name "$DAGSTER_DAEMON_CONTAINER" \
   --network "$NETWORK" \
   --restart unless-stopped \
-  --env-file "$DAGSTER_ENV_FILE" \
+  --env-file "$ENV_FILE" \
   --env-file "$PREDICTION_ENV_FILE" \
   -e DATABASE_URL="$PYTHON_DATABASE_URL" \
   -v chart-dagster-storage:/opt/dagster/storage \
@@ -680,37 +542,25 @@ docker run -d \
   --name "$PROXY_CONTAINER" \
   --network "$NETWORK" \
   --restart unless-stopped \
-  "${PROXY_PORT_ARGS[@]}" \
-  "${PROXY_TLS_ARGS[@]}" \
+  -p 80:80 \
   -v "$PROXY_CONFIG_FILE:/etc/nginx/nginx.conf:ro" \
   nginx:1.27-alpine >/dev/null
 
-if [ "$PUBLIC_SCHEME" = "https" ] && [ "$TLS_TERMINATED_UPSTREAM" != "1" ]; then
-  LOCAL_PROXY_ORIGIN="https://127.0.0.1"
-  LOCAL_PROXY_CURL_ARGS=(-kfsS)
-else
-  LOCAL_PROXY_ORIGIN="http://127.0.0.1"
-  LOCAL_PROXY_CURL_ARGS=(-fsS)
-fi
-wait_for_command "CHART web through proxy" \
-  curl "${LOCAL_PROXY_CURL_ARGS[@]}" -H "Host: $PUBLIC_HOST" \
-  "$LOCAL_PROXY_ORIGIN/api/build"
-wait_for_command "CHART API through proxy" \
-  curl "${LOCAL_PROXY_CURL_ARGS[@]}" -H "Host: $PUBLIC_HOST" \
-  "$LOCAL_PROXY_ORIGIN/chart-api/ready"
-wait_for_command "CHART climate API through proxy" \
-  curl "${LOCAL_PROXY_CURL_ARGS[@]}" -H "Host: $PUBLIC_HOST" \
-  "$LOCAL_PROXY_ORIGIN/climate-api/health"
-wait_for_command "Keycloak through proxy" \
-  curl "${LOCAL_PROXY_CURL_ARGS[@]}" -H "Host: $PUBLIC_HOST" \
-  "$LOCAL_PROXY_ORIGIN/identity/realms/chart"
-echo "CHART is running at $PUBLIC_ORIGIN"
-echo "CHART API is running at $PUBLIC_ORIGIN/chart-api"
-echo "CHART planning API is also available at $PUBLIC_ORIGIN/climate"
-echo "Dagster UI is private at http://127.0.0.1:3000 (use an SSH tunnel)."
-echo "CHART sign-in is running at $PUBLIC_ORIGIN/identity"
+wait_for_command "CHART web" curl -fsS "http://127.0.0.1/"
+wait_for_command "CHART API through proxy" curl -fsS "http://127.0.0.1/chart-api/health"
+wait_for_command "CHART climate API through proxy" curl -fsS "http://127.0.0.1/climate-api/health"
+wait_for_command "Keycloak through proxy" curl -fsS "http://127.0.0.1/identity/realms/chart"
 if [ -n "$LBW_ENABLED" ]; then
-  echo "LBW inference is private on the CHART container network."
+  wait_for_command "LBW inference through proxy" curl -fsS "http://127.0.0.1/lbw/health"
+fi
+
+echo "CHART is running at http://$PUBLIC_HOST"
+echo "CHART API is running at http://$PUBLIC_HOST/chart-api"
+echo "CHART climate API is running at http://$PUBLIC_HOST/climate"
+echo "Dagster UI is private at http://127.0.0.1:3000 (use an SSH tunnel)."
+echo "CHART sign-in is running at http://$PUBLIC_HOST/identity"
+if [ -n "$LBW_ENABLED" ]; then
+  echo "LBW inference is running at http://$PUBLIC_HOST/lbw/ui/"
 else
   echo "LBW inference is disabled until both model S3 URIs are configured."
 fi

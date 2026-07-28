@@ -26,11 +26,7 @@ def signed_token(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("KEYCLOAK_ISSUER_URL", issuer)
     monkeypatch.setenv("KEYCLOAK_CLIENT_ID", "chart-api")
     monkeypatch.setenv("KEYCLOAK_JWKS_URL", "http://keycloak.test/certs")
-    monkeypatch.setattr(
-        service,
-        "_get_signing_key",
-        lambda _url, _timeout_seconds, _token: public_key,
-    )
+    monkeypatch.setattr(service, "_get_signing_key", lambda _url, _token: public_key)
 
     def sign(**overrides):
         claims = {
@@ -119,7 +115,7 @@ def test_auth_me_rejects_token_for_another_audience(
     assert response.json() == {"error": "AUTH_TOKEN_INVALID"}
 
 
-def test_geography_access_allows_descendants_but_not_unrelated_places(
+def test_geography_access_matches_fastify_contract(
     client: TestClient, signed_token
 ) -> None:
     headers = {"Authorization": f"Bearer {signed_token()}"}
@@ -140,20 +136,6 @@ def test_geography_access_allows_descendants_but_not_unrelated_places(
     }
     assert denied.status_code == 403
     assert denied.json() == {"error": "GEOGRAPHY_OUT_OF_SCOPE"}
-
-
-def test_geography_access_does_not_leak_parent_aggregates(
-    client: TestClient, signed_token
-) -> None:
-    token = signed_token(groups=["/country-b/region-b/district-c"])
-
-    response = client.get(
-        "/auth/geography-access?geography=/country-b/region-b",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-
-    assert response.status_code == 403
-    assert response.json() == {"error": "GEOGRAPHY_OUT_OF_SCOPE"}
 
 
 def test_openapi_marks_auth_and_prediction_routes_as_bearer_protected(

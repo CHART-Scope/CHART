@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "CHART API",
-    "description": "\nThe single CHART application API.\n\nIt owns place selection, climate source tracking, data preparation requests and\nmodel predictions. Swagger is available at `/docs` and ReDoc at `/redoc`.\n",
-    "version": "0.2.0"
+    "title": "CHART Climate API",
+    "description": "\nPython climate API for CHART.\n\nReads observed ERA5 monthly facts from Postgres (`district_climate`), previews whether\ndata is ready for a standard timeframe, and optionally bridges to the LBW inference\nservice for Madhya Pradesh.\n\n**Interactive docs**\n- Swagger UI: `/docs`\n- ReDoc: `/redoc`\n- OpenAPI JSON: `/openapi.json`\n\n**Related services**\n- LBW inference (R/Plumber): `LBW_SERVICE_URL`, default `http://127.0.0.1:8000`\n- Keycloak: bearer-token identity provider for auth and prediction routes\n- CHART Fastify API (routes awaiting migration): port `3200`, docs at `/api`\n",
+    "version": "0.1.0"
   },
   "paths": {
     "/auth/me": {
@@ -200,24 +200,20 @@
         }
       }
     },
-    "/geographies": {
+    "/health": {
       "get": {
         "tags": [
-          "geographies"
+          "system"
         ],
-        "summary": "List Geographies",
-        "operationId": "list_geographies_geographies_get",
+        "summary": "Health",
+        "operationId": "health_health_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/GeographyResponse"
-                  },
-                  "type": "array",
-                  "title": "Response List Geographies Geographies Get"
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
@@ -230,7 +226,8 @@
         "tags": [
           "climate"
         ],
-        "summary": "List model-ready places",
+        "summary": "List supported geographies",
+        "description": "Returns MVP geography presets that can be used as `location_slug`.",
         "operationId": "get_locations_climate_locations_get",
         "responses": {
           "200": {
@@ -238,7 +235,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlaceListResponse"
+                  "$ref": "#/components/schemas/LocationListResponse"
                 }
               }
             }
@@ -246,66 +243,21 @@
         }
       }
     },
-    "/climate/planning-options/{geography_id}": {
+    "/climate/timeframes": {
       "get": {
         "tags": [
           "climate"
         ],
-        "summary": "Resolve available planning dates for one place",
-        "operationId": "get_place_planning_options_climate_planning_options__geography_id__get",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "geography_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Geography Id"
-            }
-          }
-        ],
+        "summary": "List standard timeframes",
+        "description": "Returns the canonical timeframe ids used by preview and predict.",
+        "operationId": "get_timeframes_climate_timeframes_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlanningOptionsResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/TimeframeListResponse"
                 }
               }
             }
@@ -318,7 +270,7 @@
         "tags": [
           "climate"
         ],
-        "summary": "Show the three climate records for a planning month",
+        "summary": "Preview climate data availability",
         "operationId": "post_preview_climate_preview_post",
         "requestBody": {
           "content": {
@@ -341,38 +293,8 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
+          "400": {
+            "description": "Invalid location or timeframe.",
             "content": {
               "application/json": {
                 "schema": {
@@ -391,12 +313,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        }
       }
     },
     "/climate/predict": {
@@ -404,7 +321,7 @@
         "tags": [
           "climate"
         ],
-        "summary": "Queue a traceable planning prediction",
+        "summary": "Preview climate data or enqueue an LBW prediction",
         "operationId": "post_predict_climate_predict_post",
         "requestBody": {
           "content": {
@@ -435,18 +352,18 @@
               }
             }
           },
-          "202": {
-            "description": "Accepted",
+          "400": {
+            "description": "Invalid request or unsupported outcome.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PredictionAcceptedResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "401": {
-            "description": "Unauthorized",
+            "description": "Keycloak token required.",
             "content": {
               "application/json": {
                 "schema": {
@@ -456,7 +373,7 @@
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Role or geography denied.",
             "content": {
               "application/json": {
                 "schema": {
@@ -465,22 +382,12 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found",
+          "202": {
+            "description": "Prediction queued in Dagster.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/PredictionAcceptedResponse"
                 }
               }
             }
@@ -503,91 +410,12 @@
         ]
       }
     },
-    "/climate/prediction-requests": {
-      "get": {
-        "tags": [
-          "climate"
-        ],
-        "summary": "List the signed-in user's recent prediction runs",
-        "operationId": "get_prediction_requests_climate_prediction_requests_get",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "geography_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Geography Id"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 25,
-              "minimum": 1,
-              "default": 10,
-              "title": "Limit"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PredictionRequestListResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/climate/prediction-requests/{request_id}": {
       "get": {
         "tags": [
           "climate"
         ],
-        "summary": "Read climate preparation and prediction status",
+        "summary": "Read a queued or completed prediction request",
         "operationId": "get_prediction_request_status_climate_prediction_requests__request_id__get",
         "security": [
           {
@@ -617,134 +445,33 @@
             }
           },
           "401": {
+            "description": "Keycloak token required.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            },
-            "description": "Unauthorized"
+            }
           },
           "403": {
+            "description": "Role or geography denied.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            },
-            "description": "Forbidden"
+            }
           },
           "404": {
+            "description": "Prediction request not found.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/setup": {
-      "get": {
-        "tags": [
-          "setup"
-        ],
-        "summary": "Status",
-        "operationId": "status_setup_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SetupStatus"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/setup/options": {
-      "get": {
-        "tags": [
-          "setup"
-        ],
-        "summary": "Options",
-        "operationId": "options_setup_options_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SetupOptions"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/setup/bootstrap": {
-      "post": {
-        "tags": [
-          "setup"
-        ],
-        "summary": "Bootstrap Route",
-        "operationId": "bootstrap_route_setup_bootstrap_post",
-        "parameters": [
-          {
-            "name": "X-CHART-Bootstrap-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Chart-Bootstrap-Token"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BootstrapSetupInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BootstrapSetupResponse"
-                }
-              }
             }
           },
           "422": {
@@ -753,562 +480,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/setup/complete": {
-      "post": {
-        "tags": [
-          "setup"
-        ],
-        "summary": "Complete Route",
-        "operationId": "complete_route_setup_complete_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CompleteSetupInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SetupStatus"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/setup/reset": {
-      "post": {
-        "tags": [
-          "setup"
-        ],
-        "summary": "Reset Route",
-        "operationId": "reset_route_setup_reset_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SetupStatus"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/hazards": {
-      "get": {
-        "tags": [
-          "solution-repository"
-        ],
-        "summary": "List Hazards",
-        "operationId": "list_hazards_hazards_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HazardListResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/hazards/{hazard_id}": {
-      "get": {
-        "tags": [
-          "solution-repository"
-        ],
-        "summary": "Get Hazard",
-        "operationId": "get_hazard_hazards__hazard_id__get",
-        "parameters": [
-          {
-            "name": "hazard_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Hazard Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HazardDetail"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/solutions": {
-      "get": {
-        "tags": [
-          "solution-repository"
-        ],
-        "summary": "List Solutions",
-        "operationId": "list_solutions_solutions_get",
-        "parameters": [
-          {
-            "name": "hazard",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Hazard"
-            }
-          },
-          {
-            "name": "solutionType",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Solutiontype"
-            }
-          },
-          {
-            "name": "cost",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Cost"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Search"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Status"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "default": 100,
-              "title": "Limit"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/solutions/taxonomies": {
-      "get": {
-        "tags": [
-          "solution-repository"
-        ],
-        "summary": "List Taxonomies",
-        "operationId": "list_taxonomies_solutions_taxonomies_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/users": {
-      "get": {
-        "tags": [
-          "users"
-        ],
-        "summary": "List Route",
-        "operationId": "list_route_users_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/UserResponse"
-                  },
-                  "type": "array",
-                  "title": "Response List Route Users Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "users"
-        ],
-        "summary": "Create Route",
-        "operationId": "create_route_users_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateUserInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/users/{user_id}/disable": {
-      "post": {
-        "tags": [
-          "users"
-        ],
-        "summary": "Disable Route",
-        "operationId": "disable_route_users__user_id__disable_post",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "User Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/workspaces": {
-      "post": {
-        "tags": [
-          "workspaces"
-        ],
-        "summary": "Create Route",
-        "operationId": "create_route_workspaces_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateWorkspaceInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WorkspaceResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/workspaces/{workspace_id}": {
-      "get": {
-        "tags": [
-          "workspaces"
-        ],
-        "summary": "Get Route",
-        "operationId": "get_route_workspaces__workspace_id__get",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Workspace Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WorkspaceResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/live": {
-      "get": {
-        "tags": [
-          "system"
-        ],
-        "summary": "Live",
-        "operationId": "live_live_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HealthResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/ready": {
-      "get": {
-        "tags": [
-          "system"
-        ],
-        "summary": "Ready",
-        "description": "Verify required durable state before accepting production traffic.",
-        "operationId": "ready_ready_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HealthResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/health": {
-      "get": {
-        "tags": [
-          "system"
-        ],
-        "summary": "Health",
-        "description": "Compatibility alias for readiness; use /live for process liveness.",
-        "operationId": "health_health_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
@@ -1334,6 +505,25 @@
       },
       "Availability": {
         "properties": {
+          "location_slug": {
+            "type": "string",
+            "enum": [
+              "madhya-pradesh",
+              "kajiado"
+            ],
+            "title": "Location Slug"
+          },
+          "timeframe_id": {
+            "type": "string",
+            "enum": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ],
+            "title": "Timeframe Id"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -1341,39 +531,30 @@
               "partial",
               "missing",
               "stale",
-              "sample",
               "not_available"
             ],
-            "title": "Status"
+            "title": "Status",
+            "description": "`ready` = enough months for the request; `partial`/`missing` = ingest or widen window; `stale` = data older than monthly cadence; `not_available` = tier not built yet."
           },
           "months_requested": {
             "type": "integer",
             "title": "Months Requested",
-            "default": 3
+            "description": "Months needed for this timeframe."
           },
           "months_found": {
             "type": "integer",
-            "title": "Months Found"
+            "title": "Months Found",
+            "description": "Months found in `district_climate` for the request."
           },
           "missing_months": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Missing Months"
+            "title": "Missing Months",
+            "description": "Requested months with no stored value."
           },
-          "input_window_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Input Window Id"
-          },
-          "input_hash": {
+          "period_start": {
             "anyOf": [
               {
                 "type": "string"
@@ -1382,150 +563,10 @@
                 "type": "null"
               }
             ],
-            "title": "Input Hash"
+            "title": "Period Start",
+            "description": "First month returned in `series`, if any."
           },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          }
-        },
-        "type": "object",
-        "required": [
-          "status",
-          "months_found",
-          "missing_months",
-          "message"
-        ],
-        "title": "Availability"
-      },
-      "BootstrapAdminResponse": {
-        "properties": {
-          "userId": {
-            "type": "string",
-            "title": "Userid"
-          },
-          "username": {
-            "type": "string",
-            "title": "Username"
-          },
-          "email": {
-            "type": "string",
-            "title": "Email"
-          }
-        },
-        "type": "object",
-        "required": [
-          "userId",
-          "username",
-          "email"
-        ],
-        "title": "BootstrapAdminResponse"
-      },
-      "BootstrapSetupInput": {
-        "properties": {
-          "countryCode": {
-            "type": "string",
-            "minLength": 2,
-            "title": "Countrycode"
-          },
-          "countryName": {
-            "type": "string",
-            "minLength": 2,
-            "title": "Countryname"
-          },
-          "focusAreaIds": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Focusareaids"
-          },
-          "geographies": {
-            "items": {
-              "$ref": "#/components/schemas/SetupGeographyInput"
-            },
-            "type": "array",
-            "title": "Geographies"
-          },
-          "geographyLevelLabel": {
-            "type": "string",
-            "minLength": 2,
-            "title": "Geographylevellabel"
-          },
-          "hazardIds": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Hazardids"
-          },
-          "healthAreaIds": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Healthareaids"
-          },
-          "admin": {
-            "$ref": "#/components/schemas/SetupAdminInput"
-          }
-        },
-        "type": "object",
-        "required": [
-          "countryCode",
-          "countryName",
-          "geographyLevelLabel",
-          "hazardIds",
-          "admin"
-        ],
-        "title": "BootstrapSetupInput"
-      },
-      "BootstrapSetupResponse": {
-        "properties": {
-          "setup": {
-            "$ref": "#/components/schemas/SetupStatus"
-          },
-          "admin": {
-            "$ref": "#/components/schemas/BootstrapAdminResponse"
-          }
-        },
-        "type": "object",
-        "required": [
-          "setup",
-          "admin"
-        ],
-        "title": "BootstrapSetupResponse"
-      },
-      "ClimateMonthResponse": {
-        "properties": {
-          "month": {
-            "type": "string",
-            "title": "Month"
-          },
-          "temperature_c": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Temperature C"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "waiting",
-              "ready",
-              "stale",
-              "sample",
-              "failed"
-            ],
-            "title": "Status"
-          },
-          "source_name": {
+          "period_end": {
             "anyOf": [
               {
                 "type": "string"
@@ -1534,9 +575,10 @@
                 "type": "null"
               }
             ],
-            "title": "Source Name"
+            "title": "Period End",
+            "description": "Last month returned in `series`, if any."
           },
-          "source_class": {
+          "last_refreshed_at": {
             "anyOf": [
               {
                 "type": "string"
@@ -1545,62 +587,8 @@
                 "type": "null"
               }
             ],
-            "title": "Source Class"
-          },
-          "source_uri": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Uri"
-          },
-          "source_issue_time": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Issue Time"
-          },
-          "downloaded_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Downloaded At"
-          },
-          "data_label": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Data Label"
-          },
-          "quality_status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Quality Status"
+            "title": "Last Refreshed At",
+            "description": "ISO timestamp from `data_source.last_refreshed_at` for this geography."
           },
           "climate_run_id": {
             "anyOf": [
@@ -1611,9 +599,10 @@
                 "type": "null"
               }
             ],
-            "title": "Climate Run Id"
+            "title": "Climate Run Id",
+            "description": "Postgres `climate_run.id` backing the series."
           },
-          "raw_file_uri": {
+          "data_label": {
             "anyOf": [
               {
                 "type": "string"
@@ -1622,9 +611,15 @@
                 "type": "null"
               }
             ],
-            "title": "Raw File Uri"
+            "title": "Data Label",
+            "description": "Provenance label for the run (`sample`, `reanalysis`, etc.)."
           },
-          "raw_file_hash": {
+          "pull_required": {
+            "type": "boolean",
+            "title": "Pull Required",
+            "description": "When true, run the suggested materialisation command before predicting."
+          },
+          "pull_hint": {
             "anyOf": [
               {
                 "type": "string"
@@ -1633,228 +628,30 @@
                 "type": "null"
               }
             ],
-            "title": "Raw File Hash"
-          },
-          "scenario": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Scenario"
-          },
-          "projection_period": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Projection Period"
-          },
-          "ensemble_summary": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ensemble Summary"
-          },
-          "expected_source_class": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expected Source Class"
-          },
-          "expected_source_name": {
-            "type": "string",
-            "title": "Expected Source Name"
-          },
-          "source_policy_version": {
-            "type": "string",
-            "title": "Source Policy Version"
-          },
-          "unavailable_reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Unavailable Reason"
+            "title": "Pull Hint",
+            "description": "Shell hint to refresh data, e.g. `PRESET=madhya-pradesh make climate-materialize`.",
+            "examples": [
+              "PRESET=madhya-pradesh make climate-materialize"
+            ]
           }
         },
         "type": "object",
         "required": [
-          "month",
+          "location_slug",
+          "timeframe_id",
           "status",
-          "expected_source_name",
-          "source_policy_version"
+          "months_requested",
+          "months_found",
+          "missing_months",
+          "period_start",
+          "period_end",
+          "last_refreshed_at",
+          "climate_run_id",
+          "data_label",
+          "pull_required",
+          "pull_hint"
         ],
-        "title": "ClimateMonthResponse"
-      },
-      "CompleteSetupInput": {
-        "properties": {
-          "countryCode": {
-            "type": "string",
-            "minLength": 2,
-            "title": "Countrycode"
-          },
-          "countryName": {
-            "type": "string",
-            "minLength": 2,
-            "title": "Countryname"
-          },
-          "focusAreaIds": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Focusareaids"
-          },
-          "geographies": {
-            "items": {
-              "$ref": "#/components/schemas/SetupGeographyInput"
-            },
-            "type": "array",
-            "title": "Geographies"
-          },
-          "geographyLevelLabel": {
-            "type": "string",
-            "minLength": 2,
-            "title": "Geographylevellabel"
-          },
-          "hazardIds": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Hazardids"
-          },
-          "healthAreaIds": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Healthareaids"
-          }
-        },
-        "type": "object",
-        "required": [
-          "countryCode",
-          "countryName",
-          "geographyLevelLabel",
-          "hazardIds"
-        ],
-        "title": "CompleteSetupInput"
-      },
-      "CreateUserInput": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 2,
-            "title": "Name"
-          },
-          "email": {
-            "type": "string",
-            "minLength": 3,
-            "title": "Email"
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phone"
-          },
-          "username": {
-            "type": "string",
-            "minLength": 2,
-            "title": "Username"
-          },
-          "password": {
-            "type": "string",
-            "minLength": 8,
-            "title": "Password"
-          },
-          "roles": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Roles"
-          },
-          "geographyIds": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Geographyids"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "email",
-          "username",
-          "password",
-          "roles",
-          "geographyIds"
-        ],
-        "title": "CreateUserInput"
-      },
-      "CreateWorkspaceInput": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Name"
-          },
-          "geographyId": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Geographyid"
-          },
-          "planningCycle": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Planningcycle"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "geographyId"
-        ],
-        "title": "CreateWorkspaceInput"
+        "title": "Availability"
       },
       "CurrentUserContext": {
         "properties": {
@@ -1927,7 +724,12 @@
         "properties": {
           "error": {
             "type": "string",
-            "title": "Error"
+            "title": "Error",
+            "description": "Stable machine-readable error code.",
+            "examples": [
+              "CLIMATE_DATA_NOT_READY",
+              "LBW_NOT_AVAILABLE_FOR_LOCATION"
+            ]
           }
         },
         "type": "object",
@@ -1959,78 +761,6 @@
         ],
         "title": "GeographyAccessResponse"
       },
-      "GeographyResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "countryCode": {
-            "type": "string",
-            "title": "Countrycode"
-          },
-          "level": {
-            "type": "string",
-            "title": "Level"
-          },
-          "levelLabel": {
-            "type": "string",
-            "title": "Levellabel"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "parentId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Parentid"
-          },
-          "externalCode": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Externalcode"
-          },
-          "path": {
-            "type": "string",
-            "title": "Path"
-          },
-          "sortOrder": {
-            "type": "integer",
-            "title": "Sortorder"
-          },
-          "supportsPrediction": {
-            "type": "boolean",
-            "title": "Supportsprediction"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "countryCode",
-          "level",
-          "levelLabel",
-          "name",
-          "parentId",
-          "externalCode",
-          "path",
-          "sortOrder",
-          "supportsPrediction"
-        ],
-        "title": "GeographyResponse"
-      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2044,242 +774,40 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "HazardDetail": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "hazardGroup": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hazardgroup"
-          },
-          "imageUrl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Imageurl"
-          },
-          "solutionCount": {
-            "type": "integer",
-            "title": "Solutioncount"
-          },
-          "solutions": {
-            "items": {
-              "$ref": "#/components/schemas/HazardSolution"
-            },
-            "type": "array",
-            "title": "Solutions"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "label",
-          "solutionCount",
-          "solutions"
-        ],
-        "title": "HazardDetail"
-      },
-      "HazardItem": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "hazardGroup": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hazardgroup"
-          },
-          "imageUrl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Imageurl"
-          },
-          "solutionCount": {
-            "type": "integer",
-            "title": "Solutioncount"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "label",
-          "solutionCount"
-        ],
-        "title": "HazardItem"
-      },
-      "HazardListResponse": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/HazardItem"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "title": "HazardListResponse"
-      },
-      "HazardOption": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "label"
-        ],
-        "title": "HazardOption"
-      },
-      "HazardSolution": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "slug": {
-            "type": "string",
-            "title": "Slug"
-          },
-          "summary": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Summary"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "slug"
-        ],
-        "title": "HazardSolution"
-      },
       "HealthResponse": {
         "properties": {
           "status": {
             "type": "string",
             "const": "ok",
             "title": "Status",
-            "default": "ok"
+            "description": "Service health status."
           }
         },
         "type": "object",
+        "required": [
+          "status"
+        ],
         "title": "HealthResponse"
       },
-      "HeatSeasonOptionResponse": {
+      "LbwOutcome": {
         "properties": {
-          "label": {
+          "type": {
             "type": "string",
-            "title": "Label"
+            "const": "lbw",
+            "title": "Type",
+            "description": "Health outcome model to run. Only `lbw` is supported today."
           },
-          "months": {
-            "items": {
-              "type": "string",
-              "format": "date"
-            },
-            "type": "array",
-            "title": "Months"
-          },
-          "planning_date": {
-            "type": "string",
-            "format": "date",
-            "title": "Planning Date"
-          },
-          "available": {
-            "type": "boolean",
-            "title": "Available"
-          },
-          "available_from": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
+          "trimester": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
             ],
-            "title": "Available From"
+            "title": "Trimester",
+            "description": "Pregnancy trimester window for the LBW model. 1 = latest trimester (T3), 2 = middle (T2), 3 = earliest (T1)."
           },
-          "unavailable_reason": {
+          "area": {
             "anyOf": [
               {
                 "type": "string"
@@ -2288,27 +816,49 @@
                 "type": "null"
               }
             ],
-            "title": "Unavailable Reason"
+            "title": "Area",
+            "description": "LBW geography within Madhya Pradesh. Use `Madhya Pradesh` for the state model or a division name (e.g. `Gwalior`). Defaults to whole state.",
+            "examples": [
+              "Madhya Pradesh",
+              "Gwalior"
+            ]
           },
-          "source_name": {
-            "type": "string",
-            "title": "Source Name"
-          },
-          "source_uri": {
-            "type": "string",
-            "title": "Source Uri"
+          "ref": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref",
+            "description": "Reference temperature in \u00b0C. Omit to use the model default for the chosen area.",
+            "examples": [
+              27.0
+            ]
           }
         },
         "type": "object",
         "required": [
-          "label",
-          "months",
-          "planning_date",
-          "available",
-          "source_name",
-          "source_uri"
+          "type",
+          "trimester"
         ],
-        "title": "HeatSeasonOptionResponse"
+        "title": "LbwOutcome",
+        "description": "Optional health outcome to score after climate data is available.",
+        "examples": [
+          {
+            "area": "Madhya Pradesh",
+            "trimester": 1,
+            "type": "lbw"
+          },
+          {
+            "area": "Gwalior",
+            "ref": 27.0,
+            "trimester": 1,
+            "type": "lbw"
+          }
+        ]
       },
       "LbwPrediction": {
         "properties": {
@@ -2318,167 +868,70 @@
           },
           "geography_level": {
             "type": "string",
-            "title": "Geography Level"
+            "title": "Geography Level",
+            "description": "`state` or `division` in the LBW model bundle."
           },
-          "pregnancy_window": {
+          "trimester": {
             "type": "integer",
-            "enum": [
-              1,
-              2,
-              3
-            ],
-            "title": "Pregnancy Window"
+            "title": "Trimester"
           },
-          "temperatures_c": {
+          "tmax_lag": {
             "items": {
               "type": "number"
             },
             "type": "array",
-            "maxItems": 3,
-            "minItems": 3,
-            "title": "Temperatures C"
+            "title": "Tmax Lag",
+            "description": "Three monthly mean temperatures in \u00b0C, most recent month first (lag0, lag1, lag2)."
           },
-          "reference_temperature_c": {
+          "ref_temp": {
             "type": "number",
-            "title": "Reference Temperature C"
+            "title": "Ref Temp",
+            "description": "Reference temperature in \u00b0C used for the odds ratio."
           },
           "odds_ratio": {
             "type": "number",
-            "exclusiveMinimum": 0.0,
-            "title": "Odds Ratio"
+            "title": "Odds Ratio",
+            "description": "Modelled odds ratio vs the reference temperature profile."
           },
           "ci95_low": {
             "type": "number",
-            "exclusiveMinimum": 0.0,
             "title": "Ci95 Low"
           },
           "ci95_high": {
             "type": "number",
-            "exclusiveMinimum": 0.0,
             "title": "Ci95 High"
           },
           "on_training_support": {
             "type": "boolean",
-            "title": "On Training Support"
+            "title": "On Training Support",
+            "description": "Whether all supplied temperatures fall within the model training range."
           },
           "model_file": {
             "type": "string",
-            "minLength": 1,
-            "title": "Model File"
-          },
-          "model_version": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Model Version"
-          },
-          "model_sha256": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^[0-9a-fA-F]{64}$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model Sha256"
-          },
-          "warning": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Warning"
-          },
-          "explanation": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Explanation"
+            "title": "Model File",
+            "description": "LBW model bundle filename used for scoring."
           }
         },
         "type": "object",
         "required": [
           "area",
           "geography_level",
-          "pregnancy_window",
-          "temperatures_c",
-          "reference_temperature_c",
+          "trimester",
+          "tmax_lag",
+          "ref_temp",
           "odds_ratio",
           "ci95_low",
           "ci95_high",
           "on_training_support",
-          "model_file",
-          "model_version"
+          "model_file"
         ],
         "title": "LbwPrediction"
       },
-      "LongTermProjectionOptionResponse": {
-        "properties": {
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "period": {
-            "type": "string",
-            "const": "2031-2040",
-            "title": "Period"
-          },
-          "months": {
-            "items": {
-              "type": "string",
-              "format": "date"
-            },
-            "type": "array",
-            "title": "Months"
-          },
-          "planning_date": {
-            "type": "string",
-            "format": "date",
-            "title": "Planning Date"
-          },
-          "scenarios": {
-            "items": {
-              "$ref": "#/components/schemas/ProjectionScenarioOptionResponse"
-            },
-            "type": "array",
-            "title": "Scenarios"
-          },
-          "source_name": {
-            "type": "string",
-            "title": "Source Name"
-          },
-          "source_uri": {
-            "type": "string",
-            "title": "Source Uri"
-          }
-        },
-        "type": "object",
-        "required": [
-          "label",
-          "period",
-          "months",
-          "planning_date",
-          "scenarios",
-          "source_name",
-          "source_uri"
-        ],
-        "title": "LongTermProjectionOptionResponse"
-      },
-      "PlaceListResponse": {
+      "LocationListResponse": {
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/PlaceResponse"
+              "$ref": "#/components/schemas/LocationResponse"
             },
             "type": "array",
             "title": "Items"
@@ -2488,35 +941,192 @@
         "required": [
           "items"
         ],
-        "title": "PlaceListResponse"
+        "title": "LocationListResponse"
       },
-      "PlaceResponse": {
+      "LocationResponse": {
         "properties": {
-          "geography_id": {
+          "slug": {
             "type": "string",
-            "title": "Geography Id"
-          },
-          "code": {
-            "type": "string",
-            "title": "Code"
+            "enum": [
+              "madhya-pradesh",
+              "kajiado"
+            ],
+            "title": "Slug"
           },
           "name": {
             "type": "string",
             "title": "Name"
           },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
           "level": {
             "type": "string",
-            "title": "Level"
+            "title": "Level",
+            "description": "Admin level for the MVP bbox unit (`state`, `county`, \u2026)."
           },
-          "path": {
-            "type": "string",
-            "title": "Path"
-          },
-          "supports_prediction": {
+          "supports_lbw_prediction": {
             "type": "boolean",
-            "title": "Supports Prediction"
+            "title": "Supports Lbw Prediction",
+            "description": "Whether the LBW inference bridge is available for this location."
           },
-          "model_version": {
+          "lbw_areas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lbw Areas",
+            "description": "LBW model areas when `supports_lbw_prediction` is true (MP state + divisions)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "country",
+          "level",
+          "supports_lbw_prediction"
+        ],
+        "title": "LocationResponse"
+      },
+      "MonthValue": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month",
+            "description": "Calendar month (`YYYY-MM`).",
+            "examples": [
+              "2024-12"
+            ]
+          },
+          "tmax_monthly_mean_c": {
+            "type": "number",
+            "title": "Tmax Monthly Mean C",
+            "description": "Monthly mean of daily maximum 2 m temperature (\u00b0C) for the admin bbox.",
+            "examples": [
+              29.1
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "tmax_monthly_mean_c"
+        ],
+        "title": "MonthValue"
+      },
+      "PredictRequest": {
+        "properties": {
+          "location_slug": {
+            "type": "string",
+            "enum": [
+              "madhya-pradesh",
+              "kajiado"
+            ],
+            "title": "Location Slug",
+            "description": "Geography preset slug. Must be one of the supported MVP locations.",
+            "examples": [
+              "madhya-pradesh",
+              "kajiado"
+            ]
+          },
+          "timeframe_id": {
+            "type": "string",
+            "enum": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ],
+            "title": "Timeframe Id",
+            "description": "Standard timeframe. Use `exposure_3m` for LBW prediction; `seasonal` and `projection` are catalogued but not ingested yet.",
+            "examples": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ]
+          },
+          "end_month": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Month",
+            "description": "Optional anchor month (`YYYY-MM`). The API walks backward from this month for rolling windows. Defaults to the latest month stored in Postgres.",
+            "examples": [
+              "2024-12"
+            ]
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LbwOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When set to `lbw`, the API uses the last three monthly mean temperatures from Postgres and calls the LBW inference service. Omit for preview-only."
+          }
+        },
+        "type": "object",
+        "required": [
+          "location_slug",
+          "timeframe_id"
+        ],
+        "title": "PredictRequest",
+        "description": "Preview climate coverage and optionally run an LBW prediction.",
+        "examples": [
+          {
+            "location_slug": "madhya-pradesh",
+            "outcome": {
+              "trimester": 1,
+              "type": "lbw"
+            },
+            "timeframe_id": "exposure_3m"
+          }
+        ]
+      },
+      "PredictResponse": {
+        "properties": {
+          "location": {
+            "$ref": "#/components/schemas/LocationResponse"
+          },
+          "timeframe": {
+            "$ref": "#/components/schemas/TimeframeResponse"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/MonthValue"
+            },
+            "type": "array",
+            "title": "Series",
+            "description": "Monthly temperature series for the requested timeframe (may be empty)."
+          },
+          "prediction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LbwPrediction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "LBW result when `outcome.type=lbw` and climate data is ready."
+          },
+          "prediction_note": {
             "anyOf": [
               {
                 "type": "string"
@@ -2525,295 +1135,46 @@
                 "type": "null"
               }
             ],
-            "title": "Model Version"
-          }
-        },
-        "type": "object",
-        "required": [
-          "geography_id",
-          "code",
-          "name",
-          "level",
-          "path",
-          "supports_prediction"
-        ],
-        "title": "PlaceResponse"
-      },
-      "PlanningOptionsResponse": {
-        "properties": {
-          "geography_id": {
-            "type": "string",
-            "title": "Geography Id"
-          },
-          "source_as_of": {
-            "type": "string",
-            "format": "date",
-            "title": "Source As Of"
-          },
-          "validated_pregnancy_windows": {
-            "items": {
-              "type": "integer",
-              "enum": [
-                1,
-                2,
-                3
-              ]
-            },
-            "type": "array",
-            "title": "Validated Pregnancy Windows"
-          },
-          "model_result_mode": {
-            "type": "string",
-            "enum": [
-              "single_association",
-              "pregnancy_windows"
-            ],
-            "title": "Model Result Mode"
-          },
-          "custom_min_month": {
-            "type": "string",
-            "format": "date",
-            "title": "Custom Min Month"
-          },
-          "custom_max_month": {
-            "type": "string",
-            "format": "date",
-            "title": "Custom Max Month"
-          },
-          "next_three_months": {
-            "$ref": "#/components/schemas/HeatSeasonOptionResponse"
-          },
-          "next_heat_season": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/HeatSeasonOptionResponse"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "long_term_projection": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/LongTermProjectionOptionResponse"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "geography_id",
-          "source_as_of",
-          "validated_pregnancy_windows",
-          "model_result_mode",
-          "custom_min_month",
-          "custom_max_month",
-          "next_three_months"
-        ],
-        "title": "PlanningOptionsResponse"
-      },
-      "PredictRequest": {
-        "properties": {
-          "geography_id": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Geography Id",
-            "description": "The place selected in CHART, for example geo-in-madhya-pradesh."
-          },
-          "planning_date": {
-            "type": "string",
-            "format": "date",
-            "title": "Planning Date",
-            "description": "The planning month; CHART derives this month and the previous two."
-          },
-          "outcome": {
-            "type": "string",
-            "const": "lbw",
-            "title": "Outcome",
-            "default": "lbw"
-          },
-          "planning_target": {
-            "type": "string",
-            "enum": [
-              "month",
-              "next_three_months",
-              "next_heat_season",
-              "long_term_hot_season"
-            ],
-            "title": "Planning Target",
-            "default": "month"
-          },
-          "projection_scenario": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "ssp126",
-                  "ssp370",
-                  "ssp585"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Projection Scenario"
-          },
-          "projection_period": {
-            "anyOf": [
-              {
-                "type": "string",
-                "const": "2031-2040"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Projection Period"
-          },
-          "pregnancy_window": {
-            "type": "integer",
-            "enum": [
-              1,
-              2,
-              3
-            ],
-            "title": "Pregnancy Window",
-            "description": "Legacy single model window. New planning requests use pregnancy_windows.",
-            "default": 1
-          },
-          "pregnancy_windows": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer",
-                  "enum": [
-                    1,
-                    2,
-                    3
-                  ]
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pregnancy Windows",
-            "description": "Pregnancy-stage model windows to calculate from the same three climate months. Window 3 is first, 2 is middle, and 1 is final."
-          }
-        },
-        "type": "object",
-        "required": [
-          "geography_id",
-          "planning_date"
-        ],
-        "title": "PredictRequest"
-      },
-      "PredictResponse": {
-        "properties": {
-          "place": {
-            "$ref": "#/components/schemas/PlaceResponse"
-          },
-          "planning_date": {
-            "type": "string",
-            "format": "date",
-            "title": "Planning Date"
-          },
-          "source_as_of": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source As Of"
-          },
-          "availability": {
-            "$ref": "#/components/schemas/Availability"
-          },
-          "climate": {
-            "items": {
-              "$ref": "#/components/schemas/ClimateMonthResponse"
-            },
-            "type": "array",
-            "title": "Climate"
-          },
-          "prediction": {
-            "$ref": "#/components/schemas/LbwPrediction"
-          },
-          "predictions": {
-            "items": {
-              "$ref": "#/components/schemas/LbwPrediction"
-            },
-            "type": "array",
-            "title": "Predictions"
+            "title": "Prediction Note",
+            "description": "Human-readable note when no outcome was requested or prediction was skipped."
           },
           "request_id": {
-            "type": "integer",
-            "title": "Request Id"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id",
+            "description": "Durable prediction request id when this result was persisted."
           },
           "request_status": {
-            "type": "string",
-            "const": "completed",
-            "title": "Request Status",
-            "default": "completed"
-          },
-          "planning_target": {
-            "type": "string",
-            "enum": [
-              "month",
-              "next_three_months",
-              "next_heat_season",
-              "long_term_hot_season"
-            ],
-            "title": "Planning Target",
-            "default": "month"
-          },
-          "projection_scenario": {
             "anyOf": [
               {
                 "type": "string",
                 "enum": [
-                  "ssp126",
-                  "ssp370",
-                  "ssp585"
+                  "queued",
+                  "running",
+                  "completed",
+                  "failed"
                 ]
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Projection Scenario"
-          },
-          "projection_period": {
-            "anyOf": [
-              {
-                "type": "string",
-                "const": "2031-2040"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Projection Period"
+            "title": "Request Status",
+            "description": "Background state when a persisted prediction request is associated with the result."
           }
         },
         "type": "object",
         "required": [
-          "place",
-          "planning_date",
+          "location",
+          "timeframe",
           "availability",
-          "climate",
-          "prediction",
-          "request_id"
+          "series"
         ],
         "title": "PredictResponse"
       },
@@ -2826,7 +1187,6 @@
           "status": {
             "type": "string",
             "enum": [
-              "waiting",
               "queued",
               "running"
             ],
@@ -2835,36 +1195,32 @@
           "stage": {
             "type": "string",
             "enum": [
-              "waiting_for_data",
               "queued",
               "preparing_climate",
-              "climate_ready",
               "predicting",
               "completed",
               "failed"
             ],
             "title": "Stage"
           },
-          "geography_id": {
+          "location_slug": {
             "type": "string",
-            "title": "Geography Id"
-          },
-          "planning_date": {
-            "type": "string",
-            "format": "date",
-            "title": "Planning Date"
-          },
-          "source_as_of": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
+            "enum": [
+              "madhya-pradesh",
+              "kajiado"
             ],
-            "title": "Source As Of"
+            "title": "Location Slug"
+          },
+          "timeframe_id": {
+            "type": "string",
+            "enum": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ],
+            "title": "Timeframe Id"
           },
           "status_url": {
             "type": "string",
@@ -2873,57 +1229,6 @@
           "message": {
             "type": "string",
             "title": "Message"
-          },
-          "available_from": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Available From"
-          },
-          "planning_target": {
-            "type": "string",
-            "enum": [
-              "month",
-              "next_three_months",
-              "next_heat_season",
-              "long_term_hot_season"
-            ],
-            "title": "Planning Target",
-            "default": "month"
-          },
-          "projection_scenario": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "ssp126",
-                  "ssp370",
-                  "ssp585"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Projection Scenario"
-          },
-          "projection_period": {
-            "anyOf": [
-              {
-                "type": "string",
-                "const": "2031-2040"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Projection Period"
           }
         },
         "type": "object",
@@ -2931,28 +1236,12 @@
           "request_id",
           "status",
           "stage",
-          "geography_id",
-          "planning_date",
+          "location_slug",
+          "timeframe_id",
           "status_url",
           "message"
         ],
         "title": "PredictionAcceptedResponse"
-      },
-      "PredictionRequestListResponse": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/PredictionRequestSummaryResponse"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "title": "PredictionRequestListResponse"
       },
       "PredictionRequestStatusResponse": {
         "properties": {
@@ -2963,7 +1252,6 @@
           "status": {
             "type": "string",
             "enum": [
-              "waiting",
               "queued",
               "running",
               "completed",
@@ -2974,36 +1262,32 @@
           "stage": {
             "type": "string",
             "enum": [
-              "waiting_for_data",
               "queued",
               "preparing_climate",
-              "climate_ready",
               "predicting",
               "completed",
               "failed"
             ],
             "title": "Stage"
           },
-          "geography_id": {
+          "location_slug": {
             "type": "string",
-            "title": "Geography Id"
-          },
-          "planning_date": {
-            "type": "string",
-            "format": "date",
-            "title": "Planning Date"
-          },
-          "source_as_of": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
+            "enum": [
+              "madhya-pradesh",
+              "kajiado"
             ],
-            "title": "Source As Of"
+            "title": "Location Slug"
+          },
+          "timeframe_id": {
+            "type": "string",
+            "enum": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ],
+            "title": "Timeframe Id"
           },
           "dagster_run_id": {
             "anyOf": [
@@ -3027,13 +1311,6 @@
             ],
             "title": "Error Code"
           },
-          "climate": {
-            "items": {
-              "$ref": "#/components/schemas/ClimateMonthResponse"
-            },
-            "type": "array",
-            "title": "Climate"
-          },
           "result": {
             "anyOf": [
               {
@@ -3051,57 +1328,6 @@
           "updated_at": {
             "type": "string",
             "title": "Updated At"
-          },
-          "available_from": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Available From"
-          },
-          "planning_target": {
-            "type": "string",
-            "enum": [
-              "month",
-              "next_three_months",
-              "next_heat_season",
-              "long_term_hot_season"
-            ],
-            "title": "Planning Target",
-            "default": "month"
-          },
-          "projection_scenario": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "ssp126",
-                  "ssp370",
-                  "ssp585"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Projection Scenario"
-          },
-          "projection_period": {
-            "anyOf": [
-              {
-                "type": "string",
-                "const": "2031-2040"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Projection Period"
           }
         },
         "type": "object",
@@ -3109,232 +1335,140 @@
           "request_id",
           "status",
           "stage",
-          "geography_id",
-          "planning_date",
+          "location_slug",
+          "timeframe_id",
           "created_at",
           "updated_at"
         ],
         "title": "PredictionRequestStatusResponse"
       },
-      "PredictionRequestSummaryResponse": {
-        "properties": {
-          "request_id": {
-            "type": "integer",
-            "title": "Request Id"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "waiting",
-              "queued",
-              "running",
-              "completed",
-              "failed"
-            ],
-            "title": "Status"
-          },
-          "stage": {
-            "type": "string",
-            "enum": [
-              "waiting_for_data",
-              "queued",
-              "preparing_climate",
-              "climate_ready",
-              "predicting",
-              "completed",
-              "failed"
-            ],
-            "title": "Stage"
-          },
-          "geography_id": {
-            "type": "string",
-            "title": "Geography Id"
-          },
-          "planning_date": {
-            "type": "string",
-            "format": "date",
-            "title": "Planning Date"
-          },
-          "source_as_of": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source As Of"
-          },
-          "error_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error Code"
-          },
-          "created_at": {
-            "type": "string",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "title": "Updated At"
-          },
-          "available_from": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Available From"
-          },
-          "planning_target": {
-            "type": "string",
-            "enum": [
-              "month",
-              "next_three_months",
-              "next_heat_season",
-              "long_term_hot_season"
-            ],
-            "title": "Planning Target",
-            "default": "month"
-          },
-          "projection_scenario": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "ssp126",
-                  "ssp370",
-                  "ssp585"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Projection Scenario"
-          },
-          "projection_period": {
-            "anyOf": [
-              {
-                "type": "string",
-                "const": "2031-2040"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Projection Period"
-          },
-          "odds_ratio": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Odds Ratio"
-          }
-        },
-        "type": "object",
-        "required": [
-          "request_id",
-          "status",
-          "stage",
-          "geography_id",
-          "planning_date",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "PredictionRequestSummaryResponse"
-      },
       "PreviewRequest": {
         "properties": {
-          "geography_id": {
+          "location_slug": {
             "type": "string",
-            "minLength": 1,
-            "title": "Geography Id",
-            "description": "The place selected in CHART, for example geo-in-madhya-pradesh."
+            "enum": [
+              "madhya-pradesh",
+              "kajiado"
+            ],
+            "title": "Location Slug",
+            "description": "Geography preset slug. Must be one of the supported MVP locations.",
+            "examples": [
+              "madhya-pradesh",
+              "kajiado"
+            ]
           },
-          "planning_date": {
+          "timeframe_id": {
             "type": "string",
-            "format": "date",
-            "title": "Planning Date",
-            "description": "The planning month; CHART derives this month and the previous two."
+            "enum": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ],
+            "title": "Timeframe Id",
+            "description": "Standard timeframe. Use `exposure_3m` for LBW prediction; `seasonal` and `projection` are catalogued but not ingested yet.",
+            "examples": [
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
+            ]
+          },
+          "end_month": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Month",
+            "description": "Optional anchor month (`YYYY-MM`). The API walks backward from this month for rolling windows. Defaults to the latest month stored in Postgres.",
+            "examples": [
+              "2024-12"
+            ]
           }
         },
         "type": "object",
         "required": [
-          "geography_id",
-          "planning_date"
+          "location_slug",
+          "timeframe_id"
         ],
-        "title": "PreviewRequest"
+        "title": "PreviewRequest",
+        "description": "Check whether observed climate data exists for a location and timeframe.",
+        "examples": [
+          {
+            "location_slug": "madhya-pradesh",
+            "timeframe_id": "exposure_3m"
+          },
+          {
+            "end_month": "2024-12",
+            "location_slug": "kajiado",
+            "timeframe_id": "recent_12m"
+          }
+        ]
       },
       "PreviewResponse": {
         "properties": {
-          "place": {
-            "$ref": "#/components/schemas/PlaceResponse"
+          "location": {
+            "$ref": "#/components/schemas/LocationResponse"
           },
-          "planning_date": {
-            "type": "string",
-            "format": "date",
-            "title": "Planning Date"
-          },
-          "source_as_of": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source As Of"
+          "timeframe": {
+            "$ref": "#/components/schemas/TimeframeResponse"
           },
           "availability": {
             "$ref": "#/components/schemas/Availability"
           },
-          "climate": {
+          "series": {
             "items": {
-              "$ref": "#/components/schemas/ClimateMonthResponse"
+              "$ref": "#/components/schemas/MonthValue"
             },
             "type": "array",
-            "title": "Climate"
+            "title": "Series",
+            "description": "Monthly temperature series for the requested timeframe (may be empty)."
           }
         },
         "type": "object",
         "required": [
-          "place",
-          "planning_date",
+          "location",
+          "timeframe",
           "availability",
-          "climate"
+          "series"
         ],
         "title": "PreviewResponse"
       },
-      "ProjectionScenarioOptionResponse": {
+      "TimeframeListResponse": {
         "properties": {
-          "value": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TimeframeResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "TimeframeListResponse"
+      },
+      "TimeframeResponse": {
+        "properties": {
+          "id": {
             "type": "string",
             "enum": [
-              "ssp126",
-              "ssp370",
-              "ssp585"
+              "exposure_3m",
+              "recent_12m",
+              "historical_window",
+              "seasonal",
+              "projection"
             ],
-            "title": "Value"
+            "title": "Id"
           },
           "label": {
             "type": "string",
@@ -3343,303 +1477,55 @@
           "description": {
             "type": "string",
             "title": "Description"
-          }
-        },
-        "type": "object",
-        "required": [
-          "value",
-          "label",
-          "description"
-        ],
-        "title": "ProjectionScenarioOptionResponse"
-      },
-      "SetupAdminInput": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 2,
-            "title": "Name"
           },
-          "email": {
+          "horizon": {
             "type": "string",
-            "minLength": 3,
-            "title": "Email"
+            "enum": [
+              "short",
+              "medium",
+              "long"
+            ],
+            "title": "Horizon",
+            "description": "User-facing horizon group: short = observed monthly, medium = seasonal, long = projection."
           },
-          "username": {
+          "resolution": {
             "type": "string",
-            "minLength": 2,
-            "title": "Username"
+            "title": "Resolution",
+            "description": "Native resolution for the tier (`monthly`, `seasonal`, `annual`)."
           },
-          "password": {
-            "type": "string",
-            "minLength": 8,
-            "title": "Password"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "email",
-          "username",
-          "password"
-        ],
-        "title": "SetupAdminInput"
-      },
-      "SetupCounts": {
-        "properties": {
-          "geographies": {
-            "type": "integer",
-            "title": "Geographies"
-          },
-          "workspaceMembers": {
-            "type": "integer",
-            "title": "Workspacemembers"
-          }
-        },
-        "type": "object",
-        "required": [
-          "geographies",
-          "workspaceMembers"
-        ],
-        "title": "SetupCounts"
-      },
-      "SetupGeographyInput": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "level": {
-            "type": "string",
-            "title": "Level"
-          },
-          "levelLabel": {
-            "type": "string",
-            "title": "Levellabel"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "parentId": {
+          "month_count": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Parentid"
+            "title": "Month Count",
+            "description": "Rolling month window when applicable. `null` means use the full ingested window."
           },
-          "path": {
+          "tier": {
             "type": "string",
-            "title": "Path"
-          },
-          "sortOrder": {
-            "type": "integer",
-            "title": "Sortorder",
-            "default": 0
+            "enum": [
+              "observed",
+              "seasonal",
+              "projection"
+            ],
+            "title": "Tier"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "level",
-          "levelLabel",
-          "name",
-          "path"
+          "label",
+          "description",
+          "horizon",
+          "resolution",
+          "month_count",
+          "tier"
         ],
-        "title": "SetupGeographyInput"
-      },
-      "SetupOptions": {
-        "properties": {
-          "hazards": {
-            "items": {
-              "$ref": "#/components/schemas/HazardOption"
-            },
-            "type": "array",
-            "title": "Hazards"
-          }
-        },
-        "type": "object",
-        "required": [
-          "hazards"
-        ],
-        "title": "SetupOptions"
-      },
-      "SetupStatus": {
-        "properties": {
-          "completed": {
-            "type": "boolean",
-            "title": "Completed"
-          },
-          "requiresOnboarding": {
-            "type": "boolean",
-            "title": "Requiresonboarding"
-          },
-          "phase": {
-            "type": "string",
-            "title": "Phase",
-            "default": "uninitialized"
-          },
-          "countryCode": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Countrycode"
-          },
-          "countryName": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Countryname"
-          },
-          "rootGeographyId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rootgeographyid"
-          },
-          "firstAdminUserId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Firstadminuserid"
-          },
-          "selectedHazards": {
-            "items": {
-              "$ref": "#/components/schemas/HazardOption"
-            },
-            "type": "array",
-            "title": "Selectedhazards"
-          },
-          "counts": {
-            "$ref": "#/components/schemas/SetupCounts"
-          }
-        },
-        "type": "object",
-        "required": [
-          "completed",
-          "requiresOnboarding",
-          "selectedHazards",
-          "counts"
-        ],
-        "title": "SetupStatus"
-      },
-      "UserGeographyScope": {
-        "properties": {
-          "geographyId": {
-            "type": "string",
-            "title": "Geographyid"
-          },
-          "path": {
-            "type": "string",
-            "title": "Path"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "levelLabel": {
-            "type": "string",
-            "title": "Levellabel"
-          }
-        },
-        "type": "object",
-        "required": [
-          "geographyId",
-          "path",
-          "name",
-          "levelLabel"
-        ],
-        "title": "UserGeographyScope"
-      },
-      "UserResponse": {
-        "properties": {
-          "userId": {
-            "type": "string",
-            "title": "Userid"
-          },
-          "username": {
-            "type": "string",
-            "title": "Username"
-          },
-          "email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Email"
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phone"
-          },
-          "displayName": {
-            "type": "string",
-            "title": "Displayname"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "roles": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Roles"
-          },
-          "geographyScopes": {
-            "items": {
-              "$ref": "#/components/schemas/UserGeographyScope"
-            },
-            "type": "array",
-            "title": "Geographyscopes"
-          }
-        },
-        "type": "object",
-        "required": [
-          "userId",
-          "username",
-          "displayName",
-          "status",
-          "roles",
-          "geographyScopes"
-        ],
-        "title": "UserResponse"
+        "title": "TimeframeResponse"
       },
       "ValidationError": {
         "properties": {
@@ -3680,88 +1566,6 @@
           "type"
         ],
         "title": "ValidationError"
-      },
-      "WorkspaceResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "planningCycle": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Planningcycle"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "geographyId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Geographyid"
-          },
-          "createdByUserId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Createdbyuserid"
-          },
-          "ownerUserId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Owneruserid"
-          },
-          "memberRole": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Memberrole"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "planningCycle",
-          "status",
-          "geographyId",
-          "createdByUserId",
-          "ownerUserId"
-        ],
-        "title": "WorkspaceResponse"
       }
     },
     "securitySchemes": {
@@ -3771,5 +1575,19 @@
         "scheme": "bearer"
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "system",
+      "description": "Health and service metadata."
+    },
+    {
+      "name": "auth",
+      "description": "Keycloak user and geography access context."
+    },
+    {
+      "name": "climate",
+      "description": "Location catalog, timeframe catalog, preview, and predict."
+    }
+  ]
 }

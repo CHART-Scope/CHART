@@ -1,52 +1,25 @@
-import React from "react";
-import type { Decorator, Preview } from "@storybook/nextjs-vite";
+import type { Preview } from "@storybook/nextjs-vite";
 
-import "../src/app/styles.css";
-
-const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-
-const withAssetBasePath: Decorator = (Story) => {
-  React.useEffect(() => {
-    if (!BASE) return;
-    function patchImgs(root: Element | Document) {
-      root.querySelectorAll<HTMLImageElement>("img").forEach((img) => {
-        const src = img.getAttribute("src");
-        if (src?.startsWith("/") && !src.startsWith("//") && !src.startsWith(BASE)) {
-          img.src = BASE + src;
-        }
-      });
-    }
-    patchImgs(document);
-    const observer = new MutationObserver((mutations) => {
-      for (const { addedNodes } of mutations) {
-        for (const node of addedNodes) {
-          if (node instanceof Element) patchImgs(node);
-        }
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, []);
-  return React.createElement(Story);
-};
+import "../src/styles/tokens.css";
+import "../src/styles/globals.css";
 
 const preview: Preview = {
-  decorators: [withAssetBasePath],
   parameters: {
-    nextjs: {
-      appDirectory: true,
-    },
-    controls: {
-      matchers: {
-        color: /(background|color)$/i,
-        date: /Date$/i,
-      },
-    },
-    layout: "centered",
+    nextjs: { appDirectory: true },
+    controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
+    layout: "padded",
     options: {
       storySort: {
-        order: ["UI", "Pages", "Repository"],
+        order: ["Foundations", "Primitives", "Composites", "Pages"],
       },
+    },
+    backgrounds: {
+      default: "ivory",
+      values: [
+        { name: "ivory", value: "#F7F5F3" },
+        { name: "white", value: "#ffffff" },
+        { name: "charcoal", value: "#2B2D31" },
+      ],
     },
   },
 };

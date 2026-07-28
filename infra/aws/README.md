@@ -1,113 +1,142 @@
-# AWS deploy
+# AWS Deploy
 
-`App Deploy` validates the requested commit and runs
-`infra/aws/deploy-app.sh` on one EC2 host.
+`App Deploy` runs the core app on one EC2 host from the `dev` branch.
 
-## What runs
+The workflow:
 
-- the connected `new_design` Next app;
-- one Python/FastAPI application API;
-- Dagster webserver and daemon;
-- Postgres/PostGIS;
-- Keycloak;
-- nginx;
-- the LBW R scorer when both model files are configured.
+1. validates API and web;
+2. SSHes into the host using GitHub secrets;
+3. resets `/opt/chart` to `origin/dev`;
+4. runs `infra/aws/deploy-app.sh`.
 
-Fastify and Drizzle are not installed or deployed. Alembic is the only CHART
-database migration path.
+The script runs Docker containers for Postgres, Keycloak, the Fastify API, web,
+the Python API, the Dagster webserver and daemon, and nginx. LBW inference is
+started when both model URIs are configured.
+Database migrations run in order on deploy:
 
-The deploy runs Alembic, loads the versioned Madhya Pradesh boundaries and place
-mappings, verifies both expected model SHA-256 values, registers scoped model
-assignments, then migrates Dagster storage.
+1. Drizzle (`npm run db:migrate:api`) via the API image
+2. API seed (`npm run db:seed:api`)
+3. Alembic (`alembic upgrade head`) via the Python image
+4. Dagster instance storage migrations
 
-## Public paths
+Only nginx is public:
 
-- `/`: Next web
-- `/chart-api/*`: Python application API
-- `/climate/*`: the same Python API, kept as a planning shortcut
-- `/chart-api/live`: process liveness
-- `/chart-api/ready`: database, migration, and model readiness
-- `/identity/*`: Keycloak
+- `/`: Next web app
+- `/chart-api/auth/*`: Python Keycloak token validation and user context
+- `/chart-api/*`: remaining Fastify API routes
+- `/climate/*`: Python climate and prediction API
+- `/climate-api/health`: Python API health check
+- `/lbw/*`: LBW inference API, when configured
+- `/identity`: Keycloak
 
-Dagster and the LBW scorer bind only to localhost on the host.
+Dagster binds to `127.0.0.1:3000` on the EC2 host and is not exposed by nginx.
 
-## GitHub secrets
+## GitHub Secrets
 
 Required:
 
-- `AWS_APP_HOST`
-- `AWS_APP_USER`
-- `AWS_APP_SSH_KEY`
+- `AWS_APP_HOST`: EC2 SSH host.
+- `AWS_APP_USER`: EC2 SSH user.
+- `AWS_APP_SSH_KEY`: private SSH key. Its public key must be in
+  `/home/<AWS_APP_USER>/.ssh/authorized_keys`.
 
 Optional:
 
-- `AWS_APP_PUBLIC_HOST`
-- `CHART_BOOTSTRAP_TOKEN` (generated and persisted when omitted)
-- `CHART_TLS_TERMINATED_UPSTREAM`
-- `CHART_TLS_CERT_FILE`
-- `CHART_TLS_KEY_FILE`
-- `CDSAPI_URL`
-- `CDSAPI_KEY`
-- `LBW_MODEL_DIVISION_S3_URI`
-- `LBW_MODEL_STATE_S3_URI`
-- `INFERENCE_LLM_ENABLED`
-- `INFERENCE_LLM_BASE_URL`
-- `INFERENCE_LLM_MODEL`
-- `INFERENCE_LLM_API_KEY`
+- `AWS_APP_PUBLIC_HOST`: browser-facing hostname. Use this for a subdomain.
+- `CDSAPI_URL`: defaults to `https://cds.climate.copernicus.eu/api`.
+- `CDSAPI_KEY`: deployment credential used only by Dagster for live ERA5 downloads.
+- `LBW_MODEL_DIVISION_S3_URI`: private S3 URI for the division model bundle.
+- `LBW_MODEL_STATE_S3_URI`: private S3 URI for the state model bundle. Configure both
+  LBW model URIs together.
 
-Both LBW model URIs must be configured together. Copernicus and optional
-explanation credentials are stored in `/opt/chart-env/prediction-worker.env`
-with mode `600` and passed only to Dagster workers. Users never enter them.
-The release ID, version, and expected artifact hashes come from the checked-in
-model-release manifest rather than independent mutable deployment variables.
+The core app deploys without the optional prediction integrations. Existing climate
+data remains readable. A missing-climate request reports
+`CLIMATE_INGEST_NOT_CONFIGURED` when no CDS key is available, while LBW processing
+reports `LBW_SERVICE_NOT_CONFIGURED` when its model service is disabled. CHART users
+never provide these deployment credentials.
 
-Without those optional integrations, the main app still starts and existing
-climate data remains readable. A prediction reports a clear unavailable error
-until its climate source and scorer are configured.
+`CDSAPI_KEY` is written to `/opt/chart-env/prediction-worker.env` and passed only to
+the Dagster webserver and daemon. It is not passed to Next, Fastify, or the Python API.
 
-## EC2 requirements
+## EC2 prerequisites
 
-- Docker running;
-- port 443 open and a TLS certificate/key, or a trusted upstream load balancer
-  that terminates TLS;
-- deploy SSH key installed;
-- an instance role that can read both LBW model objects;
-- 4 vCPU and 16 GiB RAM when all services share the host.
+- Docker installed and running.
+- Port 80 open in the EC2 security group.
+- The deploy SSH key's public key in `/home/<AWS_APP_USER>/.ssh/authorized_keys`.
+- An EC2 instance role that can read both LBW model S3 objects.
+- 4 vCPU and 16 GiB RAM when Postgres, Dagster, climate ingest, and the app share one host.
 
-## Checks
+## Ops
+
+**Check container status:**
 
 ```bash
 docker ps -a --filter "name=chart-"
+```
+
+**Tail logs:**
+
+```bash
+docker logs chart-web --tail 50
 docker logs chart-api --tail 50
-docker logs chart-new-design --tail 50
+docker logs chart-climate-api --tail 50
 docker logs chart-dagster-daemon --tail 50
 docker logs chart-dagster-webserver --tail 50
 docker logs chart-proxy --tail 50
 ```
 
-Open the private Dagster UI through a tunnel:
+**Open the private Dagster UI:**
 
 ```bash
 ssh -L 3000:127.0.0.1:3000 <user>@<host>
 ```
 
-Then open `http://127.0.0.1:3000`.
+Then open `http://127.0.0.1:3000`. The prediction-request sensor is enabled by default;
+the monthly ERA5 schedule remains stopped until an operator enables it.
 
-Test one deployed prediction with an authorised token:
+**Verify the deployed prediction handoff manually:**
 
 ```bash
-curl -s https://<host>/chart-api/climate/predict \
+curl -s http://<host>/climate/predict \
   -H 'authorization: Bearer <keycloak-access-token>' \
   -H 'content-type: application/json' \
-  -d '{"geography_id":"geo-in-madhya-pradesh","planning_date":"2026-10-01","outcome":"lbw","pregnancy_window":1}'
+  -d '{"location_slug":"madhya-pradesh","timeframe_id":"exposure_3m","outcome":{"type":"lbw","trimester":1}}'
 ```
 
-Poll the returned `status_url` through `/chart-api` until it completes. Record
-the request ID, Dagster run ID, climate-source hash, input hash, model version,
-and dashboard evidence for release sign-off.
+The response is either a cached `200` result or a `202` containing `request_id` and
+`status_url`. Poll `http://<host><status_url>` with the same bearer token until it
+completes. Deployment health checks never submit this request automatically.
 
-Find the Keycloak admin password with:
+**Reset a user to re-experience onboarding:**
+
+```bash
+docker exec -it chart-postgres psql -U chart -d chart \
+  -c "DELETE FROM users WHERE email = 'chart-admin@example.org';"
+```
+
+**Full wipe and redeploy:**
+
+```bash
+docker rm -f chart-proxy chart-web chart-api chart-climate-api chart-dagster-webserver chart-dagster-daemon chart-lbw chart-keycloak chart-postgres
+docker volume rm chart-postgres-data chart-dagster-storage chart-climate-data
+PUBLIC_HOST=<host> bash /opt/chart/infra/aws/deploy-app.sh
+```
+
+Keycloak uses the `chart_keycloak` logical database and dedicated database role on
+`chart-postgres`. On the first consolidated deployment, the script transactionally
+migrates an existing standalone Keycloak database before starting Keycloak. The
+legacy `chart-keycloak-postgres-data` volume remains available for rollback and can
+be removed manually after confirming sign-in and SSO configuration.
+
+**Find the Keycloak admin password:**
 
 ```bash
 grep KEYCLOAK_ADMIN_PASSWORD /opt/chart-env/chart.env
 ```
+
+## Workflows
+
+- `API`: API checks only.
+- `Web UI`: Next/web checks only.
+- `Storybook Pages`: Storybook build and Pages publish.
+- `App Deploy`: API + web checks, then EC2 deploy.
