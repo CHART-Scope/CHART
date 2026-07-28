@@ -11,6 +11,7 @@ export function DashboardRoutePage() {
     <RequireAuth>
       {(session, signOut) => (
         <DashboardPage
+          accessToken={session.accessToken}
           currentUser={session.user}
           onNavigate={navigate}
           onSignOut={signOut}

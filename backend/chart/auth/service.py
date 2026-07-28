@@ -39,6 +39,7 @@ class AuthConfig:
     client_id: str
     jwks_url: str
     clock_skew_seconds: int
+    jwks_timeout_seconds: float
 
 
 bearer_auth = HTTPBearer(
@@ -54,18 +55,26 @@ def get_auth_config() -> AuthConfig:
     ).rstrip("/")
     try:
         clock_skew_seconds = int(os.getenv("KEYCLOAK_CLOCK_SKEW_SECONDS", "30"))
+        jwks_timeout_seconds = float(os.getenv("KEYCLOAK_JWKS_TIMEOUT_SECONDS", "5"))
     except ValueError as error:
         raise _auth_error("AUTH_CONFIG_INVALID", 500) from error
-    if not issuer_url or clock_skew_seconds < 0:
+    client_id = os.getenv("KEYCLOAK_CLIENT_ID", "chart-api")
+    if (
+        not issuer_url
+        or not client_id
+        or clock_skew_seconds < 0
+        or jwks_timeout_seconds <= 0
+    ):
         raise _auth_error("AUTH_CONFIG_INVALID", 500)
     return AuthConfig(
         issuer_url=issuer_url,
-        client_id=os.getenv("KEYCLOAK_CLIENT_ID", "chart-api"),
+        client_id=client_id,
         jwks_url=os.getenv(
             "KEYCLOAK_JWKS_URL",
             f"{issuer_url}/protocol/openid-connect/certs",
         ),
         clock_skew_seconds=clock_skew_seconds,
+        jwks_timeout_seconds=jwks_timeout_seconds,
     )
 
 
@@ -79,7 +88,7 @@ def require_current_user(
 
 def verify_keycloak_token(token: str, config: AuthConfig) -> CurrentUserContext:
     try:
-        key = _get_signing_key(config.jwks_url, token)
+        key = _get_signing_key(config.jwks_url, config.jwks_timeout_seconds, token)
         claims = jwt.decode(
             token,
             key,
@@ -112,9 +121,7 @@ def apply_active_geography(
 def can_read_geography_path(user: CurrentUserContext, requested_path: str) -> bool:
     requested = _normalize_geography_path(requested_path)
     return any(
-        requested == scope
-        or requested.startswith(f"{scope}/")
-        or scope.startswith(f"{requested}/")
+        requested == scope or requested.startswith(f"{scope}/")
         for scope in map(_normalize_geography_path, user.geography_scopes)
     )
 
@@ -130,12 +137,12 @@ def require_geography_access(user: CurrentUserContext, requested_path: str) -> N
 
 
 @lru_cache(maxsize=4)
-def _jwks_client(jwks_url: str) -> PyJWKClient:
-    return PyJWKClient(jwks_url)
+def _jwks_client(jwks_url: str, timeout_seconds: float) -> PyJWKClient:
+    return PyJWKClient(jwks_url, timeout=timeout_seconds)
 
 
-def _get_signing_key(jwks_url: str, token: str):
-    return _jwks_client(jwks_url).get_signing_key_from_jwt(token).key
+def _get_signing_key(jwks_url: str, timeout_seconds: float, token: str):
+    return _jwks_client(jwks_url, timeout_seconds).get_signing_key_from_jwt(token).key
 
 
 def _map_claims(claims: dict[str, Any], client_id: str) -> CurrentUserContext:

@@ -1,0 +1,59 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(43, 45, 49, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+
+.card {
+  background: var(--color-white);
+  border-radius: var(--radius-2xl);
+  padding: 26px 28px;
+  max-width: 340px;
+  width: 100%;
+  position: relative;
+  box-shadow: var(--shadow-modal);
+}
+
+.wide {
+  max-width: 600px;
+}
+
+.close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--color-charcoal);
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+}
+
+.title {
+  font-family: var(--font-mono);
+  font-size: var(--fs-h3);
+  font-weight: 500;
+  color: var(--color-charcoal);
+  margin-bottom: 12px;
+}
+
+.desc {
+  font-size: var(--fs-body);
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+
+.footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}

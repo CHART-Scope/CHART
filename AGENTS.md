@@ -15,16 +15,17 @@ Generated code should be:
 
 CHART is a monorepo. Do not treat the root as a Next app.
 
-- `web`: CHART Next web app.
-- `backend`: Python/FastAPI application API and analytical engine; target owner of auth, workspaces, users, geographies, predictions, and analytical reads.
+- `new_design`: connected CHART Next planning app and current product UI.
+- `web`: older CHART Next shell retained during migration.
+- `backend`: Python/FastAPI application API and analytical engine; owner of auth, workspaces, users, geographies, predictions, and analytical reads.
 - `orchestration`: Dagster data plane importing the Python `chart` package.
-- `api`: legacy Fastify/Drizzle API being retired module-by-module after Python parity.
+- `api`: local solution-repository seed data only. The Fastify/Drizzle service is retired.
 - `chart-repository`: separate Payload CMS service for maintaining published chart repository data. It is not required to run CHART core.
 - `infra`: local services, CHART workload manifests, and AWS deployment handoff.
 - `data/`: local generated seed/import outputs, ignored by git.
 - `docs/`: local planning notes, ignored by git.
 
-Python or data-processing code belongs in `backend`, `orchestration`, or a focused `pipelines` package, never inside `web`.
+Python or data-processing code belongs in `backend`, `orchestration`, or a focused `pipelines` package, never inside either Next app.
 
 Next route handlers may be thin browser/session proxies during migration. They must not own business workflows, Keycloak authorization policy, or CHART database tables. Do not add a Next.js BFF.
 
@@ -42,9 +43,12 @@ backend/
 orchestration/
   src/chart_pipeline/
 
+new_design/
+  src/features/planning/
+  src/lib/
+
 web/
-  src/modules/solutions/
-  src/lib/api-client/
+  src/modules/
 
 chart-repository/
   payload.config.ts
@@ -67,17 +71,16 @@ chart-repository publishes data
         ↓
 Python backend reads public snapshot/API responses
         ↓
-web reads from Python backend
+new_design reads from Python backend
 ```
 
-Never import from `chart-repository/` into `backend/` or `web/`. Use an HTTP API or public JSON snapshot instead.
+Never import from `chart-repository/` into `backend/`, `new_design/`, or `web/`. Use an HTTP API or public JSON snapshot instead.
 
 ## Current Stack
 
 - Web: Next, React.
 - API + engine: Python, FastAPI, SQLAlchemy, Alembic.
 - Data plane: Dagster with Postgres-backed durable requests.
-- Legacy API during migration: Fastify, TypeScript, Drizzle.
 - Database: PostgreSQL + PostGIS.
 - Formatting: Prettier.
 
@@ -119,7 +122,7 @@ backend/tests/
 
 Use `routes.py` for HTTP endpoints and `service.py` for behavior. Engine compute must not import FastAPI or Dagster. Dagster definitions call backend services through thin wrappers.
 
-Every new Python API route should have a route-level test using FastAPI `TestClient`. Every protected route must test both authentication and role/geography denial. Legacy Fastify routes retain `Fastify.inject()` tests until they are removed.
+Every new Python API route should have a route-level test using FastAPI `TestClient`. Every protected route must test both authentication and role/geography denial.
 
 ## Backend Route Rules
 
@@ -132,10 +135,10 @@ Every new Python API route should have a route-level test using FastAPI `TestCli
 
 ## Frontend Module Shape
 
-Keep feature UI under `web/src/modules/`.
+Keep current feature UI under `new_design/src/features/`.
 
 - Use `PascalCase.tsx` for React components.
-- Keep shared shell/layout code under `web/src/app/`.
+- Keep routes and shared layout code under `new_design/src/app/`.
 - Keep static copy and seed-like UI data close to the module using it.
 - Use simple props/state first; avoid state libraries until shared state is actually needed.
 
@@ -143,7 +146,6 @@ Keep feature UI under `web/src/modules/`.
 
 - Folders: `kebab-case`.
 - Python backend files: `schemas.py`, `service.py`, `routes.py`; route tests live under `backend/tests/`.
-- Legacy TypeScript backend files: `types.ts`, `service.ts`, `routes.ts`, `routes.test.ts` until the module is retired.
 - React components: `PascalCase.tsx`.
 - Functions: `camelCase` with clear verbs, such as `getCurrentUser` or `listSources`.
 - Types: `PascalCase`.
@@ -169,18 +171,11 @@ python -m pytest backend/tests -q
 python -m pytest orchestration/tests -q
 ```
 
-Before finishing legacy Fastify work:
-
-```bash
-make api-test
-make api-build
-```
-
 Before finishing frontend work:
 
 ```bash
-make web-build
-make web-typecheck
+make new-design-build
+make new-design-typecheck
 ```
 
 Before finishing broad repo work:

@@ -55,12 +55,12 @@ nav:
   - Home: index.md
   - Python backend:
       - Overview: python-backend.md
+      - Add a geography and model: add-geography-and-model.md
       - Climate API: climate-api.md
       - OpenAPI reference: api-reference.md
   - Data pipeline: data-pipeline.md
   - Architecture: architecture.md
   - Technical design (draft): tdd.md
-  - Legacy TypeScript API: legacy-fastify-api.md
 
 extra:
   generator: false

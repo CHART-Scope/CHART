@@ -1,0 +1,29 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  font-size: var(--fs-caption);
+  cursor: pointer;
+  background: var(--color-white);
+  color: var(--color-charcoal);
+  font-family: var(--font-body);
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.pill:hover:not(.selected) {
+  border-color: var(--color-charcoal);
+}
+.pill.selected {
+  border-color: var(--color-maroon);
+  background: var(--color-maroon);
+  color: var(--color-white);
+}
+.pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

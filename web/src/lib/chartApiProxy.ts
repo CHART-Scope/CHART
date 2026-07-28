@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { getChartApiBaseUrl } from "./chartApi";
+import { getChartApiBaseUrl, getChartPythonApiBaseUrl } from "./chartApi";
 
 type ProxyOptions = {
   path: string;
@@ -13,7 +13,32 @@ export async function proxyChartApiRequest(
   request: NextRequest,
   { path, method = "GET", body, authorization }: ProxyOptions,
 ) {
-  const url = new URL(path, `${getChartApiBaseUrl(request)}/`);
+  return proxyApiRequest(request, getChartApiBaseUrl(request), {
+    path,
+    method,
+    body,
+    authorization,
+  });
+}
+
+export async function proxyChartPythonApiRequest(
+  request: NextRequest,
+  { path, method = "GET", body, authorization }: ProxyOptions,
+) {
+  return proxyApiRequest(request, getChartPythonApiBaseUrl(request), {
+    path,
+    method,
+    body,
+    authorization,
+  });
+}
+
+async function proxyApiRequest(
+  request: NextRequest,
+  baseUrl: string,
+  { path, method = "GET", body, authorization }: ProxyOptions,
+) {
+  const url = new URL(path, `${baseUrl}/`);
 
   if (method === "GET") {
     request.nextUrl.searchParams.forEach((value, key) => {

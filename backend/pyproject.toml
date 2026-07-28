@@ -8,16 +8,29 @@ version = "0.1.0"
 description = "CHART Python backend shared modules (schema owner for SQLAlchemy)."
 requires-python = ">=3.11"
 dependencies = [
+  "certifi>=2024.8.30",
   "sqlalchemy>=2.0",
   "psycopg[binary]>=3.1",
   "alembic>=1.13",
+  "geoalchemy2>=0.15",
   "fastapi>=0.115",
   "PyJWT[crypto]>=2.9",
   "uvicorn[standard]>=0.30",
 ]
 
+[project.scripts]
+chart-load-mp-boundaries = "chart.geographies.cli:main"
+chart-register-model-release = "chart.model_registry.cli:main"
+chart-bootstrap-mp = "chart.bootstrap:main"
+
 [project.optional-dependencies]
-dev = ["pytest>=8", "httpx>=0.27"]
+dev = [
+  "black==25.1.0",
+  "httpx>=0.27",
+  "mypy==1.19.1",
+  "pytest>=8",
+  "ruff==0.14.10",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

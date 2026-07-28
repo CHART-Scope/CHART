@@ -1,69 +1,31 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
-import { getSetupStatus } from "../../lib/setupClient";
 import type { CurrentUserContext } from "../auth/authClient";
-import { canManageContent } from "../auth/userContext";
-import { Button } from "../ui/Button";
-import { DataCard } from "../ui/DataCard";
+import { canRunPredictions } from "../auth/userContext";
 import { ErrorBanner } from "../ui/ErrorBanner";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
 import type { ChartRoute } from "../routes/types";
 import { WorkspaceShell } from "../shell/WorkspaceShell";
-import { CommunityConcernsCard } from "./CommunityConcernsCard";
 import { DashboardFilterBar } from "./DashboardFilterBar";
-import { DashboardKpiRow } from "./DashboardKpiRow";
-import { HealthResilienceCard } from "./HealthResilienceCard";
-import { HighestRiskGroupsCard } from "./HighestRiskGroupsCard";
-import { OpenStreetMapPanel } from "./OpenStreetMapPanel";
-import { PendingActionsCard } from "./PendingActionsCard";
-import { ProjectedTemperaturesCard } from "./ProjectedTemperaturesCard";
+import { PredictionPipelineCard } from "./PredictionPipelineCard";
 import { useDashboardGeographies } from "./useDashboardGeographies";
 
 import "./Dashboard.css";
 
 type DashboardPageProps = {
+  accessToken?: string;
   onNavigate: (route: ChartRoute) => void;
   currentUser: CurrentUserContext;
   onSignOut: (returnTo?: string) => void;
 };
 
 export function DashboardPage({
+  accessToken,
   onNavigate,
   currentUser,
   onSignOut,
 }: DashboardPageProps) {
-  const [selectedHazards, setSelectedHazards] = useState<
-    { id: string; label: string }[]
-  >([]);
   const activeGeography =
     currentUser.activeGeographyId ?? currentUser.geographyScopes[0];
-  const userCanManageContent = canManageContent(currentUser);
-
-  useEffect(() => {
-    let isMounted = true;
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 2500);
-
-    getSetupStatus({ signal: controller.signal })
-      .then((status) => {
-        if (isMounted) {
-          setSelectedHazards(status.selectedHazards);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setSelectedHazards([]);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-      window.clearTimeout(timeout);
-      controller.abort();
-    };
-  }, []);
+  const userCanRunPredictions = canRunPredictions(currentUser);
 
   const {
     visibleGeographies,
@@ -79,15 +41,18 @@ export function DashboardPage({
     visibleGeographies.length > 0
       ? visibleGeographies.map((geography) => ({
           value: geography.id,
-          label: geography.name,
+          label: geography.supportsPrediction
+            ? geography.name
+            : `${geography.name} — model not available`,
+          disabled: !geography.supportsPrediction,
         }))
       : [{ value: "", label: "No configured geography" }];
 
   return (
     <WorkspaceShell
       activeRoute="dashboard"
-      pageTitle="My dashboard"
-      pageSubtitle="Live overview of climate-health risk in your focus region."
+      pageTitle="Heat planning"
+      pageSubtitle="Create traceable low-birth-weight planning estimates from real climate data."
       currentUser={currentUser}
       onNavigate={onNavigate}
       onSignOut={onSignOut}
@@ -97,50 +62,18 @@ export function DashboardPage({
       <DashboardFilterBar
         regionOptions={regionOptions}
         selectedRegion={selectedGeography?.id ?? ""}
-        selectedHazards={selectedHazards}
         onRegionChange={setSelectedGeographyId}
       />
 
-      <ErrorBoundary sectionName="KPI metrics">
-        <DashboardKpiRow geographyId={selectedGeography?.id} />
-      </ErrorBoundary>
-
       <section className="dashboard-content-grid">
-        <ErrorBoundary sectionName="temperature projections">
-          <ProjectedTemperaturesCard geographyId={selectedGeography?.id} />
+        <ErrorBoundary sectionName="prediction pipeline">
+          <PredictionPipelineCard
+            accessToken={accessToken}
+            canRun={userCanRunPredictions}
+            geography={selectedGeography}
+          />
         </ErrorBoundary>
-        <ErrorBoundary sectionName="risk map">
-          <DataCard
-            eyebrow="Risk map"
-            title={selectedGeography?.name ?? "No geography selected"}
-            actions={
-              userCanManageContent ? (
-                <Button compact variant="ghost" onClick={() => onNavigate("solutions")}>
-                  Open action repository
-                </Button>
-              ) : null
-            }
-          >
-            <OpenStreetMapPanel selectedGeography={selectedGeography} />
-          </DataCard>
-        </ErrorBoundary>
-        {/* <ErrorBoundary sectionName="risk groups">
-          <HighestRiskGroupsCar
-          d geographyId={selectedGeography?.id} />
-        </ErrorBoundary>
-        <ErrorBoundary sectionName="pending actions">
-          <PendingActionsCard geographyId={selectedGeography?.id} />
-        </ErrorBoundary> */}
       </section>
-
-      {/* <section className="dashboard-lower-grid">
-        <ErrorBoundary sectionName="health resilience">
-          <HealthResilienceCard geographyId={selectedGeography?.id} />
-        </ErrorBoundary>
-        <ErrorBoundary sectionName="community concerns">
-          <CommunityConcernsCard geographyId={selectedGeography?.id} />
-        </ErrorBoundary>
-      </section> */}
     </WorkspaceShell>
   );
 }

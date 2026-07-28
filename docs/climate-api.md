@@ -1,155 +1,125 @@
-# CHART Climate API
+# CHART climate and prediction API
 
-Python service for climate preview and LBW prediction. Default base URL: `http://127.0.0.1:3210`.
+The Python service is the only CHART application API. Its local address is
+`http://127.0.0.1:3210`.
 
-## Interactive documentation
+## See and test the API
 
-| URL                                                 | Purpose                                  |
-| --------------------------------------------------- | ---------------------------------------- |
-| [/docs](http://127.0.0.1:3210/docs)                 | Swagger UI — try requests in the browser |
-| [/redoc](http://127.0.0.1:3210/redoc)               | ReDoc — readable reference               |
-| [/openapi.json](http://127.0.0.1:3210/openapi.json) | Machine-readable OpenAPI 3 spec          |
+- Swagger: `http://127.0.0.1:3210/docs`
+- ReDoc: `http://127.0.0.1:3210/redoc`
+- OpenAPI: `http://127.0.0.1:3210/openapi.json`
 
-Start the service:
+Run it with `make climate-api`. Refresh the checked-in API file with
+`make climate-openapi`.
 
-```bash
-make climate-api
+## Prediction flow
+
+1. The user selects a supported place and a planner-friendly time option.
+2. `POST /climate/predict` saves the request and returns its ID.
+3. Dagster gets the three required monthly temperatures.
+4. CHART checks and saves the exact data used.
+5. The model registered for that place calculates only the windows explicitly
+   validated in its model-area mapping.
+6. The UI polls `GET /climate/prediction-requests/{id}` and shows the data trace
+   and result.
+
+The API does not accept a temperature, model file, model area, reference value,
+or climate-source choice from the user.
+
+## Main routes
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/health` | Check that the Python service is running |
+| `GET` | `/geographies` | List places available to the signed-in user |
+| `GET` | `/climate/locations` | List places with their prediction support and model version |
+| `POST` | `/climate/preview` | Show the three saved climate months for a planning month |
+| `POST` | `/climate/predict` | Save or reuse a prediction request |
+| `GET` | `/climate/prediction-requests` | List the signed-in user's saved plans |
+| `GET` | `/climate/prediction-requests/{id}` | Read progress, data trace, and result |
+
+Authentication, setup, user, workspace, hazard, and solution routes are also in
+this service. The generated OpenAPI file is the full route reference.
+
+## Prediction request
+
+```json
+{
+  "geography_id": "geo-in-madhya-pradesh",
+  "planning_date": "2026-10-01",
+  "outcome": "lbw",
+  "planning_target": "next_three_months",
+  "pregnancy_windows": [1]
+}
 ```
 
-Export a checked-in copy of the spec (for sharing / CI):
+`planning_date` selects a calendar month. The day is not used. CHART needs that
+month and the previous two months.
 
-```bash
-make climate-openapi
-# writes docs/openapi/climate.json
-```
+The current Madhya Pradesh state mapping accepts only `[1]`, representing the
+one original pooled state model. CHART does not attach a pregnancy-stage label
+to that result. Division mappings may accept `[3, 2, 1]` because their release
+contains three distinct fitted blocks. Unsupported window requests return
+`MODEL_PREGNANCY_WINDOW_NOT_VALIDATED`.
 
-New engine endpoints belong in this Python service.
-
-## Endpoints
-
-| Method | Path                                | Purpose                                          |
-| ------ | ----------------------------------- | ------------------------------------------------ |
-| `GET`  | `/health`                           | Service health                                   |
-| `GET`  | `/auth/me`                          | Keycloak user, role, and geography context       |
-| `GET`  | `/auth/geography-access`            | Check geography scope from the Keycloak token    |
-| `GET`  | `/climate/locations`                | Supported `location_slug` values                 |
-| `GET`  | `/climate/timeframes`               | Standard `timeframe_id` values                   |
-| `POST` | `/climate/preview`                  | Check data availability + return series          |
-| `POST` | `/climate/predict`                  | Preview or enqueue an LBW prediction             |
-| `GET`  | `/climate/prediction-requests/{id}` | Poll queued/running prediction status and result |
-
-Prediction submission and status polling require a Keycloak access token. Location,
-timeframe, and preview endpoints remain public.
-
-## Request parameters
-
-### `location_slug` (required)
-
-| Value            | Name                  | LBW predict               |
-| ---------------- | --------------------- | ------------------------- |
-| `madhya-pradesh` | Madhya Pradesh, India | yes                       |
-| `kajiado`        | Kajiado, Kenya        | no (climate preview only) |
-
-### `timeframe_id` (required)
-
-| Value               | Horizon |   Months | Ingested | Use for                                   |
-| ------------------- | ------- | -------: | -------- | ----------------------------------------- |
-| `exposure_3m`       | short   |        3 | yes      | **LBW prediction** — last 3 monthly means |
-| `recent_12m`        | short   |       12 | yes      | Recent-year charts / checks               |
-| `historical_window` | short   | full run | yes      | Full ERA5 window in Postgres              |
-| `seasonal`          | medium  |        6 | no       | Placeholder — seasonal tier not built     |
-| `projection`        | long    |        — | no       | Placeholder — projection tier not built   |
-
-### `end_month` (optional)
-
-- Format: `YYYY-MM` (e.g. `2024-12`)
-- Anchor month for rolling windows. Omitted = latest month in `district_climate`.
-
-### `outcome` (optional, predict only)
-
-| Field       | Type              | Required | Description                                              |
-| ----------- | ----------------- | -------- | -------------------------------------------------------- |
-| `type`      | `"lbw"`           | yes      | Only supported outcome today                             |
-| `trimester` | `1` \| `2` \| `3` | yes      | LBW trimester window (1 = latest / T3)                   |
-| `area`      | string            | no       | `Madhya Pradesh` (state) or division name; default state |
-| `ref`       | number            | no       | Reference temperature °C; default from model             |
-
-## Availability `status`
-
-| Status          | Meaning                         | Action                                   |
-| --------------- | ------------------------------- | ---------------------------------------- |
-| `ready`         | All requested months present    | Safe to predict                          |
-| `partial`       | Some months missing             | Materialise or change `end_month`        |
-| `missing`       | No usable data                  | `PRESET=<slug> make climate-materialize` |
-| `stale`         | Data older than monthly cadence | Re-materialise                           |
-| `not_available` | Tier not ingested yet           | Use an observed timeframe                |
-
-## On-demand prediction workflow
-
-Every new LBW outcome request creates or reuses a durable `prediction_request` row
-and returns `202 Accepted` without holding the HTTP connection open:
+A new request returns `202 Accepted`:
 
 ```json
 {
   "request_id": 12,
   "status": "queued",
   "stage": "queued",
-  "location_slug": "madhya-pradesh",
-  "timeframe_id": "exposure_3m",
+  "geography_id": "geo-in-madhya-pradesh",
+  "planning_date": "2026-10-01",
   "status_url": "/climate/prediction-requests/12",
   "message": "Prediction is queued for background processing."
 }
 ```
 
-The Dagster sensor launches one run for that request. The run first tries the R scorer
-using stored climate data. It materialises the requested ERA5 geography only when those
-months are missing, then retries the scorer and persists the result. Poll `status_url`
-until `status` is `completed` or `failed`; `stage` reports `queued`, `predicting`,
-`preparing_climate`, `completed`, or `failed`.
+Sending the same request again reuses the saved work. A failed request can be
+retried. Postgres stores the request and result; Dagster runs the background
+work.
 
-Submitting the same normalized request while it is queued or running returns the same
-request id. Submitting it after completion returns the persisted result immediately and
-does not create another Dagster run. A failed request is requeued with an incremented
-attempt number when submitted again.
+A next-hot-season request beyond the current C3S range returns `waiting` and an
+`available_from` date. It remains saved. Dagster changes it to `queued` when the
+real seasonal forecast can cover the three months.
 
-Redis is not required: Postgres is the durable user/request state and Dagster owns job
-execution, logs, and run history.
+## What the result proves
 
-## Error codes
+The completed response includes:
 
-Invalid submissions return an HTTP error before entering the queue:
+- the request ID and Dagster run ID;
+- all three temperatures and months;
+- source name, source link, issue time, download time, raw-file location, and
+  raw-file hash;
+- the saved climate-input ID and hash;
+- model file and version;
+- only the model outputs validated for that place, with odds ratios, 95%
+  intervals, support warnings, and optional explanation.
 
-| HTTP | `error`                           | When                              |
-| ---- | --------------------------------- | --------------------------------- |
-| 400  | `LBW_NOT_AVAILABLE_FOR_LOCATION`  | LBW requested for non-MP location |
-| 400  | `LBW_REQUIRES_EXPOSURE_TIMEFRAME` | LBW requires `exposure_3m`        |
+The model is blocked when data is missing, stale, sample-only in live mode, or
+does not match the selected place.
 
-Background failures are returned by the status endpoint with `status: "failed"` and an
-`error_code`, including `CLIMATE_DATA_NOT_READY`, `LBW_PREDICT_FAILED`, or
-`LBW_SERVICE_NOT_CONFIGURED`.
+## Climate sources
 
-## Environment variables
+- ERA5 supplies past observed/reanalysis data.
+- C3S seasonal data supplies the currently supported future planning months.
+- ISIMIP3b supplies the approved March–May 2031–2040 long-term scenarios.
+- Near-term ECMWF AWS data remains unavailable until its complete-month checks
+  are implemented.
 
-| Variable                       | Default                                  | Purpose                            |
-| ------------------------------ | ---------------------------------------- | ---------------------------------- |
-| `DATABASE_URL`                 | —                                        | Postgres (`district_climate`)      |
-| `LBW_SERVICE_URL`              | `http://127.0.0.1:8000`                  | LBW Plumber API                    |
-| `KEYCLOAK_ISSUER_URL`          | `http://127.0.0.1:8080/realms/chart`     | Required token issuer              |
-| `KEYCLOAK_CLIENT_ID`           | `chart-api`                              | Client role namespace              |
-| `KEYCLOAK_JWKS_URL`            | `<issuer>/protocol/openid-connect/certs` | Internal signing-key endpoint      |
-| `KEYCLOAK_CLOCK_SKEW_SECONDS`  | `30`                                     | Token timestamp tolerance          |
-| `HOST`                         | `127.0.0.1`                              | Bind address                       |
-| `PORT`                         | `3210`                                   | Listen port                        |
+The deployment owns the Copernicus key. A normal user is never asked for it.
 
-## Example
+## Required configuration
 
-```bash
-curl -s http://127.0.0.1:3210/climate/predict \
-  -H 'authorization: Bearer <keycloak-access-token>' \
-  -H 'content-type: application/json' \
-  -d '{
-    "location_slug": "madhya-pradesh",
-    "timeframe_id": "exposure_3m",
-    "outcome": {"type": "lbw", "trimester": 1, "area": "Gwalior"}
-  }' | jq .
-```
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | CHART Postgres/PostGIS database |
+| `KEYCLOAK_ISSUER_URL` | Accepted token issuer |
+| `KEYCLOAK_CLIENT_ID` | CHART API client name |
+| `CDSAPI_KEY` | Server-side Copernicus download key |
+| `INFERENCE_LBW_BASE_URL` | LBW R service address |
+
+The optional explanation is disabled unless `INFERENCE_LLM_ENABLED=true` and an
+OpenAI-compatible `INFERENCE_LLM_BASE_URL` and `INFERENCE_LLM_MODEL` are set.
+Its failure never changes the numerical model result.
