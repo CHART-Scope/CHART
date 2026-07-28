@@ -32,6 +32,7 @@
     "source_url": "https://narmada.mp.gov.in/Home/Contact",
     "publisher": "Food, Civil Supplies and Consumer Protection Department, Government of Madhya Pradesh",
     "snapshot_date": "2026-07-21",
+    "sha256": "575ca57f8eaa082403de4e949a4012788b54f3d4f9e0a46d44fb90e6be3858ae",
     "current_district_count": 55,
     "source_geometry_count": 52,
     "note": "Maihar, Mauganj, and Pandhurna were created after the represented 2021 boundary vintage. Each remains in the same model division as its parent source geometry, so division dissolves retain the full division outline."

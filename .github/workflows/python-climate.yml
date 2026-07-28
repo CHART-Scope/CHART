@@ -84,7 +84,7 @@ jobs:
           python -m pip install black==25.1.0 mypy==1.19.1 ruff==0.14.10
 
       - name: Check formatting, lint, and types
-        run: make python-check
+        run: make python-check VENV_PYTHON=python
 
       - name: Apply Alembic migrations
         working-directory: backend

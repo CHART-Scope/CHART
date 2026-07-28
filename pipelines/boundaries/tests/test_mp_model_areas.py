@@ -94,6 +94,7 @@ def _fixture_files(tmp_path: Path, *, unexpected_district: bool = False) -> dict
         "crosswalk": {
             "source_url": "https://example.test/crosswalk",
             "snapshot_date": "2026-07-21",
+            "sha256": file_sha256(crosswalk_path),
         },
         "transform": {"id": "test-dissolve-v1"},
     }
@@ -149,6 +150,19 @@ def test_rejects_a_changed_source_artifact(tmp_path: Path) -> None:
     assert error.value.code == "BOUNDARY_SOURCE_HASH_MISMATCH"
 
 
+def test_rejects_a_changed_crosswalk_snapshot(tmp_path: Path) -> None:
+    files = _fixture_files(tmp_path)
+    files["crosswalk_path"].write_text(
+        files["crosswalk_path"].read_text(encoding="utf-8") + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(BoundaryBuildError) as error:
+        build_mp_model_areas(**files)
+
+    assert error.value.code == "BOUNDARY_SOURCE_HASH_MISMATCH"
+
+
 def test_rejects_an_unmapped_district_inside_mp(tmp_path: Path) -> None:
     files = _fixture_files(tmp_path, unexpected_district=True)
 
@@ -166,6 +180,9 @@ def test_rejects_one_source_geometry_mapped_to_two_divisions(tmp_path: Path) -> 
         MODEL_DIVISIONS[1]
     )
     crosswalk.to_csv(files["crosswalk_path"], index=False)
+    manifest = json.loads(files["source_manifest_path"].read_text(encoding="utf-8"))
+    manifest["crosswalk"]["sha256"] = file_sha256(files["crosswalk_path"])
+    files["source_manifest_path"].write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(BoundaryBuildError) as error:
         build_mp_model_areas(**files)

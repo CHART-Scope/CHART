@@ -48,7 +48,8 @@ docs/openapi/fastify.yaml
 
 # local docs and notes
 data/
-data/
+!pipelines/boundaries/data/
+!pipelines/boundaries/data/mp_district_division_crosswalk.csv
 outputs/
 web/public/uploads/
 .local/

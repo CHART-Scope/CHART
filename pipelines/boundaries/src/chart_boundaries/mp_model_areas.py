@@ -132,6 +132,7 @@ def build_mp_model_areas(
     manifest = load_source_manifest(source_manifest_path)
     verify_source_artifact(adm1_path, manifest["sources"]["adm1_validation"])
     verify_source_artifact(adm2_path, manifest["sources"]["adm2_boundaries"])
+    verify_source_artifact(crosswalk_path, manifest["crosswalk"])
     crosswalk = load_crosswalk(crosswalk_path)
 
     adm1 = gpd.read_file(adm1_path)
