@@ -5,6 +5,7 @@ import "./Select.css";
 export type SelectOption = {
   value: string;
   label: string;
+  disabled?: boolean;
 };
 
 type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "children"> & {
@@ -28,7 +29,7 @@ export function Select({
       <select {...selectProps}>
         {placeholder !== undefined ? <option value="">{placeholder}</option> : null}
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}
           </option>
         ))}

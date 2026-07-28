@@ -1,0 +1,41 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ivory);
+  border: 1px solid var(--border-subtle);
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+}
+
+.tag {
+  padding: 3px 10px;
+  font-size: 10.5px;
+  background: var(--color-white);
+}
+
+.behaviour {
+  background: var(--color-nexus-tint);
+  color: var(--color-nexus);
+  border-color: transparent;
+}
+.environment {
+  background: var(--color-env-green-tint);
+  color: var(--color-env-green);
+  border-color: transparent;
+}
+.policy {
+  background: var(--color-maroon-tint);
+  color: var(--color-maroon);
+  border-color: transparent;
+}
+
+.scenario {
+  background: var(--color-nexus-tint);
+  color: var(--color-nexus);
+  border-color: rgba(56, 62, 233, 0.25);
+  padding: 6px 14px;
+  font-weight: 500;
+}

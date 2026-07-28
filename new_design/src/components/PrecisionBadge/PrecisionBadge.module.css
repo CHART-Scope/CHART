@@ -1,0 +1,51 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid;
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  font-family: var(--font-body);
+}
+.badge:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.high {
+  border-color: var(--color-green);
+  color: var(--color-green);
+}
+.moderate {
+  border-color: var(--color-amber);
+  color: var(--color-amber);
+}
+.low {
+  border-color: var(--color-maroon);
+  color: var(--color-maroon);
+}
+
+.info {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-white);
+}
+.high .info {
+  background: var(--color-green);
+}
+.moderate .info {
+  background: var(--color-amber);
+}
+.low .info {
+  background: var(--color-maroon);
+}

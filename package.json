@@ -3,8 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "workspaces": [
-    "api",
-    "web"
+    "web",
+    "new_design"
   ],
   "scripts": {
     "dev:web": "npm --workspace @chart/web run dev",
@@ -13,17 +13,12 @@
     "typecheck:web": "npm --workspace @chart/web run typecheck",
     "storybook:web": "npm --workspace @chart/web run storybook",
     "build-storybook:web": "npm --workspace @chart/web run build-storybook",
-    "dev:api": "npm --workspace @chart/api run dev",
-    "build:api": "npm --workspace @chart/api run build",
-    "start:api": "npm --workspace @chart/api run start",
-    "test:api": "npm --workspace @chart/api run test",
-    "typecheck:api": "npm --workspace @chart/api run typecheck",
-    "db:generate:api": "npm --workspace @chart/api run db:generate",
-    "db:migrate:api": "npm --workspace @chart/api run db:migrate",
-    "db:check:api": "npm --workspace @chart/api run db:check",
-    "db:seed:api": "npm --workspace @chart/api run db:seed",
+    "dev:new-design": "npm --workspace @chart/new-design run dev",
+    "build:new-design": "npm --workspace @chart/new-design run build",
+    "typecheck:new-design": "npm --workspace @chart/new-design run typecheck",
+    "storybook:new-design": "npm --workspace @chart/new-design run storybook",
+    "build-storybook:new-design": "npm --workspace @chart/new-design run build-storybook",
     "identity:sync": "node infra/keycloak/sync-realm.js",
-    "openapi:generate:api": "npm --workspace @chart/api run openapi:generate",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

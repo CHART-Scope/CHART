@@ -1,0 +1,204 @@
+.frame {
+  display: flex;
+  flex-direction: column;
+  height: 590px;
+  max-width: 900px;
+  margin: 40px auto;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  background: var(--color-white);
+}
+
+.topbar {
+  flex-shrink: 0;
+  height: 40px;
+  background: var(--surface-outlook);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px;
+}
+.grid {
+  display: flex;
+  gap: 3px;
+}
+.grid span {
+  width: 4px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.85);
+  display: block;
+}
+.brand {
+  color: var(--color-white);
+  font-size: 13px;
+  font-weight: 500;
+}
+.search {
+  flex: 1;
+  max-width: 360px;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 5px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 11px;
+}
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  margin-left: auto;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+.sidebar {
+  width: 150px;
+  flex-shrink: 0;
+  background: var(--color-grey-light);
+  border-right: 1px solid var(--border-subtle);
+  padding: 14px 12px;
+  overflow-y: auto;
+}
+.newmail {
+  background: var(--surface-outlook);
+  color: var(--color-white);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 7px 10px;
+  border-radius: 5px;
+  margin-bottom: 14px;
+  display: inline-block;
+}
+.navlabel {
+  font-size: 10px;
+  color: var(--color-text-light);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  margin: 10px 0 4px;
+}
+.navitem {
+  font-size: 12px;
+  color: var(--color-charcoal);
+  padding: 5px 6px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+}
+.navitem.selected {
+  background: var(--color-white);
+  font-weight: 500;
+}
+.count {
+  color: var(--color-text-light);
+  font-weight: 400;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.toolbar {
+  flex-shrink: 0;
+  display: flex;
+  gap: 16px;
+  padding: 9px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.toolbar .new {
+  color: var(--surface-outlook);
+  font-weight: 500;
+}
+.subbar {
+  flex-shrink: 0;
+  display: flex;
+  gap: 18px;
+  padding: 6px 20px;
+  font-size: 11px;
+  color: var(--color-text-light);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.mailbody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 24px 24px;
+}
+.subject {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-charcoal);
+  margin-bottom: 12px;
+}
+.fromrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.avatarLg {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--surface-outlook);
+  color: var(--color-white);
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.fromname {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-charcoal);
+}
+.fromto {
+  font-size: 11px;
+  color: var(--color-text-light);
+}
+.date {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--color-text-light);
+}
+.content {
+  font-size: 12.5px;
+  color: var(--color-charcoal);
+  line-height: var(--lh-loose);
+  max-width: 560px;
+}
+.content p {
+  margin-bottom: 14px;
+}
+.content h4 {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--color-charcoal);
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
+.content a {
+  color: var(--surface-outlook);
+  text-decoration: none;
+}
+.sign {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}

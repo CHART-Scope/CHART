@@ -18,12 +18,35 @@ async function main() {
   const token = await getAdminToken();
 
   await syncRealmSettings(token, realmSeed);
+  await syncClientSettings(token, realmSeed.clients ?? []);
   await ensureClientRoles(token, realmSeed.roles?.client ?? {});
   await ensureClientProtocolMappers(token, realmSeed.clients ?? []);
   await ensureGroups(token, realmSeed.groups ?? []);
   await importUsers(token, realmSeed.users ?? []);
 
   console.log(`Synced Keycloak realm '${targetRealm}' from ${realmFile}`);
+}
+
+async function syncClientSettings(token, clients) {
+  for (const clientSeed of clients) {
+    const clientSummary = await getClient(token, clientSeed.clientId);
+    const clientUrl = `${keycloakUrl}/admin/realms/${targetRealm}/clients/${clientSummary.id}`;
+    const client = await fetchJson(clientUrl, { headers: authHeaders(token) });
+
+    await fetchOk(clientUrl, {
+      method: "PUT",
+      headers: jsonHeaders(token),
+      body: JSON.stringify({
+        ...client,
+        redirectUris: clientSeed.redirectUris ?? client.redirectUris,
+        webOrigins: clientSeed.webOrigins ?? client.webOrigins,
+        attributes: {
+          ...(client.attributes ?? {}),
+          ...(clientSeed.attributes ?? {}),
+        },
+      }),
+    });
+  }
 }
 
 async function syncRealmSettings(token, realmSeed) {

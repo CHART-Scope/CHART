@@ -1,0 +1,31 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-text-light);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-body);
+  background: var(--color-white);
+  color: var(--color-charcoal);
+  font-family: var(--font-body);
+}
+.input:focus {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+.input:read-only {
+  background: var(--color-white);
+  color: var(--color-charcoal);
+}

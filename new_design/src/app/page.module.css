@@ -1,0 +1,85 @@
+.wrap {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 80px 24px 96px;
+}
+
+.brand {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: 0.04em;
+  color: var(--color-charcoal);
+  margin-bottom: 8px;
+}
+
+.tagline {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  margin-bottom: 40px;
+  max-width: 560px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 48px;
+}
+
+.card {
+  background: var(--color-white);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  padding: 22px 24px;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+.card:hover {
+  border-color: var(--color-charcoal);
+  transform: translateY(-1px);
+}
+.cardTitle {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-charcoal);
+  margin-bottom: 8px;
+}
+.cardDesc {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+.cardMeta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.note {
+  background: var(--color-grey-light);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+.note strong {
+  color: var(--color-charcoal);
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

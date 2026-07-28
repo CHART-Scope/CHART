@@ -56,6 +56,53 @@ export function getStoredAuthSession(): AuthSession | null {
   }
 }
 
+export async function ensureFreshAuthSession(session: AuthSession) {
+  if (!shouldRefreshAccessToken(session.accessToken)) {
+    return session;
+  }
+
+  return refreshAuthSession(session);
+}
+
+export async function refreshAuthSession(session: AuthSession) {
+  if (!session.refreshToken) {
+    throw new Error("The CHART sign-in session has expired.");
+  }
+
+  const response = await fetch("/api/auth/keycloak-refresh", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ refreshToken: session.refreshToken }),
+  });
+
+  if (!response.ok) {
+    throw new Error("The CHART sign-in session could not be renewed.");
+  }
+
+  const tokens = (await response.json()) as AuthTokenResponse;
+  if (!tokens.access_token) {
+    throw new Error("The renewed CHART session is missing an access token.");
+  }
+
+  const nextSession: AuthSession = {
+    user: await fetchCurrentUser(tokens.access_token),
+    accessToken: tokens.access_token,
+    idToken: tokens.id_token ?? session.idToken,
+    refreshToken: tokens.refresh_token ?? session.refreshToken,
+  };
+  storeAuthSession(nextSession);
+  return nextSession;
+}
+
+export function accessTokenRefreshDelay(accessToken?: string) {
+  const expiresAt = readAccessTokenExpiry(accessToken);
+  if (expiresAt === null) {
+    return null;
+  }
+
+  return Math.max(0, expiresAt - Date.now() - 30_000);
+}
+
 export function storeAuthSession(session: AuthSession) {
   const storage = getBrowserStorage("localStorage");
 
@@ -152,6 +199,33 @@ function getBrowserStorage(kind: "localStorage" | "sessionStorage") {
 
   try {
     return window[kind] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function shouldRefreshAccessToken(accessToken?: string) {
+  const delay = accessTokenRefreshDelay(accessToken);
+  return delay !== null && delay === 0;
+}
+
+function readAccessTokenExpiry(accessToken?: string) {
+  if (!accessToken) {
+    return null;
+  }
+
+  try {
+    const encodedPayload = accessToken.split(".")[1];
+    if (!encodedPayload) {
+      return null;
+    }
+    const normalizedPayload = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedPayload = normalizedPayload.padEnd(
+      Math.ceil(normalizedPayload.length / 4) * 4,
+      "=",
+    );
+    const payload = JSON.parse(window.atob(paddedPayload)) as { exp?: unknown };
+    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
   } catch {
     return null;
   }

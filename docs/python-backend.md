@@ -1,59 +1,32 @@
 # Python backend
 
-CHART's target backend lives in `backend/chart/`. It is split into **shared data models**,
-**climate engine** code, and a growing **FastAPI surface** — all importable from Dagster
-without pulling in HTTP framework details.
-
-## Layout
+`backend/chart/` is the only CHART backend.
 
 ```txt
-backend/
-  chart/
-    shared/db/          # SQLAlchemy models + Alembic migrations
-    climate/            # Catalog, preview, predict service logic
-    api/                # FastAPI app (climate routes today; app modules next)
-  alembic/
-  tests/
-orchestration/
-  chart_pipeline/       # Dagster assets — imports chart.*, not FastAPI
+backend/chart/
+  api/                   FastAPI application
+  auth/                  Keycloak token and access checks
+  setup/ users/          application setup and user management
+  workspaces/            geography-scoped planning workspaces
+  geographies/           user places and analytical area mapping
+  climate/               source-neutral monthly data and requests
+  model_registry/        versioned model files and place mapping
+  inference/             deterministic scorer and optional explanation
+  solution_repository/   public repository adapter
+  shared/db/             SQLAlchemy models; Alembic is the schema owner
+  vra/                   future module placeholder only
 ```
 
-## Runtime faces
+Dagster imports these services through thin wrappers. Analytical code does not
+import FastAPI or Dagster.
 
-| Face | Entry | Port (local) |
-|---|---|---|
-| Climate predict API | `make climate-api` | 3210 |
-| Dagster | `make dev` | 3000 |
-| LBW inference (R) | `pipelines/LBW_demo/inference` | 8000 |
-
-Climate predict reads `district_climate` from Postgres when `DATABASE_URL` is set,
-then optionally calls the LBW Plumber service for `outcome.type=lbw`.
-
-## Database
-
-Postgres holds the climate spine (`district_climate`, `data_source`, …). Migrations
-run through Alembic in `backend/`; the Makefile also applies Drizzle migrations for
-the interim Fastify app tables on the same database.
+## Database and API
 
 ```bash
-export DATABASE_URL=postgresql+psycopg://chart:chart@localhost:5434/chart
-pip install -e 'backend[dev]'
-cd backend && alembic upgrade head
+make migrate
+make climate-api
+make climate-openapi
 ```
 
-## OpenAPI
-
-Python services export machine-readable contracts:
-
-```bash
-make climate-openapi    # docs/openapi/climate.json
-```
-
-Human-readable notes: [Climate API](climate-api.md). Interactive embed:
-[OpenAPI reference](api-reference.md).
-
-## Migration from Fastify
-
-New endpoints should land in `backend/chart/api/` first. The web app will switch to
-generated clients against the Python OpenAPI contract as each module moves. See
-[Legacy Fastify API](legacy-fastify-api.md) for what still runs on TypeScript today.
+API reference: [OpenAPI](api-reference.md). Place and model handoff:
+[Add a geography and model](add-geography-and-model.md).

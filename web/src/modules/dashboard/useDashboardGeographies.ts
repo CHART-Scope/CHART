@@ -36,11 +36,15 @@ function getInitialSelectedGeography(
   geographies: GeographyRecord[],
   activeGeography: string | undefined,
 ) {
-  return (
+  const active =
     geographies.find((geography) => geography.path === activeGeography) ??
-    geographies.find((geography) => geography.id === activeGeography) ??
-    geographies[0]
-  );
+    geographies.find((geography) => geography.id === activeGeography);
+
+  return active?.supportsPrediction
+    ? active
+    : (geographies.find((geography) => geography.supportsPrediction) ??
+        active ??
+        geographies[0]);
 }
 
 type UseDashboardGeographiesOptions = {

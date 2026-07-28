@@ -167,6 +167,13 @@ export const setupRoleOptions = [
 
 const contentManagerRoles = new Set<ChartRole>(["chart_admin", "content_editor"]);
 const userManagerRoles = new Set<ChartRole>(["chart_admin"]);
+const predictionRoles = new Set<ChartRole>([
+  "chart_admin",
+  "health_planning_lead",
+  "cross_sector_planning_lead",
+  "health_implementation_officer",
+  "cross_sector_implementation_officer",
+]);
 
 export function getPrimaryRole(user: CurrentUserContext) {
   return user.roles[0];
@@ -186,6 +193,10 @@ export function canManageContent(user: CurrentUserContext) {
 
 export function canManageUsers(user: CurrentUserContext) {
   return user.roles.some((role) => userManagerRoles.has(role));
+}
+
+export function canRunPredictions(user: CurrentUserContext) {
+  return user.roles.some((role) => predictionRoles.has(role));
 }
 
 export function formatGeographyPath(path: string | undefined) {

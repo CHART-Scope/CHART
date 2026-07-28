@@ -8,6 +8,7 @@ export type GeographyRecord = {
   externalCode: string | null;
   path: string;
   sortOrder: number;
+  supportsPrediction?: boolean;
 };
 
 export async function listGeographies() {

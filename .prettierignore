@@ -30,3 +30,4 @@ chart-repository/payload-types.ts
 chart-repository/src/app/(payload)/admin/importMap.ts
 
 package-lock.json
+Makefile

@@ -4,7 +4,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { getSetupStatus } from "../../lib/setupClient";
 import {
+  accessTokenRefreshDelay,
+  ensureFreshAuthSession,
   getStoredAuthSession,
+  refreshAuthSession,
   signOutOfKeycloak,
   startKeycloakSignIn,
   type AuthSession,
@@ -21,6 +24,8 @@ export function RequireAuth({ children }: RequireAuthProps) {
   const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function checkAccess() {
       const storedSession = getStoredAuthSession();
 
@@ -39,7 +44,11 @@ export function RequireAuth({ children }: RequireAuthProps) {
         return;
       }
 
-      setSession(storedSession);
+      const activeSession = await ensureFreshAuthSession(storedSession);
+      if (cancelled) {
+        return;
+      }
+      setSession(activeSession);
       setIsChecking(false);
 
       const setupStatus = await getSetupStatus();
@@ -53,10 +62,32 @@ export function RequireAuth({ children }: RequireAuthProps) {
     }
 
     checkAccess().catch(() => {
-      setError("CHART setup status could not be checked.");
-      setIsChecking(false);
+      if (!cancelled) {
+        redirectToSignIn();
+      }
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    const delay = accessTokenRefreshDelay(session.accessToken);
+    if (delay === null) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      refreshAuthSession(session).then(setSession).catch(redirectToSignIn);
+    }, delay);
+
+    return () => window.clearTimeout(timeout);
+  }, [session]);
 
   function redirectToSignIn() {
     if (hasRedirectedRef.current) {
