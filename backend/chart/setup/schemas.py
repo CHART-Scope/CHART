@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
-class HazardOption(BaseModel):
+class SectorOption(BaseModel):
     id: str
     label: str
 
@@ -21,12 +21,13 @@ class SetupStatus(BaseModel):
     countryName: str | None = None
     rootGeographyId: str | None = None
     firstAdminUserId: str | None = None
-    selectedHazards: list[HazardOption]
+    primarySectorId: str | None = None
+    collaboratingSectorIds: list[str] = Field(default_factory=list)
     counts: SetupCounts
 
 
 class SetupOptions(BaseModel):
-    hazards: list[HazardOption]
+    sectors: list[SectorOption]
 
 
 class SetupGeographyInput(BaseModel):
@@ -45,7 +46,8 @@ class CompleteSetupInput(BaseModel):
     focusAreaIds: list[str] = Field(default_factory=list)
     geographies: list[SetupGeographyInput] = Field(default_factory=list)
     geographyLevelLabel: str = Field(min_length=2)
-    hazardIds: list[str] = Field(min_length=1)
+    primarySectorId: str = Field(min_length=1)
+    collaboratingSectorIds: list[str] = Field(default_factory=list)
     healthAreaIds: list[str] = Field(default_factory=list)
 
 

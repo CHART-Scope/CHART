@@ -66,7 +66,7 @@ def ready() -> HealthResponse:
         with get_session_factory()() as session:
             session.execute(text("SELECT 1"))
             revision = session.scalar(text("SELECT version_num FROM alembic_version"))
-            if revision != "013_systemic_safety":
+            if revision != "014_setup_sector_roles":
                 raise RuntimeError(f"database revision is {revision!r}")
             if (
                 os.getenv("CHART_REQUIRE_ACTIVE_MODEL", "0") == "1"

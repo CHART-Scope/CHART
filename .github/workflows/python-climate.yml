@@ -89,8 +89,11 @@ jobs:
         run: make python-check VENV_PYTHON=python
 
       - name: Apply Alembic migrations
+        run: backend/scripts/migrate.sh
+
+      - name: Verify SQLAlchemy metadata matches Alembic
         working-directory: backend
-        run: alembic upgrade head
+        run: python -m alembic check
 
       - name: Run tests
         run: python -m pytest backend/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/LBW_demo/tests -q

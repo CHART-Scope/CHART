@@ -37,17 +37,41 @@ def planning_user_client() -> Iterator[TestClient]:
         app.dependency_overrides.pop(require_current_user, None)
 
 
+@pytest.fixture
+def admin_client() -> Iterator[TestClient]:
+    app.dependency_overrides[require_current_user] = lambda: CurrentUserContext(
+        user_id="admin-1",
+        username="admin",
+        roles=["chart_admin", "content_editor"],
+        geography_scopes=["/india/madhya-pradesh"],
+    )
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.pop(require_current_user, None)
+
+
 def test_setup_status_remains_public(client: TestClient) -> None:
     status = SetupStatus(
         completed=False,
         requiresOnboarding=True,
-        selectedHazards=[],
+        collaboratingSectorIds=[],
         counts=SetupCounts(geographies=0, workspaceMembers=0),
     )
     with patch("chart.setup.routes.get_status", return_value=status):
         response = client.get("/setup")
     assert response.status_code == 200
     assert response.json()["requiresOnboarding"] is True
+
+
+def test_setup_options_return_installation_sectors(client: TestClient) -> None:
+    response = client.get("/setup/options")
+
+    assert response.status_code == 200
+    assert response.json()["sectors"][:2] == [
+        {"id": "health", "label": "Health"},
+        {"id": "environment", "label": "Environment & climate change"},
+    ]
 
 
 def test_readiness_rejects_a_database_behind_the_code(
@@ -101,7 +125,8 @@ def test_setup_bootstrap_accepts_deployment_secret(
         countryName="India",
         rootGeographyId="geo-in",
         firstAdminUserId="admin-1",
-        selectedHazards=[{"id": "hazard-extreme-heat", "label": "Extreme heat"}],
+        primarySectorId="water",
+        collaboratingSectorIds=["agriculture"],
         counts=SetupCounts(geographies=2, workspaceMembers=1),
     )
     result = BootstrapSetupResponse(
@@ -148,7 +173,8 @@ def test_setup_complete_requires_keycloak(client: TestClient) -> None:
             "countryCode": "IN",
             "countryName": "India",
             "geographyLevelLabel": "State",
-            "hazardIds": ["hazard-extreme-heat"],
+            "primarySectorId": "water",
+            "collaboratingSectorIds": ["agriculture"],
         },
     )
     assert response.status_code == 401
@@ -162,11 +188,28 @@ def test_setup_complete_denies_non_admin(planning_user_client: TestClient) -> No
             "countryCode": "IN",
             "countryName": "India",
             "geographyLevelLabel": "State",
-            "hazardIds": ["hazard-extreme-heat"],
+            "primarySectorId": "water",
+            "collaboratingSectorIds": ["agriculture"],
         },
     )
     assert response.status_code == 403
     assert response.json() == {"error": "SETUP_FORBIDDEN"}
+
+
+def test_setup_complete_rejects_unknown_sector(admin_client: TestClient) -> None:
+    response = admin_client.post(
+        "/setup/complete",
+        json={
+            "countryCode": "IN",
+            "countryName": "India",
+            "geographyLevelLabel": "State",
+            "primarySectorId": "unknown",
+            "collaboratingSectorIds": [],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"error": "SETUP_SECTOR_INVALID"}
 
 
 def test_users_require_keycloak(client: TestClient) -> None:
@@ -186,7 +229,8 @@ def _bootstrap_request() -> dict:
         "countryCode": "IN",
         "countryName": "India",
         "geographyLevelLabel": "State",
-        "hazardIds": ["hazard-extreme-heat"],
+        "primarySectorId": "water",
+        "collaboratingSectorIds": ["agriculture"],
         "geographies": [
             {
                 "id": "geo-in-madhya-pradesh",

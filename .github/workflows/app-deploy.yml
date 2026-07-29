@@ -118,6 +118,12 @@ jobs:
           DATABASE_URL: postgresql+psycopg://chart:chart@127.0.0.1:5432/chart
         run: backend/scripts/migrate.sh
 
+      - name: Verify SQLAlchemy metadata matches Alembic
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://chart:chart@127.0.0.1:5432/chart
+        run: python -m alembic check
+
       - name: Test Python API and data flow
         run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests pipelines/LBW_demo/tests -q
 
