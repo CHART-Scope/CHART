@@ -19,10 +19,18 @@ export default meta;
 type Story = StoryObj<typeof IconArray>;
 
 export const Twelve: Story = {
-  args: { value: 12, captionSuffix: "increase in odds of LBW" },
+  args: {
+    value: 12,
+    figure: "mother-baby",
+    captionSuffix: "increase in odds of LBW",
+  },
 };
 export const TwentySix: Story = {
-  args: { value: 26, captionSuffix: "increase in odds of LBW" },
+  args: {
+    value: 26,
+    figure: "mother-baby",
+    captionSuffix: "increase in odds of LBW",
+  },
 };
 export const MotherBabyMaternalHeat: Story = {
   args: {
