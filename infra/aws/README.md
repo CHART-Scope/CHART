@@ -42,7 +42,15 @@ Required:
 
 Optional:
 
-- `AWS_APP_PUBLIC_HOST`: browser-facing hostname. Use this for a subdomain.
+- `AWS_APP_PUBLIC_ORIGIN`: browser-facing origin, including the scheme. Set this to
+  the canonical HTTPS domain, for example `https://chart.example.org`. This value is
+  used for Keycloak's issuer, web callback, logout redirects, CORS, and browser links.
+- `AWS_APP_PUBLIC_HOST`: legacy HTTP hostname fallback when
+  `AWS_APP_PUBLIC_ORIGIN` is not set.
+- `KEYCLOAK_GOOGLE_CLIENT_ID` and `KEYCLOAK_GOOGLE_CLIENT_SECRET`: Google OAuth
+  credentials for Scope Impact Workspace SSO. Configure both or neither.
+- `KEYCLOAK_GOOGLE_HOSTED_DOMAIN`: allowed Google Workspace domain. Defaults to
+  `scopeimpact.fi`.
 - `CDSAPI_URL`: defaults to `https://cds.climate.copernicus.eu/api`.
 - `CDSAPI_KEY`: deployment credential used only by Dagster for live ERA5 downloads.
 - `LBW_MODEL_DIVISION_S3_URI`: private S3 URI for the division model bundle.
@@ -54,6 +62,16 @@ data remains readable. A missing-climate request reports
 `CLIMATE_INGEST_NOT_CONFIGURED` when no CDS key is available, while LBW processing
 reports `LBW_SERVICE_NOT_CONFIGURED` when its model service is disabled. CHART users
 never provide these deployment credentials.
+
+For Google SSO, register this authorized redirect URI in the Google OAuth client:
+
+```txt
+https://<chart-domain>/identity/realms/chart/broker/scope-google/endpoint
+```
+
+The Google provider verifies the Workspace hosted-domain claim. A successful SSO
+login creates a Keycloak identity but does not grant a protected CHART role or
+geography.
 
 `CDSAPI_KEY` is written to `/opt/chart-env/prediction-worker.env` and passed only to
 the Dagster webserver and daemon. It is not passed to Next, Fastify, or the Python API.
@@ -119,7 +137,7 @@ docker exec -it chart-postgres psql -U chart -d chart \
 ```bash
 docker rm -f chart-proxy chart-web chart-api chart-climate-api chart-dagster-webserver chart-dagster-daemon chart-lbw chart-keycloak chart-postgres
 docker volume rm chart-postgres-data chart-dagster-storage chart-climate-data
-PUBLIC_HOST=<host> bash /opt/chart/infra/aws/deploy-app.sh
+PUBLIC_ORIGIN=https://<chart-domain> bash /opt/chart/infra/aws/deploy-app.sh
 ```
 
 Keycloak uses the `chart_keycloak` logical database and dedicated database role on

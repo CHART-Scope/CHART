@@ -55,6 +55,12 @@ export function signOutOfKeycloak() {
   window.location.assign("/auth/signout?returnTo=/plan");
 }
 
+export function signedInHomePath(user: CurrentUser) {
+  return user.roles.length > 0 && user.geographyScopes.length > 0
+    ? "/plan"
+    : "/onboarding";
+}
+
 export function refreshDelay(accessToken: string) {
   try {
     const encoded = accessToken.split(".")[1];

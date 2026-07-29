@@ -6,7 +6,7 @@ DRIZZLE_JOURNAL := api/drizzle/meta/_journal.json
 CHART_REPOSITORY_DIR := chart-repository
 CHART_REPOSITORY_COMPOSE := $(DOCKER) compose -f $(CHART_REPOSITORY_DIR)/docker-compose.yml
 
-.PHONY: all help install run verify local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build api api-build api-start api-test api-typecheck db-generate db-migrate db-check db-seed api-db-generate api-db-migrate api-db-check api-db-seed api-openapi-generate identity-sync identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check ensure-drizzle-journal era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run
+.PHONY: all help install run verify local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build api api-build api-start api-test api-typecheck db-generate db-migrate db-check db-seed api-db-generate api-db-migrate api-db-check api-db-seed api-openapi-generate identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check ensure-drizzle-journal era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run
 
 help:
 	@printf "\nQuick start (climate pipeline)\n"
@@ -26,6 +26,7 @@ help:
 	@printf "  make services       Start local Postgres and Keycloak\n"
 	@printf "  make mail           Start local Mailpit (SMTP :1025, inbox :8025)\n"
 	@printf "  make identity-sync  Re-apply local Keycloak seed users and groups\n"
+	@printf "  make identity-test  Test Keycloak SSO and redirect configuration\n"
 	@printf "  make identity-restart  Restart Keycloak, preserving data, then sync it\n"
 	@printf "  make identity-reset CONFIRM=1  Reset local Keycloak data and seed it\n"
 	@printf "  make db-migrate     Apply API Drizzle migrations\n"
@@ -47,7 +48,7 @@ all: local-setup verify
 run: local-setup climate-install
 	$(MAKE) -j4 api climate-api-run dagster-run web
 
-verify: api-test api-typecheck api-build web-typecheck web-build format-check
+verify: identity-test api-test api-typecheck api-build web-typecheck web-build format-check
 
 local-setup: services postgres-wait identity-wait db-migrate climate-migrate db-seed identity-sync
 
@@ -181,6 +182,9 @@ identity-wait: services
 
 identity-sync: identity-wait
 	$(NPM) run identity:sync
+
+identity-test:
+	$(NPM) run identity:test
 
 identity-restart: check-docker
 	$(MAKE) services

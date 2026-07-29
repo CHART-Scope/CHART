@@ -38,13 +38,17 @@ random_secret() {
   date +%s%N | sha256sum | cut -c 1-48
 }
 
-detect_public_host() {
-  if [ -n "${PUBLIC_HOST:-}" ]; then
-    printf "%s" "$PUBLIC_HOST"
+detect_public_origin() {
+  if [ -n "${PUBLIC_ORIGIN:-}" ]; then
+    printf "%s" "${PUBLIC_ORIGIN%/}"
     return
   fi
 
-  curl -fsS https://checkip.amazonaws.com 2>/dev/null | tr -d "[:space:]"
+  local public_host="${PUBLIC_HOST:-}"
+  if [ -z "$public_host" ]; then
+    public_host="$(curl -fsS https://checkip.amazonaws.com 2>/dev/null | tr -d "[:space:]")"
+  fi
+  printf "%s://%s" "${PUBLIC_SCHEME:-http}" "$public_host"
 }
 
 wait_for_command() {
@@ -109,17 +113,19 @@ migrate_legacy_keycloak_database() {
   echo "Migrated the legacy Keycloak database into $DB_CONTAINER."
 }
 
-PUBLIC_HOST="$(detect_public_host)"
+PUBLIC_ORIGIN="$(detect_public_origin)"
 
-if [ -z "$PUBLIC_HOST" ]; then
-  echo "Set PUBLIC_HOST to the public host or IP used by browsers." >&2
+if [ -z "$PUBLIC_ORIGIN" ]; then
+  echo "Set PUBLIC_ORIGIN to the browser-facing origin, including https://." >&2
   exit 1
 fi
 
-if [[ "$PUBLIC_HOST" == http://* || "$PUBLIC_HOST" == https://* || "$PUBLIC_HOST" == */* ]]; then
-  echo "Set PUBLIC_HOST to a bare hostname or IP without a scheme or path." >&2
+if [[ ! "$PUBLIC_ORIGIN" =~ ^https?://[a-zA-Z0-9.-]+(:[0-9]{1,5})?$ ]]; then
+  echo "Set PUBLIC_ORIGIN to an http or https origin without a path." >&2
   exit 1
 fi
+
+PUBLIC_HOST="${PUBLIC_ORIGIN#*://}"
 
 mkdir -p "$ENV_DIR"
 
@@ -127,6 +133,9 @@ DEPLOY_CDSAPI_KEY="${CDSAPI_KEY:-}"
 DEPLOY_CDSAPI_URL="${CDSAPI_URL:-}"
 DEPLOY_LBW_MODEL_DIVISION_S3_URI="${LBW_MODEL_DIVISION_S3_URI:-}"
 DEPLOY_LBW_MODEL_STATE_S3_URI="${LBW_MODEL_STATE_S3_URI:-}"
+DEPLOY_KEYCLOAK_GOOGLE_CLIENT_ID="${KEYCLOAK_GOOGLE_CLIENT_ID:-}"
+DEPLOY_KEYCLOAK_GOOGLE_CLIENT_SECRET="${KEYCLOAK_GOOGLE_CLIENT_SECRET:-}"
+DEPLOY_KEYCLOAK_GOOGLE_HOSTED_DOMAIN="${KEYCLOAK_GOOGLE_HOSTED_DOMAIN:-}"
 
 if [ -f "$ENV_FILE" ]; then
   set -a
@@ -149,6 +158,9 @@ CDSAPI_KEY="${DEPLOY_CDSAPI_KEY:-${CDSAPI_KEY:-}}"
 CDSAPI_URL="${DEPLOY_CDSAPI_URL:-${CDSAPI_URL:-https://cds.climate.copernicus.eu/api}}"
 LBW_MODEL_DIVISION_S3_URI="${DEPLOY_LBW_MODEL_DIVISION_S3_URI:-${LBW_MODEL_DIVISION_S3_URI:-${LBW_MODEL_S3_URI:-}}}"
 LBW_MODEL_STATE_S3_URI="${DEPLOY_LBW_MODEL_STATE_S3_URI:-${LBW_MODEL_STATE_S3_URI:-}}"
+KEYCLOAK_GOOGLE_CLIENT_ID="${DEPLOY_KEYCLOAK_GOOGLE_CLIENT_ID:-${KEYCLOAK_GOOGLE_CLIENT_ID:-}}"
+KEYCLOAK_GOOGLE_CLIENT_SECRET="${DEPLOY_KEYCLOAK_GOOGLE_CLIENT_SECRET:-${KEYCLOAK_GOOGLE_CLIENT_SECRET:-}}"
+KEYCLOAK_GOOGLE_HOSTED_DOMAIN="${DEPLOY_KEYCLOAK_GOOGLE_HOSTED_DOMAIN:-${KEYCLOAK_GOOGLE_HOSTED_DOMAIN:-scopeimpact.fi}}"
 
 LBW_ENABLED=""
 LBW_SERVICE_URL=""
@@ -178,20 +190,20 @@ DAGSTER_POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 DAGSTER_POSTGRES_DB=$DAGSTER_DB_NAME
 CLIMATE_OUTPUT_DIR=/opt/chart/data/climate
 ERA5_USE_FIXTURE=0
-KEYCLOAK_ISSUER_URL=http://$PUBLIC_HOST/identity/realms/chart
+KEYCLOAK_ISSUER_URL=$PUBLIC_ORIGIN/identity/realms/chart
 KEYCLOAK_CLIENT_ID=chart-api
 KEYCLOAK_JWKS_URL=http://$KEYCLOAK_CONTAINER:8080/identity/realms/chart/protocol/openid-connect/certs
 KEYCLOAK_CLOCK_SKEW_SECONDS=30
 KEYCLOAK_SERVER_URL=http://$KEYCLOAK_CONTAINER:8080/identity
-KEYCLOAK_BROWSER_URL=http://$PUBLIC_HOST/identity
+KEYCLOAK_BROWSER_URL=$PUBLIC_ORIGIN/identity
 KEYCLOAK_ADMIN_URL=http://$KEYCLOAK_CONTAINER:8080/identity
 KEYCLOAK_ADMIN_USERNAME=admin
 KEYCLOAK_REALM=chart
 KEYCLOAK_WEB_CLIENT_ID=chart-web
 CHART_API_INTERNAL_URL=http://$API_CONTAINER:3200
 CHART_PYTHON_API_INTERNAL_URL=http://$CLIMATE_API_CONTAINER:3210
-CHART_CORS_ORIGINS=http://$PUBLIC_HOST
-CHART_WEB_ORIGIN=http://$PUBLIC_HOST
+CHART_CORS_ORIGINS=$PUBLIC_ORIGIN
+CHART_WEB_ORIGIN=$PUBLIC_ORIGIN
 EOF
 
 chmod 600 "$ENV_FILE"
@@ -228,6 +240,21 @@ cat >"$PROXY_CONFIG_FILE" <<EOF
 events {}
 
 http {
+  map \$http_x_forwarded_proto \$chart_forwarded_proto {
+    default \$http_x_forwarded_proto;
+    "" \$scheme;
+  }
+
+  map \$http_x_forwarded_host \$chart_forwarded_host {
+    default \$http_x_forwarded_host;
+    "" \$host;
+  }
+
+  map \$http_x_forwarded_port \$chart_forwarded_port {
+    default \$http_x_forwarded_port;
+    "" \$server_port;
+  }
+
   server {
     listen 80;
     client_max_body_size 25m;
@@ -240,9 +267,9 @@ http {
       proxy_pass http://$KEYCLOAK_CONTAINER:8080;
       proxy_set_header Host \$host;
       proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Host \$host;
-      proxy_set_header X-Forwarded-Port \$server_port;
-      proxy_set_header X-Forwarded-Proto \$scheme;
+      proxy_set_header X-Forwarded-Host \$chart_forwarded_host;
+      proxy_set_header X-Forwarded-Port \$chart_forwarded_port;
+      proxy_set_header X-Forwarded-Proto \$chart_forwarded_proto;
     }
 
     location = /chart-api {
@@ -393,8 +420,8 @@ docker run -d \
   -e KC_DB_PASSWORD="$KEYCLOAK_DB_PASSWORD" \
   -e KC_HTTP_ENABLED=true \
   -e KC_HTTP_RELATIVE_PATH=/identity \
-  -e KC_HOSTNAME="http://$PUBLIC_HOST/identity" \
-  -e KC_HOSTNAME_STRICT=false \
+  -e KC_HOSTNAME="$PUBLIC_ORIGIN/identity" \
+  -e KC_HOSTNAME_STRICT=true \
   -e KC_PROXY_HEADERS=xforwarded \
   -v "$APP_DIR/infra/keycloak/chart-realm.json:/opt/keycloak/data/import/chart-realm.json:ro" \
   -v "$APP_DIR/infra/keycloak/themes/chart:/opt/keycloak/themes/chart:ro" \
@@ -413,22 +440,6 @@ docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh update realms/chart
   -s loginTheme=chart \
   -s sslRequired=none >/dev/null
 
-WEB_CLIENT_UUID="$(
-  docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh get clients \
-    -r chart \
-    -q clientId=chart-web \
-    --fields id \
-    --format csv \
-    --noquotes | tail -n 1
-)"
-
-docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh update \
-  "clients/$WEB_CLIENT_UUID" \
-  -r chart \
-  -s "redirectUris=[\"http://$PUBLIC_HOST/*\",\"http://localhost:3100/*\",\"http://127.0.0.1:3100/*\"]" \
-  -s "attributes={\"post.logout.redirect.uris\":\"http://$PUBLIC_HOST##http://$PUBLIC_HOST/*##http://localhost:3100##http://localhost:3100/*##http://127.0.0.1:3100##http://127.0.0.1:3100/*\"}" \
-  -s 'webOrigins=["+"]' >/dev/null
-
 docker run --rm \
   --network "$NETWORK" \
   -e KEYCLOAK_ADMIN_URL="http://$KEYCLOAK_CONTAINER:8080/identity" \
@@ -436,6 +447,10 @@ docker run --rm \
   -e KEYCLOAK_ADMIN_PASSWORD="$KEYCLOAK_ADMIN_PASSWORD" \
   -e KEYCLOAK_REALM=chart \
   -e KEYCLOAK_REALM_FILE=/keycloak/chart-realm.json \
+  -e CHART_WEB_ORIGIN="$PUBLIC_ORIGIN" \
+  -e KEYCLOAK_GOOGLE_CLIENT_ID="$KEYCLOAK_GOOGLE_CLIENT_ID" \
+  -e KEYCLOAK_GOOGLE_CLIENT_SECRET="$KEYCLOAK_GOOGLE_CLIENT_SECRET" \
+  -e KEYCLOAK_GOOGLE_HOSTED_DOMAIN="$KEYCLOAK_GOOGLE_HOSTED_DOMAIN" \
   -v "$APP_DIR/infra/keycloak:/keycloak:ro" \
   node:22-alpine node /keycloak/sync-realm.js
 
@@ -554,13 +569,13 @@ if [ -n "$LBW_ENABLED" ]; then
   wait_for_command "LBW inference through proxy" curl -fsS "http://127.0.0.1/lbw/health"
 fi
 
-echo "CHART is running at http://$PUBLIC_HOST"
-echo "CHART API is running at http://$PUBLIC_HOST/chart-api"
-echo "CHART climate API is running at http://$PUBLIC_HOST/climate"
+echo "CHART is running at $PUBLIC_ORIGIN"
+echo "CHART API is running at $PUBLIC_ORIGIN/chart-api"
+echo "CHART climate API is running at $PUBLIC_ORIGIN/climate"
 echo "Dagster UI is private at http://127.0.0.1:3000 (use an SSH tunnel)."
-echo "CHART sign-in is running at http://$PUBLIC_HOST/identity"
+echo "CHART sign-in is running at $PUBLIC_ORIGIN/identity"
 if [ -n "$LBW_ENABLED" ]; then
-  echo "LBW inference is running at http://$PUBLIC_HOST/lbw/ui/"
+  echo "LBW inference is running at $PUBLIC_ORIGIN/lbw/ui/"
 else
   echo "LBW inference is disabled until both model S3 URIs are configured."
 fi

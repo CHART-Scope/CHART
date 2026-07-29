@@ -20,6 +20,12 @@ async function main() {
   await syncRealmSettings(token, realmSeed);
   await ensureClientRoles(token, realmSeed.roles?.client ?? {});
   await ensureClientProtocolMappers(token, realmSeed.clients ?? []);
+  await ensureWebClientSettings(
+    token,
+    realmSeed.clients ?? [],
+    process.env.CHART_WEB_ORIGIN,
+  );
+  await ensureIdentityProvider(token, buildScopeGoogleIdentityProvider(process.env));
   await ensureGroups(token, realmSeed.groups ?? []);
   await importUsers(token, realmSeed.users ?? []);
 
@@ -168,6 +174,147 @@ async function ensureClientProtocolMappers(token, clients) {
   }
 }
 
+async function ensureWebClientSettings(token, clients, configuredOrigin) {
+  if (!configuredOrigin) {
+    return;
+  }
+
+  const clientSeed = clients.find((client) => client.clientId === "chart-web");
+  if (!clientSeed) {
+    throw new Error("Keycloak realm seed does not define the 'chart-web' client.");
+  }
+
+  const publicOrigin = normalizePublicOrigin(configuredOrigin);
+  const client = await getClient(token, clientSeed.clientId);
+  const clientUrl = `${keycloakUrl}/admin/realms/${targetRealm}/clients/${client.id}`;
+  const existing = await fetchJson(clientUrl, {
+    headers: authHeaders(token),
+  });
+  const settings = buildWebClientSettings(publicOrigin);
+
+  await fetchOk(clientUrl, {
+    method: "PUT",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({
+      ...existing,
+      ...settings,
+      attributes: {
+        ...(existing.attributes ?? {}),
+        ...(settings.attributes ?? {}),
+      },
+    }),
+  });
+}
+
+function buildWebClientSettings(configuredOrigin) {
+  const publicOrigin = normalizePublicOrigin(configuredOrigin);
+  const origins = unique([
+    publicOrigin,
+    "http://localhost:3100",
+    "http://127.0.0.1:3100",
+  ]);
+
+  return {
+    redirectUris: origins.map((origin) => `${origin}/auth/callback`),
+    webOrigins: origins,
+    attributes: {
+      "post.logout.redirect.uris": origins
+        .flatMap((origin) => [origin, `${origin}/*`])
+        .join("##"),
+    },
+  };
+}
+
+async function ensureIdentityProvider(token, provider) {
+  if (!provider) {
+    return;
+  }
+
+  const collectionUrl = `${keycloakUrl}/admin/realms/${targetRealm}/identity-provider/instances`;
+  const providerUrl = `${collectionUrl}/${encodeURIComponent(provider.alias)}`;
+  const response = await fetch(providerUrl, {
+    headers: authHeaders(token),
+  });
+
+  if (response.status === 404) {
+    await fetchOk(collectionUrl, {
+      method: "POST",
+      headers: jsonHeaders(token),
+      body: JSON.stringify(provider),
+    });
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Could not read Keycloak identity provider '${provider.alias}': ${response.status}`,
+    );
+  }
+
+  const existing = await response.json();
+  await fetchOk(providerUrl, {
+    method: "PUT",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({
+      ...existing,
+      ...provider,
+      config: {
+        ...(existing.config ?? {}),
+        ...provider.config,
+      },
+    }),
+  });
+}
+
+function buildScopeGoogleIdentityProvider(env) {
+  const clientId = env.KEYCLOAK_GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = env.KEYCLOAK_GOOGLE_CLIENT_SECRET?.trim();
+
+  if (!clientId && !clientSecret) {
+    return null;
+  }
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "Configure KEYCLOAK_GOOGLE_CLIENT_ID and KEYCLOAK_GOOGLE_CLIENT_SECRET together.",
+    );
+  }
+
+  const hostedDomains = (env.KEYCLOAK_GOOGLE_HOSTED_DOMAIN ?? "scopeimpact.fi")
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase())
+    .filter(Boolean);
+  if (
+    hostedDomains.length === 0 ||
+    hostedDomains.some(
+      (domain) => !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/.test(domain),
+    )
+  ) {
+    throw new Error("KEYCLOAK_GOOGLE_HOSTED_DOMAIN must contain valid email domains.");
+  }
+
+  return {
+    alias: env.KEYCLOAK_GOOGLE_ALIAS?.trim() || "scope-google",
+    displayName: env.KEYCLOAK_GOOGLE_DISPLAY_NAME?.trim() || "Scope Impact Google",
+    providerId: "google",
+    enabled: true,
+    updateProfileFirstLoginMode: "missing",
+    trustEmail: true,
+    storeToken: false,
+    addReadTokenRoleOnCreate: false,
+    authenticateByDefault: false,
+    linkOnly: false,
+    firstBrokerLoginFlowAlias: "first broker login",
+    config: {
+      clientId,
+      clientSecret,
+      defaultScope: "openid profile email",
+      hostedDomain: hostedDomains.join(","),
+      syncMode: "IMPORT",
+      useJwksUrl: "true",
+    },
+  };
+}
+
 async function ensureGroups(token, groups, parentId) {
   for (const group of groups) {
     const existing = await findGroup(token, group.name, parentId);
@@ -265,7 +412,39 @@ function trimTrailingSlash(value) {
   return value.replace(/\/$/, "");
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+function normalizePublicOrigin(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("CHART_WEB_ORIGIN must be an absolute http or https origin.");
+  }
+  if (
+    !["http:", "https:"].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error("CHART_WEB_ORIGIN must be an absolute http or https origin.");
+  }
+  return url.origin;
+}
+
+function unique(values) {
+  return [...new Set(values)];
+}
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  buildScopeGoogleIdentityProvider,
+  buildWebClientSettings,
+  normalizePublicOrigin,
+};
