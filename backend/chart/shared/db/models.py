@@ -127,6 +127,8 @@ class AppUser(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
+    __table_args__ = (Index("users_status_idx", "status"),)
+
 
 class UserRoleRecord(Base):
     __tablename__ = "user_roles"
@@ -142,6 +144,8 @@ class UserRoleRecord(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    __table_args__ = (Index("user_roles_role_idx", "role"),)
 
 
 class UserGeographyScopeRecord(Base):
@@ -167,6 +171,7 @@ class UserGeographyScopeRecord(Base):
             "source",
             name="user_geography_scopes_user_geo_source_unique",
         ),
+        Index("user_geography_scopes_user_idx", "user_id"),
     )
 
 
@@ -193,6 +198,10 @@ class SetupStateRecord(Base):
         ForeignKey("users.id", ondelete="SET NULL")
     )
     first_admin_email: Mapped[str | None] = mapped_column(String(256))
+    primary_sector_id: Mapped[str | None] = mapped_column(String(64))
+    collaborating_sector_ids: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list
+    )
     selected_hazards: Mapped[list[dict]] = mapped_column(
         JSON, nullable=False, default=list
     )
@@ -288,6 +297,11 @@ class AdminUnit(Base):
 
     __table_args__ = (
         UniqueConstraint("geography_id", "code", name="uq_admin_unit_geography_code"),
+        Index(
+            "ix_admin_unit_boundary_gist",
+            "boundary",
+            postgresql_using="gist",
+        ),
     )
 
 

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import os
 import re
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
@@ -31,14 +30,25 @@ from .schemas import (
     BootstrapSetupInput,
     BootstrapSetupResponse,
     CompleteSetupInput,
-    HazardOption,
+    SectorOption,
     SetupCounts,
     SetupOptions,
     SetupStatus,
 )
 
 SETUP_ID = "default"
-REPO_ROOT = Path(__file__).resolve().parents[3]
+SETUP_SECTORS = (
+    SectorOption(id="health", label="Health"),
+    SectorOption(id="environment", label="Environment & climate change"),
+    SectorOption(id="animal-health", label="Animal health"),
+    SectorOption(id="agriculture", label="Agriculture"),
+    SectorOption(id="disaster", label="Disaster management"),
+    SectorOption(id="urban", label="Urban planning"),
+    SectorOption(id="water", label="Water and sanitation"),
+    SectorOption(id="energy", label="Energy"),
+    SectorOption(id="social", label="Social Services"),
+    SectorOption(id="other", label="Other"),
+)
 
 
 class SetupError(ValueError):
@@ -67,7 +77,8 @@ def get_status(*, session_factory=None) -> SetupStatus:
             countryName=state.country_name if state else None,
             rootGeographyId=state.root_geography_id if state else None,
             firstAdminUserId=state.first_admin_user_id if state else None,
-            selectedHazards=state.selected_hazards if state else [],
+            primarySectorId=state.primary_sector_id if state else None,
+            collaboratingSectorIds=(state.collaborating_sector_ids if state else []),
             counts=SetupCounts(
                 geographies=int(geography_count), workspaceMembers=int(member_count)
             ),
@@ -75,7 +86,7 @@ def get_status(*, session_factory=None) -> SetupStatus:
 
 
 def get_options() -> SetupOptions:
-    return SetupOptions(hazards=_hazards())
+    return SetupOptions(sectors=list(SETUP_SECTORS))
 
 
 def bootstrap(
@@ -149,7 +160,10 @@ def complete(
 ) -> SetupStatus:
     if "chart_admin" not in user.roles:
         raise SetupError("SETUP_FORBIDDEN", 403)
-    selected = _selected_hazards(input_data.hazardIds)
+    primary_sector_id, collaborating_sector_ids = _selected_sectors(
+        input_data.primarySectorId,
+        input_data.collaboratingSectorIds,
+    )
     country_code = input_data.countryCode.strip().upper()
     root_id = f"geo-{country_code.lower()}"
     root_path = f"/{_slug(input_data.countryName)}"
@@ -256,7 +270,9 @@ def complete(
         state.root_geography_id = root_id
         state.first_admin_user_id = user.user_id
         state.first_admin_email = user.email
-        state.selected_hazards = [item.model_dump() for item in selected]
+        state.primary_sector_id = primary_sector_id
+        state.collaborating_sector_ids = collaborating_sector_ids
+        state.selected_hazards = []
         session.commit()
     return get_status(session_factory=session_factory)
 
@@ -276,6 +292,8 @@ def reset(user: CurrentUserContext) -> SetupStatus:
         state.provisioning_token = None
         state.provisioning_request_hash = None
         state.provisioning_started_at = None
+        state.primary_sector_id = None
+        state.collaborating_sector_ids = []
         state.selected_hazards = []
         session.commit()
     return get_status()
@@ -397,28 +415,17 @@ def _upsert_place(session, place_id, country, level, label, name, parent, path, 
     place.sort_order = order
 
 
-def _hazards() -> list[HazardOption]:
-    path = REPO_ROOT / "api/src/services/chart-repository/seed-data/seed.json"
-    if not path.is_file():
-        return [HazardOption(id="hazard-extreme-heat", label="Extreme heat")]
-    seed = json.loads(path.read_text(encoding="utf-8"))
-    labels = sorted(
-        {
-            label
-            for item in seed.get("items", [])
-            for label in item.get("climateHazards", [])
-        }
-    )
-    return [HazardOption(id=f"hazard-{_slug(label)}", label=label) for label in labels]
-
-
-def _selected_hazards(ids: list[str]) -> list[HazardOption]:
-    options = {item.id: item for item in _hazards()}
-    if not ids:
-        raise SetupError("SETUP_HAZARD_REQUIRED", 400)
-    if any(item not in options for item in ids):
-        raise SetupError("SETUP_HAZARD_INVALID", 400)
-    return [options[item] for item in dict.fromkeys(ids)]
+def _selected_sectors(
+    primary_id: str, collaborating_ids: list[str]
+) -> tuple[str, list[str]]:
+    options = {item.id for item in SETUP_SECTORS}
+    if primary_id not in options:
+        code = "SETUP_SECTOR_REQUIRED" if not primary_id else "SETUP_SECTOR_INVALID"
+        raise SetupError(code, 400)
+    unique_collaborators = list(dict.fromkeys(collaborating_ids))
+    if any(item not in options for item in unique_collaborators):
+        raise SetupError("SETUP_SECTOR_INVALID", 400)
+    return primary_id, [item for item in unique_collaborators if item != primary_id]
 
 
 def _slug(value: str) -> str:
