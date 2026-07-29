@@ -33,8 +33,12 @@ on:
       - "web/**"
   workflow_dispatch:
     inputs:
+      public_origin:
+        description: "Preferred browser origin, such as https://chart.example.org."
+        required: false
+        type: string
       public_host:
-        description: "Optional public hostname for browser URLs, such as dev.example.org. Defaults to AWS_APP_PUBLIC_HOST or AWS_APP_HOST."
+        description: "Legacy hostname fallback. Used with http when public_origin is empty."
         required: false
         type: string
 
@@ -88,6 +92,9 @@ jobs:
 
       - name: Check deploy script syntax
         run: bash -n infra/aws/deploy-app.sh
+
+      - name: Test Keycloak SSO configuration
+        run: npm run identity:test
 
       - name: Check API migrations
         run: npm run db:check:api
@@ -159,11 +166,15 @@ jobs:
     environment: dev
     env:
       AWS_APP_HOST: ${{ secrets.AWS_APP_HOST }}
+      AWS_APP_PUBLIC_ORIGIN: ${{ secrets.AWS_APP_PUBLIC_ORIGIN }}
       AWS_APP_PUBLIC_HOST: ${{ secrets.AWS_APP_PUBLIC_HOST }}
       AWS_APP_SSH_KEY: ${{ secrets.AWS_APP_SSH_KEY }}
       AWS_APP_USER: ${{ secrets.AWS_APP_USER }}
       CDSAPI_KEY: ${{ secrets.CDSAPI_KEY }}
       CDSAPI_URL: ${{ secrets.CDSAPI_URL }}
+      KEYCLOAK_GOOGLE_CLIENT_ID: ${{ secrets.KEYCLOAK_GOOGLE_CLIENT_ID }}
+      KEYCLOAK_GOOGLE_CLIENT_SECRET: ${{ secrets.KEYCLOAK_GOOGLE_CLIENT_SECRET }}
+      KEYCLOAK_GOOGLE_HOSTED_DOMAIN: ${{ secrets.KEYCLOAK_GOOGLE_HOSTED_DOMAIN }}
       LBW_MODEL_DIVISION_S3_URI: ${{ secrets.LBW_MODEL_DIVISION_S3_URI }}
       LBW_MODEL_STATE_S3_URI: ${{ secrets.LBW_MODEL_STATE_S3_URI }}
     steps:
@@ -176,6 +187,16 @@ jobs:
               missing=1
             fi
           done
+          if [ -n "$KEYCLOAK_GOOGLE_CLIENT_ID" ] || [ -n "$KEYCLOAK_GOOGLE_CLIENT_SECRET" ]; then
+            if [ -z "$KEYCLOAK_GOOGLE_CLIENT_ID" ] || [ -z "$KEYCLOAK_GOOGLE_CLIENT_SECRET" ]; then
+              echo "::error title=Incomplete Google SSO configuration::Set both KEYCLOAK_GOOGLE_CLIENT_ID and KEYCLOAK_GOOGLE_CLIENT_SECRET"
+              missing=1
+            fi
+            if [ -z "${{ inputs.public_origin || env.AWS_APP_PUBLIC_ORIGIN }}" ]; then
+              echo "::error title=Missing public origin::Google SSO requires AWS_APP_PUBLIC_ORIGIN, for example https://chart.example.org"
+              missing=1
+            fi
+          fi
           exit "$missing"
 
       - name: Deploy app on EC2
@@ -185,7 +206,7 @@ jobs:
           username: ${{ env.AWS_APP_USER }}
           key: ${{ env.AWS_APP_SSH_KEY }}
           command_timeout: 30m
-          envs: CDSAPI_KEY,CDSAPI_URL,LBW_MODEL_DIVISION_S3_URI,LBW_MODEL_STATE_S3_URI
+          envs: CDSAPI_KEY,CDSAPI_URL,KEYCLOAK_GOOGLE_CLIENT_ID,KEYCLOAK_GOOGLE_CLIENT_SECRET,KEYCLOAK_GOOGLE_HOSTED_DOMAIN,LBW_MODEL_DIVISION_S3_URI,LBW_MODEL_STATE_S3_URI
           script: |
             set -euo pipefail
 
@@ -204,13 +225,17 @@ jobs:
               git clone --branch "$BRANCH" https://github.com/CHART-Scope/CHART.git "$APP_DIR"
             fi
 
+            PUBLIC_ORIGIN="${{ inputs.public_origin || env.AWS_APP_PUBLIC_ORIGIN }}"
             PUBLIC_HOST="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
-            PUBLIC_HOST="$PUBLIC_HOST" bash "$APP_DIR/infra/aws/deploy-app.sh"
+            PUBLIC_ORIGIN="$PUBLIC_ORIGIN" PUBLIC_HOST="$PUBLIC_HOST" bash "$APP_DIR/infra/aws/deploy-app.sh"
 
       - name: Verify public app remains reachable
         run: |
-          public_host="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
-          base_url="http://${public_host}"
+          base_url="${{ inputs.public_origin || env.AWS_APP_PUBLIC_ORIGIN }}"
+          if [ -z "$base_url" ]; then
+            public_host="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
+            base_url="http://${public_host}"
+          fi
 
           for attempt in $(seq 1 12); do
             web_status="$(curl -fsS -o /dev/null -w "%{http_code}" "$base_url/" || true)"

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { completeKeycloakSignIn } from "@/lib/authClient";
+import { completeKeycloakSignIn, signedInHomePath } from "@/lib/authClient";
 import styles from "./AuthState.module.css";
 
 export function AuthCallbackPage() {
@@ -15,7 +15,7 @@ export function AuthCallbackPage() {
     if (started.current) return;
     started.current = true;
     completeKeycloakSignIn(window.location.search)
-      .then(() => router.replace("/plan"))
+      .then((session) => router.replace(signedInHomePath(session.user)))
       .catch(() => setError("The sign-in response could not be completed."));
   }, [router]);
 

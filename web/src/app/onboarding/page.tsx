@@ -2,9 +2,14 @@
 
 import { useRouter } from "next/navigation";
 
-import { OnboardingFlow } from "@/features/onboarding";
+import { RequireAuth } from "@/features/auth/RequireAuth";
+import { OnboardingWizard } from "@/features/onboarding";
 
 export default function OnboardingPage() {
   const router = useRouter();
-  return <OnboardingFlow onLaunch={() => router.push("/plan")} />;
+  return (
+    <RequireAuth>
+      {() => <OnboardingWizard onLaunch={() => router.push("/plan")} />}
+    </RequireAuth>
+  );
 }

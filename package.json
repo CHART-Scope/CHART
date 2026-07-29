@@ -23,6 +23,7 @@
     "db:check:api": "npm --workspace @chart/api run db:check",
     "db:seed:api": "npm --workspace @chart/api run db:seed",
     "identity:sync": "node infra/keycloak/sync-realm.js",
+    "identity:test": "node --test infra/keycloak/sync-realm.test.js",
     "openapi:generate:api": "npm --workspace @chart/api run openapi:generate",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
