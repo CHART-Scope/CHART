@@ -39,5 +39,12 @@ services:
       - ./keycloak/chart-realm.json:/opt/keycloak/data/import/chart-realm.json:ro
       - ./keycloak/themes/chart:/opt/keycloak/themes/chart:ro
 
+  chart-mailpit:
+    image: axllent/mailpit:v1.30.0
+    container_name: chart-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
 volumes:
   chart-postgres-data:
