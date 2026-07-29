@@ -26,6 +26,47 @@ make climate-openapi    # writes docs/openapi/climate.json
 
 Human-readable reference: [docs/climate-api.md](../docs/climate-api.md).
 
+## Email gateway
+
+The backend has a provider-neutral SMTP gateway under `chart.email`. Email is
+disabled by default, and delivery failures can be handled as best-effort so they
+do not break the main application workflow:
+
+```python
+from chart.email import OutboundEmail, build_email_service
+
+email_service = build_email_service()
+result = email_service.send_best_effort(
+    OutboundEmail(
+        to=("planner@example.org",),
+        subject="Your CHART workspace is ready",
+        text_body="Open CHART to continue.",
+    )
+)
+```
+
+`send_best_effort` returns `sent`, `failed`, or `skipped`. It logs classified
+transport failures without logging the recipient or message body. Use `send`
+instead when the caller must handle a delivery failure.
+
+Copy or source the values in `backend/.env.example` for local development, then
+set `EMAIL_MODE=smtp`. The local stack includes
+[Mailpit](https://mailpit.axllent.org/): run `make mail`, send through
+`127.0.0.1:1025`, and inspect captured messages at
+<http://127.0.0.1:8025>.
+
+Production SMTP profiles use the same configuration:
+
+| Platform                     | SMTP host                                           | Port              | TLS      |
+| ---------------------------- | --------------------------------------------------- | ----------------- | -------- |
+| AWS SES                      | Region-specific SES SMTP endpoint                   | 587               | STARTTLS |
+| Azure Communication Services | `smtp.azurecomm.net`                                | 587               | STARTTLS |
+| Google Cloud                 | SMTP provider such as SendGrid, Mailgun, or Mailjet | Provider-specific | STARTTLS |
+
+Set SMTP credentials through deployment secrets. AWS SES SMTP credentials are
+not the same as AWS access keys. Azure SMTP credentials use an SMTP username
+linked to a Microsoft Entra application.
+
 ## `district_climate` row shape
 
 ERA5 CSV output is **wide** (one column per metric). Postgres stores **long** facts — one row per
