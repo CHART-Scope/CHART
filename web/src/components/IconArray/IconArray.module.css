@@ -1,45 +1,22 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
-  gap: 3px;
-  padding: 12px;
-  background: var(--color-grey-light);
-  border-radius: var(--radius-lg);
-  max-width: 220px;
-  margin: 0 auto;
-}
-/*
-  Icon variant: no background chip, tighter gap so 100 figures still fit.
-  The figures themselves carry the color signal.
-*/
-.gridTight {
   gap: 1px;
   padding: 6px;
-  background: transparent;
+  border-radius: var(--radius-lg);
   max-width: 260px;
+  margin: 0 auto;
 }
 
 .cell {
   aspect-ratio: 1 / 1;
-  border-radius: 3px;
-  background: var(--color-grey-mid);
-  transition: background 0.15s ease;
-}
-.cellOn {
-  background: var(--color-maroon);
-}
-
-/* Icon-mode cell: transparent background, currentColor drives the icon fill. */
-.cellIcon {
-  background: transparent;
-  border-radius: 0;
   color: var(--color-grey-mid);
   width: 100%;
   height: 100%;
   display: block;
+  transition: color 0.15s ease;
 }
-.cellIcon.cellOn {
-  background: transparent;
+.cellOn {
   color: var(--color-maroon);
 }
 
