@@ -491,7 +491,7 @@ docker rm -f \
   "$LBW_CONTAINER" \
   "$KEYCLOAK_CONTAINER" \
   "$DB_CONTAINER" >/dev/null 2>&1 || true
-docker rm -f chart-new-design >/dev/null 2>&1 || true
+docker rm -f chart-new-design chart-climate-api >/dev/null 2>&1 || true
 
 docker run -d \
   --name "$DB_CONTAINER" \
