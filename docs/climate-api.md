@@ -1,20 +1,26 @@
 # CHART Climate API
 
-Python service for climate preview and LBW prediction. Default base URL: `http://127.0.0.1:3210`.
+Python service for climate preview and LBW prediction. Its default local base
+URL is `http://127.0.0.1:3210`.
 
 ## Interactive documentation
-
-| URL                                                 | Purpose                                  |
-| --------------------------------------------------- | ---------------------------------------- |
-| [/docs](http://127.0.0.1:3210/docs)                 | Swagger UI — try requests in the browser |
-| [/redoc](http://127.0.0.1:3210/redoc)               | ReDoc — readable reference               |
-| [/openapi.json](http://127.0.0.1:3210/openapi.json) | Machine-readable OpenAPI 3 spec          |
 
 Start the service:
 
 ```bash
 make climate-api
 ```
+
+These local addresses become available after the service starts:
+
+| Local address | Purpose |
+|---|---|
+| `http://127.0.0.1:3210/docs` | Swagger UI — try requests in the browser |
+| `http://127.0.0.1:3210/redoc` | ReDoc — readable reference |
+| `http://127.0.0.1:3210/openapi.json` | Machine-readable OpenAPI 3 specification |
+
+For a reference that works without starting CHART, use the published
+[API explorer](api-reference.md).
 
 Export a checked-in copy of the spec (for sharing / CI):
 

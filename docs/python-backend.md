@@ -11,11 +11,13 @@ backend/
   chart/
     shared/db/          # SQLAlchemy models + Alembic migrations
     climate/            # Catalog, preview, predict service logic
-    api/                # FastAPI app (climate routes today; app modules next)
+    auth/               # Keycloak identity and access checks
+    geographies/        # Geography-scoped application routes
+    api/                # FastAPI application and OpenAPI export
   alembic/
   tests/
 orchestration/
-  chart_pipeline/       # Dagster assets — imports chart.*, not FastAPI
+  src/chart_pipeline/   # Dagster assets — imports chart.*, not FastAPI
 ```
 
 ## Runtime faces
@@ -23,7 +25,7 @@ orchestration/
 | Face | Entry | Port (local) |
 |---|---|---|
 | Climate predict API | `make climate-api` | 3210 |
-| Dagster | `make dev` | 3000 |
+| Dagster | `make dev` | 3002 |
 | LBW inference (R) | `pipelines/LBW_demo/inference` | 8000 |
 
 Climate predict reads `district_climate` from Postgres when `DATABASE_URL` is set,
@@ -49,8 +51,8 @@ Python services export machine-readable contracts:
 make climate-openapi    # docs/openapi/climate.json
 ```
 
-Human-readable notes: [Climate API](climate-api.md). Interactive embed:
-[OpenAPI reference](api-reference.md).
+Human-readable notes: [Climate API](climate-api.md). Interactive contracts:
+[API explorer](api-reference.md).
 
 ## Migration from Fastify
 

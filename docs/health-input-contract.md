@@ -1,6 +1,6 @@
 # NFHS/DHS health input contract
 
-Parent issue: https://github.com/CHART-Scope/CHART/issues/127
+Parent issue: [Prepare NFHS/DHS health input contract for modeling](https://github.com/CHART-Scope/CHART/issues/127)
 
 This document captures the first health-data handoff contract for CHART
 modeling. It is intentionally a contract, not an ingestion implementation.
@@ -63,9 +63,9 @@ Out of scope for this branch:
 
 Useful source links:
 
-- Kenya DHS 2022 dataset page: https://dhsprogram.com/data/dataset/Kenya_Standard-DHS_2022.cfm?flag=0
-- India DHS/NFHS-5 dataset page: https://dhsprogram.com/data/dataset/India_Standard-DHS_2020.cfm?flag=0
-- DHS data access portal: https://dhsprogram.com/data/
+- [Kenya DHS 2022 dataset page](https://dhsprogram.com/data/dataset/Kenya_Standard-DHS_2022.cfm?flag=0)
+- [India DHS/NFHS-5 dataset page](https://dhsprogram.com/data/dataset/India_Standard-DHS_2020.cfm?flag=0)
+- [DHS data access portal](https://dhsprogram.com/data/)
 
 ## Data handling rules
 

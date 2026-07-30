@@ -57,10 +57,11 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Getting started: getting-started.md
   - Python backend:
       - Overview: python-backend.md
       - Climate API: climate-api.md
-      - OpenAPI reference: api-reference.md
+      - API explorer: api-reference.md
   - Data pipeline: data-pipeline.md
   - Health data:
       - NFHS/DHS input contract: health-input-contract.md

@@ -1,21 +1,26 @@
-# OpenAPI reference
+# API explorer
 
-Specs on this page are generated from the running services — not hand-written prose.
-Regenerate before publishing:
+This page embeds snapshots of CHART's OpenAPI contracts. OpenAPI is a
+machine-readable description of an API: its paths, request fields, responses,
+and authentication rules.
 
-```bash
-make climate-openapi
-make docs-prepare
-```
+You do not need to open the underlying `.json` or `.yaml` files to use this
+page. Expand an endpoint below to read its parameters and response schema.
+
+!!! note "Reference, not a running API"
+    The embedded explorers describe the APIs but do not turn this documentation
+    site into an API server. To send test requests, start CHART locally and use
+    the local Swagger address shown for that service.
 
 ## Climate API (Python) — primary
 
-FastAPI service for climate preview and LBW prediction. This is the direction of travel
-for engine-facing HTTP endpoints.
+The FastAPI service owns climate preview and prediction endpoints, plus Python
+auth and geography routes as they migrate.
 
 **Local base URL:** `http://127.0.0.1:3210`
 
-**Live Swagger:** [http://127.0.0.1:3210/docs](http://127.0.0.1:3210/docs)
+After running `make climate-api`, use the local Swagger UI at
+`http://127.0.0.1:3210/docs`.
 
 <swagger-ui src="openapi/climate.json"/>
 
@@ -23,13 +28,23 @@ Parameter semantics and availability statuses are explained in [Climate API](cli
 
 ## CHART app API (Fastify) — legacy
 
-The interim TypeScript API still powers much of the web app. It will shrink as modules
-move to Python. Spec is copied from `api/openapi.yaml` at docs build time.
+The interim TypeScript API still powers parts of the web application. Its
+published contract is generated during the documentation build.
 
 **Local base URL:** `http://127.0.0.1:3200`
 
-**Live Swagger:** [http://127.0.0.1:3200/api](http://127.0.0.1:3200/api)
+After running `make run`, use its local Swagger UI at
+`http://127.0.0.1:3200/api`.
 
 <swagger-ui src="openapi/fastify.yaml"/>
 
 See [Legacy Fastify API](legacy-fastify-api.md) for scope and retirement plan.
+
+??? info "Regenerate the contracts"
+    Contributors can refresh the checked-in Python contract and prepare both
+    specifications with:
+
+    ```bash
+    make climate-openapi
+    make docs-prepare
+    ```

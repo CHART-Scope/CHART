@@ -1,6 +1,6 @@
 # NFHS/DHS health survey exploration guide
 
-Parent issue: https://github.com/CHART-Scope/CHART/issues/127
+Parent issue: [Prepare NFHS/DHS health input contract for modeling](https://github.com/CHART-Scope/CHART/issues/127)
 
 This guide is the first safe exploration step for the health-data side of the
 CHART modeling workflow. It is designed for restricted DHS/NFHS microdata:

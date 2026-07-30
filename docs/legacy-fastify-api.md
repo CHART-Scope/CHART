@@ -16,16 +16,22 @@
 
 ## Local access
 
+For the complete local environment, follow [Getting started](getting-started.md)
+and run `make run`.
+
+To start only the TypeScript API after its database and identity services are
+ready:
+
 ```bash
 make api
 ```
 
-- Web app: [http://127.0.0.1:3100](http://127.0.0.1:3100)
-- Swagger UI: [http://127.0.0.1:3200/api](http://127.0.0.1:3200/api)
+- Web app: `http://127.0.0.1:3100`
+- Swagger UI: `http://127.0.0.1:3200/api`
 - OpenAPI file: `api/openapi.yaml` (generate with `make api-openapi-generate`)
 
 ## Docs
 
-Embedded spec (when built): [OpenAPI reference](api-reference.md#chart-app-api-fastify-legacy).
+Published contract: [API explorer](api-reference.md#chart-app-api-fastify-legacy).
 
 Current migration guidance is summarized in [Python backend](python-backend.md).

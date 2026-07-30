@@ -8,7 +8,7 @@ and optional Postgres loads.
 ```bash
 make migrate
 PRESET=madhya-pradesh make climate-materialize
-make dev                  # Dagster UI — http://127.0.0.1:3000
+make dev                  # Dagster UI — http://127.0.0.1:3002
 ```
 
 `PRESET` selects a geography partition (`madhya-pradesh`, `kajiado`, …). Materialisation
@@ -27,7 +27,7 @@ Dagster definitions live in `orchestration/src/chart_pipeline/`:
 
 - `definitions.py` — climate asset, monthly schedule, and on-demand prediction sensor/job
 
-Full operator notes: [orchestration/README.md](https://github.com/CHART-Scope/CHART/blob/main/orchestration/README.md)
+Full operator notes: [orchestration/README.md](https://github.com/CHART-Scope/CHART/blob/dev/orchestration/README.md)
 in the repository.
 
 ## Handoff to the Python API
