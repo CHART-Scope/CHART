@@ -4,11 +4,15 @@ import os
 from logging.config import fileConfig
 
 from alembic import context
-from geoalchemy2.alembic_helpers import include_object
+from geoalchemy2.alembic_helpers import include_object as geoalchemy_include_object
 from sqlalchemy import engine_from_config, pool
 
 from chart.shared.db.base import Base
 from chart.shared.db import models  # noqa: F401
+from chart.shared.db.migration_filter import (
+    extension_aware_include_object,
+    extension_owned_tables,
+)
 
 config = context.config
 if config.config_file_name is not None:
@@ -27,7 +31,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        include_object=include_object,
+        include_object=geoalchemy_include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -42,6 +46,9 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
+        include_object = extension_aware_include_object(
+            extension_owned_tables(connection)
+        )
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
