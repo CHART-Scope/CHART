@@ -13,14 +13,14 @@ issue,normalized_field,record_family,source_column_candidates,type,required_for,
 #148,urban_rural,child_or_birth,"v025",category,covariate,no,"Residence category.",draft_needs_r_confirmation
 #148,latitude_displaced,gps,"LATNUM",float,climate_join,conditional,"Restricted GPS cluster latitude; displaced for privacy and not official facility coordinates.",draft_needs_access_confirmation
 #148,longitude_displaced,gps,"LONGNUM",float,climate_join,conditional,"Restricted GPS cluster longitude; displaced for privacy and not official facility coordinates.",draft_needs_access_confirmation
-#148,climate_join_key,derived,"cluster_id; admin1_code; admin2_code",string,climate_join,yes,"Decide cluster-level vs admin-level join with MaQueens/Satish before implementation.",blocked_pending_model_decision
+#148,climate_join_key,derived,"cluster_id; admin1_code; admin2_code",string,climate_join,yes,"Decide cluster-level vs admin-level join with the model owners before implementation.",blocked_pending_model_decision
 #148,birth_month,child_or_birth,"b1",integer,outcome_timing,yes,"Month of child's birth.",draft_needs_r_confirmation
 #148,birth_year,child_or_birth,"b2",integer,outcome_timing,yes,"Year of child's birth.",draft_needs_r_confirmation
 #148,birth_cmc,child_or_birth,"b3",integer,outcome_timing,yes,"Century month code for birth date; likely easiest for pregnancy/exposure windows.",draft_needs_r_confirmation
-#148,child_sex,child_or_birth,"b4",category,covariate,no,"Used in MaQueens models if confirmed.",draft_needs_r_confirmation
+#148,child_sex,child_or_birth,"b4",category,covariate,no,"Used in the approved models if confirmed.",draft_needs_r_confirmation
 #148,child_alive,child_or_birth,"b5",boolean,mortality_extension,conditional,"Required only if infant/neonatal mortality stays in scope.",blocked_pending_outcome_decision
 #148,age_at_death_raw,child_or_birth,"b6; b7",mixed,mortality_extension,conditional,"Only for mortality outcome. DHS age-at-death encoding must be confirmed from R workflow/recode docs.",blocked_pending_outcome_decision
-#148,birth_weight_g,child_or_birth,"m19; m19_1; country-specific birthweight variable",integer,low_birth_weight,yes,"Measured/reported birth weight in grams. Exact source variable must be confirmed from MaQueens workflow.",draft_needs_r_confirmation
+#148,birth_weight_g,child_or_birth,"m19; m19_1; country-specific birthweight variable",integer,low_birth_weight,yes,"Measured/reported birth weight in grams. Exact source variable must be confirmed from the approved workflow.",draft_needs_r_confirmation
 #148,low_birth_weight,derived,"birth_weight_g",boolean,low_birth_weight,yes,"Derive as birth_weight_g < 2500 after excluding missing/not-weighed/special codes.",draft_needs_filter_confirmation
 #148,birth_weight_status,derived,"m19 special codes; source labels",category,quality_flags,yes,"Flag valid, missing, not weighed, don't know, implausible, or excluded records.",draft_needs_filter_confirmation
 #148,mother_age,individual_or_child,"v012; v013",integer,covariate,no,"Mother's age or age band. Confirm exact model covariates.",draft_needs_r_confirmation
@@ -32,7 +32,7 @@ issue,normalized_field,record_family,source_column_candidates,type,required_for,
 #148,interview_cmc,child_or_birth,"v008",integer,recency_filters,no,"May be used for age/filter checks.",draft_needs_r_confirmation
 #148,exposure_start_cmc,derived,"birth_cmc",integer,climate_join,conditional,"Derived pregnancy exposure window start if low birth weight model uses trimester/month lags.",blocked_pending_model_decision
 #148,exposure_end_cmc,derived,"birth_cmc",integer,climate_join,conditional,"Derived pregnancy exposure window end if low birth weight model uses trimester/month lags.",blocked_pending_model_decision
-#148,exposure_months,derived,"birth_cmc",array,climate_join,conditional,"List of month keys to join against climate metrics. Exact lag structure depends on MaQueens workflow.",blocked_pending_model_decision
+#148,exposure_months,derived,"birth_cmc",array,climate_join,conditional,"List of month keys to join against climate metrics. Exact lag structure depends on the approved workflow.",blocked_pending_model_decision
 #148,denominator_population,aggregate,"birth count; eligible births",integer,aggregate_outputs,conditional,"Only needed for monthly/admin aggregate outputs; individual-level extraction may not include this row field.",draft_needs_output_shape_confirmation
 #148,data_status,derived,"access status; extraction flags",category,quality_flags,yes,"Example values: extracted, blocked_missing_source, blocked_unconfirmed_column, excluded_by_filter.",draft
 #148,quality_flags,derived,"missingness; special codes; join checks",array,quality_flags,yes,"Must make missing/invalid fields visible rather than silently dropping them.",draft

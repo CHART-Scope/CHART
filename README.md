@@ -2,6 +2,14 @@
 
 CHART is a climate-health planning platform.
 
+Documentation: [https://chart-scope.github.io/CHART/docs/](https://chart-scope.github.io/CHART/docs/)
+
+CHART is developed as open-source infrastructure for public-interest climate
+and health planning. Its project-authored software and documentation are
+licensed under the GNU Affero General Public License v3.0. The project is
+designed to support digital-public-good principles; this is a statement of
+intent, not a claim of certification by the Digital Public Goods Alliance.
+
 ## What runs
 
 - `web`: the canonical Next planning interface and design system.
@@ -48,3 +56,11 @@ make verify
 
 Adding a place or model: [docs/add-geography-and-model.md](docs/add-geography-and-model.md).
 The current design and remaining work are in [docs/tdd.md](docs/tdd.md).
+
+## Licence
+
+CHART is licensed under the
+[GNU Affero General Public License v3.0](LICENSE). See the
+[digital public good and licensing guide](docs/licensing.md) for the project
+intent, source-availability expectations, and third-party data and model
+boundaries.
