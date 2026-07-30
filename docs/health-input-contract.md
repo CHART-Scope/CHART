@@ -1,133 +1,100 @@
 # NFHS/DHS health input contract
 
-Parent issue: [Prepare NFHS/DHS health input contract for modeling](https://github.com/CHART-Scope/CHART/issues/127)
-
-This document captures the first health-data handoff contract for CHART
-modeling. It is intentionally a contract, not an ingestion implementation.
-Restricted survey microdata must not be committed to the repository.
+This document defines the boundary between restricted survey exploration,
+health-model preparation, and CHART runtime inference. It is a schema and
+governance contract, not an ingestion implementation.
 
 Related artifacts:
 
-- exploration guide: `docs/health-survey-exploration-guide.md`;
-- draft extraction map: `docs/health-survey-column-map.csv`.
+- [Health survey exploration guide](health-survey-exploration-guide.md)
+- `docs/health-survey-column-map.csv`
+- [Climate API](climate-api.md)
 
-## Sprint scope
+## Scope
 
-The next MVP step is to prepare the health input side of the
-climate-health modeling workflow:
+The first health-model path:
 
-- document NFHS-5 India and Kenya DHS access, rights, and storage constraints;
-- confirm the first health outcome and exact source columns with the model
-  owners;
-- draft a column map that can later drive automated extraction from large
-  DHS/NFHS files;
-- keep unresolved access/modeling blockers explicit.
+- uses approved NFHS-5 India or Kenya DHS source files outside Git;
+- derives a documented low-birth-weight modeling dataset;
+- joins health timing and geography to climate exposure;
+- packages a reviewed, versioned model artefact;
+- exposes inference through the internal LBW service and CHART Climate API.
 
-Out of scope for this branch:
+Raw respondent records, survey downloads, and private model artefacts are not
+part of the application repository.
 
-- committing raw DHS/NFHS files;
-- fitting the health model;
-- joining health rows to ERA5 rows;
-- API/UI integration.
+## Data and model handoff
 
-## Recommended issue order
+```mermaid
+flowchart TB
+    subgraph restricted["Restricted preparation environment"]
+        survey["DHS/NFHS microdata"]
+        mapping["Checked-in column map"]
+        extraction["Extraction and quality rules"]
+        modelrows["Model-ready health rows"]
+        training["Training and validation"]
+        survey --> extraction
+        mapping --> extraction
+        extraction --> modelrows --> training
+    end
 
-1. **Access and storage constraints**: #146 is the richer version of #133.
-   Use #146 as the working issue and close #133 as duplicate once #146 is
-   documented.
-2. **Model indicator/R-code dependency**: #147 is the richer version of #134.
-   Use #147 as the working issue and close #134 as duplicate once the column
-   usage is confirmed or explicitly blocked.
-3. **Column extraction map**: #148 is the richer version of #135. Use #148
-   as the working issue and close #135 as duplicate once the draft map is
-   accepted.
-4. **Parent contract**: close #127 only after access constraints, selected
-   indicators, and the extraction map are all documented.
+    registry["Private model artefact storage"]
+    inference["LBW Plumber service"]
+    climate["CHART climate API"]
 
-## Current issue status
+    training -->|"versioned .rds bundle"| registry
+    registry --> inference
+    climate -->|"three monthly tmax values"| inference
+    inference -->|"conditional odds ratio"| climate
+```
 
-| Issue | Status | Notes |
+## Source assumptions
+
+| Source | Intended use | Access and storage rule |
 | --- | --- | --- |
-| #146 | Draft documented | Access links and storage rules are captured here; actual approved dataset access still needs confirmation. |
-| #147 | Blocked on R workflow | Low birth weight is the working assumption; exact columns, filters, and lag windows need the approved R code or column list. |
-| #148 | Draft map created | See `docs/health-survey-column-map.csv`; exact fields remain marked as draft until confirmed. |
-| #127 | In progress | Parent should remain open until #146, #147, and #148 are reviewed. |
+| NFHS-5 / India DHS 2019–21 | India birth outcomes and maternal covariates | Requires approved access; raw files stay outside Git |
+| Kenya DHS 2022 | Kenya birth outcomes and maternal covariates | Requires approved access; raw files stay outside Git |
+| DHS/NFHS GPS cluster files | Climate exposure join | Restricted and privacy-displaced; document the join limitation |
+| Recode dictionaries | Field definitions and missing-value codes | Safe to cite; do not reproduce licensed source data |
 
-## Current data-source assumptions
-
-| Source | Intended use | Current sprint status | Access/storage note |
-| --- | --- | --- | --- |
-| NFHS-5 / India DHS 2019-21 | India birth outcome records and maternal covariates | Use as India source unless the model owners confirm a different extract | Requires approved access/download. Do not commit raw files. |
-| Kenya DHS 2022 | Kenya birth outcome records and maternal covariates | Use as Kenya source unless the model owners confirm a different extract | Requires approved access/download. Do not commit raw files. |
-| NFHS-6 | Future India update | Not in Sprint 4 contract until public microdata/access status is confirmed | Treat as unavailable for implementation unless access is confirmed. |
-| DHS/NFHS GPS cluster files | Climate exposure join | Needed if modeling uses cluster-level climate exposure | Coordinates are privacy-displaced; document this caveat in analysis outputs. |
+NFHS-6 is outside the current implementation contract until its access and
+microdata status are confirmed.
 
 Useful source links:
 
-- [Kenya DHS 2022 dataset page](https://dhsprogram.com/data/dataset/Kenya_Standard-DHS_2022.cfm?flag=0)
-- [India DHS/NFHS-5 dataset page](https://dhsprogram.com/data/dataset/India_Standard-DHS_2020.cfm?flag=0)
+- [Kenya DHS 2022 dataset](https://dhsprogram.com/data/dataset/Kenya_Standard-DHS_2022.cfm?flag=0)
+- [India DHS/NFHS-5 dataset](https://dhsprogram.com/data/dataset/India_Standard-DHS_2020.cfm?flag=0)
 - [DHS data access portal](https://dhsprogram.com/data/)
 
 ## Data handling rules
 
-- Store restricted raw data outside Git, or under an ignored local path such as
-  `data/restricted/health-surveys/`.
-- Never commit raw `.DTA`, `.SAV`, `.DAT`, `.ZIP`, GPS, or respondent-level
-  extracts.
-- Commit only schemas, column maps, non-sensitive derived aggregate examples,
-  and reproducible code.
-- Keep survey access status and blockers visible in GitHub issues before
-  implementation proceeds.
-- Any CHART fixture should be fake/minimal or aggregated enough to avoid
-  exposing respondent-level records.
+- Store restricted source data under approved external storage or an ignored
+  local path such as `data/restricted/health-surveys/`.
+- Never commit raw survey, GPS, or respondent-level extracts.
+- Commit only schemas, column maps, code, synthetic fixtures, and safe
+  aggregate summaries.
+- Record dataset version, extraction version, model version, and quality checks
+  for every model release.
+- Keep model artefacts in private artefact storage and load them by explicit
+  version.
 
-## First outcome assumption
+## First outcome
 
-Primary working assumption: **low birth weight** is the first outcome to map
-because it matches the current health-modeling workflow.
-
-Draft definition:
+The implemented outcome is **low birth weight**, represented as:
 
 - outcome: `low_birth_weight`;
-- source measure: measured birth weight in grams;
-- threshold: `< 2500g`;
-- source record family: likely DHS/NFHS birth or child record;
-- climate exposure window: likely pregnancy window based on child birth date,
-  with trimester logic confirmed by the approved R workflow.
+- source measure: measured or reported birth weight in grams;
+- threshold: `< 2500g` after applying the agreed validity filters;
+- record family: DHS/NFHS birth or child record;
+- exposure input: three monthly maximum-temperature means selected by
+  trimester and area.
 
-Candidate extension: neonatal/infant mortality. This depends on confirmation of
-the exact birth/death record fields used by the approved R workflow and should
-not be treated as implemented until the R column usage is shared.
+Neonatal or infant mortality is a possible later extension, not part of the
+current runtime contract.
 
-## Draft source file families
+## Model-preparation schema
 
-| File family | Use | Current status |
-| --- | --- | --- |
-| Birth record / child record | Child birth date, birth weight, sex, survival/death fields | Required for selected outcome; exact recode file to be confirmed |
-| Individual/women record | Maternal age, education, wealth, residence, survey weights/design | Required for covariates; exact joins to be confirmed |
-| GPS cluster file | Cluster latitude/longitude or admin join to climate exposure | Required for cluster-level climate joins; privacy displacement caveat |
-| Household/person record | Denominators or household covariates | Not first-scope unless the model owners confirm use |
-
-## Open questions for the model owners
-
-1. Is the first Sprint 4 health outcome definitely low birth weight, or should
-   the contract also prepare infant/neonatal mortality now?
-2. Which files did the current R workflow read: BR, KR, IR, GE, or others?
-3. What exact source columns are used for birth weight, birth date, death age,
-   sample weights, region/admin geography, and GPS join?
-4. How are invalid, missing, not-weighed, or recalled birth-weight values
-   filtered?
-5. Is the climate join expected at GPS cluster, admin district/county, or
-   survey region level?
-6. Does the model use survey weights/design variables directly, and if so
-   which ones?
-7. What is the expected output shape from health extraction: individual birth
-   rows, monthly admin aggregates, or model-ready design matrix?
-
-## Handoff shape target
-
-The first implementation should produce a schema contract that can later become
-a pipeline output:
+The extraction should produce a stable schema before model fitting:
 
 ```txt
 country
@@ -151,5 +118,29 @@ source_file_family
 quality_flags
 ```
 
-This is the health-data equivalent of the ERA5 handoff: stable enough for
-future extraction/API/UI work, but honest about access blockers.
+The checked-in column map records the exact source variable for each field and
+whether that mapping is confirmed, conditional, or blocked.
+
+## Decisions required before a new model release
+
+The model owner and data steward must confirm:
+
+1. the outcome and eligible survey population;
+2. exact BR, KR, IR, GE, or other input files;
+3. source columns and special-value filters;
+4. sample-weight, PSU, and strata handling;
+5. GPS-cluster, administrative-area, or survey-region climate join;
+6. pregnancy and trimester exposure windows;
+7. validation metrics and release acceptance criteria;
+8. runtime model identifier and artefact checksum.
+
+These are contract decisions. Public documentation should describe the role
+and evidence required, not depend on named individuals.
+
+## Runtime API contract
+
+The deployed inference path receives model inputs derived from `district_climate`;
+it never receives respondent-level survey rows. The public CHART request
+contains `location_slug`, `timeframe_id`, and an LBW outcome configuration.
+The Python API validates the request, Dagster prepares missing climate data,
+and the internal R service scores the versioned model bundle.

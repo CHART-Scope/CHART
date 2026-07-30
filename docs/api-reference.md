@@ -26,6 +26,21 @@ workspace, user, hazard, and solution endpoints.
 After running `make climate-api`, use the local Swagger UI at
 `http://127.0.0.1:3210/docs`.
 
+## How to read the contract
+
+- Routes marked with `bearerAuth` require a Keycloak access token in the
+  `Authorization: Bearer <token>` header.
+- Authentication alone does not grant analytical access. Protected planning,
+  prediction, workspace, and user routes also enforce role and geography scope.
+- `POST /climate/predict` returns `200` when a completed idempotent request can
+  be returned immediately. It returns `202` when Dagster has queued new work;
+  poll the response's status URL until the request completes or fails.
+- `422` means a path, query, or request-body value did not satisfy the published
+  schema. Endpoint-specific authorization, availability, and conflict responses
+  remain listed under each operation.
+- Public hazard and solution routes do not require sign-in. They read the
+  configured public repository service and fall back to the bundled snapshot.
+
 <swagger-ui src="openapi/climate.json"/>
 
 Parameter semantics and availability statuses are explained in [Climate API](climate-api.md).

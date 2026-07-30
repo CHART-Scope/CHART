@@ -4,12 +4,14 @@ import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import text
 
+from chart.api.openapi import build_openapi_schema
 from chart.auth.routes import router as auth_router
 from chart.climate.routes import router as climate_router
 from chart.climate.schemas import ErrorResponse, HealthResponse
@@ -22,10 +24,14 @@ from chart.users.routes import router as users_router
 from chart.workspaces.routes import router as workspaces_router
 
 API_DESCRIPTION = """
-The single CHART application API.
+The single CHART application API for authentication, geography-scoped planning,
+climate data preparation, model predictions, setup, users, workspaces, hazards,
+and public solutions.
 
-It owns place selection, climate source tracking, data preparation requests and
-model predictions. Swagger is available at `/docs` and ReDoc at `/redoc`.
+Protected routes use a Keycloak bearer token and enforce both role and geography
+scope. Prediction submission is durable: HTTP 200 means a completed request was
+available, while HTTP 202 means Dagster has queued background work. Swagger is
+available at `/docs` and ReDoc at `/redoc`.
 """
 
 
@@ -35,7 +41,14 @@ async def lifespan(_app: FastAPI):
     dispose_engines()
 
 
-app = FastAPI(
+class ChartFastAPI(FastAPI):
+    def openapi(self) -> dict[str, Any]:
+        if self.openapi_schema is None:
+            self.openapi_schema = build_openapi_schema(self)
+        return self.openapi_schema
+
+
+app = ChartFastAPI(
     title="CHART API",
     version="0.2.0",
     description=API_DESCRIPTION,

@@ -3,6 +3,46 @@
 The user chooses a place and a simple planning option. CHART resolves the exact
 three months. Dagster then saves the data before any model call.
 
+## How the API and Dagster are coupled
+
+The API and Dagster do not call each other directly. Postgres is their durable
+handoff: the API writes a request, the Dagster sensor claims it, and the API
+polls the same row for progress and results.
+
+```mermaid
+sequenceDiagram
+    actor Planner
+    participant API as FastAPI
+    participant DB as Postgres
+    participant Sensor as Dagster sensor
+    participant Job as Dagster job
+    participant ERA5 as ERA5 pipeline
+    participant LBW as LBW R service
+
+    Planner->>API: POST /climate/predict
+    API->>DB: Insert or reuse prediction_request
+    API-->>Planner: 202 + request_id + status_url
+    Sensor->>DB: Read queued requests
+    Sensor->>Job: Launch one idempotent run
+    Job->>DB: Read district_climate
+    alt requested months are missing
+        Job->>ERA5: Materialise requested geography
+        ERA5->>DB: Upsert district_climate
+    end
+    Job->>LBW: area + trimester + 3 monthly tmax values
+    LBW-->>Job: Conditional odds ratio
+    Job->>DB: Persist completed result
+    Planner->>API: GET status_url
+    API->>DB: Read request status and result
+    API-->>Planner: completed result
+```
+
+Dagster owns execution, retries, logs, and run history. FastAPI owns request
+validation and HTTP responses. Postgres owns durable state. Redis is not part
+of this path.
+
+## Climate and model handoff
+
 ```mermaid
 flowchart LR
   choice["Place + next 3 months, hot season, or long term"] --> request["Saved plan"]

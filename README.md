@@ -6,7 +6,8 @@ Documentation: [https://chart-scope.github.io/CHART/docs/](https://chart-scope.g
 
 CHART is developed as open-source infrastructure for public-interest climate
 and health planning. Its project-authored software and documentation are
-licensed under the GNU Affero General Public License v3.0. The project is
+[GNU Affero General Public License v3.0](LICENSE). See [NOTICE](NOTICE) for
+copyright, dependency, and imported-content boundaries. The project is
 designed to support digital-public-good principles; this is a statement of
 intent, not a claim of certification by the Digital Public Goods Alliance.
 
@@ -55,12 +56,18 @@ make verify
 ```
 
 Adding a place or model: [docs/add-geography-and-model.md](docs/add-geography-and-model.md).
-The current design and remaining work are in [docs/tdd.md](docs/tdd.md).
 
-## Licence
+## Digital public good and licence
 
-CHART is licensed under the
-[GNU Affero General Public License v3.0](LICENSE). See the
-[digital public good and licensing guide](docs/licensing.md) for the project
-intent, source-availability expectations, and third-party data and model
-boundaries.
+CHART is designed to be inspected, adapted, self-hosted, and improved by
+public institutions and their partners. Hosted modifications remain subject
+to the AGPL network-source requirements.
+
+The repository may also reference imported action records, media, restricted
+health data, or model artefacts with separate rights and distribution rules.
+The project licence does not override those restrictions.
+
+Read the [digital public good and licensing guide](docs/licensing.md) before
+redistributing CHART or operating a modified public service. This
+digital-public-good statement describes the project's intent and does not
+claim current certification by the Digital Public Goods Alliance.
