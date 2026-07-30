@@ -13,14 +13,16 @@ from chart.shared.db.migration_filter import (
 def test_extension_owned_tables_reads_catalog_relations() -> None:
     connection = MagicMock()
     connection.execute.return_value = [
-        ("public", "spatial_ref_sys"),
-        ("public", "state"),
-        ("topology", "layer"),
+        ("public", "spatial_ref_sys", True),
+        ("tiger", "state", True),
+        ("topology", "layer", False),
     ]
 
     assert extension_owned_tables(connection) == {
         ("public", "spatial_ref_sys"),
-        ("public", "state"),
+        (None, "spatial_ref_sys"),
+        ("tiger", "state"),
+        (None, "state"),
         ("topology", "layer"),
     }
 
@@ -28,11 +30,12 @@ def test_extension_owned_tables_reads_catalog_relations() -> None:
     assert "dependency.classid = 'pg_class'::regclass" in query
     assert "dependency.refclassid = 'pg_extension'::regclass" in query
     assert "dependency.deptype = 'e'" in query
+    assert "pg_table_is_visible(relation.oid)" in query
 
 
 def test_extension_only_reflected_tables_are_ignored() -> None:
     include_object = extension_aware_include_object(
-        {("public", "state"), ("topology", "layer")},
+        {(None, "state"), ("topology", "layer")},
         base_include_object=lambda *_args: True,
     )
 
@@ -66,7 +69,7 @@ def test_chart_and_non_extension_objects_still_reach_geoalchemy_filter() -> None
         return True
 
     include_object = extension_aware_include_object(
-        {("public", "state")},
+        {(None, "state")},
         base_include_object=base_include_object,
     )
     reflected_state = Table("state", MetaData())

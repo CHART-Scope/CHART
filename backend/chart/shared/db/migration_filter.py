@@ -6,15 +6,19 @@ from typing import Any
 from geoalchemy2.alembic_helpers import include_object as geoalchemy_include_object
 from sqlalchemy import Connection, text
 
+TableKey = tuple[str | None, str]
 IncludeObject = Callable[[Any, str | None, str, bool, Any | None], bool]
 
 
-def extension_owned_tables(connection: Connection) -> set[tuple[str, str]]:
+def extension_owned_tables(connection: Connection) -> set[TableKey]:
     """Return tables managed by installed PostgreSQL extensions."""
     rows = connection.execute(
         text(
             """
-            SELECT namespace.nspname, relation.relname
+            SELECT
+              namespace.nspname,
+              relation.relname,
+              pg_table_is_visible(relation.oid)
             FROM pg_depend AS dependency
             JOIN pg_extension AS installed_extension
               ON installed_extension.oid = dependency.refobjid
@@ -29,11 +33,16 @@ def extension_owned_tables(connection: Connection) -> set[tuple[str, str]]:
             """
         )
     )
-    return {(schema_name, table_name) for schema_name, table_name in rows}
+    tables: set[TableKey] = set()
+    for schema_name, table_name, visible_without_schema in rows:
+        tables.add((schema_name, table_name))
+        if visible_without_schema:
+            tables.add((None, table_name))
+    return tables
 
 
 def extension_aware_include_object(
-    extension_tables: set[tuple[str, str]],
+    extension_tables: set[TableKey],
     base_include_object: IncludeObject = geoalchemy_include_object,
 ) -> IncludeObject:
     """Compose GeoAlchemy filtering with PostgreSQL extension ownership."""
@@ -46,7 +55,7 @@ def extension_aware_include_object(
         compare_to: Any | None,
     ) -> bool:
         if reflected and compare_to is None and type_ == "table" and name is not None:
-            schema_name = getattr(object_, "schema", None) or "public"
+            schema_name = getattr(object_, "schema", None)
             if (schema_name, name) in extension_tables:
                 return False
         return base_include_object(object_, name, type_, reflected, compare_to)
