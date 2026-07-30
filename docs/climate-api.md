@@ -70,6 +70,28 @@ contains three distinct fitted blocks. Unsupported window requests return
 
 A new request returns `202 Accepted`:
 
+```mermaid
+flowchart LR
+    client["Web app or API client"]
+    api["FastAPI<br/>validate and enqueue"]
+    requests[("Postgres<br/>prediction_request")]
+    sensor["Dagster sensor"]
+    job["Dagster prediction job"]
+    climate[("Postgres<br/>district_climate")]
+    era5["ERA5 asset<br/>only if data is missing"]
+    lbw["LBW Plumber service<br/>versioned R model"]
+
+    client -->|"POST /climate/predict"| api
+    api --> requests
+    requests --> sensor --> job
+    climate --> job
+    job -->|"missing months"| era5 --> climate
+    job -->|"3-month tmax profile"| lbw
+    lbw --> job --> requests
+    client -->|"GET status_url"| api
+    requests --> api
+```
+
 ```json
 {
   "request_id": 12,
