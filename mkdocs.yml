@@ -34,7 +34,17 @@ theme:
 
 plugins:
   - search
-  - swagger-ui-tag
+  - swagger-ui-tag:
+      docExpansion: full
+      filter: true
+      syntaxHighlightTheme: nord
+      tryItOutEnabled: false
+      supportedSubmitMethods: []
+      validatorUrl: none
+      extra_css:
+        - stylesheets/swagger-ui-theme.css
+      filter_files:
+        - api-reference.md
 
 markdown_extensions:
   - admonition
