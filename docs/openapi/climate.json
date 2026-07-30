@@ -1452,13 +1452,17 @@
             "minLength": 2,
             "title": "Geographylevellabel"
           },
-          "hazardIds": {
+          "primarySectorId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Primarysectorid"
+          },
+          "collaboratingSectorIds": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "minItems": 1,
-            "title": "Hazardids"
+            "title": "Collaboratingsectorids"
           },
           "healthAreaIds": {
             "items": {
@@ -1476,7 +1480,7 @@
           "countryCode",
           "countryName",
           "geographyLevelLabel",
-          "hazardIds",
+          "primarySectorId",
           "admin"
         ],
         "title": "BootstrapSetupInput"
@@ -1739,13 +1743,17 @@
             "minLength": 2,
             "title": "Geographylevellabel"
           },
-          "hazardIds": {
+          "primarySectorId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Primarysectorid"
+          },
+          "collaboratingSectorIds": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "minItems": 1,
-            "title": "Hazardids"
+            "title": "Collaboratingsectorids"
           },
           "healthAreaIds": {
             "items": {
@@ -1760,7 +1768,7 @@
           "countryCode",
           "countryName",
           "geographyLevelLabel",
-          "hazardIds"
+          "primarySectorId"
         ],
         "title": "CompleteSetupInput"
       },
@@ -2179,24 +2187,6 @@
           "items"
         ],
         "title": "HazardListResponse"
-      },
-      "HazardOption": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "label"
-        ],
-        "title": "HazardOption"
       },
       "HazardSolution": {
         "properties": {
@@ -3353,6 +3343,24 @@
         ],
         "title": "ProjectionScenarioOptionResponse"
       },
+      "SectorOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "SectorOption"
+      },
       "SetupAdminInput": {
         "properties": {
           "name": {
@@ -3454,17 +3462,17 @@
       },
       "SetupOptions": {
         "properties": {
-          "hazards": {
+          "sectors": {
             "items": {
-              "$ref": "#/components/schemas/HazardOption"
+              "$ref": "#/components/schemas/SectorOption"
             },
             "type": "array",
-            "title": "Hazards"
+            "title": "Sectors"
           }
         },
         "type": "object",
         "required": [
-          "hazards"
+          "sectors"
         ],
         "title": "SetupOptions"
       },
@@ -3527,12 +3535,23 @@
             ],
             "title": "Firstadminuserid"
           },
-          "selectedHazards": {
+          "primarySectorId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primarysectorid"
+          },
+          "collaboratingSectorIds": {
             "items": {
-              "$ref": "#/components/schemas/HazardOption"
+              "type": "string"
             },
             "type": "array",
-            "title": "Selectedhazards"
+            "title": "Collaboratingsectorids"
           },
           "counts": {
             "$ref": "#/components/schemas/SetupCounts"
@@ -3542,7 +3561,6 @@
         "required": [
           "completed",
           "requiresOnboarding",
-          "selectedHazards",
           "counts"
         ],
         "title": "SetupStatus"
