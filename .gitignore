@@ -16,6 +16,8 @@ coverage/
 out/
 **/dist/
 **/build/
+!web/src/app/api/build/
+!web/src/app/api/build/route.ts
 **/coverage/
 **/.next/
 **/out/
