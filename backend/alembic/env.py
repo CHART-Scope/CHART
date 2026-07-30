@@ -45,10 +45,13 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+    # Catalog inspection starts an implicit SQLAlchemy transaction. Keep it off
+    # the migration connection so Alembic owns and commits its transaction.
+    with connectable.connect() as catalog_connection:
+        extension_tables = extension_owned_tables(catalog_connection)
+
     with connectable.connect() as connection:
-        include_object = extension_aware_include_object(
-            extension_owned_tables(connection)
-        )
+        include_object = extension_aware_include_object(extension_tables)
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
