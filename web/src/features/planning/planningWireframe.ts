@@ -7,10 +7,7 @@ import type {
 } from "@/lib/planningClient";
 
 export type PlanningPeriod =
-  | "next-three-months"
-  | "next-hot-season"
-  | "long-term"
-  | "specific-month";
+  "next-three-months" | "next-hot-season" | "long-term" | "specific-month";
 
 export type ClimateScenario = "ssp126" | "ssp370" | "ssp585";
 

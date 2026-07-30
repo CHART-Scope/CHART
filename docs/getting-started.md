@@ -42,8 +42,7 @@ After startup, open the service you need:
 | Service | Local address |
 |---|---|
 | CHART web application | `http://127.0.0.1:3100` |
-| TypeScript API documentation | `http://127.0.0.1:3200/api` |
-| Python API documentation | `http://127.0.0.1:3210/docs` |
+| CHART API documentation | `http://127.0.0.1:3210/docs` |
 | Dagster | `http://127.0.0.1:3002` |
 | Keycloak | `http://127.0.0.1:8080` |
 | Mailpit inbox | `http://127.0.0.1:8025` |

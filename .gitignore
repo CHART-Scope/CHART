@@ -47,8 +47,7 @@ site/
 docs/openapi/fastify.yaml
 
 # local docs and notes
-data/
-data/
+/data/
 outputs/
 web/public/uploads/
 .local/

@@ -5,13 +5,15 @@ on:
     paths:
       - ".github/workflows/app-deploy.yml"
       - ".dockerignore"
-      - "api/**"
       - "backend/**"
       - "infra/**"
       - "orchestration/**"
       - "package.json"
       - "package-lock.json"
       - "pipelines/era5_heat/**"
+      - "pipelines/seasonal_c3s/**"
+      - "pipelines/isimip_projection/**"
+      - "pipelines/boundaries/**"
       - "pipelines/LBW_demo/**"
       - "web/**"
   push:
@@ -20,7 +22,6 @@ on:
     paths:
       - ".github/workflows/app-deploy.yml"
       - ".dockerignore"
-      - "api/**"
       - "backend/**"
       - ".prettierignore"
       - ".prettierrc.json"
@@ -29,6 +30,9 @@ on:
       - "package.json"
       - "package-lock.json"
       - "pipelines/era5_heat/**"
+      - "pipelines/seasonal_c3s/**"
+      - "pipelines/isimip_projection/**"
+      - "pipelines/boundaries/**"
       - "pipelines/LBW_demo/**"
       - "web/**"
   workflow_dispatch:
@@ -38,9 +42,17 @@ on:
         required: false
         type: string
       public_host:
-        description: "Legacy hostname fallback. Used with http when public_origin is empty."
+        description: "Optional public hostname for browser URLs, such as dev.example.org. Defaults to AWS_APP_PUBLIC_HOST or AWS_APP_HOST."
         required: false
         type: string
+      public_scheme:
+        description: "Public browser scheme. Production defaults to https."
+        required: false
+        default: "https"
+        type: choice
+        options:
+          - https
+          - http
 
 env:
   DEPLOY_BRANCH: dev
@@ -58,7 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgis/postgis:16-3.5
         env:
           POSTGRES_DB: chart
           POSTGRES_USER: chart
@@ -88,7 +100,7 @@ jobs:
         run: npm ci
 
       - name: Check formatting
-        run: npx prettier --check .github README.md api infra web/src web/.storybook web/*.json web/*.mjs web/*.ts package.json
+        run: npx prettier --check .github README.md infra web/src web/.storybook web/*.json web/*.mjs web/*.ts package.json
 
       - name: Check deploy script syntax
         run: bash -n infra/aws/deploy-app.sh
@@ -96,44 +108,39 @@ jobs:
       - name: Test Keycloak SSO configuration
         run: npm run identity:test
 
-      - name: Check API migrations
-        run: npm run db:check:api
-
-      - name: Apply API migrations
-        run: npm run db:migrate:api
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install backend package
-        run: python -m pip install -e 'backend[dev]'
+      - name: Install Python application
+        run: >-
+          python -m pip install -e 'backend[dev]' -e 'pipelines/era5_heat[dev]'
+          -e 'pipelines/seasonal_c3s[dev]' -e 'pipelines/boundaries[dev]'
+          -e 'pipelines/isimip_projection[dev]'
+          -e orchestration
 
       - name: Apply Alembic migrations
         env:
           DATABASE_URL: postgresql+psycopg://chart:chart@127.0.0.1:5432/chart
         run: backend/scripts/migrate.sh
 
-      - name: Typecheck API
-        run: npm run typecheck:api
+      - name: Verify SQLAlchemy metadata matches Alembic
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://chart:chart@127.0.0.1:5432/chart
+        run: python -m alembic check
 
-      - name: Test API
-        run: npm run test:api
+      - name: Test Python API and data flow
+        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests pipelines/LBW_demo/tests -q
 
-      - name: Build API
-        run: npm run build:api
-
-      - name: Typecheck web
+      - name: Typecheck current frontend
         run: npm run typecheck:web
 
-      - name: Build web
+      - name: Build current frontend
         run: npm run build:web
 
-      - name: Build API image
-        run: docker build -f api/Dockerfile -t chart-api:ci .
-
-      - name: Build Python prediction image
+      - name: Build CHART API and data image
         run: docker build -f backend/Dockerfile -t chart-python:ci .
 
       - name: Create Dagster database
@@ -145,7 +152,9 @@ jobs:
 
       - name: Validate Python prediction image
         run: |
-          docker run --rm chart-python:ci python -c 'from chart.api.app import app; assert "/auth/me" in app.openapi()["paths"]'
+          docker run --rm chart-python:ci test -x /app/backend/scripts/migrate.sh
+          docker run --rm chart-python:ci chart-admin-recover --help
+          docker run --rm chart-python:ci python -c 'from chart.api.app import app; paths=app.openapi()["paths"]; assert all(path in paths for path in ["/auth/me", "/setup", "/users", "/geographies", "/climate/predict"])'
           docker run --rm chart-python:ci python -c 'import dagster as dg; from chart_pipeline.definitions import defs; dg.Definitions.validate_loadable(defs)'
           docker run --rm --network host \
             -e DAGSTER_POSTGRES_HOST=127.0.0.1 \
@@ -155,8 +164,11 @@ jobs:
             -e DAGSTER_POSTGRES_DB=chart_dagster \
             chart-python:ci dagster instance info
 
-      - name: Build web image
-        run: docker build -f web/Dockerfile -t chart-web:ci .
+      - name: Validate LBW prediction image
+        run: docker build --target test -f pipelines/LBW_demo/Dockerfile -t chart-lbw:ci pipelines/LBW_demo
+
+      - name: Build current frontend image
+        run: docker build --build-arg "CHART_BUILD_ID=$GITHUB_SHA" -f web/Dockerfile -t chart-web:ci .
 
   deploy:
     name: Deploy app
@@ -177,6 +189,16 @@ jobs:
       KEYCLOAK_GOOGLE_HOSTED_DOMAIN: ${{ secrets.KEYCLOAK_GOOGLE_HOSTED_DOMAIN }}
       LBW_MODEL_DIVISION_S3_URI: ${{ secrets.LBW_MODEL_DIVISION_S3_URI }}
       LBW_MODEL_STATE_S3_URI: ${{ secrets.LBW_MODEL_STATE_S3_URI }}
+      INFERENCE_LLM_ENABLED: ${{ secrets.INFERENCE_LLM_ENABLED }}
+      INFERENCE_LLM_BASE_URL: ${{ secrets.INFERENCE_LLM_BASE_URL }}
+      INFERENCE_LLM_MODEL: ${{ secrets.INFERENCE_LLM_MODEL }}
+      INFERENCE_LLM_API_KEY: ${{ secrets.INFERENCE_LLM_API_KEY }}
+      PUBLIC_SCHEME: ${{ inputs.public_scheme || secrets.CHART_PUBLIC_SCHEME || 'https' }}
+      TLS_TERMINATED_UPSTREAM: ${{ secrets.CHART_TLS_TERMINATED_UPSTREAM }}
+      TLS_CERT_FILE: ${{ secrets.CHART_TLS_CERT_FILE }}
+      TLS_KEY_FILE: ${{ secrets.CHART_TLS_KEY_FILE }}
+      ALLOW_INSECURE_HTTP: ${{ secrets.CHART_ALLOW_INSECURE_HTTP }}
+      CHART_BOOTSTRAP_TOKEN: ${{ secrets.CHART_BOOTSTRAP_TOKEN }}
     steps:
       - name: Validate deploy secrets
         run: |
@@ -206,7 +228,7 @@ jobs:
           username: ${{ env.AWS_APP_USER }}
           key: ${{ env.AWS_APP_SSH_KEY }}
           command_timeout: 30m
-          envs: CDSAPI_KEY,CDSAPI_URL,KEYCLOAK_GOOGLE_CLIENT_ID,KEYCLOAK_GOOGLE_CLIENT_SECRET,KEYCLOAK_GOOGLE_HOSTED_DOMAIN,LBW_MODEL_DIVISION_S3_URI,LBW_MODEL_STATE_S3_URI
+          envs: CDSAPI_KEY,CDSAPI_URL,KEYCLOAK_GOOGLE_CLIENT_ID,KEYCLOAK_GOOGLE_CLIENT_SECRET,KEYCLOAK_GOOGLE_HOSTED_DOMAIN,LBW_MODEL_DIVISION_S3_URI,LBW_MODEL_STATE_S3_URI,INFERENCE_LLM_ENABLED,INFERENCE_LLM_BASE_URL,INFERENCE_LLM_MODEL,INFERENCE_LLM_API_KEY,PUBLIC_SCHEME,TLS_TERMINATED_UPSTREAM,TLS_CERT_FILE,TLS_KEY_FILE,ALLOW_INSECURE_HTTP,CHART_BOOTSTRAP_TOKEN
           script: |
             set -euo pipefail
 
@@ -234,19 +256,23 @@ jobs:
           base_url="${{ inputs.public_origin || env.AWS_APP_PUBLIC_ORIGIN }}"
           if [ -z "$base_url" ]; then
             public_host="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
-            base_url="http://${public_host}"
+            base_url="${PUBLIC_SCHEME}://${public_host}"
           fi
 
           for attempt in $(seq 1 12); do
-            web_status="$(curl -fsS -o /dev/null -w "%{http_code}" "$base_url/" || true)"
-            api_body="$(curl -fsS "$base_url/chart-api/health" || true)"
-            climate_body="$(curl -fsS "$base_url/climate-api/health" || true)"
-            auth_status="$(curl -sS -o /dev/null -w "%{http_code}" "$base_url/chart-api/auth/me" || true)"
-            keycloak_status="$(curl -fsS -o /dev/null -w "%{http_code}" "$base_url/identity/realms/chart" || true)"
+            web_status="$(curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/" || true)"
+            build_id="$(curl -fsS --connect-timeout 5 --max-time 15 "$base_url/api/build" | jq -r .buildId || true)"
+            api_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$base_url/chart-api/ready" || true)"
+            auth_status="$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/chart-api/auth/me" || true)"
+            keycloak_status="$(curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/identity/realms/chart" || true)"
 
-            if [ "$web_status" != "200" ] || [ "$api_body" != '{"status":"ok"}' ] || [ "$climate_body" != '{"status":"ok"}' ] || [ "$auth_status" != "401" ] || [ "$keycloak_status" != "200" ]; then
-              echo "::error title=Public smoke check failed::attempt ${attempt}: web=${web_status:-000} api=${api_body:-empty} climate=${climate_body:-empty} auth=${auth_status:-000} keycloak=${keycloak_status:-000}"
-              exit 1
+            if [ "$web_status" != "200" ] || [ "$build_id" != "$GITHUB_SHA" ] || [ "$api_body" != '{"status":"ok"}' ] || [ "$auth_status" != "401" ] || [ "$keycloak_status" != "200" ]; then
+              echo "::error title=Public smoke check failed::attempt ${attempt}: web=${web_status:-000} build=${build_id:-empty} api=${api_body:-empty} auth=${auth_status:-000} keycloak=${keycloak_status:-000}"
+              if [ "$attempt" -eq 12 ]; then
+                exit 1
+              fi
+              sleep 10
+              continue
             fi
 
             echo "Public smoke check ${attempt}/12 passed."
@@ -266,7 +292,7 @@ jobs:
             docker ps -a --filter "name=chart-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             ss -ltnp || true
 
-            for container in chart-proxy chart-web chart-api chart-climate-api chart-dagster-webserver chart-dagster-daemon chart-lbw chart-keycloak chart-postgres; do
+            for container in chart-proxy chart-web chart-api chart-dagster-webserver chart-dagster-daemon chart-lbw chart-keycloak chart-postgres; do
               if docker ps -a --format "{{.Names}}" | grep -qx "$container"; then
                 echo "===== $container logs ====="
                 docker logs --tail 120 "$container" || true

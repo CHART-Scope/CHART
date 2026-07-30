@@ -7,17 +7,10 @@ export type GeographyRecord = {
 };
 
 export type PlanningTarget =
-  | "month"
-  | "next_three_months"
-  | "next_heat_season"
-  | "long_term_hot_season";
+  "month" | "next_three_months" | "next_heat_season" | "long_term_hot_season";
 
 export type PredictionStatus =
-  | "waiting"
-  | "queued"
-  | "running"
-  | "completed"
-  | "failed";
+  "waiting" | "queued" | "running" | "completed" | "failed";
 
 export type PredictionStage =
   | "waiting_for_data"

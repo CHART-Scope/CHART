@@ -2,7 +2,7 @@
   "realm": "chart",
   "enabled": true,
   "displayName": "CHART",
-  "sslRequired": "none",
+  "sslRequired": "external",
   "loginTheme": "chart",
   "roles": {
     "realm": [
@@ -112,10 +112,7 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "fullScopeAllowed": true,
-      "redirectUris": [
-        "http://localhost:3100/auth/callback",
-        "http://127.0.0.1:3100/auth/callback"
-      ],
+      "redirectUris": ["http://localhost:3100/*", "http://127.0.0.1:3100/*"],
       "webOrigins": ["http://localhost:3100", "http://127.0.0.1:3100"],
       "attributes": {
         "post.logout.redirect.uris": "http://localhost:3100##http://localhost:3100/*##http://127.0.0.1:3100##http://127.0.0.1:3100/*"

@@ -7,7 +7,6 @@ on:
       - ".prettierignore"
       - ".prettierrc.json"
       - "Makefile"
-      - "api/**"
       - "docs/**"
       - "mkdocs.yml"
       - "package.json"
@@ -27,7 +26,6 @@ on:
       - ".prettierignore"
       - ".prettierrc.json"
       - "Makefile"
-      - "api/**"
       - "docs/**"
       - "mkdocs.yml"
       - "package.json"
@@ -89,12 +87,6 @@ jobs:
         run: npm run build-storybook:web
         env:
           STORYBOOK_BASE_URL: ${{ steps.pages.outputs.base_path }}
-
-      - name: Prepare API reference
-        run: |
-          npm run openapi:generate:api
-          mkdir -p docs/openapi
-          cp api/openapi.yaml docs/openapi/fastify.yaml
 
       - name: Build documentation
         run: python -m mkdocs build --strict --site-dir web/storybook-static/docs

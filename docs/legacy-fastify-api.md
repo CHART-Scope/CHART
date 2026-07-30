@@ -1,37 +1,10 @@
-# Legacy Fastify API
+# Retired TypeScript API
 
-!!! warning "Interim only"
-    The TypeScript Fastify app in `api/` is being replaced by the Python `backend/chart/api`
-    package. New climate and engine endpoints belong in Python. App modules (auth, workspaces,
-    hazards, solutions) will migrate module-by-module behind the OpenAPI contract.
+The Fastify/Drizzle service is retired. It is not installed, started, deployed,
+or permitted to migrate the CHART database.
 
-## What still runs here
+All browser routes now forward to the Python API on port 3210. SQLAlchemy and
+Alembic own all CHART application tables.
 
-| Area | Status |
-|---|---|
-| Auth / Keycloak context | Fastify |
-| Workspaces, users, geographies | Fastify |
-| Hazards, solutions repository reads | Fastify |
-| Climate preview / predict | **Moved to Python** (`make climate-api`) |
-
-## Local access
-
-For the complete local environment, follow [Getting started](getting-started.md)
-and run `make run`.
-
-To start only the TypeScript API after its database and identity services are
-ready:
-
-```bash
-make api
-```
-
-- Web app: `http://127.0.0.1:3100`
-- Swagger UI: `http://127.0.0.1:3200/api`
-- OpenAPI file: `api/openapi.yaml` (generate with `make api-openapi-generate`)
-
-## Docs
-
-Published contract: [API explorer](api-reference.md#chart-app-api-fastify-legacy).
-
-Current migration guidance is summarized in [Python backend](python-backend.md).
+Use [Getting started](getting-started.md) for the current local environment and
+[Python backend](python-backend.md) for the application API.

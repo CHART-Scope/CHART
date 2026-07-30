@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next dev --webpack --hostname 127.0.0.1 --port 3100",
-    "build": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next build --webpack",
-    "start": "NEXT_TEST_WASM=1 NEXT_TEST_WASM_DIR=$PWD/../node_modules/@next/swc-wasm-nodejs next start --hostname ${HOSTNAME:-127.0.0.1} --port ${PORT:-3100}",
+    "dev": "next dev --webpack --hostname 127.0.0.1 --port 3100",
+    "build": "next build --webpack",
+    "start": "next start --hostname ${HOSTNAME:-127.0.0.1} --port ${PORT:-3100}",
     "typecheck": "tsc --noEmit",
     "storybook": "NODE_PATH=$PWD/node_modules:$PWD/../node_modules storybook dev --port 6006 --host 127.0.0.1",
     "build-storybook": "NODE_PATH=$PWD/node_modules:$PWD/../node_modules storybook build"
@@ -17,7 +17,6 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@next/swc-wasm-nodejs": "16.2.6",
     "@storybook/addon-a11y": "^9.1.20",
     "@storybook/addon-docs": "^9.1.20",
     "@storybook/nextjs-vite": "^9.1.20",

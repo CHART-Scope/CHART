@@ -2,24 +2,23 @@ NPM := $(shell command -v npm || command -v /opt/homebrew/bin/npm || command -v 
 DOCKER := $(shell command -v docker || command -v /Applications/Docker.app/Contents/Resources/bin/docker)
 export PATH := $(dir $(NPM)):$(PATH)
 
-DRIZZLE_JOURNAL := api/drizzle/meta/_journal.json
 CHART_REPOSITORY_DIR := chart-repository
 CHART_REPOSITORY_COMPOSE := $(DOCKER) compose -f $(CHART_REPOSITORY_DIR)/docker-compose.yml
 
-.PHONY: all help install run verify local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build api api-build api-start api-test api-typecheck db-generate db-migrate db-check db-seed api-db-generate api-db-migrate api-db-check api-db-seed api-openapi-generate identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check ensure-drizzle-journal era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run
+.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run
 
 help:
 	@printf "\nQuick start (climate pipeline)\n"
-	@printf "  make migrate        Start Postgres, run Drizzle + Alembic migrations\n"
-	@printf "  make dev            Dagster UI on :3002 with fixture climate asset\n"
+	@printf "  make migrate        Start Postgres and run the Python migrations\n"
+	@printf "  make dev            Dagster UI on :3002 using live climate sources\n"
+	@printf "  make dagster-run-fixture  Dagster with clearly labelled sample data\n"
 	@printf "  make climate-materialize  Materialise one geography partition (PRESET=…)\n"
 	@printf "  make climate-api        Python climate predict API on :3210\n"
 	@printf "  make climate-openapi    Export docs/openapi/climate.json\n"
-	@printf "  make docs-serve         MkDocs site on :8000 (DOCS_PORT=… to override)\n\n"
+	@printf "  make docs-serve         MkDocs site on :8001 (DOCS_PORT=… to override)\n\n"
 	@printf "CHART app\n"
-	@printf "  make run            Run Next, Python API, Dagster, and legacy API\n"
-	@printf "  make api            Run the Fastify API\n"
-	@printf "  make web            Run the CHART Next app\n"
+	@printf "  make run            Run Next, Python, Dagster, and the R prediction model\n"
+	@printf "  make web            Run the canonical CHART web app on :3100\n"
 	@printf "  make verify         Run API tests, typechecks, builds, and formatting check\n"
 	@printf "  make all            Provision local services and run verification checks\n"
 	@printf "  make local-setup    Start Docker services, migrate, seed, and sync identity\n"
@@ -29,11 +28,10 @@ help:
 	@printf "  make identity-test  Test Keycloak SSO and redirect configuration\n"
 	@printf "  make identity-restart  Restart Keycloak, preserving data, then sync it\n"
 	@printf "  make identity-reset CONFIRM=1  Reset local Keycloak data and seed it\n"
-	@printf "  make db-migrate     Apply API Drizzle migrations\n"
-	@printf "  make db-seed        Seed API reference data\n"
-	@printf "  make api-test       Run API tests\n"
+	@printf "  make migrate        Apply all CHART database migrations\n"
 	@printf "  make format-check   Check formatting\n\n"
 	@printf "Climate / orchestration\n"
+	@printf "  make lbw-run            Run the R prediction model on :8000\n"
 	@printf "  make era5-fixture       Write MVP fixture CSV to data/climate (no Dagster)\n"
 	@printf "  make climate-migrate    Run Alembic for climate spine tables\n\n"
 	@printf "Chart repository commands\n"
@@ -45,12 +43,18 @@ help:
 
 all: local-setup verify
 
-run: local-setup climate-install
-	$(MAKE) -j4 api climate-api-run dagster-run web
+run: local-setup climate-install lbw-check
+	$(MAKE) -j4 lbw-run climate-api-run dagster-run web
 
-verify: identity-test api-test api-typecheck api-build web-typecheck web-build format-check
+verify: climate-install identity-test python-check web-typecheck web-build format-check
+	$(VENV_PYTHON) -m pytest backend/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/LBW_demo/tests -q
 
-local-setup: services postgres-wait identity-wait db-migrate climate-migrate db-seed identity-sync
+python-check:
+	$(VENV_PYTHON) -m ruff check backend orchestration pipelines/boundaries pipelines/era5_heat/src pipelines/era5_heat/tests pipelines/seasonal_c3s pipelines/isimip_projection pipelines/LBW_demo/model_release.py pipelines/LBW_demo/tests
+	$(VENV_PYTHON) -m black --check backend orchestration pipelines/boundaries pipelines/seasonal_c3s pipelines/isimip_projection pipelines/era5_heat/src/era5_heat/__init__.py pipelines/era5_heat/src/era5_heat/aggregate.py pipelines/era5_heat/tests/test_aggregate.py pipelines/LBW_demo/model_release.py pipelines/LBW_demo/tests
+	$(VENV_PYTHON) -m mypy backend/chart orchestration/src pipelines/boundaries/src pipelines/era5_heat/src pipelines/seasonal_c3s/src pipelines/isimip_projection/src pipelines/LBW_demo/model_release.py --ignore-missing-imports --no-error-summary
+
+local-setup: services postgres-wait identity-wait climate-migrate identity-sync
 
 check-docker:
 	@if [ -z "$(DOCKER)" ]; then printf "Docker CLI not found. Start Docker Desktop or install docker CLI.\n"; exit 1; fi
@@ -124,48 +128,6 @@ web-storybook:
 
 web-storybook-build:
 	$(NPM) run build-storybook:web
-
-api:
-	$(NPM) run dev:api
-
-api-build:
-	$(NPM) run build:api
-
-api-start:
-	$(NPM) run start:api
-
-api-test:
-	$(NPM) run test:api
-
-api-typecheck:
-	$(NPM) run typecheck:api
-
-ensure-drizzle-journal:
-	@mkdir -p api/drizzle/meta
-	@if [ ! -f "$(DRIZZLE_JOURNAL)" ]; then printf '{\n  "version": "7",\n  "dialect": "postgresql",\n  "entries": []\n}\n' > "$(DRIZZLE_JOURNAL)"; fi
-
-db-generate: ensure-drizzle-journal
-	$(NPM) run db:generate:api
-
-db-migrate:
-	DATABASE_URL="$(API_DATABASE_URL)" $(NPM) run db:migrate:api
-
-db-check: ensure-drizzle-journal
-	$(NPM) run db:check:api
-
-db-seed:
-	$(NPM) run db:seed:api
-
-api-db-generate: db-generate
-
-api-db-migrate: db-migrate
-
-api-db-check: db-check
-
-api-db-seed: db-seed
-
-api-openapi-generate:
-	$(NPM) run openapi:generate:api
 
 identity-wait: services
 	@printf "Waiting for local Keycloak"
@@ -267,6 +229,10 @@ format-check:
 	$(NPM) run format:check
 
 ERA5_DIR := pipelines/era5_heat
+SEASONAL_DIR := pipelines/seasonal_c3s
+PROJECTION_DIR := pipelines/isimip_projection
+BOUNDARY_DIR := pipelines/boundaries
+LBW_DIR := pipelines/LBW_demo
 ORCH_DIR := orchestration
 BACKEND_DIR := backend
 CLIMATE_OUT := data/climate
@@ -274,19 +240,58 @@ PYTHON ?= python3.11
 UV := $(shell command -v uv 2>/dev/null)
 VENV_DIR ?= .venv
 VENV_PYTHON := $(abspath $(VENV_DIR))/bin/python
-DOCS_PORT ?= 8000
+DOCS_PORT ?= 8001
+LBW_PORT ?= 8000
+LBW_MODEL_RELEASE_MANIFEST ?= $(abspath $(LBW_DIR)/model-release.example.json)
+LBW_MODEL_DIVISION ?= $(abspath $(LBW_DIR)/model/MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds)
+LBW_MODEL_STATE ?= $(abspath $(LBW_DIR)/model/MP_state_LBW_tmax_DHS2015-21_v1.0.0.rds)
 DAGSTER_PORT ?= 3002
 CHART_DATABASE_URL ?= postgresql+psycopg://chart:chart@127.0.0.1:5434/chart
-API_DATABASE_URL ?= postgres://chart:chart@127.0.0.1:5434/chart
-
-migrate: postgres-wait db-migrate climate-migrate
+migrate: climate-migrate
 
 dev: climate-migrate
 	$(MAKE) dagster-run
 
+lbw-check:
+	@if ! command -v Rscript >/dev/null 2>&1; then \
+		printf "Rscript is required for the LBW prediction model.\n"; \
+		exit 1; \
+	fi
+	@$(PYTHON) $(LBW_DIR)/model_release.py \
+		--manifest "$(LBW_MODEL_RELEASE_MANIFEST)" \
+		--division "$(LBW_MODEL_DIVISION)" \
+		--state "$(LBW_MODEL_STATE)"
+	@Rscript $(LBW_DIR)/tests/test_serialization.R
+
+lbw-run: lbw-check
+	@health=$$(curl -fsS "http://127.0.0.1:$(LBW_PORT)/health" 2>/dev/null || true); \
+	if printf "%s" "$$health" | grep -q '"region"[[:space:]]*:[[:space:]]*"MP"'; then \
+		printf "LBW prediction model is already ready on http://127.0.0.1:$(LBW_PORT)\n"; \
+		exit 0; \
+	fi; \
+	if lsof -ti :"$(LBW_PORT)" >/dev/null 2>&1; then \
+		printf "Port %s is in use by something other than the LBW prediction model.\n" "$(LBW_PORT)"; \
+		exit 1; \
+	fi
+	@printf "LBW prediction model: http://127.0.0.1:$(LBW_PORT)\n"
+	cd $(LBW_DIR) && \
+		PORT="$(LBW_PORT)" \
+		PYTHON="$(PYTHON)" \
+		LBW_MODEL_RELEASE_MANIFEST="$(LBW_MODEL_RELEASE_MANIFEST)" \
+		LBW_MODEL_DIVISION="$(LBW_MODEL_DIVISION)" \
+		LBW_MODEL_STATE="$(LBW_MODEL_STATE)" \
+		bash run_api.sh
+
 dagster-run:
 	@mkdir -p $(ORCH_DIR)/.dagster_home
-	cd $(ORCH_DIR) && ERA5_USE_FIXTURE=1 DATABASE_URL="$(CHART_DATABASE_URL)" \
+	cd $(ORCH_DIR) && DATABASE_URL="$(CHART_DATABASE_URL)" \
+	  LBW_SERVICE_URL="$${LBW_SERVICE_URL:-http://127.0.0.1:8000}" \
+	  DAGSTER_HOME=$(CURDIR)/$(ORCH_DIR) \
+	  $(VENV_PYTHON) -m dagster dev -p "$(DAGSTER_PORT)" -m chart_pipeline.definitions
+
+dagster-run-fixture:
+	@mkdir -p $(ORCH_DIR)/.dagster_home
+	cd $(ORCH_DIR) && CLIMATE_USE_FIXTURE=1 DATABASE_URL="$(CHART_DATABASE_URL)" \
 	  LBW_SERVICE_URL="$${LBW_SERVICE_URL:-http://127.0.0.1:8000}" \
 	  DAGSTER_HOME=$(CURDIR)/$(ORCH_DIR) \
 	  $(VENV_PYTHON) -m dagster dev -p "$(DAGSTER_PORT)" -m chart_pipeline.definitions
@@ -312,10 +317,14 @@ climate-venv:
 climate-install: climate-venv
 	@if [ -n "$(UV)" ]; then \
 		$(UV) pip install --python "$(VENV_PYTHON)" \
-			-e '$(BACKEND_DIR)[dev]' -e '$(ERA5_DIR)[dev]' -e '$(ORCH_DIR)'; \
+			-e '$(BACKEND_DIR)[dev]' -e '$(ERA5_DIR)[dev]' \
+			-e '$(SEASONAL_DIR)[dev]' -e '$(PROJECTION_DIR)[dev]' \
+			-e '$(BOUNDARY_DIR)[dev]' -e '$(ORCH_DIR)'; \
 	else \
 		$(VENV_PYTHON) -m pip install \
-			-e '$(BACKEND_DIR)[dev]' -e '$(ERA5_DIR)[dev]' -e '$(ORCH_DIR)'; \
+			-e '$(BACKEND_DIR)[dev]' -e '$(ERA5_DIR)[dev]' \
+			-e '$(SEASONAL_DIR)[dev]' -e '$(PROJECTION_DIR)[dev]' \
+			-e '$(BOUNDARY_DIR)[dev]' -e '$(ORCH_DIR)'; \
 	fi
 
 climate-api: climate-migrate
@@ -338,11 +347,6 @@ docs-install: climate-venv
 
 docs-prepare:
 	@mkdir -p docs/openapi
-	@if [ -f api/openapi.yaml ]; then \
-		cp api/openapi.yaml docs/openapi/fastify.yaml; \
-	elif [ ! -f docs/openapi/fastify.yaml ]; then \
-		$(MAKE) api-openapi-generate && cp api/openapi.yaml docs/openapi/fastify.yaml; \
-	fi
 	@if $(VENV_PYTHON) -c "import chart.api.export_openapi" 2>/dev/null; then \
 		$(VENV_PYTHON) -m chart.api.export_openapi --output docs/openapi/climate.json; \
 	elif [ ! -f docs/openapi/climate.json ]; then \
@@ -388,8 +392,8 @@ docs-build: docs-prepare
 	fi
 
 climate-migrate: climate-install postgres-wait
-	cd $(BACKEND_DIR) && DATABASE_URL="$(CHART_DATABASE_URL)" \
-	  $(VENV_PYTHON) -m alembic upgrade head
+	PYTHON_BIN="$(VENV_PYTHON)" DATABASE_URL="$(CHART_DATABASE_URL)" \
+	  backend/scripts/migrate.sh
 
 climate-db-migrate: climate-migrate
 

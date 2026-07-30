@@ -49,11 +49,14 @@ class EmailSettings:
         environ: Mapping[str, str] | None = None,
     ) -> EmailSettings:
         values = os.environ if environ is None else environ
-        mode = values.get("EMAIL_MODE", "disabled").strip().lower()
-        if mode not in {"disabled", "smtp"}:
-            raise EmailConfigurationError(
-                "EMAIL_MODE must be one of: disabled, smtp"
-            )
+        raw_mode = values.get("EMAIL_MODE", "disabled").strip().lower()
+        mode: EmailMode
+        if raw_mode == "disabled":
+            mode = "disabled"
+        elif raw_mode == "smtp":
+            mode = "smtp"
+        else:
+            raise EmailConfigurationError("EMAIL_MODE must be one of: disabled, smtp")
 
         return cls(
             mode=mode,
@@ -112,18 +115,18 @@ def build_email_service(settings: EmailSettings | None = None) -> EmailService:
     if resolved.mode == "disabled":
         return EmailService(NullEmailGateway())
 
-    missing = [
-        variable
-        for variable, value in (
-            ("EMAIL_FROM_ADDRESS", resolved.from_address),
-            ("EMAIL_SMTP_HOST", resolved.smtp_host),
-        )
-        if not value
-    ]
-    if missing:
-        raise EmailConfigurationError(
-            f"SMTP email requires: {', '.join(missing)}"
-        )
+    from_address = resolved.from_address
+    smtp_host = resolved.smtp_host
+    if not from_address or not smtp_host:
+        missing = [
+            variable
+            for variable, value in (
+                ("EMAIL_FROM_ADDRESS", from_address),
+                ("EMAIL_SMTP_HOST", smtp_host),
+            )
+            if not value
+        ]
+        raise EmailConfigurationError(f"SMTP email requires: {', '.join(missing)}")
     if bool(resolved.smtp_username) != bool(resolved.smtp_password):
         raise EmailConfigurationError(
             "EMAIL_SMTP_USERNAME and EMAIL_SMTP_PASSWORD must be set together"
@@ -132,9 +135,9 @@ def build_email_service(settings: EmailSettings | None = None) -> EmailService:
     from .smtp import SmtpEmailGateway
 
     gateway = SmtpEmailGateway(
-        host=resolved.smtp_host,
+        host=smtp_host,
         port=resolved.smtp_port,
-        from_address=resolved.from_address,
+        from_address=from_address,
         from_name=resolved.from_name,
         username=resolved.smtp_username,
         password=resolved.smtp_password,

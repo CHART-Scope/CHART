@@ -2,6 +2,7 @@ node_modules/
 **/node_modules/
 
 **/.next/
+**/storybook-static/
 **/dist/
 **/build/
 **/coverage/
@@ -30,3 +31,4 @@ chart-repository/payload-types.ts
 chart-repository/src/app/(payload)/admin/importMap.ts
 
 package-lock.json
+Makefile

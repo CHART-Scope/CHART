@@ -70,9 +70,7 @@ class SmtpEmailGateway:
     def _build_message(self, message: OutboundEmail) -> EmailMessage:
         email_message = EmailMessage()
         email_message["Subject"] = message.subject
-        email_message["From"] = formataddr(
-            (self._from_name, self._from_address)
-        )
+        email_message["From"] = formataddr((self._from_name, self._from_address))
         email_message["To"] = ", ".join(message.to)
         if message.reply_to is not None:
             email_message["Reply-To"] = message.reply_to

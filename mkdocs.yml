@@ -60,6 +60,7 @@ nav:
   - Getting started: getting-started.md
   - Python backend:
       - Overview: python-backend.md
+      - Add a geography and model: add-geography-and-model.md
       - Climate API: climate-api.md
       - API explorer: api-reference.md
   - Modeling:
@@ -67,7 +68,6 @@ nav:
       - Health input contract: health-input-contract.md
       - Survey exploration guide: health-survey-exploration-guide.md
   - Data pipeline: data-pipeline.md
-  - Legacy TypeScript API: legacy-fastify-api.md
 
 extra:
   generator: false

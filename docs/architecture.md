@@ -1,51 +1,45 @@
 # Architecture
 
-## Stack
+## Running services
 
-| Layer         | Tech                  | Port (internal) |
-| ------------- | --------------------- | --------------- |
-| Web           | Next.js               | 3100            |
-| Legacy API    | Fastify               | 3200            |
-| Python API    | FastAPI               | 3210            |
-| Orchestration | Dagster               | 3000            |
-| Identity      | Keycloak 26           | 8080            |
-| Database      | Postgres 16 (one host) | 5432            |
-| Proxy         | nginx                 | **80 (public)** |
+| Service | Job | Local port |
+|---|---|---:|
+| Next (`web`) | connected planning interface | 3100 |
+| FastAPI | all CHART API routes | 3210 |
+| Dagster | fetch data and run prediction jobs | 3002 |
+| R scorer | deterministic LBW calculation | 8000 |
+| Keycloak | login, role, and place access | 8080 |
+| Postgres + PostGIS | application and analytical data | 5434 |
 
-## Container layout
+Fastify is retired from the runtime. The planning interface forwards browser
+credentials to FastAPI but owns no application rules or tables.
 
 ```mermaid
-graph TD
-    Browser([Browser]) -->|":80"| proxy[nginx\nchart-proxy]
-    proxy -->|/| web[Next.js\nchart-web :3100]
-    proxy -->|/chart-api/| api[Fastify API\nchart-api :3200]
-    proxy -->|/chart-api/auth/ + /climate/| py[Python API\nchart-climate-api :3210]
-    proxy -->|/identity/| kc[Keycloak\nchart-keycloak :8080]
-    web -.->|server-side calls| api
-    web -.->|auth + climate| py
-    api --> pg[(Postgres server :5432)]
-    py --> pg
-    dagster[Dagster daemon + UI] --> pg
-    kc --> pg
-    pg --- appdb[(chart)]
-    pg --- dagsterdb[(chart_dagster)]
-    pg --- kcdb[(chart_keycloak)]
+flowchart LR
+  user["Planning user"] --> web["CHART web"]
+  web --> api["Python API"]
+  api --> keycloak["Keycloak"]
+  api --> postgres[("Postgres + PostGIS")]
+  api --> request["Saved prediction request"]
+  request --> lease["Expiring ownership lease"]
+  lease --> dagster["Dagster"]
+  dagster --> climate["Climate source adapter"]
+  climate --> postgres
+  postgres --> gate["Three-month data check"]
+  gate --> digest["Model version + SHA check"]
+  digest --> scorer["LBW R scorer"]
+  scorer --> postgres
+  postgres --> web
 ```
 
-All containers share a Docker bridge network (`chart-net`). Only nginx binds a public port.
+The same Python image runs the API and supplies the code imported by Dagster.
+EC2 deployment runs Alembic, loads the versioned place mappings, registers the
+model release, and then starts the services.
 
-## CI / CD
+Postgres is the durable queue and ownership authority. Prediction workers and
+climate acquisitions use expiring leases; all commits verify ownership.
+Model activation is scoped to an analytical area, module, and outcome. Climate
+runs retain immutable source snapshots even if catalog metadata changes later.
 
-1. Push to `dev` triggers the `App Deploy` workflow.
-2. GitHub Actions validates (typecheck, tests, builds both images).
-3. On success, SSHes into EC2 and runs `infra/aws/deploy-app.sh`.
-4. The script builds Docker images on the host and restarts all containers.
-
-## Notes
-
-- Keycloak runs in `start-dev` mode — cold starts are slow (~30 s). This is expected.
-- Secrets (DB password, Keycloak admin password) are auto-generated on first deploy and persisted in `/opt/chart-env/chart.env`.
-- The solution repository is loaded from `CHART_REPOSITORY_URL` if set; otherwise the bundled snapshot in `api/src/services/chart-repository/seed-data/seed.json` is used.
-- The `chart`, `chart_dagster`, and `chart_keycloak` logical databases share one
-  Postgres server. Keycloak uses its own database role and never writes to CHART
-  application tables.
+The public solution repository is read through `CHART_REPOSITORY_URL`. The
+bundled snapshot is only a local fallback.

@@ -12,6 +12,8 @@ dependencies = [
   "dagster-postgres>=0.23",
   "dagster-webserver>=1.7",
   "psycopg2-binary>=2.9",
+  "geoalchemy2>=0.15",
+  "shapely>=2.0",
 ]
 
 [tool.setuptools.packages.find]
