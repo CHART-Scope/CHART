@@ -531,6 +531,7 @@ fi
 migrate_legacy_keycloak_database
 docker rm -f "$LEGACY_KEYCLOAK_DB_CONTAINER" >/dev/null 2>&1 || true
 
+# The stock image has not run kc.sh build, so let Keycloak build on first start.
 docker run -d \
   --name "$KEYCLOAK_CONTAINER" \
   --network "$NETWORK" \
@@ -550,7 +551,7 @@ docker run -d \
   -v "$APP_DIR/infra/keycloak/chart-realm.json:/opt/keycloak/data/import/chart-realm.json:ro" \
   -v "$APP_DIR/infra/keycloak/themes/chart:/opt/keycloak/themes/chart:ro" \
   quay.io/keycloak/keycloak:26.6.1 \
-  start --optimized --import-realm >/dev/null
+  start --import-realm >/dev/null
 
 wait_for_command "Keycloak" curl -fsS "http://127.0.0.1:8080/identity/realms/chart"
 
