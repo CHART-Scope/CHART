@@ -28,4 +28,4 @@ make api
 
 Embedded spec (when built): [OpenAPI reference](api-reference.md#chart-app-api-fastify-legacy).
 
-Target architecture is described in [Technical design (draft)](tdd.md) §4 and §8.
+Current migration guidance is summarized in [Python backend](python-backend.md).

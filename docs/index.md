@@ -39,5 +39,4 @@ make docs-serve          # http://127.0.0.1:8000 — uses uv when installed
 | [Climate API](climate-api.md) | Preview + LBW predict parameters |
 | [OpenAPI reference](api-reference.md) | Interactive specs embedded in the site |
 | [Data pipeline](data-pipeline.md) | Dagster assets and materialisation |
-| [Architecture](architecture.md) | Containers, ports, and deployment |
 | [Legacy Fastify API](legacy-fastify-api.md) | Interim TypeScript API (being retired) |
