@@ -6,10 +6,11 @@ Documentation: [https://chart-scope.github.io/CHART/docs/](https://chart-scope.g
 
 CHART is developed as open-source infrastructure for public-interest climate
 and health planning. Its project-authored software and documentation are
-[GNU Affero General Public License v3.0](LICENSE). See [NOTICE](NOTICE) for
-copyright, dependency, and imported-content boundaries. The project is
-designed to support digital-public-good principles; this is a statement of
-intent, not a claim of certification by the Digital Public Goods Alliance.
+licensed under the [GNU Affero General Public License v3.0](LICENSE). See
+[NOTICE](NOTICE) for copyright, dependency, and imported-content boundaries.
+The project is designed to support digital-public-good principles; this is a
+statement of intent, not a claim of certification by the Digital Public Goods
+Alliance.
 
 ## What runs
 

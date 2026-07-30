@@ -7,10 +7,10 @@ app for the browser experience.
 This site explains how to run the platform locally and operate its application,
 model, and climate data pipeline.
 
-CHART is developed as open-source infrastructure under the GNU Affero General
-the [GNU Affero General Public License v3.0](licensing.md). The project is
-designed for inspection, local adaptation, and independent deployment while
-supporting digital-public-good principles.
+CHART is developed as open-source infrastructure under the
+[GNU Affero General Public License v3.0](licensing.md). The project is designed
+for inspection, local adaptation, and independent deployment while supporting
+digital-public-good principles.
 
 ## Start here
 
