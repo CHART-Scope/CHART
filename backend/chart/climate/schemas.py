@@ -1,297 +1,270 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .catalog import ClimateLocationSlug, ClimateTimeframeId
+ProjectionScenario = Literal["ssp126", "ssp370", "ssp585"]
+ProjectionPeriod = Literal["2031-2040"]
+PregnancyWindow = Literal[1, 2, 3]
+PlanningTarget = Literal[
+    "month",
+    "next_three_months",
+    "next_heat_season",
+    "long_term_hot_season",
+]
 
-PredictionStatus = Literal["queued", "running", "completed", "failed"]
-AvailabilityStatus = Literal["ready", "partial", "missing", "stale", "not_available"]
+PredictionStatus = Literal["waiting", "queued", "running", "completed", "failed"]
 PredictionStage = Literal[
+    "waiting_for_data",
     "queued",
     "preparing_climate",
+    "climate_ready",
     "predicting",
     "completed",
     "failed",
 ]
-
-
-class LbwOutcome(BaseModel):
-    """Optional health outcome to score after climate data is available."""
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "examples": [
-                {"type": "lbw", "trimester": 1, "area": "Madhya Pradesh"},
-                {"type": "lbw", "trimester": 1, "area": "Gwalior", "ref": 27.0},
-            ]
-        }
-    )
-
-    type: Literal["lbw"] = Field(
-        description="Health outcome model to run. Only `lbw` is supported today."
-    )
-    trimester: Literal[1, 2, 3] = Field(
-        description=(
-            "Pregnancy trimester window for the LBW model. "
-            "1 = latest trimester (T3), 2 = middle (T2), 3 = earliest (T1)."
-        )
-    )
-    area: str | None = Field(
-        default=None,
-        description=(
-            "LBW geography within Madhya Pradesh. Use `Madhya Pradesh` for the state model "
-            "or a division name (e.g. `Gwalior`). Defaults to whole state."
-        ),
-        examples=["Madhya Pradesh", "Gwalior"],
-    )
-    ref: float | None = Field(
-        default=None,
-        description="Reference temperature in °C. Omit to use the model default for the chosen area.",
-        examples=[27.0],
-    )
+AvailabilityStatus = Literal[
+    "ready", "partial", "missing", "stale", "sample", "not_available"
+]
+ClimateMonthStatus = Literal["waiting", "ready", "stale", "sample", "failed"]
 
 
 class PreviewRequest(BaseModel):
-    """Check whether observed climate data exists for a location and timeframe."""
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "examples": [
-                {"location_slug": "madhya-pradesh", "timeframe_id": "exposure_3m"},
-                {
-                    "location_slug": "kajiado",
-                    "timeframe_id": "recent_12m",
-                    "end_month": "2024-12",
-                },
-            ]
-        }
+    geography_id: str = Field(
+        min_length=1,
+        description="The place selected in CHART, for example geo-in-madhya-pradesh.",
     )
-
-    location_slug: ClimateLocationSlug = Field(
-        description="Geography preset slug. Must be one of the supported MVP locations.",
-        examples=["madhya-pradesh", "kajiado"],
-    )
-    timeframe_id: ClimateTimeframeId = Field(
-        description=(
-            "Standard timeframe. Use `exposure_3m` for LBW prediction; "
-            "`seasonal` and `projection` are catalogued but not ingested yet."
-        ),
-        examples=[
-            "exposure_3m",
-            "recent_12m",
-            "historical_window",
-            "seasonal",
-            "projection",
-        ],
-    )
-    end_month: str | None = Field(
-        default=None,
-        pattern=r"^\d{4}-\d{2}$",
-        description=(
-            "Optional anchor month (`YYYY-MM`). The API walks backward from this month "
-            "for rolling windows. Defaults to the latest month stored in Postgres."
-        ),
-        examples=["2024-12"],
+    planning_date: date = Field(
+        description="The planning month; CHART derives this month and the previous two."
     )
 
 
 class PredictRequest(PreviewRequest):
-    """Preview climate coverage and optionally run an LBW prediction."""
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "examples": [
-                {
-                    "location_slug": "madhya-pradesh",
-                    "timeframe_id": "exposure_3m",
-                    "outcome": {"type": "lbw", "trimester": 1},
-                }
-            ]
-        }
+    outcome: Literal["lbw"] = "lbw"
+    planning_target: PlanningTarget = "month"
+    projection_scenario: ProjectionScenario | None = None
+    projection_period: ProjectionPeriod | None = None
+    pregnancy_window: PregnancyWindow = Field(
+        default=1,
+        description="Legacy single model window. New planning requests use pregnancy_windows.",
     )
-
-    outcome: LbwOutcome | None = Field(
+    pregnancy_windows: tuple[PregnancyWindow, ...] | None = Field(
         default=None,
         description=(
-            "When set to `lbw`, the API uses the last three monthly mean temperatures "
-            "from Postgres and calls the LBW inference service. Omit for preview-only."
+            "Pregnancy-stage model windows to calculate from the same three climate "
+            "months. Window 3 is first, 2 is middle, and 1 is final."
         ),
     )
 
+    @model_validator(mode="after")
+    def validate_projection_choice(self):
+        if self.pregnancy_windows is not None:
+            if not self.pregnancy_windows or len(set(self.pregnancy_windows)) != len(
+                self.pregnancy_windows
+            ):
+                raise ValueError("PREGNANCY_WINDOWS_INVALID")
+        if self.planning_target == "long_term_hot_season":
+            if self.projection_scenario is None or self.projection_period is None:
+                raise ValueError("CLIMATE_PROJECTION_CHOICE_REQUIRED")
+            if self.planning_date != date(2040, 5, 1):
+                raise ValueError("CLIMATE_PROJECTION_PLANNING_DATE_INVALID")
+        elif self.projection_scenario is not None or self.projection_period is not None:
+            raise ValueError("CLIMATE_PROJECTION_FIELDS_NOT_ALLOWED")
+        return self
 
-class MonthValue(BaseModel):
-    month: str = Field(description="Calendar month (`YYYY-MM`).", examples=["2024-12"])
-    tmax_monthly_mean_c: float = Field(
-        description="Monthly mean of daily maximum 2 m temperature (°C) for the admin bbox.",
-        examples=[29.1],
-    )
+    def selected_pregnancy_windows(self) -> tuple[PregnancyWindow, ...]:
+        return self.pregnancy_windows or (self.pregnancy_window,)
+
+
+class PlaceResponse(BaseModel):
+    geography_id: str
+    code: str
+    name: str
+    level: str
+    path: str
+    supports_prediction: bool
+    model_version: str | None = None
+
+
+class ClimateMonthResponse(BaseModel):
+    month: str
+    temperature_c: float | None = None
+    status: ClimateMonthStatus
+    source_name: str | None = None
+    source_class: str | None = None
+    source_uri: str | None = None
+    source_issue_time: str | None = None
+    downloaded_at: str | None = None
+    data_label: str | None = None
+    quality_status: str | None = None
+    climate_run_id: int | None = None
+    raw_file_uri: str | None = None
+    raw_file_hash: str | None = None
+    scenario: str | None = None
+    projection_period: str | None = None
+    ensemble_summary: str | None = None
+    expected_source_class: str | None = None
+    expected_source_name: str
+    source_policy_version: str
+    unavailable_reason: str | None = None
 
 
 class Availability(BaseModel):
-    location_slug: ClimateLocationSlug
-    timeframe_id: ClimateTimeframeId
-    status: AvailabilityStatus = Field(
-        description=(
-            "`ready` = enough months for the request; `partial`/`missing` = ingest or widen window; "
-            "`stale` = data older than monthly cadence; `not_available` = tier not built yet."
-        )
-    )
-    months_requested: int = Field(description="Months needed for this timeframe.")
-    months_found: int = Field(
-        description="Months found in `district_climate` for the request."
-    )
-    missing_months: list[str] = Field(
-        description="Requested months with no stored value."
-    )
-    period_start: str | None = Field(
-        description="First month returned in `series`, if any."
-    )
-    period_end: str | None = Field(
-        description="Last month returned in `series`, if any."
-    )
-    last_refreshed_at: str | None = Field(
-        description="ISO timestamp from `data_source.last_refreshed_at` for this geography."
-    )
-    climate_run_id: int | None = Field(
-        description="Postgres `climate_run.id` backing the series."
-    )
-    data_label: str | None = Field(
-        description="Provenance label for the run (`sample`, `reanalysis`, etc.)."
-    )
-    pull_required: bool = Field(
-        description="When true, run the suggested materialisation command before predicting."
-    )
-    pull_hint: str | None = Field(
-        description="Shell hint to refresh data, e.g. `PRESET=madhya-pradesh make climate-materialize`.",
-        examples=["PRESET=madhya-pradesh make climate-materialize"],
-    )
-
-
-class LocationResponse(BaseModel):
-    slug: ClimateLocationSlug
-    name: str
-    country: str
-    level: str = Field(
-        description="Admin level for the MVP bbox unit (`state`, `county`, …)."
-    )
-    supports_lbw_prediction: bool = Field(
-        description="Whether the LBW inference bridge is available for this location."
-    )
-    lbw_areas: list[str] = Field(
-        default_factory=list,
-        description="LBW model areas when `supports_lbw_prediction` is true (MP state + divisions).",
-    )
-
-
-class TimeframeResponse(BaseModel):
-    id: ClimateTimeframeId
-    label: str
-    description: str
-    horizon: Literal["short", "medium", "long"] = Field(
-        description="User-facing horizon group: short = observed monthly, medium = seasonal, long = projection."
-    )
-    resolution: str = Field(
-        description="Native resolution for the tier (`monthly`, `seasonal`, `annual`)."
-    )
-    month_count: int | None = Field(
-        description="Rolling month window when applicable. `null` means use the full ingested window."
-    )
-    tier: Literal["observed", "seasonal", "projection"]
+    status: AvailabilityStatus
+    months_requested: int = 3
+    months_found: int
+    missing_months: list[str]
+    input_window_id: int | None = None
+    input_hash: str | None = None
+    message: str
 
 
 class PreviewResponse(BaseModel):
-    location: LocationResponse
-    timeframe: TimeframeResponse
+    place: PlaceResponse
+    planning_date: date
+    source_as_of: date | None = None
     availability: Availability
-    series: list[MonthValue] = Field(
-        description="Monthly temperature series for the requested timeframe (may be empty)."
-    )
+    climate: list[ClimateMonthResponse]
 
 
 class LbwPrediction(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
     area: str
-    geography_level: str = Field(
-        description="`state` or `division` in the LBW model bundle."
-    )
-    trimester: int
-    tmax_lag: list[float] = Field(
-        description="Three monthly mean temperatures in °C, most recent month first (lag0, lag1, lag2)."
-    )
-    ref_temp: float = Field(
-        description="Reference temperature in °C used for the odds ratio."
-    )
-    odds_ratio: float = Field(
-        description="Modelled odds ratio vs the reference temperature profile."
-    )
-    ci95_low: float
-    ci95_high: float
-    on_training_support: bool = Field(
-        description="Whether all supplied temperatures fall within the model training range."
-    )
-    model_file: str = Field(description="LBW model bundle filename used for scoring.")
+    geography_level: str
+    pregnancy_window: PregnancyWindow
+    temperatures_c: list[float] = Field(min_length=3, max_length=3)
+    reference_temperature_c: float
+    odds_ratio: float = Field(gt=0)
+    ci95_low: float = Field(gt=0)
+    ci95_high: float = Field(gt=0)
+    on_training_support: bool
+    model_file: str = Field(min_length=1)
+    model_version: str = Field(min_length=1)
+    model_sha256: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{64}$")
+    warning: str | None = None
+    explanation: str | None = None
+
+    @model_validator(mode="after")
+    def validate_confidence_interval(self):
+        if not self.ci95_low <= self.odds_ratio <= self.ci95_high:
+            raise ValueError("LBW_CONFIDENCE_INTERVAL_INVALID")
+        return self
 
 
 class PredictResponse(PreviewResponse):
-    prediction: LbwPrediction | None = Field(
-        default=None,
-        description="LBW result when `outcome.type=lbw` and climate data is ready.",
-    )
-    prediction_note: str | None = Field(
-        default=None,
-        description="Human-readable note when no outcome was requested or prediction was skipped.",
-    )
-    request_id: int | None = Field(
-        default=None,
-        description="Durable prediction request id when this result was persisted.",
-    )
-    request_status: PredictionStatus | None = Field(
-        default=None,
-        description=(
-            "Background state when a persisted prediction request is associated "
-            "with the result."
-        ),
-    )
+    prediction: LbwPrediction
+    predictions: list[LbwPrediction] = Field(default_factory=list)
+    request_id: int
+    request_status: Literal["completed"] = "completed"
+    planning_target: PlanningTarget = "month"
+    projection_scenario: ProjectionScenario | None = None
+    projection_period: ProjectionPeriod | None = None
 
 
 class PredictionAcceptedResponse(BaseModel):
     request_id: int
-    status: Literal["queued", "running"]
+    status: Literal["waiting", "queued", "running"]
     stage: PredictionStage
-    location_slug: ClimateLocationSlug
-    timeframe_id: ClimateTimeframeId
+    geography_id: str
+    planning_date: date
+    source_as_of: date | None = None
     status_url: str
     message: str
+    available_from: date | None = None
+    planning_target: PlanningTarget = "month"
+    projection_scenario: ProjectionScenario | None = None
+    projection_period: ProjectionPeriod | None = None
 
 
 class PredictionRequestStatusResponse(BaseModel):
     request_id: int
     status: PredictionStatus
     stage: PredictionStage
-    location_slug: ClimateLocationSlug
-    timeframe_id: ClimateTimeframeId
+    geography_id: str
+    planning_date: date
+    source_as_of: date | None = None
     dagster_run_id: str | None = None
     error_code: str | None = None
+    climate: list[ClimateMonthResponse] = Field(default_factory=list)
     result: PredictResponse | None = None
     created_at: str
     updated_at: str
+    available_from: date | None = None
+    planning_target: PlanningTarget = "month"
+    projection_scenario: ProjectionScenario | None = None
+    projection_period: ProjectionPeriod | None = None
 
 
-class LocationListResponse(BaseModel):
-    items: list[LocationResponse]
+class PredictionRequestSummaryResponse(BaseModel):
+    request_id: int
+    status: PredictionStatus
+    stage: PredictionStage
+    geography_id: str
+    planning_date: date
+    source_as_of: date | None = None
+    error_code: str | None = None
+    created_at: str
+    updated_at: str
+    available_from: date | None = None
+    planning_target: PlanningTarget = "month"
+    projection_scenario: ProjectionScenario | None = None
+    projection_period: ProjectionPeriod | None = None
+    odds_ratio: float | None = None
 
 
-class TimeframeListResponse(BaseModel):
-    items: list[TimeframeResponse]
+class PredictionRequestListResponse(BaseModel):
+    items: list[PredictionRequestSummaryResponse]
+
+
+class PlaceListResponse(BaseModel):
+    items: list[PlaceResponse]
+
+
+class HeatSeasonOptionResponse(BaseModel):
+    label: str
+    months: list[date]
+    planning_date: date
+    available: bool
+    available_from: date | None = None
+    unavailable_reason: str | None = None
+    source_name: str
+    source_uri: str
+
+
+class ProjectionScenarioOptionResponse(BaseModel):
+    value: ProjectionScenario
+    label: str
+    description: str
+
+
+class LongTermProjectionOptionResponse(BaseModel):
+    label: str
+    period: ProjectionPeriod
+    months: list[date]
+    planning_date: date
+    scenarios: list[ProjectionScenarioOptionResponse]
+    source_name: str
+    source_uri: str
+
+
+class PlanningOptionsResponse(BaseModel):
+    geography_id: str
+    source_as_of: date
+    validated_pregnancy_windows: list[PregnancyWindow]
+    model_result_mode: Literal["single_association", "pregnancy_windows"]
+    custom_min_month: date
+    custom_max_month: date
+    next_three_months: HeatSeasonOptionResponse
+    next_heat_season: HeatSeasonOptionResponse | None = None
+    long_term_projection: LongTermProjectionOptionResponse | None = None
 
 
 class ErrorResponse(BaseModel):
-    error: str = Field(
-        description="Stable machine-readable error code.",
-        examples=["CLIMATE_DATA_NOT_READY", "LBW_NOT_AVAILABLE_FOR_LOCATION"],
-    )
+    error: str
 
 
 class HealthResponse(BaseModel):
-    status: Literal["ok"] = Field(description="Service health status.")
+    status: Literal["ok"] = "ok"

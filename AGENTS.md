@@ -15,8 +15,8 @@ Generated code should be:
 
 CHART is a monorepo. Do not treat the root as a Next app.
 
-- `web`: CHART Next web app.
-- `backend`: Python/FastAPI application API and analytical engine; target owner of auth, workspaces, users, geographies, predictions, and analytical reads.
+- `web`: CHART Next web app and current product UI.
+- `backend`: Python/FastAPI application API and analytical engine; owner of auth, workspaces, users, geographies, predictions, and analytical reads.
 - `orchestration`: Dagster data plane importing the Python `chart` package.
 - `api`: legacy Fastify/Drizzle API being retired module-by-module after Python parity.
 - `chart-repository`: separate Payload CMS service for maintaining published chart repository data. It is not required to run CHART core.
@@ -43,8 +43,8 @@ orchestration/
   src/chart_pipeline/
 
 web/
-  src/modules/solutions/
-  src/lib/api-client/
+  src/features/
+  src/lib/
 
 chart-repository/
   payload.config.ts
@@ -77,7 +77,6 @@ Never import from `chart-repository/` into `backend/` or `web/`. Use an HTTP API
 - Web: Next, React.
 - API + engine: Python, FastAPI, SQLAlchemy, Alembic.
 - Data plane: Dagster with Postgres-backed durable requests.
-- Legacy API during migration: Fastify, TypeScript, Drizzle.
 - Database: PostgreSQL + PostGIS.
 - Formatting: Prettier.
 
@@ -119,7 +118,7 @@ backend/tests/
 
 Use `routes.py` for HTTP endpoints and `service.py` for behavior. Engine compute must not import FastAPI or Dagster. Dagster definitions call backend services through thin wrappers.
 
-Every new Python API route should have a route-level test using FastAPI `TestClient`. Every protected route must test both authentication and role/geography denial. Legacy Fastify routes retain `Fastify.inject()` tests until they are removed.
+Every new Python API route should have a route-level test using FastAPI `TestClient`. Every protected route must test both authentication and role/geography denial.
 
 ## Backend Route Rules
 
@@ -132,10 +131,10 @@ Every new Python API route should have a route-level test using FastAPI `TestCli
 
 ## Frontend Module Shape
 
-Keep feature UI under `web/src/modules/`.
+Keep current feature UI under `web/src/features/`.
 
 - Use `PascalCase.tsx` for React components.
-- Keep shared shell/layout code under `web/src/app/`.
+- Keep routes and shared layout code under `web/src/app/`.
 - Keep static copy and seed-like UI data close to the module using it.
 - Use simple props/state first; avoid state libraries until shared state is actually needed.
 
@@ -143,7 +142,6 @@ Keep feature UI under `web/src/modules/`.
 
 - Folders: `kebab-case`.
 - Python backend files: `schemas.py`, `service.py`, `routes.py`; route tests live under `backend/tests/`.
-- Legacy TypeScript backend files: `types.ts`, `service.ts`, `routes.ts`, `routes.test.ts` until the module is retired.
 - React components: `PascalCase.tsx`.
 - Functions: `camelCase` with clear verbs, such as `getCurrentUser` or `listSources`.
 - Types: `PascalCase`.
@@ -167,13 +165,6 @@ Before finishing Python backend work:
 ```bash
 python -m pytest backend/tests -q
 python -m pytest orchestration/tests -q
-```
-
-Before finishing legacy Fastify work:
-
-```bash
-make api-test
-make api-build
 ```
 
 Before finishing frontend work:

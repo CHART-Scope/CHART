@@ -51,9 +51,7 @@ class EmailSettings:
         values = os.environ if environ is None else environ
         mode = values.get("EMAIL_MODE", "disabled").strip().lower()
         if mode not in {"disabled", "smtp"}:
-            raise EmailConfigurationError(
-                "EMAIL_MODE must be one of: disabled, smtp"
-            )
+            raise EmailConfigurationError("EMAIL_MODE must be one of: disabled, smtp")
 
         return cls(
             mode=mode,
@@ -121,9 +119,7 @@ def build_email_service(settings: EmailSettings | None = None) -> EmailService:
         if not value
     ]
     if missing:
-        raise EmailConfigurationError(
-            f"SMTP email requires: {', '.join(missing)}"
-        )
+        raise EmailConfigurationError(f"SMTP email requires: {', '.join(missing)}")
     if bool(resolved.smtp_username) != bool(resolved.smtp_password):
         raise EmailConfigurationError(
             "EMAIL_SMTP_USERNAME and EMAIL_SMTP_PASSWORD must be set together"

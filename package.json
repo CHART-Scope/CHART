@@ -3,7 +3,6 @@
   "private": true,
   "version": "0.1.0",
   "workspaces": [
-    "api",
     "web"
   ],
   "scripts": {
@@ -13,18 +12,8 @@
     "typecheck:web": "npm --workspace @chart/web run typecheck",
     "storybook:web": "npm --workspace @chart/web run storybook",
     "build-storybook:web": "npm --workspace @chart/web run build-storybook",
-    "dev:api": "npm --workspace @chart/api run dev",
-    "build:api": "npm --workspace @chart/api run build",
-    "start:api": "npm --workspace @chart/api run start",
-    "test:api": "npm --workspace @chart/api run test",
-    "typecheck:api": "npm --workspace @chart/api run typecheck",
-    "db:generate:api": "npm --workspace @chart/api run db:generate",
-    "db:migrate:api": "npm --workspace @chart/api run db:migrate",
-    "db:check:api": "npm --workspace @chart/api run db:check",
-    "db:seed:api": "npm --workspace @chart/api run db:seed",
     "identity:sync": "node infra/keycloak/sync-realm.js",
     "identity:test": "node --test infra/keycloak/sync-realm.test.js",
-    "openapi:generate:api": "npm --workspace @chart/api run openapi:generate",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -34,5 +23,8 @@
   "overrides": {
     "vite": "6.4.1"
   },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.61.1"
+  }
 }

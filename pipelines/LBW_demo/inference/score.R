@@ -123,7 +123,17 @@ state_block <- function(store, trimester) {
   list(cb = cb, mod = mod, ad = ad, ref_default = ref_default)
 }
 
-score_area <- function(division_store, state_store, area, trimester, tmax_lag, ref = NULL) {
+score_area <- function(
+  division_store,
+  state_store,
+  area,
+  trimester,
+  tmax_lag,
+  ref = NULL,
+  model_version,
+  division_sha256,
+  state_sha256
+) {
   if (identical(area, "Madhya Pradesh")) {
     block <- state_block(state_store, trimester)
     geography_level <- "state"
@@ -149,7 +159,8 @@ score_area <- function(division_store, state_store, area, trimester, tmax_lag, r
       trimester = as.integer(trimester),
       exposure_metric = "monthly mean of daily maximum 2m temperature (Celsius)",
       model_file = basename(if (geography_level == "state") state_store$path else division_store$path),
-      model_version = "1.0.0"
+      model_version = model_version,
+      model_sha256 = if (geography_level == "state") state_sha256 else division_sha256
     ),
     result
   )
