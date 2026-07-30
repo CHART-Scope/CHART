@@ -31,6 +31,7 @@ module by module, behind the same OpenAPI contract.
 |---|---|
 | [Getting started](getting-started.md) | Install and run CHART locally |
 | [Python backend overview](python-backend.md) | Build FastAPI modules |
+| [Modeling](modeling.md) | Understand the LBW model, inputs, outputs, and limitations |
 | [Climate API](climate-api.md) | Understand preview and prediction parameters |
 | [API explorer](api-reference.md) | Browse the published API contracts |
 | [Data pipeline](data-pipeline.md) | Run Dagster assets and materialisation |

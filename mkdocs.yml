@@ -62,10 +62,11 @@ nav:
       - Overview: python-backend.md
       - Climate API: climate-api.md
       - API explorer: api-reference.md
-  - Data pipeline: data-pipeline.md
-  - Health data:
-      - NFHS/DHS input contract: health-input-contract.md
+  - Modeling:
+      - Overview: modeling.md
+      - Health input contract: health-input-contract.md
       - Survey exploration guide: health-survey-exploration-guide.md
+  - Data pipeline: data-pipeline.md
   - Legacy TypeScript API: legacy-fastify-api.md
 
 extra:

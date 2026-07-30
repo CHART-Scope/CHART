@@ -3,6 +3,9 @@
 Python service for climate preview and LBW prediction. Its default local base
 URL is `http://127.0.0.1:3210`.
 
+Read [Modeling](modeling.md) before interpreting LBW odds ratios, confidence
+intervals, or extrapolation warnings.
+
 ## Interactive documentation
 
 Start the service:

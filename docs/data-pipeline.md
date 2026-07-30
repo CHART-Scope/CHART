@@ -37,3 +37,6 @@ LBW prediction. A preview still returns a manual `pull_hint`. Every new LBW outc
 returns `202 Accepted`, persists an idempotent `prediction_request`, and is picked up by
 `pending_prediction_requests_sensor`. Its Dagster run skips ERA5 when the required months
 already exist and materialises only the requested geography when they are missing.
+
+See [Modeling](modeling.md) for the scorer's inputs, artifact provenance, and
+interpretation limits.
