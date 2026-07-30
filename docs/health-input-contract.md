@@ -17,7 +17,8 @@ The next MVP step is to prepare the health input side of the
 climate-health modeling workflow:
 
 - document NFHS-5 India and Kenya DHS access, rights, and storage constraints;
-- confirm the first health outcome and exact source columns with MaQueens;
+- confirm the first health outcome and exact source columns with the model
+  owners;
 - draft a column map that can later drive automated extraction from large
   DHS/NFHS files;
 - keep unresolved access/modeling blockers explicit.
@@ -34,9 +35,9 @@ Out of scope for this branch:
 1. **Access and storage constraints**: #146 is the richer version of #133.
    Use #146 as the working issue and close #133 as duplicate once #146 is
    documented.
-2. **MaQueens indicator/R-code dependency**: #147 is the richer version of
-   #134. Use #147 as the working issue and close #134 as duplicate once the
-   column usage is confirmed or explicitly blocked.
+2. **Model indicator/R-code dependency**: #147 is the richer version of #134.
+   Use #147 as the working issue and close #134 as duplicate once the column
+   usage is confirmed or explicitly blocked.
 3. **Column extraction map**: #148 is the richer version of #135. Use #148
    as the working issue and close #135 as duplicate once the draft map is
    accepted.
@@ -48,7 +49,7 @@ Out of scope for this branch:
 | Issue | Status | Notes |
 | --- | --- | --- |
 | #146 | Draft documented | Access links and storage rules are captured here; actual approved dataset access still needs confirmation. |
-| #147 | Blocked on R workflow | Low birth weight is the working assumption; exact columns, filters, and lag windows need MaQueens' R code or column list. |
+| #147 | Blocked on R workflow | Low birth weight is the working assumption; exact columns, filters, and lag windows need the approved R code or column list. |
 | #148 | Draft map created | See `docs/health-survey-column-map.csv`; exact fields remain marked as draft until confirmed. |
 | #127 | In progress | Parent should remain open until #146, #147, and #148 are reviewed. |
 
@@ -56,8 +57,8 @@ Out of scope for this branch:
 
 | Source | Intended use | Current sprint status | Access/storage note |
 | --- | --- | --- | --- |
-| NFHS-5 / India DHS 2019-21 | India birth outcome records and maternal covariates | Use as India source unless MaQueens confirms a different extract | Requires approved access/download. Do not commit raw files. |
-| Kenya DHS 2022 | Kenya birth outcome records and maternal covariates | Use as Kenya source unless MaQueens confirms a different extract | Requires approved access/download. Do not commit raw files. |
+| NFHS-5 / India DHS 2019-21 | India birth outcome records and maternal covariates | Use as India source unless the model owners confirm a different extract | Requires approved access/download. Do not commit raw files. |
+| Kenya DHS 2022 | Kenya birth outcome records and maternal covariates | Use as Kenya source unless the model owners confirm a different extract | Requires approved access/download. Do not commit raw files. |
 | NFHS-6 | Future India update | Not in Sprint 4 contract until public microdata/access status is confirmed | Treat as unavailable for implementation unless access is confirmed. |
 | DHS/NFHS GPS cluster files | Climate exposure join | Needed if modeling uses cluster-level climate exposure | Coordinates are privacy-displaced; document this caveat in analysis outputs. |
 
@@ -83,7 +84,7 @@ Useful source links:
 ## First outcome assumption
 
 Primary working assumption: **low birth weight** is the first outcome to map
-because it matches the current MaQueens modeling discussion.
+because it matches the current health-modeling workflow.
 
 Draft definition:
 
@@ -92,11 +93,11 @@ Draft definition:
 - threshold: `< 2500g`;
 - source record family: likely DHS/NFHS birth or child record;
 - climate exposure window: likely pregnancy window based on child birth date,
-  with trimester logic confirmed by MaQueens' R workflow.
+  with trimester logic confirmed by the approved R workflow.
 
 Candidate extension: neonatal/infant mortality. This depends on confirmation of
-the exact birth/death record fields used by MaQueens and should not be treated
-as implemented until the R column usage is shared.
+the exact birth/death record fields used by the approved R workflow and should
+not be treated as implemented until the R column usage is shared.
 
 ## Draft source file families
 
@@ -105,9 +106,9 @@ as implemented until the R column usage is shared.
 | Birth record / child record | Child birth date, birth weight, sex, survival/death fields | Required for selected outcome; exact recode file to be confirmed |
 | Individual/women record | Maternal age, education, wealth, residence, survey weights/design | Required for covariates; exact joins to be confirmed |
 | GPS cluster file | Cluster latitude/longitude or admin join to climate exposure | Required for cluster-level climate joins; privacy displacement caveat |
-| Household/person record | Denominators or household covariates | Not first-scope unless MaQueens confirms use |
+| Household/person record | Denominators or household covariates | Not first-scope unless the model owners confirm use |
 
-## Open questions for MaQueens, Satish, and Alessandro
+## Open questions for the model owners
 
 1. Is the first Sprint 4 health outcome definitely low birth weight, or should
    the contract also prepare infant/neonatal mortality now?

@@ -7,6 +7,11 @@ app for the browser experience.
 This site explains how to run the platform locally and operate its application,
 model, and climate data pipeline.
 
+CHART is developed as open-source infrastructure under the GNU Affero General
+Public License v3.0, with the aim of supporting digital-public-good
+principles. Read the [licensing guide](licensing.md) for the practical
+implications and third-party data and model boundaries.
+
 ## Start here
 
 Follow [Getting started](getting-started.md) to install CHART, start the complete
@@ -27,6 +32,29 @@ CHART has one Python backend (`backend/chart/`):
 
 The retired Fastify/Drizzle API is not installed, started, or deployed.
 
+## How the pieces connect
+
+Dagster does not own application requests or user-facing API routes. FastAPI
+saves durable work in Postgres, and Dagster claims that work, prepares the
+required climate inputs, and hands validated inputs to the model. The public
+action repository remains a separate publishing service that CHART reads over
+HTTP.
+
+```mermaid
+flowchart LR
+    repository["Public action repository<br/>API or snapshot"] --> adapter["FastAPI repository adapter"]
+    adapter --> web["CHART web"]
+
+    web --> api["FastAPI"]
+    api --> requests[("Postgres<br/>saved requests")]
+    requests --> dagster["Dagster sensor and job"]
+    providers["Climate data providers"] --> dagster
+    dagster --> inputs[("Postgres<br/>validated climate inputs")]
+    inputs --> model["Versioned model"]
+    model --> results[("Postgres<br/>saved results")]
+    results --> api
+```
+
 ## Read next
 
 | Page | Use it for |
@@ -38,3 +66,4 @@ The retired Fastify/Drizzle API is not installed, started, or deployed.
 | [API explorer](api-reference.md) | Browse the published API contracts |
 | [Data pipeline](data-pipeline.md) | Run Dagster assets and materialisation |
 | [Add a geography and model](add-geography-and-model.md) | Extend the supported analytical areas |
+| [Digital public good and licensing](licensing.md) | Understand CHART's AGPL licence, source availability, and third-party boundaries |

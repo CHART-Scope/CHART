@@ -12,9 +12,9 @@ extracts.
 1. **Confirm access and storage** (#146): record which India NFHS-5 and Kenya
    DHS files are accessible, where they are stored locally, and what cannot be
    shared.
-2. **Confirm MaQueens workflow dependency** (#147): get the R code or a column
-   list for the first outcome. Until then, treat the first outcome as low birth
-   weight and mark exact columns as draft.
+2. **Confirm the health-model workflow dependency** (#147): get the R code or a
+   column list for the first outcome. Until then, treat the first outcome as
+   low birth weight and mark exact columns as draft.
 3. **Fill the column map** (#148): update
    `docs/health-survey-column-map.csv` with exact source columns, filters, and
    output shape.
@@ -46,8 +46,8 @@ extracts.
 
 ## Current assumption for exploration
 
-Use **low birth weight** as the first health outcome unless MaQueens confirms a
-different Sprint 4 target.
+Use **low birth weight** as the first health outcome unless the model owners
+confirm a different Sprint 4 target.
 
 Expected derived field:
 
@@ -55,9 +55,9 @@ Expected derived field:
 low_birth_weight = birth_weight_g < 2500
 ```
 
-This is not enough by itself. The implementation still needs MaQueens'
-confirmed filters for special/missing birth-weight values and the exact lag
-window used to connect births to climate exposure.
+This is not enough by itself. The implementation still needs approved filters
+for special/missing birth-weight values and the exact lag window used to
+connect births to climate exposure.
 
 ## Safe outputs from exploration
 
