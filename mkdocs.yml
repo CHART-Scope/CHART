@@ -1,8 +1,12 @@
 site_name: CHART
 site_description: Climate-health planning platform documentation
-site_url: https://chart.example.org
-repo_url: https://github.com/scope/CHART
-repo_name: scope/CHART
+site_url: https://chart-scope.github.io/CHART/docs/
+repo_url: https://github.com/CHART-Scope/CHART
+repo_name: CHART-Scope/CHART
+
+exclude_docs: |
+  architecture.md
+  tdd.md
 
 theme:
   name: material
@@ -53,14 +57,17 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Getting started: getting-started.md
   - Python backend:
       - Overview: python-backend.md
       - Add a geography and model: add-geography-and-model.md
       - Climate API: climate-api.md
-      - OpenAPI reference: api-reference.md
+      - API explorer: api-reference.md
+  - Modeling:
+      - Overview: modeling.md
+      - Health input contract: health-input-contract.md
+      - Survey exploration guide: health-survey-exploration-guide.md
   - Data pipeline: data-pipeline.md
-  - Architecture: architecture.md
-  - Technical design (draft): tdd.md
 
 extra:
   generator: false

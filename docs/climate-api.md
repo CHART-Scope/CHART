@@ -3,6 +3,9 @@
 The Python service is the only CHART application API. Its local address is
 `http://127.0.0.1:3210`.
 
+Read [Modeling](modeling.md) before interpreting LBW odds ratios, confidence
+intervals, or extrapolation warnings.
+
 ## See and test the API
 
 - Swagger: `http://127.0.0.1:3210/docs`
@@ -11,6 +14,9 @@ The Python service is the only CHART application API. Its local address is
 
 Run it with `make climate-api`. Refresh the checked-in API file with
 `make climate-openapi`.
+
+For a reference that works without starting CHART, use the published
+[API explorer](api-reference.md).
 
 ## Prediction flow
 

@@ -1,4 +1,4 @@
-name: Storybook Pages
+name: Project Pages
 
 on:
   pull_request:
@@ -7,8 +7,11 @@ on:
       - ".prettierignore"
       - ".prettierrc.json"
       - "Makefile"
+      - "docs/**"
+      - "mkdocs.yml"
       - "package.json"
       - "package-lock.json"
+      - "scripts/check_docs_links.py"
       - "web/.storybook/**"
       - "web/package.json"
       - "web/public/**"
@@ -23,8 +26,11 @@ on:
       - ".prettierignore"
       - ".prettierrc.json"
       - "Makefile"
+      - "docs/**"
+      - "mkdocs.yml"
       - "package.json"
       - "package-lock.json"
+      - "scripts/check_docs_links.py"
       - "web/.storybook/**"
       - "web/package.json"
       - "web/public/**"
@@ -41,7 +47,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Storybook
+    name: Build project site
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -62,6 +68,16 @@ jobs:
       - name: Typecheck web
         run: npm run typecheck:web
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+
+      - name: Install documentation dependencies
+        run: python -m pip install -r docs/requirements.txt
+
       - name: Configure Pages
         id: pages
         if: github.event_name != 'pull_request'
@@ -72,14 +88,20 @@ jobs:
         env:
           STORYBOOK_BASE_URL: ${{ steps.pages.outputs.base_path }}
 
-      - name: Upload Storybook artifact
+      - name: Build documentation
+        run: python -m mkdocs build --strict --site-dir web/storybook-static/docs
+
+      - name: Check documentation links
+        run: python scripts/check_docs_links.py web/storybook-static/docs
+
+      - name: Upload project site
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: web/storybook-static
 
   deploy:
-    name: Deploy Storybook to GitHub Pages
+    name: Deploy project site
     if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
