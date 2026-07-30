@@ -22,7 +22,7 @@ For each operation, the explorer shows:
     deployment. To execute requests, start the API and open the runnable local
     Swagger interface.
 
-[Open runnable local Swagger](http://127.0.0.1:3210/docs){ .md-button .md-button--primary }
+After starting the API, open `http://127.0.0.1:3210/docs` for runnable Swagger.
 
 The local API base URL is `http://127.0.0.1:3210`. Start it with:
 
