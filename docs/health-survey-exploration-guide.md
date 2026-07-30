@@ -1,76 +1,110 @@
 # NFHS/DHS health survey exploration guide
 
-Parent issue: [Prepare NFHS/DHS health input contract for modeling](https://github.com/CHART-Scope/CHART/issues/127)
+This guide explains where restricted DHS/NFHS survey data fits into CHART,
+what the health model needs, and which outputs are safe to share. Raw
+respondent records are model-development inputs; they are not sent to the
+runtime CHART API.
 
-This guide is the first safe exploration step for the health-data side of the
-CHART modeling workflow. It is designed for restricted DHS/NFHS microdata:
-inspect structure and metadata, but do not commit raw records or respondent
-extracts.
+## Where survey data fits
 
-## Working order
+```mermaid
+flowchart LR
+    raw["Restricted DHS/NFHS files<br/>local approved storage"]
+    extract["Local extraction<br/>columns, filters, weights"]
+    validate["Validated model rows<br/>not committed to Git"]
+    train["Health model training<br/>and validation"]
+    bundle["Versioned R model bundle<br/>private artefact storage"]
+    api["LBW inference service<br/>runtime API"]
 
-1. **Confirm access and storage** (#146): record which India NFHS-5 and Kenya
-   DHS files are accessible, where they are stored locally, and what cannot be
-   shared.
-2. **Confirm the health-model workflow dependency** (#147): get the R code or a
-   column list for the first outcome. Until then, treat the first outcome as
-   low birth weight and mark exact columns as draft.
-3. **Fill the column map** (#148): update
-   `docs/health-survey-column-map.csv` with exact source columns, filters, and
-   output shape.
-4. **Close the parent** (#127): only after access/storage, selected indicators,
-   and the extraction map are reviewable.
+    raw --> extract --> validate --> train --> bundle --> api
+```
 
-## Files to look for after approved access
+The checked-in column map documents the extraction contract. It does not grant
+access to the underlying survey files and must not contain respondent values.
+
+## Exploration sequence
+
+1. Confirm approved datasets, access rights, and local storage.
+2. Confirm the model contract: outcome, source columns, filters, survey
+   weights, geography join, exposure window, and output shape.
+3. Update `docs/health-survey-column-map.csv` with exact source fields and
+   unresolved decisions.
+4. Validate the derived schema without publishing respondent-level data.
+5. Package the fitted model as a versioned artefact for the runtime inference
+   service.
+
+## Files to inspect after approved access
 
 | File family | Why it matters | Exploration output |
 | --- | --- | --- |
-| BR or KR birth/child record | Birth date, birth weight, child sex, survival/death fields | List exact columns used for outcome and timing |
-| IR individual/women record | Maternal covariates and survey design fields | Confirm whether covariates are already present in BR/KR or need joins |
-| GE GPS cluster file | Cluster coordinates or region metadata for climate exposure joins | Confirm join key and privacy displacement caveat |
-| Recode dictionary / variable labels | Field meanings and special missing codes | Record filters for invalid or non-measured values |
+| BR or KR birth/child record | Birth date, birth weight, child sex, survival/death fields | Exact outcome and timing columns |
+| IR individual/women record | Maternal covariates and survey design fields | Required joins and covariates |
+| GE GPS cluster file | Cluster or region metadata for climate exposure joins | Join level and privacy-displacement caveat |
+| Recode dictionary / variable labels | Field meanings and special missing codes | Exclusion and quality rules |
 
-## First-pass exploration checklist
+## First-pass checklist
 
-- Record dataset name, country, survey years, file family, and file format.
-- List available columns and labels for birth date, birth weight, survival,
-  age at death, cluster, region, sample weight, PSU, strata, and GPS join.
+- Record dataset name, country, survey years, file family, and format.
+- List columns and labels for birth date, birth weight, survival, age at death,
+  cluster, region, sample weight, PSU, strata, and the climate join.
 - Count rows and missingness for candidate outcome fields.
-- Identify special codes for missing, not weighed, refused, or implausible
-  birth-weight values.
-- Confirm whether the model needs individual birth rows or aggregated
+- Identify special values for missing, not weighed, refused, or implausible
+  birth weights.
+- Confirm whether model preparation uses individual birth rows or aggregated
   geography-month rows.
-- Confirm climate join level: GPS cluster, admin/state/county, or survey
-  region.
-- Do not copy raw records into GitHub, docs, screenshots, or fixtures.
+- Confirm whether climate exposure joins at GPS cluster, administrative area,
+  or survey region.
+- Do not copy raw records into GitHub, documentation, screenshots, or fixtures.
 
-## Current assumption for exploration
+## Current model assumption
 
-Use **low birth weight** as the first health outcome unless the model owners
-confirm a different Sprint 4 target.
-
-Expected derived field:
+The current runtime model estimates the temperature association with **low
+birth weight**. The working derived field is:
 
 ```txt
 low_birth_weight = birth_weight_g < 2500
 ```
 
-This is not enough by itself. The implementation still needs approved filters
-for special/missing birth-weight values and the exact lag window used to
-connect births to climate exposure.
+That definition is incomplete until the model contract also specifies special
+and missing-value filters, survey design handling, and the pregnancy or
+trimester exposure window.
+
+## Runtime boundary
+
+Survey microdata is used before deployment to produce the versioned model
+bundle. At runtime, CHART sends three monthly maximum-temperature values,
+geography, trimester, and reference temperature to the LBW inference service.
+The service returns a conditional odds ratio; it does not calculate an
+individual baby's probability of low birth weight.
+
+```mermaid
+flowchart LR
+    user["Planner request"]
+    chart["CHART climate API"]
+    climate[("Postgres<br/>district_climate")]
+    model["LBW inference service<br/>versioned R model"]
+    result["Conditional odds ratio<br/>with model metadata"]
+
+    user --> chart
+    climate --> chart
+    chart -->|"area, trimester, 3-month tmax, reference"| model
+    model --> result --> chart --> user
+```
 
 ## Safe outputs from exploration
 
 Safe to commit:
 
 - column names and labels;
-- field availability/missingness summaries;
+- field availability and missingness summaries;
 - extraction contracts and pseudocode;
-- small fake examples that do not come from respondent records.
+- aggregate validation summaries;
+- small synthetic examples that do not come from respondent records.
 
 Do not commit:
 
 - raw `.DTA`, `.SAV`, `.DAT`, `.ZIP`, or GPS files;
 - respondent-level CSV exports;
 - screenshots showing real respondent rows;
-- exact displaced GPS points unless access/data-rights allow it.
+- exact displaced GPS points unless access and data-rights rules allow them;
+- fitted model artefacts that are licensed or classified for private storage.

@@ -8,9 +8,9 @@ This site explains how to run the platform locally and operate its application,
 model, and climate data pipeline.
 
 CHART is developed as open-source infrastructure under the GNU Affero General
-Public License v3.0, with the aim of supporting digital-public-good
-principles. Read the [licensing guide](licensing.md) for the practical
-implications and third-party data and model boundaries.
+the [GNU Affero General Public License v3.0](licensing.md). The project is
+designed for inspection, local adaptation, and independent deployment while
+supporting digital-public-good principles.
 
 ## Start here
 
@@ -66,4 +66,6 @@ flowchart LR
 | [API explorer](api-reference.md) | Browse the published API contracts |
 | [Data pipeline](data-pipeline.md) | Run Dagster assets and materialisation |
 | [Add a geography and model](add-geography-and-model.md) | Extend the supported analytical areas |
+| [Health survey exploration](health-survey-exploration-guide.md) | Survey-to-model flow and safe outputs |
+| [Health input contract](health-input-contract.md) | Model-preparation schema and runtime boundary |
 | [Digital public good and licensing](licensing.md) | Understand CHART's AGPL licence, source availability, and third-party boundaries |
