@@ -1,18 +1,55 @@
 #!/usr/bin/env bash
-# CHART pre-commit hook: keep generated artifacts in sync with source.
+# CHART pre-commit hook: format staged files and keep generated artifacts fresh.
 # Install with `make install-hooks` (sets core.hooksPath = .githooks).
 
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-STAGED="$(git diff --cached --name-only)"
+cd "$REPO_ROOT"
 
-# Regenerate docs/openapi/climate.json when backend Python routes/schemas change.
-if echo "$STAGED" | grep -qE '^backend/chart/.*\.py$'; then
+STAGED_ALL="$(git diff --cached --name-only --diff-filter=ACM)"
+
+# Filter helpers — only touch files that (a) are staged and (b) still exist
+# after any earlier hook step re-staged something.
+staged_matching() {
+  local pattern="$1"
+  # `|| true` keeps set -e / pipefail happy when grep finds no matches.
+  echo "$STAGED_ALL" | { grep -E "$pattern" || true; } | while IFS= read -r path; do
+    [ -f "$path" ] && printf '%s\n' "$path"
+  done
+}
+
+# --- Python: black + ruff --fix on staged .py files -------------------------
+STAGED_PY="$(staged_matching '\.py$' | tr '\n' ' ')"
+if [ -n "${STAGED_PY// /}" ]; then
+  if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
+    "$REPO_ROOT/.venv/bin/python" -m black --quiet $STAGED_PY
+    "$REPO_ROOT/.venv/bin/python" -m ruff check --fix --quiet $STAGED_PY || true
+    git add $STAGED_PY
+    echo "pre-commit: formatted $(echo $STAGED_PY | wc -w | tr -d ' ') Python file(s)"
+  else
+    echo "pre-commit: skipping Python format (no .venv/bin/python — run make climate-install)" >&2
+  fi
+fi
+
+# --- Web: prettier --write on staged web files ------------------------------
+STAGED_WEB="$(staged_matching '\.(ts|tsx|js|jsx|mjs|css|json|md|yml|yaml)$' | tr '\n' ' ')"
+if [ -n "${STAGED_WEB// /}" ]; then
+  if command -v npx >/dev/null 2>&1; then
+    npx --no-install prettier --write --log-level=warn --ignore-unknown $STAGED_WEB
+    git add $STAGED_WEB
+    echo "pre-commit: formatted $(echo $STAGED_WEB | wc -w | tr -d ' ') web file(s)"
+  else
+    echo "pre-commit: skipping Prettier (npx not found)" >&2
+  fi
+fi
+
+# --- OpenAPI: regenerate docs/openapi/climate.json when backend routes/schemas change
+if echo "$STAGED_ALL" | grep -qE '^backend/chart/.*\.py$'; then
   if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
     "$REPO_ROOT/.venv/bin/python" -m chart.api.export_openapi \
       --output "$REPO_ROOT/docs/openapi/climate.json"
-    git add "$REPO_ROOT/docs/openapi/climate.json"
+    git add docs/openapi/climate.json
     echo "pre-commit: regenerated docs/openapi/climate.json"
   else
     echo "pre-commit: skipping OpenAPI regen (no .venv/bin/python — run make climate-install)" >&2
