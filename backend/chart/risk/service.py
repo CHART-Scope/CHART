@@ -156,9 +156,7 @@ def load_short_term_view(
     admin_unit_code: str | None = None,
 ) -> ShortTermRiskResponse:
     try:
-        admin_unit = _resolve_admin_unit(
-            session, app_geography_id, admin_unit_code
-        )
+        admin_unit = _resolve_admin_unit(session, app_geography_id, admin_unit_code)
     except NoAdminUnitForGeography:
         if admin_unit_code is not None:
             raise
@@ -188,9 +186,7 @@ def load_long_term_view(
     admin_unit_code: str | None = None,
 ) -> LongTermRiskResponse:
     try:
-        admin_unit = _resolve_admin_unit(
-            session, app_geography_id, admin_unit_code
-        )
+        admin_unit = _resolve_admin_unit(session, app_geography_id, admin_unit_code)
     except NoAdminUnitForGeography:
         if admin_unit_code is not None:
             raise
@@ -243,17 +239,13 @@ def load_current_observation(
     """
 
     try:
-        admin_unit = _resolve_admin_unit(
-            session, app_geography_id, admin_unit_code
-        )
+        admin_unit = _resolve_admin_unit(session, app_geography_id, admin_unit_code)
     except NoAdminUnitForGeography:
         if admin_unit_code is not None:
             raise
         return _empty_current_observation()
 
-    row = _select_latest_observed(
-        session, admin_unit.id, CURRENT_OBSERVATION_VARIABLE
-    )
+    row = _select_latest_observed(session, admin_unit.id, CURRENT_OBSERVATION_VARIABLE)
     if row is None:
         row = _select_latest_observed(session, admin_unit.id, variable=None)
 
@@ -316,9 +308,7 @@ def _empty_current_observation() -> CurrentObservationResponse:
     )
 
 
-def _build_long_term_scenario(
-    name: str, rows: list[HealthImpact]
-) -> LongTermScenario:
+def _build_long_term_scenario(name: str, rows: list[HealthImpact]) -> LongTermScenario:
     by_horizon: dict[str, HealthImpact] = {}
     for row in rows:
         by_horizon.setdefault(row.horizon, row)

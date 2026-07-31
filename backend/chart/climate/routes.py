@@ -182,9 +182,7 @@ def _require_place_access(user: CurrentUserContext, geography_id: str) -> None:
     require_geography_access(user, get_place_path(geography_id))
 
 
-def _require_geography_only_access(
-    user: CurrentUserContext, geography_id: str
-) -> None:
+def _require_geography_only_access(user: CurrentUserContext, geography_id: str) -> None:
     """Guard for endpoints that need scope but not a configured admin_unit.
 
     ``get_place_path`` walks AppGeography -> admin_unit -> active model

@@ -660,7 +660,8 @@ def _resolve_climate_run_for_record(
         )
         .join(
             ClimateInputWindowRecord,
-            ClimateInputWindowRecord.id == ClimateInputMonthRecord.climate_input_window_id,
+            ClimateInputWindowRecord.id
+            == ClimateInputMonthRecord.climate_input_window_id,
         )
         .where(ClimateInputWindowRecord.id == window_id)
         .order_by(ClimateInputMonthRecord.lag_index.asc())
