@@ -65,6 +65,6 @@ jobs:
       - name: Test API, orchestration, and source adapters
         env:
           DATABASE_URL: postgresql+psycopg://chart:chart@127.0.0.1:5432/chart
-        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests pipelines/LBW_demo/tests -q
+        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests pipelines/models/lbw/tests -q
       - name: Check deploy script
         run: bash -n infra/aws/deploy-app.sh

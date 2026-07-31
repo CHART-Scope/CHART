@@ -20,7 +20,7 @@ an individual baby's probability of low birth weight.
 | Output | Conditional odds ratio, 95% confidence interval, and support warning |
 | Model version | `1.0.0` |
 | Training | Performed in an upstream restricted-data modeling project |
-| Inference | Implemented in `pipelines/LBW_demo/` |
+| Inference | Implemented in `pipelines/models/lbw/` |
 
 The ten division models cover Bhopal, Chambal, Gwalior, Indore, Jabalpur,
 Narmadapuram, Rewa, Sagar, Shahdol, and Ujjain. A separate pooled model covers
@@ -136,12 +136,12 @@ Requirements:
 
 - R 4.0 or newer;
 - the `dlnm`, `plumber`, `jsonlite`, and `optparse` R packages;
-- approved copies of both model bundles in `pipelines/LBW_demo/model/`.
+- approved copies of both model bundles in `pipelines/models/lbw/model/`.
 
 Install dependencies and verify the artifacts:
 
 ```bash
-cd pipelines/LBW_demo
+cd pipelines/models/lbw
 bash setup.sh
 ```
 
@@ -161,7 +161,7 @@ The smoke tests verify that:
 
 ## Run the modeling API
 
-From `pipelines/LBW_demo/`:
+From `pipelines/models/lbw/`:
 
 ```bash
 bash run_api.sh
@@ -245,4 +245,4 @@ should be completed before treating model activation as production-grade.
   blocks, validation, and a versioned artifact release.
 
 For implementation-level details, see the
-[LBW demo README](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/LBW_demo/README.md).
+[LBW demo README](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/lbw/README.md).

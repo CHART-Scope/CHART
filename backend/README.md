@@ -46,7 +46,7 @@ CHART_ADMIN_RECOVERY_PASSWORD='<new-password>' chart-admin-recover \
 
 Follow [Add a geography and model](../docs/add-geography-and-model.md). The
 model handoff file is
-[`pipelines/LBW_demo/model-release.example.json`](../pipelines/LBW_demo/model-release.example.json).
+[`pipelines/models/lbw/model-release.example.json`](../pipelines/models/lbw/model-release.example.json).
 
 ## Invitation emails
 

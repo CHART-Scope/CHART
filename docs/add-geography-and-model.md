@@ -8,7 +8,7 @@ Use one release file to connect a CHART place, its climate area, and its model.
 2. A stable CHART place code for every model area.
 3. The model file or files.
 4. A `model-release.json` based on
-   `pipelines/LBW_demo/model-release.example.json`.
+   `pipelines/models/lbw/model-release.example.json`.
 
 Here, a boundary simply means the saved map shape for the area. Climate data
 uses that shape to include the right grid cells and exclude neighbouring areas.
@@ -30,7 +30,7 @@ For the current MP release:
 chart-bootstrap-mp \
   --source-manifest pipelines/boundaries/manifests/mp_model_areas_v1.json \
   --crosswalk pipelines/boundaries/data/mp_district_division_crosswalk.csv \
-  --model-release pipelines/LBW_demo/model-release.example.json \
+  --model-release pipelines/models/lbw/model-release.example.json \
   --activate-model
 ```
 

@@ -1,7 +1,7 @@
 # Deploy the LBW demo to CHART EC2
 
 The LBW service is deployed automatically when a commit to `main` changes
-`pipelines/LBW_demo/`, `infra/`, or the app-deploy workflow. It runs as the
+`pipelines/models/lbw/`, `infra/`, or the app-deploy workflow. It runs as the
 internal `chart-lbw` Docker container and is reachable through the existing
 reverse proxy at:
 
@@ -95,7 +95,7 @@ container to download it without overwriting the previous cached model.
 ## Troubleshooting
 
 - **Deployment does not start:** confirm the commit includes a path matched by
-  `.github/workflows/app-deploy.yml`, especially `pipelines/LBW_demo/**`.
+  `.github/workflows/app-deploy.yml`, especially `pipelines/models/lbw/**`.
 - **`LBW inference through proxy` times out:** inspect the service log:
   `docker logs chart-lbw`. Usually the instance role cannot read the S3 object
   or the URI is wrong.
