@@ -3,19 +3,14 @@
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo } from "react";
 
-import { AppShell, type NavItem } from "@/components/AppShell";
+import { AppShell } from "@/components/AppShell";
 import { IconSprite } from "@/components/Icon";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { PredictionsPanel } from "@/features/dashboard";
+import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
 
 import styles from "./page.module.css";
-
-const planningNav: NavItem = {
-  id: "planning",
-  label: "Planning center",
-  icon: "users",
-};
 
 type PageProps = {
   params: Promise<{ geo: string }>;
@@ -62,14 +57,12 @@ function AuthorizedDashboard({
     if (!hasAccess) router.replace("/access-pending");
   }, [hasAccess, router]);
 
-  const nav: NavItem[] = session.user.roles.includes("chart_admin")
-    ? [planningNav, { id: "users", label: "People & access", icon: "settings" }]
-    : [planningNav];
+  const nav = appNavForRoles(session.user.roles);
 
   const handleNavigate = useCallback(
     (id: string) => {
-      if (id === "planning") router.push("/plan");
-      else if (id === "users") router.push("/plan");
+      const target = NAV_ROUTE[id];
+      if (target) router.push(target);
     },
     [router],
   );
