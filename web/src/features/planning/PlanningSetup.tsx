@@ -1,8 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
-import { Select } from "@/components/Select";
 import type { GeographyRecord } from "@/lib/planningClient";
 import type { PlanningSelection } from "./planningWireframe";
 import styles from "./PlanningSetup.module.css";
@@ -17,6 +18,17 @@ type Props = {
   onStart: () => void;
 };
 
+/**
+ * The two variables in the "Mad Libs" sentence are locked to whatever
+ * the deployed model supports. Today the only registered model is the
+ * heat -> LBW curve for Madhya Pradesh, so the hazard is Extreme heat
+ * and the health-domain framing is Maternal, newborn and child health.
+ * When a second model lands, replace the constants with a fetch from
+ * the model registry - the layout is already built around a menu.
+ */
+const DEPLOYED_HAZARD = "Extreme heat";
+const DEPLOYED_HEALTH_DOMAIN = "Maternal, newborn and child health";
+
 export function PlanningSetup({
   selection,
   areas,
@@ -26,97 +38,129 @@ export function PlanningSetup({
   onChange,
   onStart,
 }: Props) {
-  const canSubmit = Boolean(selection.area) && !isLoading && !isSubmitting;
+  const activeArea = useMemo(
+    () => areas.find((area) => area.id === selection.area) ?? null,
+    [areas, selection.area],
+  );
+
+  const canStart = Boolean(activeArea) && !isLoading && !isSubmitting;
+  const country = activeArea ? countryFromPath(activeArea.path) : null;
+  const areaName = activeArea?.name ?? "your area";
 
   return (
     <div className={styles.wrap}>
+      {country ? (
+        <div className={styles.breadcrumb} aria-label="Current geography">
+          <span>{country}</span>
+          <Icon name="arrow-right" size={11} />
+          <strong>{areaName}</strong>
+        </div>
+      ) : null}
+
       <header className={styles.header}>
-        <div className={styles.eyebrow}>Heat and low birth weight</div>
-        <h1>Choose an area to open its dashboard</h1>
+        <h1>What would you like to plan for, together?</h1>
         <p>
-          Pick the place you are planning for. The dashboard shows the Short-term
-          seasonal outlook and the Long-term projection side by side.
+          Build a sentence below. CHART will generate the shared risk picture,
+          recommended actions, and planning tools your departments can act on
+          together.
         </p>
       </header>
 
-      <div className={styles.layout}>
-        <form
-          className={styles.form}
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (canSubmit) onStart();
-          }}
+      <form
+        className={styles.card}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (canStart) onStart();
+        }}
+      >
+        <button
+          type="button"
+          className={styles.bookmark}
+          aria-label="Save this combination"
+          title="Save this combination"
+          disabled
         >
-          <section className={styles.section}>
-            <div className={styles.stepHeading}>
-              <span>1</span>
-              <div>
-                <h2>Where are you planning?</h2>
-              </div>
-            </div>
-            <Select
-              id="planning-area"
-              label="Area"
-              fullWidth
+          <Icon name="bookmark" size={16} />
+        </button>
+
+        <p className={styles.sentence}>
+          <span>We&apos;re planning together for the impacts of </span>
+          <ModelPill
+            label={DEPLOYED_HAZARD}
+            hint="This is the hazard the deployed model covers."
+          />
+          <span> on </span>
+          <ModelPill
+            label={DEPLOYED_HEALTH_DOMAIN}
+            hint="The deployed model estimates low birth weight within maternal, newborn, and child health."
+          />
+          <span> in {areaName}.</span>
+        </p>
+
+        {areas.length > 1 ? (
+          <label className={styles.areaSwitcher}>
+            <span>Switch area</span>
+            <select
               value={selection.area}
-              disabled={areas.length === 0}
-              options={areas.map((area) => ({ value: area.id, label: area.name }))}
               onChange={(event) =>
                 onChange({ ...selection, area: event.currentTarget.value })
               }
-            />
-            {error ? (
-              <div className={styles.error} role="alert">
-                {error}
-              </div>
-            ) : null}
-          </section>
-
-          <div className={styles.submitRow}>
-            <div>
-              <strong>Time horizon is chosen on the dashboard</strong>
-              <span>
-                Switch between the Short-term and Long-term tabs once the dashboard is open.
-              </span>
-            </div>
-            <Button
-              type="submit"
-              size="lg"
-              disabled={!canSubmit}
-              trailingIcon={<Icon name="arrow-right" size={15} />}
             >
-              {isSubmitting ? "Opening…" : "Open dashboard"}
-            </Button>
-          </div>
-        </form>
+              {areas.map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
-        <aside className={styles.aside} aria-label="What CHART will do">
-          <div className={styles.asideEyebrow}>On the dashboard you will see</div>
-          <ol>
-            <li>
-              <Icon name="check" size={15} />
-              Short-term seasonal outlook with 3 and 6 month cards
-            </li>
-            <li>
-              <Icon name="check" size={15} />
-              Long-term projections under three RCP scenarios
-            </li>
-            <li>
-              <Icon name="check" size={15} />
-              Confidence bands showing forecast uncertainty
-            </li>
-            <li>
-              <Icon name="check" size={15} />
-              Modeled numbers labelled with their source
-            </li>
-          </ol>
-          <div className={styles.fixedOutcome}>
-            <span>Health outcome</span>
-            <strong>Low birth weight</strong>
-            <small>This model currently estimates low birth weight only.</small>
+        {error ? (
+          <div className={styles.error} role="alert">
+            {error}
           </div>
-        </aside>
-      </div>
+        ) : null}
+
+        <div className={styles.ctaRow}>
+          <p className={styles.ctaHint}>Ready to build your shared risk picture</p>
+          <Button
+            type="submit"
+            size="md"
+            disabled={!canStart}
+            trailingIcon={<Icon name="arrow-right" size={14} />}
+          >
+            {isSubmitting ? "Opening…" : "Start planning together"}
+          </Button>
+        </div>
+      </form>
+
+      <section className={styles.saved} aria-labelledby="saved-scenarios">
+        <h2 id="saved-scenarios">Saved scenarios</h2>
+        <p>
+          No saved scenarios yet. Use the bookmark icon above to save a
+          combination you plan to revisit.
+        </p>
+      </section>
     </div>
   );
+}
+
+
+function ModelPill({ label, hint }: { label: string; hint: string }) {
+  return (
+    <span className={styles.modelPill} title={hint}>
+      {label}
+      <Icon name="chevron-down" size={12} />
+    </span>
+  );
+}
+
+
+function countryFromPath(path: string): string | null {
+  const parts = path.split("/").filter(Boolean);
+  if (parts.length === 0) return null;
+  return parts[0]
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
