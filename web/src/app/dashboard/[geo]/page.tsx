@@ -156,9 +156,7 @@ function AuthorizedDashboard({
               geographyId={geographyId}
               adminUnit={adminUnit}
               accessToken={session.accessToken}
-              supportsPrediction={
-                currentGeography?.supportsPrediction ?? undefined
-              }
+              supportsPrediction={currentGeography?.supportsPrediction ?? undefined}
             />
           </div>
 
