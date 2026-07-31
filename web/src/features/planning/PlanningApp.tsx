@@ -25,14 +25,20 @@ import {
   targetForPeriod,
   type PlanningSelection,
 } from "./planningWireframe";
+import { UserManagement } from "./UserManagement";
 
-type View = "planning" | "result";
+type View = "planning" | "result" | "users";
 
-const nav: NavItem[] = [{ id: "planning", label: "Start planning", icon: "users" }];
+const planningNav: NavItem = {
+  id: "planning",
+  label: "Start planning",
+  icon: "users",
+};
 
 type Props = {
   accessToken: string;
   username: string;
+  roles: string[];
   geographyScopes: string[];
   activeGeographyId?: string;
   onSignOut: () => void;
@@ -41,6 +47,7 @@ type Props = {
 export function PlanningApp({
   accessToken,
   username,
+  roles,
   geographyScopes,
   activeGeographyId,
   onSignOut,
@@ -57,6 +64,9 @@ export function PlanningApp({
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const nav: NavItem[] = roles.includes("chart_admin")
+    ? [planningNav, { id: "users", label: "People & access", icon: "settings" }]
+    : [planningNav];
 
   const refreshHistory = useCallback(
     async (geographyId: string) => {
@@ -250,12 +260,14 @@ export function PlanningApp({
       <IconSprite />
       <AppShell
         nav={nav}
-        activeNav="planning"
-        onNavigate={() => setView("planning")}
+        activeNav={view === "users" ? "users" : "planning"}
+        onNavigate={(id) => setView(id === "users" ? "users" : "planning")}
         onSignOut={onSignOut}
         userLabel={username}
       >
-        {view === "planning" ? (
+        {view === "users" ? (
+          <UserManagement accessToken={accessToken} />
+        ) : view === "planning" ? (
           <PlanningSetup
             selection={selection}
             areas={areas}
