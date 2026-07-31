@@ -1,0 +1,77 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem 1.15rem;
+  border: 1px solid var(--color-border-subtle, #e6e6e6);
+  border-radius: 8px;
+  background: #fff;
+  min-height: 22rem;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted, #4a4a4a);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: end;
+  margin: 0.5rem 0 1rem;
+}
+
+.figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.figureLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--color-charcoal, #111);
+  font-weight: 500;
+}
+
+.sunIcon {
+  color: #c9922e;
+  font-size: 1rem;
+}
+
+.shadeIcon {
+  color: var(--color-nexus, #3455d8);
+  font-size: 1rem;
+}
+
+.figureCaption {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-muted, #4a4a4a);
+  text-align: center;
+}
+
+.body {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-charcoal, #111);
+  line-height: 1.55;
+}
