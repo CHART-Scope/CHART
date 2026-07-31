@@ -181,8 +181,9 @@ export async function submitPrediction(
         geography_id: input.geographyId,
         planning_date: `${input.planningMonth}-01`,
         outcome: "lbw",
-        // Window 1 is the approved cumulative three-month model block.
-        pregnancy_windows: [1],
+        // The dashboard reports the third-trimester signal only; that
+        // is where the LBW model's evidence is strongest.
+        pregnancy_windows: [3],
         planning_target: input.target,
         projection_scenario: input.scenario,
         projection_period: input.projectionPeriod,
