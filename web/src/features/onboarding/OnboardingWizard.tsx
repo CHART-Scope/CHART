@@ -284,12 +284,13 @@ export function OnboardingWizard({
                         className={styles.setupSelect}
                         placeholder="— Choose —"
                         value={state.subgeo ?? ""}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          const value = event.currentTarget.value;
                           setState((current) => ({
                             ...current,
-                            subgeo: event.currentTarget.value || null,
-                          }))
-                        }
+                            subgeo: value || null,
+                          }));
+                        }}
                         options={subOptions.map((option) => ({
                           value: option,
                           label: option,
@@ -422,12 +423,13 @@ export function OnboardingWizard({
                 id="setup-admin-name"
                 label="Full name"
                 value={state.adminName}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
                   setState((current) => ({
                     ...current,
-                    adminName: event.currentTarget.value,
-                  }))
-                }
+                    adminName: value,
+                  }));
+                }}
                 autoComplete="name"
               />
               <TextInput
@@ -435,12 +437,13 @@ export function OnboardingWizard({
                 label="Email address"
                 type="email"
                 value={state.adminEmail}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
                   setState((current) => ({
                     ...current,
-                    adminEmail: event.currentTarget.value,
-                  }))
-                }
+                    adminEmail: value,
+                  }));
+                }}
                 autoComplete="email"
               />
               <TextInput
@@ -449,12 +452,13 @@ export function OnboardingWizard({
                 type="password"
                 minLength={8}
                 value={state.adminPassword}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
                   setState((current) => ({
                     ...current,
-                    adminPassword: event.currentTarget.value,
-                  }))
-                }
+                    adminPassword: value,
+                  }));
+                }}
                 autoComplete="new-password"
               />
             </div>
