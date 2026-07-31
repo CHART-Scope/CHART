@@ -49,12 +49,12 @@ run: local-setup climate-install lbw-check
 	$(MAKE) -j4 lbw-run climate-api-run dagster-run web
 
 verify: climate-install identity-test python-check web-typecheck web-build format-check
-	$(VENV_PYTHON) -m pytest backend/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/LBW_demo/tests -q
+	$(VENV_PYTHON) -m pytest backend/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/models/lbw/tests -q
 
 python-check:
-	$(VENV_PYTHON) -m ruff check backend orchestration pipelines/boundaries pipelines/era5_heat/src pipelines/era5_heat/tests pipelines/seasonal_c3s pipelines/isimip_projection pipelines/LBW_demo/model_release.py pipelines/LBW_demo/tests
-	$(VENV_PYTHON) -m black --check backend orchestration pipelines/boundaries pipelines/seasonal_c3s pipelines/isimip_projection pipelines/era5_heat/src/era5_heat/__init__.py pipelines/era5_heat/src/era5_heat/aggregate.py pipelines/era5_heat/tests/test_aggregate.py pipelines/LBW_demo/model_release.py pipelines/LBW_demo/tests
-	$(VENV_PYTHON) -m mypy backend/chart orchestration/src pipelines/boundaries/src pipelines/era5_heat/src pipelines/seasonal_c3s/src pipelines/isimip_projection/src pipelines/LBW_demo/model_release.py --ignore-missing-imports --no-error-summary
+	$(VENV_PYTHON) -m ruff check backend orchestration pipelines/boundaries pipelines/era5_heat/src pipelines/era5_heat/tests pipelines/seasonal_c3s pipelines/isimip_projection pipelines/models/lbw/model_release.py pipelines/models/lbw/tests
+	$(VENV_PYTHON) -m black --check backend orchestration pipelines/boundaries pipelines/seasonal_c3s pipelines/isimip_projection pipelines/era5_heat/src/era5_heat/__init__.py pipelines/era5_heat/src/era5_heat/aggregate.py pipelines/era5_heat/tests/test_aggregate.py pipelines/models/lbw/model_release.py pipelines/models/lbw/tests
+	$(VENV_PYTHON) -m mypy backend/chart orchestration/src pipelines/boundaries/src pipelines/era5_heat/src pipelines/seasonal_c3s/src pipelines/isimip_projection/src pipelines/models/lbw/model_release.py --ignore-missing-imports --no-error-summary
 
 local-setup: services postgres-wait identity-wait climate-migrate identity-sync
 
@@ -254,7 +254,7 @@ ERA5_DIR := pipelines/era5_heat
 SEASONAL_DIR := pipelines/seasonal_c3s
 PROJECTION_DIR := pipelines/isimip_projection
 BOUNDARY_DIR := pipelines/boundaries
-LBW_DIR := pipelines/LBW_demo
+LBW_DIR := pipelines/models/lbw
 ORCH_DIR := orchestration
 BACKEND_DIR := backend
 CLIMATE_OUT := data/climate
