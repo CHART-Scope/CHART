@@ -1,49 +1,50 @@
 .strip {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.5fr);
-  gap: 1.25rem;
+  gap: var(--space-4);
   align-items: center;
-  padding: 0.85rem 1.15rem;
-  border: 1px solid var(--color-border-subtle, #e6e6e6);
-  border-radius: 6px;
-  background: var(--surface-card, #fafafa);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
 }
 
 .eyebrow {
   margin: 0;
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
+  font-family: var(--font-display);
+  font-size: var(--fs-eyebrow);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
-  color: var(--color-muted, #4a4a4a);
+  color: var(--color-text-muted);
 }
 
 .today {
-  margin: 0.15rem 0 0;
-  font-size: 0.95rem;
-  color: var(--color-fg, #111);
+  margin: 2px 0 0;
+  font-size: var(--fs-body-lg);
+  color: var(--color-charcoal);
   font-weight: 500;
 }
 
 .value {
-  font-family: var(--font-serif, Georgia, "Times New Roman", serif);
-  font-size: 1.8rem;
-  color: var(--color-accent, #7a1a4a);
+  font-family: var(--font-display);
+  font-size: var(--fs-hero);
+  color: var(--color-maroon);
   font-weight: 500;
   text-align: center;
   white-space: nowrap;
 }
 
 .source {
-  font-size: 0.78rem;
-  color: var(--color-muted, #4a4a4a);
-  line-height: 1.4;
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+  line-height: var(--lh-body);
   text-align: right;
 }
 
 @media (max-width: 720px) {
   .strip {
     grid-template-columns: 1fr;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
   .value,
   .source {

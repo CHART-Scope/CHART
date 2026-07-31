@@ -1,27 +1,28 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.82rem;
+  font-size: var(--fs-body-sm);
 }
 
 .table th,
 .table td {
-  padding: 0.35rem 0.55rem;
+  padding: var(--space-2) var(--space-3);
   text-align: left;
-  border-bottom: 1px solid var(--color-border-subtle, #e6e6e6);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .table th {
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
+  font-family: var(--font-display);
+  font-size: var(--fs-eyebrow);
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
-  color: var(--color-muted, #4a4a4a);
+  color: var(--color-text-muted);
   font-weight: 500;
 }
 
@@ -29,36 +30,36 @@
   display: inline-block;
   width: 10px;
   height: 10px;
-  border-radius: 50%;
-  margin-right: 0.5rem;
+  border-radius: var(--radius-pill);
+  margin-right: var(--space-2);
   vertical-align: middle;
 }
 
 .empty {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: center;
-  color: var(--color-muted, #4a4a4a);
-  padding: 1rem;
-  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  padding: var(--space-4);
+  font-size: var(--fs-body-lg);
   text-align: center;
 }
 
 .errorRow {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-3);
   align-items: center;
-  background: #fff3f3;
-  border: 1px solid #f4c9c9;
-  color: #7a1a1a;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
+  background: var(--color-sem-low-tint);
+  border: 1px solid var(--color-sem-low);
+  color: var(--color-sem-low);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-body-sm);
 }
 
 .footnote {
-  font-size: 0.72rem;
-  color: var(--color-muted, #4a4a4a);
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
   margin: 0;
 }

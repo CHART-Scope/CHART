@@ -1,11 +1,11 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem 1.15rem;
-  border: 1px solid var(--color-border-subtle, #e6e6e6);
-  border-radius: 6px;
-  background: #fff;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
   min-height: 22rem;
 }
 
@@ -13,39 +13,45 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  gap: var(--space-3);
 }
 
 .eyebrow {
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-muted, #4a4a4a);
   margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-eyebrow);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
 .status {
   margin: 0;
-  font-size: 0.75rem;
-  color: var(--color-muted, #4a4a4a);
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .status[data-phase="failed"] {
-  color: #7a1a1a;
+  color: var(--color-sem-low);
+}
+
+.status[data-phase="not_configured"] {
+  color: var(--color-amber);
 }
 
 .status[data-phase="completed"] {
-  color: var(--color-accent, #7a1a4a);
+  color: var(--color-maroon);
 }
 
 .dot {
   display: inline-block;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
-  background: var(--color-accent, #7a1a4a);
+  border-radius: var(--radius-pill);
+  background: var(--color-maroon);
   animation: pulse 1.4s ease-in-out infinite;
 }
 
