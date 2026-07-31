@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 
 import { Button } from "@/components/Button";
-import { ConfidenceBandChart, type ChartSeries } from "@/components/ConfidenceBandChart";
+import { ConfidenceBandChart, type ChartPoint, type ChartSeries } from "@/components/ConfidenceBandChart";
 import { StatCardWithBadge } from "@/components/StatCardWithBadge";
 import {
   fetchShortTermRisk,
@@ -85,33 +85,33 @@ function buildSeries(payload: ShortTermRiskResponse): ChartSeries[] {
     ["seas5_ensemble", { color: "#7a1a4a", label: "Seasonal outlook (1-6 mo)" }],
     ["rcp45", { color: "#b26499", label: "Near-term projection (RCP 4.5)" }],
   ]);
-  const byScenario = new Map<string, ChartSeries>();
+  const buffers = new Map<
+    string,
+    { color: string; label: string; points: ChartPoint[] }
+  >();
   for (const point of payload.series) {
     const template = map.get(point.scenario) ?? {
       color: "#4a4a4a",
       label: point.scenario,
     };
-    let series = byScenario.get(point.scenario);
-    if (!series) {
-      series = {
-        id: point.scenario,
-        label: template.label,
-        color: template.color,
-        points: [],
-      };
-      byScenario.set(point.scenario, series);
+    let buffer = buffers.get(point.scenario);
+    if (!buffer) {
+      buffer = { color: template.color, label: template.label, points: [] };
+      buffers.set(point.scenario, buffer);
     }
-    (series.points as typeof series.points & Array<unknown>) = [
-      ...series.points,
-      {
-        x: point.valid_month,
-        y: point.attributable_fraction_milli,
-        low: point.rr_ci_low_milli,
-        high: point.rr_ci_high_milli,
-      },
-    ];
+    buffer.points.push({
+      x: point.valid_month,
+      y: point.attributable_fraction_milli,
+      low: point.rr_ci_low_milli,
+      high: point.rr_ci_high_milli,
+    });
   }
-  return [...byScenario.values()];
+  return Array.from(buffers.entries()).map(([id, buffer]) => ({
+    id,
+    label: buffer.label,
+    color: buffer.color,
+    points: buffer.points,
+  }));
 }
 
 

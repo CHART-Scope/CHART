@@ -29,6 +29,15 @@ export function useHorizonView<T>({
 }: Options<T>) {
   const [state, setState] = useState<FetchState<T>>({ status: "idle" });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Callers routinely pass inline arrow-function isEmpty predicates. If we
+  // let the predicate flow into `load`'s dep array, `load` becomes a new
+  // reference on every render, the effect below re-fires, setState runs,
+  // and we're in an infinite loop. Reading from a ref keeps `load` stable
+  // across renders and callers do not have to remember to memoize.
+  const isEmptyRef = useRef(isEmpty);
+  const pollIntervalMsRef = useRef(pollIntervalMs);
+  isEmptyRef.current = isEmpty;
+  pollIntervalMsRef.current = pollIntervalMs;
 
   const load = useCallback(
     async (options: { silent?: boolean; retryCount?: number } = {}) => {
@@ -38,7 +47,7 @@ export function useHorizonView<T>({
       }
       try {
         const data = await fetcher();
-        if (isEmpty(data)) {
+        if (isEmptyRef.current(data)) {
           setState({ status: "empty", retryCount });
         } else {
           setState({ status: "ready", data });
@@ -51,7 +60,7 @@ export function useHorizonView<T>({
         });
       }
     },
-    [fetcher, isEmpty],
+    [fetcher],
   );
 
   useEffect(() => {
@@ -65,18 +74,18 @@ export function useHorizonView<T>({
   }, [load]);
 
   useEffect(() => {
-    if (pollIntervalMs <= 0) return;
+    if (pollIntervalMsRef.current <= 0) return;
     if (state.status !== "empty") return;
     timer.current = setTimeout(() => {
       void load({ silent: true, retryCount: state.retryCount + 1 });
-    }, pollIntervalMs);
+    }, pollIntervalMsRef.current);
     return () => {
       if (timer.current !== null) {
         clearTimeout(timer.current);
         timer.current = null;
       }
     };
-  }, [load, pollIntervalMs, state]);
+  }, [load, state]);
 
   const retry = useCallback(() => {
     const nextRetry =
