@@ -48,6 +48,38 @@ Follow [Add a geography and model](../docs/add-geography-and-model.md). The
 model handoff file is
 [`pipelines/LBW_demo/model-release.example.json`](../pipelines/LBW_demo/model-release.example.json).
 
+## Invitation emails
+
+Use the reusable invitation template when inviting a planner:
+
+```python
+from chart.email import (
+    InvitationEmail,
+    OutboundEmail,
+    build_email_service,
+    build_invitation_email,
+)
+
+email_service = build_email_service()
+message = build_invitation_email(
+    InvitationEmail(
+        recipient_email="planner@example.org",
+        recipient_name="Grace Lemayian",
+        inviter_name="Kenya Ministry of Health",
+        geography_name="Kajiado County",
+        role_name="County planning lead",
+        start_date="1 January 2026",
+        end_date="31 December 2026",
+        activation_url="https://chart.example.org/",
+    )
+)
+result = email_service.send_best_effort(message)
+```
+
+`send_best_effort` returns `sent`, `failed`, or `skipped`. It logs classified
+transport failures without logging the recipient or message body. Use `send`
+instead when the caller must handle a delivery failure.
+
 ## Tests
 
 ```bash
