@@ -59,7 +59,20 @@ export function useAutoPrediction({
 
   useEffect(() => {
     cancelled.current = false;
-    if (disabled || !geographyId) {
+    if (disabled) {
+      setState({
+        phase: "not_configured",
+        requestId: null,
+        stage: null,
+        error: null,
+        completedAt: null,
+      });
+      return () => {
+        cancelled.current = true;
+        if (timer.current) clearTimeout(timer.current);
+      };
+    }
+    if (!geographyId) {
       return () => {
         cancelled.current = true;
         if (timer.current) clearTimeout(timer.current);

@@ -13,6 +13,12 @@ type Props = {
   geographyId: string;
   adminUnit: string | null;
   accessToken: string;
+  /**
+   * When false, the panel skips the /climate/predict submission entirely
+   * (and stays in the not_configured state), so a fresh install without a
+   * registered model does not spam the API with doomed POSTs.
+   */
+  supportsPrediction?: boolean;
 };
 
 type TabValue = "short" | "long";
@@ -32,9 +38,18 @@ const PHASE_LABEL: Record<AutoPredictionPhase, string> = {
   not_configured: "No LBW model registered for this area yet",
 };
 
-export function PredictionsPanel({ geographyId, adminUnit, accessToken }: Props) {
+export function PredictionsPanel({
+  geographyId,
+  adminUnit,
+  accessToken,
+  supportsPrediction,
+}: Props) {
   const [tab, setTab] = useState<TabValue>("short");
-  const auto = useAutoPrediction({ geographyId, accessToken });
+  const auto = useAutoPrediction({
+    geographyId,
+    accessToken,
+    disabled: supportsPrediction === false,
+  });
 
   const identity = useMemo(
     () => ({ geographyId, adminUnit, accessToken }),
