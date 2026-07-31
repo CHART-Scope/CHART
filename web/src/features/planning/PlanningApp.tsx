@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { AppShell, type NavItem } from "@/components/AppShell";
+import { AppShell } from "@/components/AppShell";
 import { IconSprite } from "@/components/Icon";
+import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import {
   listGeographies,
   type GeographyRecord,
@@ -17,12 +18,6 @@ import {
 import { UserManagement } from "./UserManagement";
 
 type View = "planning" | "users";
-
-const planningNav: NavItem = {
-  id: "planning",
-  label: "Planning center",
-  icon: "users",
-};
 
 type Props = {
   accessToken: string;
@@ -50,9 +45,7 @@ export function PlanningApp({
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const nav: NavItem[] = roles.includes("chart_admin")
-    ? [planningNav, { id: "users", label: "People & access", icon: "settings" }]
-    : [planningNav];
+  const nav = appNavForRoles(roles);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,7 +104,18 @@ export function PlanningApp({
       <AppShell
         nav={nav}
         activeNav={view === "users" ? "users" : "planning"}
-        onNavigate={(id) => setView(id === "users" ? "users" : "planning")}
+        onNavigate={(id) => {
+          if (id === "users") {
+            setView("users");
+            return;
+          }
+          if (id === "planning") {
+            setView("planning");
+            return;
+          }
+          const target = NAV_ROUTE[id];
+          if (target) router.push(target);
+        }}
         onSignOut={onSignOut}
         userLabel={username}
       >

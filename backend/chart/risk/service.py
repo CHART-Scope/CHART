@@ -149,7 +149,19 @@ def load_short_term_view(
     app_geography_id: str,
     admin_unit_code: str | None = None,
 ) -> ShortTermRiskResponse:
-    admin_unit = _resolve_admin_unit(session, app_geography_id, admin_unit_code)
+    try:
+        admin_unit = _resolve_admin_unit(
+            session, app_geography_id, admin_unit_code
+        )
+    except NoAdminUnitForGeography:
+        if admin_unit_code is not None:
+            raise
+        return ShortTermRiskResponse(
+            admin_unit_id=0,
+            admin_unit_code="",
+            series=[],
+            cards=[],
+        )
     rows = _fetch_rows(
         session,
         _Filters(admin_unit_id=admin_unit.id, scenarios=SHORT_TERM_SCENARIOS),
@@ -169,7 +181,27 @@ def load_long_term_view(
     app_geography_id: str,
     admin_unit_code: str | None = None,
 ) -> LongTermRiskResponse:
-    admin_unit = _resolve_admin_unit(session, app_geography_id, admin_unit_code)
+    try:
+        admin_unit = _resolve_admin_unit(
+            session, app_geography_id, admin_unit_code
+        )
+    except NoAdminUnitForGeography:
+        if admin_unit_code is not None:
+            raise
+        return LongTermRiskResponse(
+            admin_unit_id=0,
+            admin_unit_code="",
+            scenarios=[
+                LongTermScenario(
+                    name=name,
+                    label=_RCP_LABELS.get(name, name),
+                    series=[],
+                    table=[],
+                )
+                for name in DASHBOARD_LONG_TERM_RCPS
+            ],
+            socioeconomic_baseline=SOCIOECONOMIC_BASELINE,
+        )
     rows = _fetch_rows(
         session,
         _Filters(
