@@ -6,7 +6,11 @@ import { use, useCallback, useEffect, useMemo } from "react";
 import { AppShell } from "@/components/AppShell";
 import { IconSprite } from "@/components/Icon";
 import { RequireAuth } from "@/features/auth/RequireAuth";
-import { PredictionsPanel, RunsStrip, TodayStrip } from "@/features/dashboard";
+import {
+  HeatLbwLinkPanel,
+  PredictionsPanel,
+  RiskProtectionPanel,
+} from "@/features/dashboard";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
 
@@ -20,9 +24,6 @@ type PageProps = {
 export default function DashboardGeoPage(props: PageProps) {
   const params = use(props.params);
   const searchParams = use(props.searchParams);
-  // Omit admin_unit entirely when the caller hasn't picked one - the
-  // backend then resolves the default admin_unit linked to the geography
-  // that was chosen during onboarding.
   const adminUnit = searchParams.admin_unit ?? null;
 
   return (
@@ -58,7 +59,6 @@ function AuthorizedDashboard({
   }, [hasAccess, router]);
 
   const nav = appNavForRoles(session.user.roles);
-
   const handleNavigate = useCallback(
     (id: string) => {
       const target = NAV_ROUTE[id];
@@ -81,32 +81,36 @@ function AuthorizedDashboard({
       >
         <main className={styles.page}>
           <header className={styles.header}>
-            <p className={styles.eyebrow}>CHART · Dashboard</p>
+            <p className={styles.eyebrow}>Understand the climate-health risk</p>
             <h1 className={styles.title}>
-              Protecting mothers and babies from extreme heat
+              Protecting mothers and babies from extreme heat: The science and
+              actions that can save lives
             </h1>
-            <p className={styles.subtitle}>
-              Viewing for <strong>{adminUnit ?? geographyId}</strong>
-            </p>
           </header>
+
           <div className={styles.grid}>
-            <div className={styles.panels}>
-              <TodayStrip
-                geographyId={geographyId}
-                adminUnit={adminUnit}
-                accessToken={session.accessToken}
-              />
-              <RunsStrip
-                geographyId={geographyId}
-                accessToken={session.accessToken}
-              />
-              <PredictionsPanel
-                geographyId={geographyId}
-                adminUnit={adminUnit}
-                accessToken={session.accessToken}
-              />
-            </div>
+            <RiskProtectionPanel />
+            <HeatLbwLinkPanel
+              activeAdminUnitCode={adminUnit}
+              onAdminUnitChange={(code) => {
+                const url = `/dashboard/${geographyId}?admin_unit=${encodeURIComponent(code)}`;
+                router.push(url);
+              }}
+            />
+            <PredictionsPanel
+              geographyId={geographyId}
+              adminUnit={adminUnit}
+              accessToken={session.accessToken}
+            />
           </div>
+
+          <section className={styles.recommendedActions}>
+            <p className={styles.recommendedEyebrow}>Recommended actions</p>
+            <p className={styles.recommendedBody}>
+              Actions from the reviewed solutions repository will appear here
+              once your first prediction has completed.
+            </p>
+          </section>
         </main>
       </AppShell>
     </>
