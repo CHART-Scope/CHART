@@ -5,7 +5,7 @@ export PATH := $(dir $(NPM)):$(PATH)
 CHART_REPOSITORY_DIR := chart-repository
 CHART_REPOSITORY_COMPOSE := $(DOCKER) compose -f $(CHART_REPOSITORY_DIR)/docker-compose.yml
 
-.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run bootstrap-token
+.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run bootstrap-token install-hooks
 
 help:
 	@printf "\nQuick start (climate pipeline)\n"
@@ -25,6 +25,7 @@ help:
 	@printf "  make services       Start local Postgres and Keycloak\n"
 	@printf "  make mail           Start local Mailpit (SMTP :1025, inbox :8025)\n"
 	@printf "  make bootstrap-token  Ensure CHART_BOOTSTRAP_TOKEN exists in web/.env.local\n"
+	@printf "  make install-hooks    Enable local pre-commit hooks (OpenAPI regen)\n"
 	@printf "  make identity-sync  Re-apply local Keycloak seed users and groups\n"
 	@printf "  make identity-test  Test Keycloak SSO and redirect configuration\n"
 	@printf "  make identity-restart  Restart Keycloak, preserving data, then sync it\n"
@@ -111,6 +112,11 @@ identity: services
 
 install:
 	$(NPM) install
+
+install-hooks:
+	git config core.hooksPath .githooks
+	chmod +x .githooks/*
+	@echo "Hooks installed. Backend commits will now regenerate docs/openapi/climate.json."
 
 WEB_ENV_LOCAL := web/.env.local
 

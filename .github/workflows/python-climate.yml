@@ -39,7 +39,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -103,5 +103,17 @@ jobs:
 
       - name: Verify OpenAPI contract is in sync
         run: |
-          python -m chart.api.export_openapi --output /tmp/climate-openapi.json
-          diff -u docs/openapi/climate.json /tmp/climate-openapi.json
+          python -m chart.api.export_openapi --output docs/openapi/climate.json
+          if git diff --exit-code docs/openapi/climate.json; then
+            echo "OpenAPI in sync."
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            echo "OpenAPI drift detected on dev — auto-committing regenerated contract."
+            git config user.name "chart-openapi-bot"
+            git config user.email "chart-openapi-bot@users.noreply.github.com"
+            git add docs/openapi/climate.json
+            git commit -m "Regenerate climate.json OpenAPI [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+          else
+            echo "OpenAPI drift detected — run make climate-openapi locally (or make install-hooks)." >&2
+            exit 1
+          fi

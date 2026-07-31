@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# CHART pre-commit hook: keep generated artifacts in sync with source.
+# Install with `make install-hooks` (sets core.hooksPath = .githooks).
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+STAGED="$(git diff --cached --name-only)"
+
+# Regenerate docs/openapi/climate.json when backend Python routes/schemas change.
+if echo "$STAGED" | grep -qE '^backend/chart/.*\.py$'; then
+  if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
+    "$REPO_ROOT/.venv/bin/python" -m chart.api.export_openapi \
+      --output "$REPO_ROOT/docs/openapi/climate.json"
+    git add "$REPO_ROOT/docs/openapi/climate.json"
+    echo "pre-commit: regenerated docs/openapi/climate.json"
+  else
+    echo "pre-commit: skipping OpenAPI regen (no .venv/bin/python — run make climate-install)" >&2
+  fi
+fi
