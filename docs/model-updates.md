@@ -16,7 +16,7 @@ runs which step and how the artefacts are stored.
 ## 1. The model-release contract
 
 Every model release is described by one JSON file matching
-[`pipelines/models/lbw/model-release.example.json`](../pipelines/models/lbw/model-release.example.json).
+[`pipelines/models/lbw/model-release.example.json`](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/lbw/model-release.example.json).
 The file is the single source of truth for:
 
 - `id`, `version` — release identifiers, immutable once shipped.
@@ -107,7 +107,7 @@ curl -X POST http://api.chart.local/internal/erf-parameters \
 ```
 
 The endpoint is idempotent on `(geography, outcome, git_ref)` — see
-[`backend/chart/erf_registry/schemas.py`](../backend/chart/erf_registry/schemas.py)
+[`backend/chart/erf_registry/schemas.py`](https://github.com/CHART-Scope/CHART/blob/dev/backend/chart/erf_registry/schemas.py)
 for the exact payload shape.
 
 Once both are in place:
@@ -201,7 +201,7 @@ If you change the model contract or the workflow, update:
 - **[`docs/add-geography-and-model.md`](add-geography-and-model.md)**
   — the operational runbook for adding a specific geography + model
   pairing.
-- **[`pipelines/models/lbw/README.md`](../pipelines/models/lbw/README.md)**
+- **[`pipelines/models/lbw/README.md`](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/lbw/README.md)**
   — the inside-view README that lives next to the code.
 
 CI's docs check (`mkdocs build --strict` in `.github/workflows/docs.yml`)

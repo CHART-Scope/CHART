@@ -22,7 +22,7 @@ COPY pipelines/boundaries/pyproject.toml pipelines/boundaries/pyproject.toml
 COPY pipelines/boundaries/src pipelines/boundaries/src
 COPY pipelines/boundaries/data pipelines/boundaries/data
 COPY pipelines/boundaries/manifests pipelines/boundaries/manifests
-COPY pipelines/LBW_demo/model-release.example.json pipelines/LBW_demo/model-release.example.json
+COPY pipelines/models/lbw/model-release.example.json pipelines/models/lbw/model-release.example.json
 COPY orchestration/pyproject.toml orchestration/pyproject.toml
 COPY orchestration/src orchestration/src
 COPY orchestration/dagster.production.yaml /opt/dagster/dagster_home/dagster.yaml
