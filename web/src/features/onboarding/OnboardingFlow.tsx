@@ -4,9 +4,8 @@ import { useState } from "react";
 
 import { InvitationEmail } from "./InvitationEmail";
 import { Login } from "./Login";
-import { OnboardingWizard } from "./OnboardingWizard";
 
-type Screen = "email" | "login" | "wizard";
+type Screen = "email" | "login";
 
 type Props = {
   initial?: Screen;
@@ -19,8 +18,5 @@ export function OnboardingFlow({ initial = "email", onLaunch }: Props) {
   if (screen === "email") {
     return <InvitationEmail onActivate={() => setScreen("login")} />;
   }
-  if (screen === "login") {
-    return <Login onSubmit={() => setScreen("wizard")} />;
-  }
-  return <OnboardingWizard onLaunch={onLaunch} />;
+  return <Login setupMode="configured" onSignIn={onLaunch} />;
 }

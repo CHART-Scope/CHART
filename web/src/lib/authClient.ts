@@ -58,7 +58,7 @@ export function signOutOfKeycloak() {
 export function signedInHomePath(user: CurrentUser) {
   return user.roles.length > 0 && user.geographyScopes.length > 0
     ? "/plan"
-    : "/onboarding";
+    : "/access-pending";
 }
 
 export function refreshDelay(accessToken: string) {
