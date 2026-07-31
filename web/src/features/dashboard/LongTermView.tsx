@@ -30,7 +30,7 @@ const LONG_TERM_POLL_MS = 30_000;
 
 type Props = {
   geographyId: string;
-  adminUnit: string;
+  adminUnit: string | null;
   accessToken?: string;
 };
 

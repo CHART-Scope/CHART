@@ -17,7 +17,10 @@ type PageProps = {
 export default function DashboardGeoPage(props: PageProps) {
   const params = use(props.params);
   const searchParams = use(props.searchParams);
-  const adminUnit = searchParams.admin_unit ?? params.geo;
+  // Omit admin_unit entirely when the caller hasn't picked one - the
+  // backend then resolves the default admin_unit linked to the geography
+  // that was chosen during onboarding.
+  const adminUnit = searchParams.admin_unit ?? null;
 
   return (
     <RequireAuth>
@@ -40,7 +43,7 @@ function AuthorizedDashboard({
 }: {
   session: AuthSession;
   geographyId: string;
-  adminUnit: string;
+  adminUnit: string | null;
 }) {
   const router = useRouter();
   const hasAccess = useMemo(
@@ -63,7 +66,7 @@ function AuthorizedDashboard({
           Protecting mothers and babies from extreme heat
         </h1>
         <p className={styles.subtitle}>
-          Viewing for <strong>{adminUnit}</strong>
+          Viewing for <strong>{adminUnit ?? geographyId}</strong>
         </p>
       </header>
       <div className={styles.grid}>

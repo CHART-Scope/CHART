@@ -254,6 +254,16 @@ def dashboard_client(isolated_session_factory, monkeypatch) -> Iterator[TestClie
         app.dependency_overrides.pop(require_current_user, None)
 
 
+def test_short_term_without_admin_unit_query_uses_default_for_geography(
+    dashboard_client,
+) -> None:
+    response = dashboard_client.get(f"/risk/{GEOGRAPHY_ID}/short-term")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["admin_unit_code"] == "MP-BAR"
+    assert len(body["cards"]) == 2
+
+
 def test_short_term_returns_series_and_horizon_cards(dashboard_client) -> None:
     response = dashboard_client.get(
         f"/risk/{GEOGRAPHY_ID}/short-term?admin_unit=MP-BAR"

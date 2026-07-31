@@ -77,14 +77,24 @@ async function readDashboardError(response: Response): Promise<string> {
 }
 
 
+function buildRiskUrl(
+  geographyId: string,
+  horizon: "short-term" | "long-term",
+  adminUnit: string | null,
+): string {
+  const base = `/api/chart/risk/${encodeURIComponent(geographyId)}/${horizon}`;
+  if (!adminUnit) return base;
+  return `${base}?${new URLSearchParams({ admin_unit: adminUnit })}`;
+}
+
+
 export async function fetchShortTermRisk(
   geographyId: string,
-  adminUnit: string,
+  adminUnit: string | null,
   accessToken?: string,
 ): Promise<ShortTermRiskResponse> {
-  const query = new URLSearchParams({ admin_unit: adminUnit });
   const response = await fetch(
-    `/api/chart/risk/${encodeURIComponent(geographyId)}/short-term?${query}`,
+    buildRiskUrl(geographyId, "short-term", adminUnit),
     { cache: "no-store", headers: authHeaders(accessToken) },
   );
   if (!response.ok) {
@@ -96,12 +106,11 @@ export async function fetchShortTermRisk(
 
 export async function fetchLongTermRisk(
   geographyId: string,
-  adminUnit: string,
+  adminUnit: string | null,
   accessToken?: string,
 ): Promise<LongTermRiskResponse> {
-  const query = new URLSearchParams({ admin_unit: adminUnit });
   const response = await fetch(
-    `/api/chart/risk/${encodeURIComponent(geographyId)}/long-term?${query}`,
+    buildRiskUrl(geographyId, "long-term", adminUnit),
     { cache: "no-store", headers: authHeaders(accessToken) },
   );
   if (!response.ok) {
