@@ -23,7 +23,7 @@ const SHORT_TERM_POLL_MS = 15_000;
 
 type Props = {
   geographyId: string;
-  adminUnit: string;
+  adminUnit: string | null;
   accessToken?: string;
 };
 

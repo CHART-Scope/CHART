@@ -70,8 +70,10 @@ def _require_read_access(user: CurrentUserContext, geography_id: str) -> None:
 )
 def read_short_term(
     geography_id: str,
-    admin_unit: Annotated[str, Query(min_length=1, max_length=64)],
     user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    admin_unit: Annotated[
+        str | None, Query(min_length=1, max_length=64)
+    ] = None,
 ) -> ShortTermRiskResponse:
     _require_read_access(user, geography_id)
     with get_session_factory()() as session:
@@ -90,8 +92,10 @@ def read_short_term(
 )
 def read_long_term(
     geography_id: str,
-    admin_unit: Annotated[str, Query(min_length=1, max_length=64)],
     user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    admin_unit: Annotated[
+        str | None, Query(min_length=1, max_length=64)
+    ] = None,
 ) -> LongTermRiskResponse:
     _require_read_access(user, geography_id)
     with get_session_factory()() as session:

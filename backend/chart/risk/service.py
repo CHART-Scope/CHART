@@ -52,22 +52,30 @@ class _Filters:
 
 
 def _resolve_admin_unit(
-    session: Session, app_geography_id: str, admin_unit_code: str
+    session: Session,
+    app_geography_id: str,
+    admin_unit_code: str | None,
 ) -> AdminUnit:
-    """Look up the admin_unit by the URL geography id + district code.
+    """Look up the admin_unit for a URL geography id, plus an optional code.
 
     The URL identifier is the ``AppGeography.id`` used across the rest of
-    the API (e.g. ``geo-in-madhya-pradesh``), matching the request path.
+    the API (e.g. ``geo-in-madhya-pradesh``). When ``admin_unit_code`` is
+    None, we return the admin_unit already linked to that AppGeography -
+    the default the user implicitly picked at onboarding - so the URL
+    stays clean and the caller does not have to know the district code.
+    When it is provided we still respect the exact grain, so a dashboard
+    URL can point at a specific district within a state-level geography.
     """
 
-    admin_unit = session.scalar(
-        select(AdminUnit).where(
-            AdminUnit.app_geography_id == app_geography_id,
-            AdminUnit.code == admin_unit_code,
-        )
-    )
+    query = select(AdminUnit).where(AdminUnit.app_geography_id == app_geography_id)
+    if admin_unit_code is not None:
+        query = query.where(AdminUnit.code == admin_unit_code)
+    admin_unit = session.scalar(query)
     if admin_unit is None:
-        raise NoAdminUnitForGeography(f"{app_geography_id}/{admin_unit_code}")
+        raise NoAdminUnitForGeography(
+            f"{app_geography_id}"
+            + (f"/{admin_unit_code}" if admin_unit_code else "")
+        )
     return admin_unit
 
 
@@ -137,7 +145,9 @@ def _cards_from_rows(rows: list[HealthImpact]) -> list[HorizonCard]:
 
 
 def load_short_term_view(
-    session: Session, app_geography_id: str, admin_unit_code: str
+    session: Session,
+    app_geography_id: str,
+    admin_unit_code: str | None = None,
 ) -> ShortTermRiskResponse:
     admin_unit = _resolve_admin_unit(session, app_geography_id, admin_unit_code)
     rows = _fetch_rows(
@@ -155,7 +165,9 @@ def load_short_term_view(
 
 
 def load_long_term_view(
-    session: Session, app_geography_id: str, admin_unit_code: str
+    session: Session,
+    app_geography_id: str,
+    admin_unit_code: str | None = None,
 ) -> LongTermRiskResponse:
     admin_unit = _resolve_admin_unit(session, app_geography_id, admin_unit_code)
     rows = _fetch_rows(

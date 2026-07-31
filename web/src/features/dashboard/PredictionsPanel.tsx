@@ -10,7 +10,7 @@ import { ShortTermView } from "./ShortTermView";
 
 type Props = {
   geographyId: string;
-  adminUnit: string;
+  adminUnit: string | null;
   accessToken?: string;
 };
 
