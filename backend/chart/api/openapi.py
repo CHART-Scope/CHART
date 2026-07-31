@@ -375,6 +375,26 @@ OPERATION_DOCUMENTATION: dict[
             )
         },
     ),
+    ("post", "/internal/bootstrap-place"): OperationDocumentation(
+        summary="Seed one place's admin_units and register the model release",
+        description=(
+            "Onboarding calls this on setup completion. The service reads the "
+            "boundary manifest, downloads the two GeoJSON files, walks the "
+            "district-to-model-area crosswalk, upserts one AdminUnit per "
+            "model area, and registers (or replaces) the ModelRelease + "
+            "ActiveModelAssignment so the dashboard immediately reports "
+            "supportsPrediction=true for those places. Idempotent - running "
+            "twice with the same manifests is a no-op. Requires the internal "
+            "service token from the CHART_INTERNAL_API_TOKEN environment "
+            "variable."
+        ),
+        success_responses={
+            "201": (
+                "The place was seeded; response reports how many admin_units "
+                "landed and which model release is now active for them."
+            )
+        },
+    ),
     ("post", "/internal/erf-parameters"): OperationDocumentation(
         summary="Publish a fitted exposure-response curve for a geography",
         description=(

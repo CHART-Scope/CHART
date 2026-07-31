@@ -342,8 +342,8 @@ def test_recent_requests_are_scoped_to_user_and_place(
 ) -> None:
     with (
         patch(
-            "chart.climate.routes.get_place_path",
-            return_value="/india/madhya-pradesh",
+            "chart.climate.routes._require_geography_only_access",
+            return_value=None,
         ),
         patch(
             "chart.climate.routes.list_prediction_requests",
@@ -380,11 +380,17 @@ def test_recent_requests_deny_out_of_scope_place(client: TestClient) -> None:
         roles=["health_planning_lead"],
         geography_scopes=["/kenya/kajiado"],
     )
+
+    def _raise_out_of_scope(_user, _geo_id):
+        from chart.climate.service import ClimateServiceError
+
+        raise ClimateServiceError("GEOGRAPHY_OUT_OF_SCOPE", 403)
+
     try:
         with (
             patch(
-                "chart.climate.routes.get_place_path",
-                return_value="/india/madhya-pradesh",
+                "chart.climate.routes._require_geography_only_access",
+                side_effect=_raise_out_of_scope,
             ),
             patch("chart.climate.routes.list_prediction_requests") as recent,
         ):
