@@ -61,8 +61,7 @@ export function PlanningSetup({
         <h1>What would you like to plan for, together?</h1>
         <p>
           Build a sentence below. CHART will generate the shared risk picture,
-          recommended actions, and planning tools your departments can act on
-          together.
+          recommended actions, and planning tools your departments can act on together.
         </p>
       </header>
 
@@ -137,14 +136,13 @@ export function PlanningSetup({
       <section className={styles.saved} aria-labelledby="saved-scenarios">
         <h2 id="saved-scenarios">Saved scenarios</h2>
         <p>
-          No saved scenarios yet. Use the bookmark icon above to save a
-          combination you plan to revisit.
+          No saved scenarios yet. Use the bookmark icon above to save a combination you
+          plan to revisit.
         </p>
       </section>
     </div>
   );
 }
-
 
 function ModelPill({ label, hint }: { label: string; hint: string }) {
   return (
@@ -154,7 +152,6 @@ function ModelPill({ label, hint }: { label: string; hint: string }) {
     </span>
   );
 }
-
 
 function countryFromPath(path: string): string | null {
   const parts = path.split("/").filter(Boolean);

@@ -19,8 +19,15 @@ export const ShortTermActive: Story = {
   render: () => {
     const [value, setValue] = useState<"short" | "long">("short");
     return (
-      <Tabs items={items} value={value} onChange={setValue} ariaLabel="Predictions view">
-        <p style={{ color: "#4a4a4a" }}>Chart for &quot;{value}&quot; would render here.</p>
+      <Tabs
+        items={items}
+        value={value}
+        onChange={setValue}
+        ariaLabel="Predictions view"
+      >
+        <p style={{ color: "#4a4a4a" }}>
+          Chart for &quot;{value}&quot; would render here.
+        </p>
       </Tabs>
     );
   },
@@ -30,8 +37,15 @@ export const LongTermActive: Story = {
   render: () => {
     const [value, setValue] = useState<"short" | "long">("long");
     return (
-      <Tabs items={items} value={value} onChange={setValue} ariaLabel="Predictions view">
-        <p style={{ color: "#4a4a4a" }}>Chart for &quot;{value}&quot; would render here.</p>
+      <Tabs
+        items={items}
+        value={value}
+        onChange={setValue}
+        ariaLabel="Predictions view"
+      >
+        <p style={{ color: "#4a4a4a" }}>
+          Chart for &quot;{value}&quot; would render here.
+        </p>
       </Tabs>
     );
   },

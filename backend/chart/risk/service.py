@@ -73,15 +73,12 @@ def _resolve_admin_unit(
     admin_unit = session.scalar(query)
     if admin_unit is None:
         raise NoAdminUnitForGeography(
-            f"{app_geography_id}"
-            + (f"/{admin_unit_code}" if admin_unit_code else "")
+            f"{app_geography_id}" + (f"/{admin_unit_code}" if admin_unit_code else "")
         )
     return admin_unit
 
 
-def _fetch_rows(
-    session: Session, filters: _Filters
-) -> list[HealthImpact]:
+def _fetch_rows(session: Session, filters: _Filters) -> list[HealthImpact]:
     return list(
         session.scalars(
             select(HealthImpact)
@@ -136,9 +133,7 @@ def _cards_from_rows(rows: list[HealthImpact]) -> list[HorizonCard]:
                 attributable_number=row.attributable_number,
                 rr_ci_low_milli=row.rr_ci_low_milli,
                 rr_ci_high_milli=row.rr_ci_high_milli,
-                precision=_precision_for_ci(
-                    row.rr_ci_low_milli, row.rr_ci_high_milli
-                ),
+                precision=_precision_for_ci(row.rr_ci_low_milli, row.rr_ci_high_milli),
             )
         )
     return cards
@@ -172,9 +167,7 @@ def load_long_term_view(
     admin_unit = _resolve_admin_unit(session, app_geography_id, admin_unit_code)
     rows = _fetch_rows(
         session,
-        _Filters(
-            admin_unit_id=admin_unit.id, scenarios=DASHBOARD_LONG_TERM_RCPS
-        ),
+        _Filters(admin_unit_id=admin_unit.id, scenarios=DASHBOARD_LONG_TERM_RCPS),
     )
     by_scenario: dict[str, list[HealthImpact]] = {
         name: [] for name in DASHBOARD_LONG_TERM_RCPS
@@ -194,9 +187,7 @@ def load_long_term_view(
     )
 
 
-def _build_long_term_scenario(
-    name: str, rows: list[HealthImpact]
-) -> LongTermScenario:
+def _build_long_term_scenario(name: str, rows: list[HealthImpact]) -> LongTermScenario:
     by_horizon: dict[str, HealthImpact] = {}
     for row in rows:
         by_horizon.setdefault(row.horizon, row)

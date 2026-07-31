@@ -5,15 +5,9 @@ import { useCallback, useEffect, useState } from "react";
 
 import { AppShell, type NavItem } from "@/components/AppShell";
 import { IconSprite } from "@/components/Icon";
-import {
-  listGeographies,
-  type GeographyRecord,
-} from "@/lib/planningClient";
+import { listGeographies, type GeographyRecord } from "@/lib/planningClient";
 import { PlanningSetup } from "./PlanningSetup";
-import {
-  defaultPlanningSelection,
-  type PlanningSelection,
-} from "./planningWireframe";
+import { defaultPlanningSelection, type PlanningSelection } from "./planningWireframe";
 import { UserManagement } from "./UserManagement";
 
 type View = "planning" | "users";
@@ -63,9 +57,7 @@ export function PlanningApp({
         // empty-state skeleton when nothing has been materialized yet,
         // and the onboarded location may not yet have a registered
         // model release. Geography scope from Keycloak still applies.
-        const inScope = records.filter((area) =>
-          isInScope(area, geographyScopes),
-        );
+        const inScope = records.filter((area) => isInScope(area, geographyScopes));
         const active =
           inScope.find(
             (area) => area.id === activeGeographyId || area.path === activeGeographyId,

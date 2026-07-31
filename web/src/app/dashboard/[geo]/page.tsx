@@ -11,7 +11,6 @@ import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
 
 import styles from "./page.module.css";
 
-
 const planningNav: NavItem = {
   id: "planning",
   label: "Planning center",
@@ -44,7 +43,6 @@ export default function DashboardGeoPage(props: PageProps) {
   );
 }
 
-
 function AuthorizedDashboard({
   session,
   geographyId,
@@ -56,8 +54,7 @@ function AuthorizedDashboard({
 }) {
   const router = useRouter();
   const hasAccess = useMemo(
-    () =>
-      session.user.roles.length > 0 && session.user.geographyScopes.length > 0,
+    () => session.user.roles.length > 0 && session.user.geographyScopes.length > 0,
     [session.user.roles, session.user.geographyScopes],
   );
 

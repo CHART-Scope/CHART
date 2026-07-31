@@ -9,14 +9,7 @@ const meta: Meta<typeof ConfidenceBandChart> = {
 export default meta;
 type Story = StoryObj<typeof ConfidenceBandChart>;
 
-const months = [
-  "2026-10",
-  "2027-01",
-  "2027-07",
-  "2028-01",
-  "2028-07",
-  "2029-01",
-];
+const months = ["2026-10", "2027-01", "2027-07", "2028-01", "2028-07", "2029-01"];
 
 const shortTermSeries = {
   id: "af-milli",
@@ -44,7 +37,13 @@ export const ShortTerm: Story = {
 export const LongTermThreeScenarios: Story = {
   render: () => {
     const years = ["2031", "2036", "2041", "2046", "2051"];
-    const build = (base: number, slope: number, color: string, label: string, id: string) => ({
+    const build = (
+      base: number,
+      slope: number,
+      color: string,
+      label: string,
+      id: string,
+    ) => ({
       id,
       label,
       color,

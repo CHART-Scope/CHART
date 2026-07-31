@@ -61,11 +61,7 @@ export function Tabs<Value extends string>({
 
   return (
     <div className={[styles.wrap, className ?? ""].filter(Boolean).join(" ")}>
-      <div
-        role="tablist"
-        aria-label={ariaLabel}
-        className={styles.list}
-      >
+      <div role="tablist" aria-label={ariaLabel} className={styles.list}>
         {items.map((item, index) => {
           const selected = item.value === value;
           const tabId = `${groupId}-tab-${item.value}`;

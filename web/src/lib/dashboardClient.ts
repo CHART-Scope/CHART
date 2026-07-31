@@ -9,7 +9,8 @@
  * request record reports completed.
  */
 
-export type DashboardScenario = "seas5_ensemble" | "rcp26" | "rcp45" | "rcp60" | "rcp85" | string;
+export type DashboardScenario =
+  "seas5_ensemble" | "rcp26" | "rcp45" | "rcp60" | "rcp85" | string;
 
 export type HealthImpactPoint = {
   valid_month: string;
@@ -61,11 +62,9 @@ export type LongTermRiskResponse = {
   socioeconomic_baseline: string;
 };
 
-
 function authHeaders(accessToken?: string): Record<string, string> {
   return accessToken ? { authorization: `Bearer ${accessToken}` } : {};
 }
-
 
 async function readDashboardError(response: Response): Promise<string> {
   try {
@@ -75,7 +74,6 @@ async function readDashboardError(response: Response): Promise<string> {
     return "The dashboard could not load.";
   }
 }
-
 
 function buildRiskUrl(
   geographyId: string,
@@ -87,32 +85,30 @@ function buildRiskUrl(
   return `${base}?${new URLSearchParams({ admin_unit: adminUnit })}`;
 }
 
-
 export async function fetchShortTermRisk(
   geographyId: string,
   adminUnit: string | null,
   accessToken?: string,
 ): Promise<ShortTermRiskResponse> {
-  const response = await fetch(
-    buildRiskUrl(geographyId, "short-term", adminUnit),
-    { cache: "no-store", headers: authHeaders(accessToken) },
-  );
+  const response = await fetch(buildRiskUrl(geographyId, "short-term", adminUnit), {
+    cache: "no-store",
+    headers: authHeaders(accessToken),
+  });
   if (!response.ok) {
     throw new Error(await readDashboardError(response));
   }
   return (await response.json()) as ShortTermRiskResponse;
 }
 
-
 export async function fetchLongTermRisk(
   geographyId: string,
   adminUnit: string | null,
   accessToken?: string,
 ): Promise<LongTermRiskResponse> {
-  const response = await fetch(
-    buildRiskUrl(geographyId, "long-term", adminUnit),
-    { cache: "no-store", headers: authHeaders(accessToken) },
-  );
+  const response = await fetch(buildRiskUrl(geographyId, "long-term", adminUnit), {
+    cache: "no-store",
+    headers: authHeaders(accessToken),
+  });
   if (!response.ok) {
     throw new Error(await readDashboardError(response));
   }

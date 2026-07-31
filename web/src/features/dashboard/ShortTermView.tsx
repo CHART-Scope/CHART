@@ -3,7 +3,11 @@
 import { useCallback } from "react";
 
 import { Button } from "@/components/Button";
-import { ConfidenceBandChart, type ChartPoint, type ChartSeries } from "@/components/ConfidenceBandChart";
+import {
+  ConfidenceBandChart,
+  type ChartPoint,
+  type ChartSeries,
+} from "@/components/ConfidenceBandChart";
 import { StatCardWithBadge } from "@/components/StatCardWithBadge";
 import {
   fetchShortTermRisk,
@@ -50,8 +54,8 @@ export function ShortTermView({ geographyId, adminUnit, accessToken }: Props) {
         emptyState={
           <div className={styles.empty}>
             <p>
-              We are preparing your Short-term forecast. This usually takes a
-              few moments.
+              We are preparing your Short-term forecast. This usually takes a few
+              moments.
             </p>
             <Button variant="secondary" size="sm" onClick={retry}>
               Check now
@@ -59,9 +63,7 @@ export function ShortTermView({ geographyId, adminUnit, accessToken }: Props) {
           </div>
         }
       />
-      <div className={styles.cardRow}>
-        {renderCards(state)}
-      </div>
+      <div className={styles.cardRow}>{renderCards(state)}</div>
       {state.status === "error" ? (
         <div className={styles.errorRow} role="alert">
           <span>{state.message}</span>
@@ -71,14 +73,12 @@ export function ShortTermView({ geographyId, adminUnit, accessToken }: Props) {
         </div>
       ) : null}
       <p className={styles.footnote}>
-        The shaded band shows the range of plausible outcomes at each point —
-        it widens further out because forecasts naturally become less certain
-        over time.
+        The shaded band shows the range of plausible outcomes at each point — it widens
+        further out because forecasts naturally become less certain over time.
       </p>
     </div>
   );
 }
-
 
 function buildSeries(payload: ShortTermRiskResponse): ChartSeries[] {
   const map = new Map<string, { color: string; label: string }>([
@@ -114,7 +114,6 @@ function buildSeries(payload: ShortTermRiskResponse): ChartSeries[] {
   }));
 }
 
-
 function renderCards(
   state: ReturnType<typeof useHorizonView<ShortTermRiskResponse>>["state"],
 ) {
@@ -137,9 +136,7 @@ function renderCards(
         key={horizon}
         eyebrow={HORIZON_LABELS[horizon] ?? horizon}
         headline="—"
-        supporting={
-          state.status === "error" ? "unavailable" : "preparing forecast"
-        }
+        supporting={state.status === "error" ? "unavailable" : "preparing forecast"}
         precision="moderate"
       />
     ));
@@ -158,7 +155,6 @@ function renderCards(
   }
   return cards.map((card) => renderCard(card));
 }
-
 
 function renderCard(card: HorizonCard) {
   const percent = Math.round(card.attributable_fraction_milli / 10);

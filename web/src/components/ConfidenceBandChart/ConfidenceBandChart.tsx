@@ -40,7 +40,6 @@ const PAD_RIGHT = 20;
 const PAD_TOP = 16;
 const PAD_BOTTOM = 32;
 
-
 export function ConfidenceBandChart({
   series,
   title,
@@ -171,19 +170,21 @@ export function ConfidenceBandChart({
   );
 }
 
-
 function renderSeries(
   entry: ChartSeries,
   xScale: (value: string) => number,
   yScale: (value: number) => number,
 ): ReactNode {
   const points = [...entry.points].sort((a, b) => a.x.localeCompare(b.x));
-  const showBand = entry.showBand !== false && points.every(
-    (point) => point.low !== undefined && point.high !== undefined,
-  );
+  const showBand =
+    entry.showBand !== false &&
+    points.every((point) => point.low !== undefined && point.high !== undefined);
 
   const linePath = points
-    .map((point, index) => `${index === 0 ? "M" : "L"}${xScale(point.x)},${yScale(point.y)}`)
+    .map(
+      (point, index) =>
+        `${index === 0 ? "M" : "L"}${xScale(point.x)},${yScale(point.y)}`,
+    )
     .join(" ");
 
   const bandPath = showBand
@@ -225,13 +226,13 @@ function renderSeries(
   );
 }
 
-
 function buildYTicks(yLow: number, yHigh: number): number[] {
   const range = yHigh - yLow;
   if (range <= 0) return [yLow];
   const stepBase = Math.pow(10, Math.floor(Math.log10(range / 4)));
   const candidateSteps = [stepBase, stepBase * 2, stepBase * 5, stepBase * 10];
-  const step = candidateSteps.find((candidate) => range / candidate <= 6) ?? stepBase * 10;
+  const step =
+    candidateSteps.find((candidate) => range / candidate <= 6) ?? stepBase * 10;
   const first = Math.ceil(yLow / step) * step;
   const ticks: number[] = [];
   for (let value = first; value <= yHigh; value += step) {
@@ -240,12 +241,24 @@ function buildYTicks(yLow: number, yHigh: number): number[] {
   return ticks;
 }
 
-
 function shortMonth(iso: string): string {
   if (iso.length < 7) return iso;
   const year = iso.slice(0, 4);
   const monthIndex = Number.parseInt(iso.slice(5, 7), 10) - 1;
   if (Number.isNaN(monthIndex)) return iso;
-  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const names = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   return `${names[monthIndex] ?? "?"} ${year}`;
 }

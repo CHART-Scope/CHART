@@ -71,18 +71,14 @@ def _require_read_access(user: CurrentUserContext, geography_id: str) -> None:
 def read_short_term(
     geography_id: str,
     user: Annotated[CurrentUserContext, Depends(require_current_user)],
-    admin_unit: Annotated[
-        str | None, Query(min_length=1, max_length=64)
-    ] = None,
+    admin_unit: Annotated[str | None, Query(min_length=1, max_length=64)] = None,
 ) -> ShortTermRiskResponse:
     _require_read_access(user, geography_id)
     with get_session_factory()() as session:
         try:
             return load_short_term_view(session, geography_id, admin_unit)
         except NoAdminUnitForGeography as exc:
-            raise HTTPException(
-                status_code=404, detail="ADMIN_UNIT_NOT_FOUND"
-            ) from exc
+            raise HTTPException(status_code=404, detail="ADMIN_UNIT_NOT_FOUND") from exc
 
 
 @router.get(
@@ -93,15 +89,11 @@ def read_short_term(
 def read_long_term(
     geography_id: str,
     user: Annotated[CurrentUserContext, Depends(require_current_user)],
-    admin_unit: Annotated[
-        str | None, Query(min_length=1, max_length=64)
-    ] = None,
+    admin_unit: Annotated[str | None, Query(min_length=1, max_length=64)] = None,
 ) -> LongTermRiskResponse:
     _require_read_access(user, geography_id)
     with get_session_factory()() as session:
         try:
             return load_long_term_view(session, geography_id, admin_unit)
         except NoAdminUnitForGeography as exc:
-            raise HTTPException(
-                status_code=404, detail="ADMIN_UNIT_NOT_FOUND"
-            ) from exc
+            raise HTTPException(status_code=404, detail="ADMIN_UNIT_NOT_FOUND") from exc

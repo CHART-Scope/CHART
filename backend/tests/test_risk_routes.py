@@ -294,9 +294,7 @@ def test_short_term_empty_series_when_no_rows(dashboard_client) -> None:
 
 
 def test_long_term_returns_three_scenarios_in_design_order(dashboard_client) -> None:
-    response = dashboard_client.get(
-        f"/risk/{GEOGRAPHY_ID}/long-term?admin_unit=MP-BAR"
-    )
+    response = dashboard_client.get(f"/risk/{GEOGRAPHY_ID}/long-term?admin_unit=MP-BAR")
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["socioeconomic_baseline"] == "ssp2"
@@ -314,9 +312,7 @@ def test_long_term_returns_three_scenarios_in_design_order(dashboard_client) -> 
 
 
 def test_long_term_returns_empty_scenarios_when_no_rows(dashboard_client) -> None:
-    response = dashboard_client.get(
-        f"/risk/{GEOGRAPHY_ID}/long-term?admin_unit=NONE"
-    )
+    response = dashboard_client.get(f"/risk/{GEOGRAPHY_ID}/long-term?admin_unit=NONE")
     assert response.status_code == 404
     assert response.json()["error"] == "ADMIN_UNIT_NOT_FOUND"
 
@@ -333,9 +329,7 @@ def test_short_term_denies_geography_the_user_cannot_access(
     )
     try:
         client = TestClient(app)
-        response = client.get(
-            f"/risk/{GEOGRAPHY_ID}/short-term?admin_unit=MP-BAR"
-        )
+        response = client.get(f"/risk/{GEOGRAPHY_ID}/short-term?admin_unit=MP-BAR")
         assert response.status_code == 403
     finally:
         app.dependency_overrides.pop(require_current_user, None)
@@ -343,9 +337,7 @@ def test_short_term_denies_geography_the_user_cannot_access(
 
 def test_short_term_rejects_unauthenticated_client() -> None:
     client = TestClient(app)
-    response = client.get(
-        f"/risk/{GEOGRAPHY_ID}/short-term?admin_unit=MP-BAR"
-    )
+    response = client.get(f"/risk/{GEOGRAPHY_ID}/short-term?admin_unit=MP-BAR")
     assert response.status_code in (401, 403)
 
 

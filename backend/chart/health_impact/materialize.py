@@ -154,9 +154,7 @@ def materialize_health_impact(
     rr_low_milli = relative_risk_milli(spec.ci95_low)
     rr_high_milli = relative_risk_milli(spec.ci95_high)
     af_milli = attributable_fraction_milli(spec.odds_ratio)
-    population = _load_population(
-        session, spec.admin_unit_id, spec.valid_month.year
-    )
+    population = _load_population(session, spec.admin_unit_id, spec.valid_month.year)
     an = attributable_number(af_milli, population)
     spread_milli = (
         None

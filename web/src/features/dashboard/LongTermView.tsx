@@ -3,7 +3,10 @@
 import { useCallback } from "react";
 
 import { Button } from "@/components/Button";
-import { ConfidenceBandChart, type ChartSeries } from "@/components/ConfidenceBandChart";
+import {
+  ConfidenceBandChart,
+  type ChartSeries,
+} from "@/components/ConfidenceBandChart";
 import {
   fetchLongTermRisk,
   type LongTermRiskResponse,
@@ -58,9 +61,9 @@ export function LongTermView({ geographyId, adminUnit, accessToken }: Props) {
         emptyState={
           <div className={styles.empty}>
             <p>
-              We are preparing your Long-term projections. This usually takes
-              longer than the seasonal outlook because the pipeline runs the
-              full ISIMIP window.
+              We are preparing your Long-term projections. This usually takes longer
+              than the seasonal outlook because the pipeline runs the full ISIMIP
+              window.
             </p>
             <Button variant="secondary" size="sm" onClick={retry}>
               Check now
@@ -68,9 +71,7 @@ export function LongTermView({ geographyId, adminUnit, accessToken }: Props) {
           </div>
         }
       />
-      {state.status === "ready" ? (
-        <LongTermTable data={state.data} />
-      ) : null}
+      {state.status === "ready" ? <LongTermTable data={state.data} /> : null}
       {state.status === "error" ? (
         <div className={styles.errorRow} role="alert">
           <span>{state.message}</span>
@@ -89,7 +90,6 @@ export function LongTermView({ geographyId, adminUnit, accessToken }: Props) {
   );
 }
 
-
 function buildSeries(payload: LongTermRiskResponse): ChartSeries[] {
   return payload.scenarios
     .filter((scenario) => scenario.series.length > 0)
@@ -105,13 +105,10 @@ function buildSeries(payload: LongTermRiskResponse): ChartSeries[] {
     }));
 }
 
-
 function LongTermTable({ data }: { data: LongTermRiskResponse }) {
   const horizons: string[] = Array.from(
     new Set(
-      data.scenarios.flatMap((scenario) =>
-        scenario.table.map((row) => row.horizon),
-      ),
+      data.scenarios.flatMap((scenario) => scenario.table.map((row) => row.horizon)),
     ),
   ).sort();
 
@@ -129,17 +126,12 @@ function LongTermTable({ data }: { data: LongTermRiskResponse }) {
       </thead>
       <tbody>
         {data.scenarios.map((scenario) => (
-          <LongTermRow
-            key={scenario.name}
-            scenario={scenario}
-            horizons={horizons}
-          />
+          <LongTermRow key={scenario.name} scenario={scenario} horizons={horizons} />
         ))}
       </tbody>
     </table>
   );
 }
-
 
 function LongTermRow({
   scenario,

@@ -41,9 +41,7 @@ def isolated_session_factory():
 
 
 @pytest.fixture
-def modeler_client(
-    isolated_session_factory, monkeypatch
-) -> Iterator[TestClient]:
+def modeler_client(isolated_session_factory, monkeypatch) -> Iterator[TestClient]:
     monkeypatch.setenv(erf_routes._INTERNAL_TOKEN_ENV, INTERNAL_TOKEN)
     monkeypatch.setattr(
         erf_routes, "get_session_factory", lambda: isolated_session_factory
@@ -105,9 +103,7 @@ def test_publish_is_idempotent_on_git_ref(modeler_client) -> None:
 
 
 def test_publish_rejects_missing_token(modeler_client) -> None:
-    response = modeler_client.post(
-        "/internal/erf-parameters", json=_valid_payload()
-    )
+    response = modeler_client.post("/internal/erf-parameters", json=_valid_payload())
     assert response.status_code == 401
     assert response.json()["error"] == "INTERNAL_TOKEN_INVALID"
 

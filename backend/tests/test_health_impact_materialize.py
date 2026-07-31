@@ -238,7 +238,9 @@ def test_materialize_raises_when_no_erf_is_published(session_factory) -> None:
             materialize_health_impact(session, spec)
 
 
-def test_materialize_preserves_legacy_ssp_label_without_rcp_pair(session_factory) -> None:
+def test_materialize_preserves_legacy_ssp_label_without_rcp_pair(
+    session_factory,
+) -> None:
     with session_factory() as session:
         spec = _seed_prerequisites(session)
         legacy_spec = MaterializationInput(

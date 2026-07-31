@@ -829,7 +829,9 @@ class HealthImpact(Base):
     )
 
     admin_unit: Mapped[AdminUnit] = relationship()
-    erf_parameters: Mapped[ErfParameters] = relationship(back_populates="health_impacts")
+    erf_parameters: Mapped[ErfParameters] = relationship(
+        back_populates="health_impacts"
+    )
     climate_run: Mapped[ClimateRun] = relationship()
 
     __table_args__ = (
