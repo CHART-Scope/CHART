@@ -13,10 +13,21 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from chart.health_impact import (
+    ErfParametersNotFound,
+    MaterializationInput,
+    materialize_health_impact,
+)
 from chart.inference import LbwScore
 from chart.inference.explanations import explain_if_configured
 from chart.model_registry.service import get_model_mapping, get_model_mappings
-from chart.shared.db.models import PredictionRequestRecord
+from chart.shared.db.models import (
+    AdminUnit,
+    ClimateInputMonthRecord,
+    ClimateInputWindowRecord,
+    DistrictClimate,
+    PredictionRequestRecord,
+)
 from chart.shared.db.session import get_session_factory
 
 from .input_windows import ClimateInputError, build_and_persist_input_window
@@ -566,12 +577,118 @@ def complete_prediction_request(
         record.completed_at = _now()
         _clear_lease(record)
         record.updated_at = _now()
+        _materialize_health_impact_best_effort(session, record, result)
         session.commit()
     return _add_optional_explanation_after_save(
         result,
         request_id=request_id,
         session_factory=session_factory,
     )
+
+
+def _materialize_health_impact_best_effort(
+    session: Session,
+    record: PredictionRequestRecord,
+    result: PredictResponse,
+) -> None:
+    """Populate ``health_impact`` from a completed prediction if we can.
+
+    Runs inside the same transaction as the completion write so the
+    dashboard's read grain stays consistent with the request's result
+    payload. Any failure - missing fitted curve, missing admin_unit link,
+    unexpected result shape - is logged and swallowed: the prediction
+    completion itself is not blocked by a materialization gap.
+    """
+
+    try:
+        prediction = result.prediction
+        admin_unit_id = record.admin_unit_id
+        if admin_unit_id is None:
+            return
+        admin_unit = session.get(AdminUnit, admin_unit_id)
+        if admin_unit is None:
+            return
+        climate_run_id = _resolve_climate_run_for_record(session, record)
+        if climate_run_id is None:
+            return
+        planning_date = record.planning_date
+        if planning_date is None:
+            return
+        planning_target = _planning_target_from_record(record)
+        ssp_scenario = _ssp_scenario_from_record(record)
+        outcome = _outcome_from_record(record)
+        spec = MaterializationInput(
+            admin_unit_id=admin_unit_id,
+            geography_id=admin_unit.geography_id,
+            outcome=outcome,
+            planning_target=planning_target,
+            valid_month=planning_date.replace(day=1),
+            climate_run_id=climate_run_id,
+            ssp_scenario=ssp_scenario,
+            odds_ratio=prediction.odds_ratio,
+            ci95_low=prediction.ci95_low,
+            ci95_high=prediction.ci95_high,
+            ensemble_spread=None,
+        )
+        materialize_health_impact(session, spec)
+    except ErfParametersNotFound:
+        logger.info(
+            "Skipping health_impact materialization for request %s: no ErfParameters yet.",
+            record.id,
+        )
+    except Exception:  # noqa: BLE001 - best-effort, must not fail completion
+        logger.exception(
+            "health_impact materialization failed for request %s; leaving the "
+            "prediction completed and the dashboard empty until fixed.",
+            record.id,
+        )
+
+
+def _resolve_climate_run_for_record(
+    session: Session, record: PredictionRequestRecord
+) -> int | None:
+    if record.climate_run_id is not None:
+        return record.climate_run_id
+    window_id = record.climate_input_window_id
+    if window_id is None:
+        return None
+    row = session.scalar(
+        select(DistrictClimate.climate_run_id)
+        .join(
+            ClimateInputMonthRecord,
+            ClimateInputMonthRecord.district_climate_id == DistrictClimate.id,
+        )
+        .join(
+            ClimateInputWindowRecord,
+            ClimateInputWindowRecord.id == ClimateInputMonthRecord.climate_input_window_id,
+        )
+        .where(ClimateInputWindowRecord.id == window_id)
+        .order_by(ClimateInputMonthRecord.lag_index.asc())
+        .limit(1)
+    )
+    return row
+
+
+def _planning_target_from_record(record: PredictionRequestRecord) -> str:
+    payload = record.request_payload or {}
+    value = payload.get("planning_target")
+    if isinstance(value, str) and value:
+        return value
+    return "month"
+
+
+def _ssp_scenario_from_record(record: PredictionRequestRecord) -> str | None:
+    payload = record.request_payload or {}
+    value = payload.get("projection_scenario")
+    return value if isinstance(value, str) and value else None
+
+
+def _outcome_from_record(record: PredictionRequestRecord) -> str:
+    payload = record.request_payload or {}
+    value = payload.get("outcome")
+    if isinstance(value, str) and value:
+        return value
+    return "lbw"
 
 
 def fail_prediction_request(
