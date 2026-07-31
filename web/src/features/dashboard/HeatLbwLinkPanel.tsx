@@ -10,11 +10,13 @@ import styles from "./HeatLbwLinkPanel.module.css";
 
 
 type Props = {
-  /** Optional list of admin_units the "Viewing for" dropdown offers. */
-  adminUnits?: readonly { code: string; name: string }[];
-  /** Currently selected admin_unit code, if any. */
+  /** Label for the state / whole-area default (e.g. "Madhya Pradesh (State)"). */
+  stateLabel: string;
+  /** Districts the model covers under this state. */
+  districts?: readonly { code: string; name: string }[];
+  /** Selected district code, or ``null`` for the whole-state view. */
   activeAdminUnitCode?: string | null;
-  onAdminUnitChange?: (code: string) => void;
+  onAdminUnitChange?: (code: string | null) => void;
 };
 
 
@@ -24,7 +26,8 @@ const DEFAULT_TEMP = 32;
 
 
 export function HeatLbwLinkPanel({
-  adminUnits = [],
+  stateLabel,
+  districts = [],
   activeAdminUnitCode = null,
   onAdminUnitChange,
 }: Props) {
@@ -40,15 +43,15 @@ export function HeatLbwLinkPanel({
           <span className={styles.viewingLabel}>Viewing for</span>
           <select
             value={activeAdminUnitCode ?? ""}
-            onChange={(event) => onAdminUnitChange?.(event.currentTarget.value)}
-            disabled={adminUnits.length === 0}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              onAdminUnitChange?.(value === "" ? null : value);
+            }}
           >
-            {adminUnits.length === 0 ? (
-              <option value="">Whole area</option>
-            ) : null}
-            {adminUnits.map((unit) => (
-              <option key={unit.code} value={unit.code}>
-                {unit.name}
+            <option value="">{stateLabel}</option>
+            {districts.map((district) => (
+              <option key={district.code} value={district.code}>
+                {district.name}
               </option>
             ))}
           </select>
