@@ -122,18 +122,20 @@ def _cards_from_rows(rows: list[HealthImpact]) -> list[HorizonCard]:
         by_horizon.setdefault(row.horizon, row)
     cards: list[HorizonCard] = []
     for horizon in SHORT_TERM_CARD_HORIZONS:
-        row = by_horizon.get(horizon)
-        if row is None:
+        entry = by_horizon.get(horizon)
+        if entry is None:
             continue
         cards.append(
             HorizonCard(
                 horizon=horizon,
-                valid_month=row.valid_month,
-                attributable_fraction_milli=row.attributable_fraction_milli,
-                attributable_number=row.attributable_number,
-                rr_ci_low_milli=row.rr_ci_low_milli,
-                rr_ci_high_milli=row.rr_ci_high_milli,
-                precision=_precision_for_ci(row.rr_ci_low_milli, row.rr_ci_high_milli),
+                valid_month=entry.valid_month,
+                attributable_fraction_milli=entry.attributable_fraction_milli,
+                attributable_number=entry.attributable_number,
+                rr_ci_low_milli=entry.rr_ci_low_milli,
+                rr_ci_high_milli=entry.rr_ci_high_milli,
+                precision=_precision_for_ci(
+                    entry.rr_ci_low_milli, entry.rr_ci_high_milli
+                ),
             )
         )
     return cards
@@ -194,12 +196,12 @@ def _build_long_term_scenario(name: str, rows: list[HealthImpact]) -> LongTermSc
     table = [
         LongTermTableRow(
             horizon=horizon,
-            valid_month=row.valid_month,
-            attributable_fraction_milli=row.attributable_fraction_milli,
-            attributable_number=row.attributable_number,
+            valid_month=entry.valid_month,
+            attributable_fraction_milli=entry.attributable_fraction_milli,
+            attributable_number=entry.attributable_number,
         )
         for horizon in LONG_TERM_TABLE_HORIZONS
-        if (row := by_horizon.get(horizon)) is not None
+        if (entry := by_horizon.get(horizon)) is not None
     ]
     return LongTermScenario(
         name=name,
