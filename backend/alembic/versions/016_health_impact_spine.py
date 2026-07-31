@@ -20,11 +20,33 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "016_health_impact_spine"
 down_revision: str | None = "015_reconcile_legacy_application_schema"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
+
+
+def _data_label_type() -> postgresql.ENUM:
+    """Reference the pre-existing ``data_label`` PostgreSQL enum.
+
+    The enum was created in migration 001 and had ``forecast`` and
+    ``projection`` values added in 006. Setting ``create_type=False`` here
+    stops SQLAlchemy from re-emitting ``CREATE TYPE`` when we attach it to
+    columns in new tables.
+    """
+
+    return postgresql.ENUM(
+        "modeled",
+        "observed",
+        "reanalysis",
+        "forecast",
+        "projection",
+        "sample",
+        name="data_label",
+        create_type=False,
+    )
 
 
 def upgrade() -> None:
@@ -96,20 +118,7 @@ def upgrade() -> None:
             sa.Column("valid_year", sa.Integer(), nullable=False),
             sa.Column("value", sa.Float(), nullable=False),
             sa.Column("unit", sa.String(length=32)),
-            sa.Column(
-                "data_label",
-                sa.Enum(
-                    "modeled",
-                    "observed",
-                    "reanalysis",
-                    "forecast",
-                    "projection",
-                    "sample",
-                    name="data_label",
-                    create_type=False,
-                ),
-                nullable=False,
-            ),
+            sa.Column("data_label", _data_label_type(), nullable=False),
             sa.ForeignKeyConstraint(
                 ["admin_unit_id"],
                 ["admin_unit.id"],
@@ -152,20 +161,7 @@ def upgrade() -> None:
             sa.Column("attributable_fraction_milli", sa.Integer(), nullable=False),
             sa.Column("attributable_number", sa.Integer()),
             sa.Column("ensemble_spread_milli", sa.Integer()),
-            sa.Column(
-                "data_label",
-                sa.Enum(
-                    "modeled",
-                    "observed",
-                    "reanalysis",
-                    "forecast",
-                    "projection",
-                    "sample",
-                    name="data_label",
-                    create_type=False,
-                ),
-                nullable=False,
-            ),
+            sa.Column("data_label", _data_label_type(), nullable=False),
             sa.Column(
                 "computed_at",
                 sa.DateTime(timezone=True),
