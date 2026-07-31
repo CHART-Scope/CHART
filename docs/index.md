@@ -66,6 +66,7 @@ flowchart LR
 | [API explorer](api-reference.md) | Browse the published API contracts |
 | [Data pipeline](data-pipeline.md) | Run Dagster assets and materialisation |
 | [Add a geography and model](add-geography-and-model.md) | Extend the supported analytical areas |
+| [Where model updates happen](model-updates.md) | Register, version, or replace a health model — for CHART devs and external adopters |
 | [Health survey exploration](health-survey-exploration-guide.md) | Survey-to-model flow and safe outputs |
 | [Health input contract](health-input-contract.md) | Model-preparation schema and runtime boundary |
 | [Digital public good and licensing](licensing.md) | Understand CHART's AGPL licence, source availability, and third-party boundaries |
