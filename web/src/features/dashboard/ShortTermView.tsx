@@ -25,9 +25,10 @@ type Props = {
   geographyId: string;
   adminUnit: string | null;
   accessToken?: string;
+  refreshKey?: string | null;
 };
 
-export function ShortTermView({ geographyId, adminUnit, accessToken }: Props) {
+export function ShortTermView({ geographyId, adminUnit, accessToken, refreshKey }: Props) {
   const fetcher = useCallback(
     () => fetchShortTermRisk(geographyId, adminUnit, accessToken),
     [geographyId, adminUnit, accessToken],
@@ -37,6 +38,7 @@ export function ShortTermView({ geographyId, adminUnit, accessToken }: Props) {
     fetcher,
     isEmpty: (payload) => payload.series.length === 0,
     pollIntervalMs: SHORT_TERM_POLL_MS,
+    refreshKey,
   });
 
   return (

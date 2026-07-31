@@ -22,3 +22,41 @@
   color: var(--color-muted, #4a4a4a);
   margin: 0;
 }
+
+.status {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-muted, #4a4a4a);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status[data-phase="failed"] {
+  color: #7a1a1a;
+}
+
+.status[data-phase="completed"] {
+  color: var(--color-accent, #7a1a4a);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent, #7a1a4a);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
