@@ -20,7 +20,7 @@ type View = "planning" | "users";
 
 const planningNav: NavItem = {
   id: "planning",
-  label: "Start planning",
+  label: "Planning center",
   icon: "users",
 };
 
