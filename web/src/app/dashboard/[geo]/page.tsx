@@ -1,13 +1,22 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { use, useEffect, useMemo } from "react";
+import { use, useCallback, useEffect, useMemo } from "react";
 
+import { AppShell, type NavItem } from "@/components/AppShell";
+import { IconSprite } from "@/components/Icon";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { PredictionsPanel } from "@/features/dashboard";
-import { type AuthSession } from "@/lib/authClient";
+import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
 
 import styles from "./page.module.css";
+
+
+const planningNav: NavItem = {
+  id: "planning",
+  label: "Planning center",
+  icon: "users",
+};
 
 type PageProps = {
   params: Promise<{ geo: string }>;
@@ -56,28 +65,51 @@ function AuthorizedDashboard({
     if (!hasAccess) router.replace("/access-pending");
   }, [hasAccess, router]);
 
+  const nav: NavItem[] = session.user.roles.includes("chart_admin")
+    ? [planningNav, { id: "users", label: "People & access", icon: "settings" }]
+    : [planningNav];
+
+  const handleNavigate = useCallback(
+    (id: string) => {
+      if (id === "planning") router.push("/plan");
+      else if (id === "users") router.push("/plan");
+    },
+    [router],
+  );
+
   if (!hasAccess) return null;
 
   return (
-    <main className={styles.page}>
-      <header className={styles.header}>
-        <p className={styles.eyebrow}>CHART · Dashboard</p>
-        <h1 className={styles.title}>
-          Protecting mothers and babies from extreme heat
-        </h1>
-        <p className={styles.subtitle}>
-          Viewing for <strong>{adminUnit ?? geographyId}</strong>
-        </p>
-      </header>
-      <div className={styles.grid}>
-        <div className={styles.panels}>
-          <PredictionsPanel
-            geographyId={geographyId}
-            adminUnit={adminUnit}
-            accessToken={session.accessToken}
-          />
-        </div>
-      </div>
-    </main>
+    <>
+      <IconSprite />
+      <AppShell
+        nav={nav}
+        activeNav="planning"
+        onNavigate={handleNavigate}
+        onSignOut={signOutOfKeycloak}
+        userLabel={session.user.username}
+      >
+        <main className={styles.page}>
+          <header className={styles.header}>
+            <p className={styles.eyebrow}>CHART · Dashboard</p>
+            <h1 className={styles.title}>
+              Protecting mothers and babies from extreme heat
+            </h1>
+            <p className={styles.subtitle}>
+              Viewing for <strong>{adminUnit ?? geographyId}</strong>
+            </p>
+          </header>
+          <div className={styles.grid}>
+            <div className={styles.panels}>
+              <PredictionsPanel
+                geographyId={geographyId}
+                adminUnit={adminUnit}
+                accessToken={session.accessToken}
+              />
+            </div>
+          </div>
+        </main>
+      </AppShell>
+    </>
   );
 }
