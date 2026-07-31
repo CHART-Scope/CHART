@@ -10,6 +10,7 @@ import {
   OnboardingWizard,
   type OnboardingState,
   type SetupSector,
+  useOnboardingStore,
 } from "@/features/onboarding";
 import {
   bootstrapChartSetup,
@@ -75,6 +76,7 @@ export default function OnboardingPage() {
     if (pageState.phase !== "setup") return;
 
     await bootstrapChartSetup(state);
+    useOnboardingStore.getState().reset();
     setPageState({ phase: "complete", repository: pageState.repository });
   }
 

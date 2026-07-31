@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/Button";
 import { Chip } from "@/components/Chip";
@@ -11,6 +11,7 @@ import { TextInput } from "@/components/TextInput";
 import { COUNTRIES, GEO_DATA, geoLabelForLevel, subGeoLabelForLevel } from "./data/geo";
 import { SECTORS } from "./data/sectors";
 import styles from "./OnboardingWizard.module.css";
+import { useOnboardingStore, type OnboardingState } from "./store";
 
 const STEPS: Step[] = [
   { id: "country", title: "Country", sub: "Select your country" },
@@ -29,31 +30,7 @@ export type SetupSector = {
   label: string;
 };
 
-export type OnboardingState = {
-  country: string | null;
-  level: string | null;
-  geo: string | null;
-  subgeo: string | null;
-  primarySectorId: string | null;
-  collaboratingSectorIds: Set<string>;
-  adminName: string;
-  adminEmail: string;
-  adminPassword: string;
-};
-
-function emptyState(): OnboardingState {
-  return {
-    country: null,
-    level: null,
-    geo: null,
-    subgeo: null,
-    primarySectorId: null,
-    collaboratingSectorIds: new Set(),
-    adminName: "",
-    adminEmail: "",
-    adminPassword: "",
-  };
-}
+export type { OnboardingState } from "./store";
 
 type Props = {
   sectors?: SetupSector[];
@@ -66,18 +43,36 @@ type Props = {
 export function OnboardingWizard({
   sectors = exampleSetupSectors,
   actionRepositoryCount,
-  initialStep = 0,
+  initialStep,
   initialState,
   onLaunch,
 }: Props) {
-  const [state, setState] = useState<OnboardingState>(() => ({
-    ...emptyState(),
-    ...initialState,
-    collaboratingSectorIds: new Set(initialState?.collaboratingSectorIds ?? []),
-  }));
-  const [idx, setIdx] = useState(() =>
-    Math.max(0, Math.min(STEPS.length - 1, initialStep)),
-  );
+  const state = useOnboardingStore();
+  const {
+    setCountry,
+    setLevel,
+    setGeo,
+    setSubgeo,
+    selectPrimarySector,
+    toggleCollaboratingSector,
+    setAdminField,
+    setStep,
+    hydrate,
+    reset,
+  } = state;
+
+  useEffect(() => {
+    if (!initialState && initialStep === undefined) return;
+    reset();
+    if (initialState) hydrate(initialState);
+    if (initialStep !== undefined) {
+      setStep(Math.max(0, Math.min(STEPS.length - 1, initialStep)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const idx = Math.min(STEPS.length - 1, Math.max(0, state.currentStep));
+
   const [isLaunching, setIsLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [showAdminDialog, setShowAdminDialog] = useState(false);
@@ -107,7 +102,7 @@ export function OnboardingWizard({
   async function next() {
     if (idx < STEPS.length - 1) {
       setLaunchError(null);
-      setIdx(idx + 1);
+      setStep(idx + 1);
       return;
     }
     if (!adminReady) {
@@ -123,7 +118,7 @@ export function OnboardingWizard({
     setIsLaunching(true);
     setLaunchError(null);
     try {
-      await onLaunch(state);
+      await onLaunch(snapshot(state));
     } catch (error) {
       setLaunchError(
         error instanceof Error
@@ -133,50 +128,6 @@ export function OnboardingWizard({
     } finally {
       setIsLaunching(false);
     }
-  }
-
-  function setCountry(value: string) {
-    setState((current) => ({
-      ...current,
-      country: value || null,
-      level: null,
-      geo: null,
-      subgeo: null,
-    }));
-  }
-
-  function setLevel(value: string) {
-    setState((current) => ({
-      ...current,
-      level: value || null,
-      geo: null,
-      subgeo: null,
-    }));
-  }
-
-  function setGeo(value: string) {
-    setState((current) => ({ ...current, geo: value || null, subgeo: null }));
-  }
-
-  function selectPrimarySector(id: string) {
-    setState((current) => {
-      const collaboratingSectorIds = new Set(current.collaboratingSectorIds);
-      collaboratingSectorIds.delete(id);
-      return {
-        ...current,
-        primarySectorId: id,
-        collaboratingSectorIds,
-      };
-    });
-  }
-
-  function toggleCollaboratingSector(id: string) {
-    setState((current) => {
-      const collaboratingSectorIds = new Set(current.collaboratingSectorIds);
-      if (collaboratingSectorIds.has(id)) collaboratingSectorIds.delete(id);
-      else collaboratingSectorIds.add(id);
-      return { ...current, collaboratingSectorIds };
-    });
   }
 
   return (
@@ -197,7 +148,7 @@ export function OnboardingWizard({
               steps={STEPS}
               currentIndex={idx}
               onStepClick={(stepIndex) => {
-                if (stepIndex <= idx) setIdx(stepIndex);
+                if (stepIndex <= idx) setStep(stepIndex);
               }}
             />
           </aside>
@@ -284,13 +235,7 @@ export function OnboardingWizard({
                         className={styles.setupSelect}
                         placeholder="— Choose —"
                         value={state.subgeo ?? ""}
-                        onChange={(event) => {
-                          const value = event.currentTarget.value;
-                          setState((current) => ({
-                            ...current,
-                            subgeo: value || null,
-                          }));
-                        }}
+                        onChange={(event) => setSubgeo(event.currentTarget.value)}
                         options={subOptions.map((option) => ({
                           value: option,
                           label: option,
@@ -338,7 +283,7 @@ export function OnboardingWizard({
                         .map((sector) => (
                           <Pill
                             key={sector.id}
-                            selected={state.collaboratingSectorIds.has(sector.id)}
+                            selected={state.collaboratingSectorIds.includes(sector.id)}
                             onClick={() => toggleCollaboratingSector(sector.id)}
                           >
                             {sector.label}
@@ -368,7 +313,7 @@ export function OnboardingWizard({
                     state={state}
                     sectors={sectors}
                     actionRepositoryCount={actionRepositoryCount}
-                    onEdit={setIdx}
+                    onEdit={setStep}
                   />
                 </section>
               ) : null}
@@ -382,10 +327,7 @@ export function OnboardingWizard({
               ) : null}
               <div className={styles.actions}>
                 {idx > 0 ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() => setIdx((current) => current - 1)}
-                  >
+                  <Button variant="secondary" onClick={() => setStep(idx - 1)}>
                     Back
                   </Button>
                 ) : null}
@@ -423,13 +365,9 @@ export function OnboardingWizard({
                 id="setup-admin-name"
                 label="Full name"
                 value={state.adminName}
-                onChange={(event) => {
-                  const value = event.currentTarget.value;
-                  setState((current) => ({
-                    ...current,
-                    adminName: value,
-                  }));
-                }}
+                onChange={(event) =>
+                  setAdminField("adminName", event.currentTarget.value)
+                }
                 autoComplete="name"
               />
               <TextInput
@@ -437,13 +375,9 @@ export function OnboardingWizard({
                 label="Email address"
                 type="email"
                 value={state.adminEmail}
-                onChange={(event) => {
-                  const value = event.currentTarget.value;
-                  setState((current) => ({
-                    ...current,
-                    adminEmail: value,
-                  }));
-                }}
+                onChange={(event) =>
+                  setAdminField("adminEmail", event.currentTarget.value)
+                }
                 autoComplete="email"
               />
               <TextInput
@@ -452,13 +386,9 @@ export function OnboardingWizard({
                 type="password"
                 minLength={8}
                 value={state.adminPassword}
-                onChange={(event) => {
-                  const value = event.currentTarget.value;
-                  setState((current) => ({
-                    ...current,
-                    adminPassword: value,
-                  }));
-                }}
+                onChange={(event) =>
+                  setAdminField("adminPassword", event.currentTarget.value)
+                }
                 autoComplete="new-password"
               />
             </div>
@@ -496,6 +426,21 @@ export function OnboardingWizard({
   );
 }
 
+function snapshot(state: OnboardingState): OnboardingState {
+  return {
+    country: state.country,
+    level: state.level,
+    geo: state.geo,
+    subgeo: state.subgeo,
+    primarySectorId: state.primarySectorId,
+    collaboratingSectorIds: [...state.collaboratingSectorIds],
+    adminName: state.adminName,
+    adminEmail: state.adminEmail,
+    adminPassword: state.adminPassword,
+    currentStep: state.currentStep,
+  };
+}
+
 function NumberedLabel({ n, children }: { n: number; children: React.ReactNode }) {
   return (
     <div className={styles.sublabel}>
@@ -518,7 +463,7 @@ function SetupReview({
 }) {
   const primarySector = sectors.find((sector) => sector.id === state.primarySectorId);
   const collaboratingSectors = sectors.filter((sector) =>
-    state.collaboratingSectorIds.has(sector.id),
+    state.collaboratingSectorIds.includes(sector.id),
   );
   const geography = state.subgeo ?? state.geo ?? state.country ?? "—";
   const workspaceSector = primarySector?.label.toLowerCase() ?? "your sector";
