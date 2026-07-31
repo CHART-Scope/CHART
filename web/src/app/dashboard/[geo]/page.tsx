@@ -11,6 +11,7 @@ import {
   HeatLbwLinkPanel,
   PredictionsPanel,
   RiskProtectionPanel,
+  RunsStrip,
 } from "@/features/dashboard";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
@@ -160,6 +161,14 @@ function AuthorizedDashboard({
               accessToken={session.accessToken}
             />
           </div>
+
+          <RunsStrip
+            geographyId={geographyId}
+            accessToken={session.accessToken}
+            linkForRun={(id) =>
+              `/dashboard/${encodeURIComponent(geographyId)}/runs/${id}`
+            }
+          />
 
           <section className={styles.recommendedActions}>
             <p className={styles.recommendedEyebrow}>Recommended actions</p>
