@@ -101,7 +101,10 @@ function AuthorizedDashboard({
     return geographies
       .filter((geo) => geo.path.startsWith(parentPrefix))
       .filter((geo) => geo.supportsPrediction !== false)
-      .map((geo) => ({ code: geo.id, name: geo.name }));
+      .map((geo) => ({
+        code: geo.id,
+        name: cleanDisplayName(geo.name, geo.levelLabel),
+      }));
   }, [currentGeography, geographies]);
 
   const nav = appNavForRoles(session.user.roles);
@@ -179,4 +182,19 @@ function countryFromPath(path: string): string {
     .split("-")
     .map((piece) => piece.charAt(0).toUpperCase() + piece.slice(1))
     .join(" ");
+}
+
+
+/**
+ * The geography seed stores division names as "Bhopal Division". The
+ * mockup shows just "Bhopal", so strip a trailing level-label suffix
+ * when it is present, but leave state-level names ("Madhya Pradesh")
+ * alone.
+ */
+function cleanDisplayName(name: string, levelLabel: string): string {
+  const suffix = ` ${levelLabel}`;
+  if (levelLabel && name.endsWith(suffix)) {
+    return name.slice(0, -suffix.length);
+  }
+  return name;
 }
