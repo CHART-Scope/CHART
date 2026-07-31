@@ -686,3 +686,180 @@ class IngestionLeaseRecord(Base):
         ),
         Index("ix_ingestion_lease_status_expiry", "status", "lease_expires_at"),
     )
+
+
+class ErfParameters(Base):
+    """One fitted exposure-response curve, published by the modeler.
+
+    CHART never fits. Rows here are produced offline (R, DHS data) and
+    handed to CHART through the modeler-handoff endpoint. A row is
+    identified by the (geography, outcome, git_ref) tuple, so re-publishing
+    the same curve is a no-op and a new fit gets a new row rather than
+    silently overwriting the previous one.
+    """
+
+    __tablename__ = "erf_parameters"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    geography_id: Mapped[int] = mapped_column(
+        ForeignKey("chart_geographies.id", ondelete="RESTRICT"), nullable=False
+    )
+    outcome: Mapped[str] = mapped_column(String(64), nullable=False)
+    spline_coefficients: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=False
+    )
+    lag_window: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=False
+    )
+    reference_percentile_milli: Mapped[int] = mapped_column(nullable=False)
+    projection_source: Mapped[str | None] = mapped_column(String(128))
+    git_ref: Mapped[str] = mapped_column(String(128), nullable=False)
+    published_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    geography: Mapped[Geography] = relationship()
+    health_impacts: Mapped[list[HealthImpact]] = relationship(
+        back_populates="erf_parameters"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "geography_id",
+            "outcome",
+            "git_ref",
+            name="uq_erf_parameters_geography_outcome_git_ref",
+        ),
+        CheckConstraint(
+            "reference_percentile_milli BETWEEN 0 AND 100000",
+            name="erf_parameters_reference_percentile_range",
+        ),
+        Index(
+            "ix_erf_parameters_geography_outcome",
+            "geography_id",
+            "outcome",
+        ),
+    )
+
+
+class Covariate(Base):
+    """Population or pollution overlay used to convert AF into a case count.
+
+    Scoped by admin_unit and by the socioeconomic pathway of the overlay.
+    Population under SSP2 is the default for both dashboard tabs: climate
+    varies, socio stays fixed, so the user sees a pure climate signal.
+    """
+
+    __tablename__ = "covariate"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    admin_unit_id: Mapped[int] = mapped_column(
+        ForeignKey("admin_unit.id", ondelete="CASCADE"), nullable=False
+    )
+    provenance_id: Mapped[int] = mapped_column(
+        ForeignKey("provenance.id", ondelete="RESTRICT"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    scenario_socio: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="ssp2"
+    )
+    valid_year: Mapped[int] = mapped_column(nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    unit: Mapped[str | None] = mapped_column(String(32))
+    data_label: Mapped[DataLabel] = mapped_column(
+        Enum(DataLabel, name="data_label"), nullable=False
+    )
+
+    admin_unit: Mapped[AdminUnit] = relationship()
+    provenance: Mapped[Provenance] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint(
+            "admin_unit_id",
+            "kind",
+            "scenario_socio",
+            "valid_year",
+            name="uq_covariate_grain",
+        ),
+        Index(
+            "ix_covariate_admin_kind_year",
+            "admin_unit_id",
+            "kind",
+            "valid_year",
+        ),
+    )
+
+
+class HealthImpact(Base):
+    """Precomputed attributable metrics for one place x scenario x horizon.
+
+    One row = the number the dashboard renders for a specific
+    (admin_unit, scenario, horizon, valid_month) grain. Values are stored
+    as fixed-point milli-units so the wire format is integer-only and
+    round-trip stable.
+    """
+
+    __tablename__ = "health_impact"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    admin_unit_id: Mapped[int] = mapped_column(
+        ForeignKey("admin_unit.id", ondelete="CASCADE"), nullable=False
+    )
+    erf_parameters_id: Mapped[int] = mapped_column(
+        ForeignKey("erf_parameters.id", ondelete="RESTRICT"), nullable=False
+    )
+    climate_run_id: Mapped[int] = mapped_column(
+        ForeignKey("climate_run.id", ondelete="RESTRICT"), nullable=False
+    )
+    scenario: Mapped[str] = mapped_column(String(32), nullable=False)
+    horizon: Mapped[str] = mapped_column(String(16), nullable=False)
+    valid_month: Mapped[date] = mapped_column(Date, nullable=False)
+    relative_risk_milli: Mapped[int] = mapped_column(nullable=False)
+    rr_ci_low_milli: Mapped[int] = mapped_column(nullable=False)
+    rr_ci_high_milli: Mapped[int] = mapped_column(nullable=False)
+    attributable_fraction_milli: Mapped[int] = mapped_column(nullable=False)
+    attributable_number: Mapped[int | None] = mapped_column()
+    ensemble_spread_milli: Mapped[int | None] = mapped_column()
+    data_label: Mapped[DataLabel] = mapped_column(
+        Enum(DataLabel, name="data_label"), nullable=False
+    )
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    admin_unit: Mapped[AdminUnit] = relationship()
+    erf_parameters: Mapped[ErfParameters] = relationship(back_populates="health_impacts")
+    climate_run: Mapped[ClimateRun] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint(
+            "admin_unit_id",
+            "scenario",
+            "horizon",
+            "valid_month",
+            name="uq_health_impact_grain",
+        ),
+        CheckConstraint(
+            "rr_ci_low_milli <= relative_risk_milli",
+            name="health_impact_ci_low_le_rr",
+        ),
+        CheckConstraint(
+            "relative_risk_milli <= rr_ci_high_milli",
+            name="health_impact_rr_le_ci_high",
+        ),
+        CheckConstraint(
+            "attributable_number IS NULL OR attributable_number >= 0",
+            name="health_impact_attributable_number_nonneg",
+        ),
+        Index(
+            "ix_health_impact_dashboard_read",
+            "admin_unit_id",
+            "scenario",
+            "valid_month",
+        ),
+        Index(
+            "ix_health_impact_climate_run",
+            "climate_run_id",
+        ),
+    )

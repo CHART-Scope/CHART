@@ -15,7 +15,9 @@ from chart.api.openapi import build_openapi_schema
 from chart.auth.routes import router as auth_router
 from chart.climate.routes import router as climate_router
 from chart.climate.schemas import ErrorResponse, HealthResponse
+from chart.erf_registry.routes import router as erf_registry_router
 from chart.geographies.routes import router as geographies_router
+from chart.risk.routes import router as risk_router
 from chart.setup.routes import router as setup_router
 from chart.solution_repository.hazards import router as hazards_router
 from chart.solution_repository.routes import router as solutions_router
@@ -64,6 +66,8 @@ app.include_router(hazards_router)
 app.include_router(solutions_router)
 app.include_router(users_router)
 app.include_router(workspaces_router)
+app.include_router(risk_router)
+app.include_router(erf_registry_router)
 
 
 @app.get("/live", tags=["system"], response_model=HealthResponse)

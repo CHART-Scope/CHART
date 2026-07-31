@@ -1,0 +1,46 @@
+.page {
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted, #4a4a4a);
+  margin: 0;
+}
+
+.title {
+  font-family: var(--font-serif, Georgia, "Times New Roman", serif);
+  font-size: 1.6rem;
+  color: var(--color-fg, #111);
+  margin: 0;
+  font-weight: 500;
+}
+
+.subtitle {
+  font-size: 0.9rem;
+  color: var(--color-muted, #4a4a4a);
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.panels {
+  display: grid;
+  gap: 1rem;
+}
