@@ -16,11 +16,53 @@ uses that shape to include the right grid cells and exclude neighbouring areas.
 Each area entry must contain:
 
 - `place_code`: the code stored on `admin_unit`;
+- `country_code`: ISO 3166-1 alpha-2 (e.g. `IN`, `KE`) so onboarding can filter
+  areas by installation country;
+- `level`: geography level (`country`, `state`, `province`, `division`,
+  `district`, `county`, `sub-county`, or `sub-district`);
 - `model_area_name`: the exact area name expected by the scorer;
-- `model_file`: the exact versioned model filename.
+- `model_file`: a filename that also appears in the top-level `model_files`
+  list.
 
-The release also records file hashes, model version, source Git reference, the
-required temperature variable, and the required three-month order.
+The manifest also declares, at the top level:
+
+- `module`: the analytical module (e.g. `prediction`);
+- `outcome`: the health outcome this release predicts (e.g. `lbw`);
+- `climate_hazard`: the climate driver the model is trained on
+  (e.g. `extreme_heat`) — surfaced to operators during onboarding;
+- `base_uri`: an `s3://<bucket>/<outcome>/<version>` prefix that owns every
+  file in `model_files`;
+- file hashes, model version, source Git reference, the required temperature
+  variable, and the required three-month order.
+
+## S3 layout
+
+Model files live under `base_uri` in the shape
+
+```
+s3://<bucket>/<outcome>/<version>/<filename>.rds
+```
+
+Each `<filename>` matches an entry in `model_files[].filename`, and its SHA-256
+matches `model_files[].sha256`. The bootstrap process downloads only the files
+referenced by the manifest, then verifies their hashes before activation.
+
+## Adding a new country or model
+
+1. Upload the trained model file(s) under a fresh
+   `s3://<bucket>/<outcome>/<version>/` prefix and record each SHA-256.
+2. Copy `pipelines/LBW_demo/model-release.example.json` to a new file, update
+   `id`, `version`, `outcome`, `climate_hazard`, `base_uri`,
+   `source_git_ref`, and `release_notes`.
+3. List each covered geography under `areas[]` with the fields above. Reuse
+   `place_code`s already present on `admin_unit` where possible; new codes
+   need matching boundaries loaded via
+   `pipelines/boundaries/manifests/*.json`.
+4. Run `python pipelines/LBW_demo/model_release.py --manifest <path> --division
+   <path> --state <path>` to validate the manifest and file hashes before
+   registration.
+5. Register with `chart-register-model-release` (see below). Onboarding will
+   now show the new country and geographies filtered by `country_code`.
 
 ## Load it
 

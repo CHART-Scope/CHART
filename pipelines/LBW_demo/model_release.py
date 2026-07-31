@@ -15,6 +15,21 @@ from typing import Any, NamedTuple, Sequence
 
 
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+COUNTRY_CODE_PATTERN = re.compile(r"^[A-Z]{2}$")
+S3_URI_PATTERN = re.compile(r"^s3://[a-z0-9][a-z0-9.-]*[a-z0-9]/.+$")
+
+VALID_LEVELS: frozenset[str] = frozenset(
+    {
+        "country",
+        "state",
+        "province",
+        "division",
+        "district",
+        "county",
+        "sub-county",
+        "sub-district",
+    }
+)
 
 
 class ReleaseValidationError(ValueError):
@@ -82,6 +97,71 @@ def _manifest_hashes(document: dict[str, Any]) -> dict[str, str]:
     return hashes
 
 
+def _validate_top_level(document: dict[str, Any]) -> None:
+    """Ensure the manifest declares module, outcome, climate hazard, and S3 base."""
+
+    _required_text(document, "module")
+    _required_text(document, "outcome")
+    _required_text(document, "climate_hazard")
+    base_uri = _required_text(document, "base_uri")
+    if not S3_URI_PATTERN.match(base_uri):
+        raise ReleaseValidationError(
+            f"Model release base_uri must be an s3:// URI, got {base_uri!r}"
+        )
+
+
+def _validate_areas(document: dict[str, Any], model_filenames: set[str]) -> None:
+    """Each area must name a real geography, level, country, and manifest model_file."""
+
+    entries = document.get("areas")
+    if not isinstance(entries, list) or not entries:
+        raise ReleaseValidationError(
+            "Model release manifest field 'areas' must be a non-empty list"
+        )
+
+    seen_place_codes: set[str] = set()
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            raise ReleaseValidationError(
+                f"Model release area {index} must be an object"
+            )
+        for field in (
+            "place_code",
+            "model_file",
+            "model_area_name",
+            "country_code",
+            "level",
+        ):
+            value = entry.get(field)
+            if not isinstance(value, str) or not value:
+                raise ReleaseValidationError(
+                    f"Model release area {index} field {field!r} must be a non-empty string"
+                )
+
+        place_code = entry["place_code"]
+        if place_code in seen_place_codes:
+            raise ReleaseValidationError(
+                f"Model release contains duplicate place_code {place_code!r}"
+            )
+        seen_place_codes.add(place_code)
+
+        if entry["model_file"] not in model_filenames:
+            raise ReleaseValidationError(
+                f"Model release area {place_code!r} references unknown model_file "
+                f"{entry['model_file']!r}"
+            )
+        if not COUNTRY_CODE_PATTERN.fullmatch(entry["country_code"]):
+            raise ReleaseValidationError(
+                f"Model release area {place_code!r} country_code must be an "
+                f"ISO 3166-1 alpha-2 code like 'IN' or 'KE'"
+            )
+        if entry["level"] not in VALID_LEVELS:
+            raise ReleaseValidationError(
+                f"Model release area {place_code!r} level must be one of "
+                f"{sorted(VALID_LEVELS)}, got {entry['level']!r}"
+            )
+
+
 def _sha256(path: Path) -> str:
     if not path.is_file():
         raise ReleaseValidationError(f"LBW model file does not exist: {path}")
@@ -132,7 +212,9 @@ def load_and_verify_release(
 
     release_id = _required_text(document, "id")
     version = _required_text(document, "version")
+    _validate_top_level(document)
     manifest_hashes = _manifest_hashes(document)
+    _validate_areas(document, set(manifest_hashes))
     division_sha256 = _verify_model(
         label="division",
         model_path=division_path,

@@ -2,6 +2,7 @@
   "id": "lbw-mp-1.0.0",
   "module": "prediction",
   "outcome": "lbw",
+  "climate_hazard": "extreme_heat",
   "version": "1.0.0",
   "base_uri": "s3://replace-with-your-model-bucket/lbw/1.0.0",
   "temperature_input": "tmax_lag: planning month, previous month, two months before; newest first; degrees Celsius",
@@ -21,57 +22,79 @@
   "areas": [
     {
       "place_code": "madhya-pradesh",
+      "country_code": "IN",
+      "level": "state",
       "model_file": "MP_state_LBW_tmax_DHS2015-21_v1.0.0.rds",
       "model_area_name": "Madhya Pradesh",
       "validated_pregnancy_windows": [1]
     },
     {
       "place_code": "bhopal",
+      "country_code": "IN",
+      "level": "division",
       "model_file": "MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds",
       "model_area_name": "Bhopal"
     },
     {
       "place_code": "chambal",
+      "country_code": "IN",
+      "level": "division",
       "model_file": "MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds",
       "model_area_name": "Chambal"
     },
     {
       "place_code": "gwalior",
+      "country_code": "IN",
+      "level": "division",
       "model_file": "MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds",
       "model_area_name": "Gwalior"
     },
     {
       "place_code": "indore",
+      "country_code": "IN",
+      "level": "division",
       "model_file": "MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds",
       "model_area_name": "Indore"
     },
     {
       "place_code": "jabalpur",
+      "country_code": "IN",
+      "level": "division",
       "model_file": "MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds",
       "model_area_name": "Jabalpur"
     },
     {
       "place_code": "narmadapuram",
+      "country_code": "IN",
+      "level": "division",
       "model_file": "MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds",
       "model_area_name": "Narmadapuram"
     },
     {
       "place_code": "rewa",
+      "country_code": "IN",
+      "level": "division",
       "model_file": "MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds",
       "model_area_name": "Rewa"
     },
     {
       "place_code": "sagar",
+      "country_code": "IN",
+      "level": "division",
       "model_file": "MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds",
       "model_area_name": "Sagar"
     },
     {
       "place_code": "shahdol",
+      "country_code": "IN",
+      "level": "division",
       "model_file": "MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds",
       "model_area_name": "Shahdol"
     },
     {
       "place_code": "ujjain",
+      "country_code": "IN",
+      "level": "division",
       "model_file": "MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds",
       "model_area_name": "Ujjain"
     }

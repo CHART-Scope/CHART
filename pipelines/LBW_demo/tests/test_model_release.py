@@ -29,7 +29,11 @@ def _write_release(tmp_path: Path) -> tuple[Path, Path, Path]:
         json.dumps(
             {
                 "id": "lbw-test-1.0.0",
+                "module": "prediction",
+                "outcome": "lbw",
+                "climate_hazard": "extreme_heat",
                 "version": "1.0.0",
+                "base_uri": "s3://chart-model-bucket/lbw/1.0.0",
                 "model_files": [
                     {
                         "filename": division_path.name,
@@ -38,6 +42,22 @@ def _write_release(tmp_path: Path) -> tuple[Path, Path, Path]:
                     {
                         "filename": state_path.name,
                         "sha256": _sha256(state_content),
+                    },
+                ],
+                "areas": [
+                    {
+                        "place_code": "test-state",
+                        "country_code": "IN",
+                        "level": "state",
+                        "model_file": state_path.name,
+                        "model_area_name": "Test State",
+                    },
+                    {
+                        "place_code": "test-division",
+                        "country_code": "IN",
+                        "level": "division",
+                        "model_file": division_path.name,
+                        "model_area_name": "Test Division",
                     },
                 ],
             }
@@ -76,6 +96,9 @@ def test_rejects_a_model_missing_from_the_release(tmp_path: Path) -> None:
     manifest_path, division_path, state_path = _write_release(tmp_path)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["model_files"] = manifest["model_files"][1:]
+    manifest["areas"] = [
+        entry for entry in manifest["areas"] if entry["model_file"] == state_path.name
+    ]
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(ReleaseValidationError, match="absent from"):
@@ -100,4 +123,44 @@ def test_rejects_duplicate_model_entries(tmp_path: Path) -> None:
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(ReleaseValidationError, match="duplicate filename"):
+        load_and_verify_release(manifest_path, division_path, state_path)
+
+
+def test_rejects_non_s3_base_uri(tmp_path: Path) -> None:
+    manifest_path, division_path, state_path = _write_release(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["base_uri"] = "https://example.com/models"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ReleaseValidationError, match="s3://"):
+        load_and_verify_release(manifest_path, division_path, state_path)
+
+
+def test_rejects_area_with_unknown_country_code(tmp_path: Path) -> None:
+    manifest_path, division_path, state_path = _write_release(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["areas"][0]["country_code"] = "India"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ReleaseValidationError, match="ISO 3166-1"):
+        load_and_verify_release(manifest_path, division_path, state_path)
+
+
+def test_rejects_area_with_invalid_level(tmp_path: Path) -> None:
+    manifest_path, division_path, state_path = _write_release(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["areas"][0]["level"] = "supercountry"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ReleaseValidationError, match="level"):
+        load_and_verify_release(manifest_path, division_path, state_path)
+
+
+def test_rejects_area_missing_model_file_reference(tmp_path: Path) -> None:
+    manifest_path, division_path, state_path = _write_release(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["areas"][0]["model_file"] = "not-in-model-files.rds"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ReleaseValidationError, match="unknown model_file"):
         load_and_verify_release(manifest_path, division_path, state_path)
