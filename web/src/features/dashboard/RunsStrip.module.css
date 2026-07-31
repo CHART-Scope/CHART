@@ -50,7 +50,9 @@
   font: inherit;
   font-size: var(--fs-body-sm);
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
 }
 
 .chip:hover {

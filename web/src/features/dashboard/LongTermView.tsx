@@ -38,7 +38,12 @@ type Props = {
   refreshKey?: string | null;
 };
 
-export function LongTermView({ geographyId, adminUnit, accessToken, refreshKey }: Props) {
+export function LongTermView({
+  geographyId,
+  adminUnit,
+  accessToken,
+  refreshKey,
+}: Props) {
   const fetcher = useCallback(
     () => fetchLongTermRisk(geographyId, adminUnit, accessToken),
     [geographyId, adminUnit, accessToken],

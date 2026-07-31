@@ -33,7 +33,6 @@ export default function RunDetailPage(props: PageProps) {
   );
 }
 
-
 function AuthorizedRunDetail({
   session,
   geographyId,
@@ -45,8 +44,7 @@ function AuthorizedRunDetail({
 }) {
   const router = useRouter();
   const hasAccess = useMemo(
-    () =>
-      session.user.roles.length > 0 && session.user.geographyScopes.length > 0,
+    () => session.user.roles.length > 0 && session.user.geographyScopes.length > 0,
     [session.user.roles, session.user.geographyScopes],
   );
 
@@ -80,8 +78,7 @@ function AuthorizedRunDetail({
         >
           <main className={styles.page}>
             <p className={styles.empty}>
-              That run identifier is not valid.{" "}
-              <a href={backHref}>Back to dashboard</a>
+              That run identifier is not valid. <a href={backHref}>Back to dashboard</a>
             </p>
           </main>
         </AppShell>

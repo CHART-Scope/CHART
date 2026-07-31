@@ -13,18 +13,15 @@ const BASE_NAV: readonly NavItem[] = [
   { id: "learning", label: "Learning", icon: "book" },
 ] as const;
 
-
 const ADMIN_ITEM: NavItem = {
   id: "users",
   label: "People & access",
   icon: "settings",
 };
 
-
 export function appNavForRoles(roles: readonly string[]): NavItem[] {
   return roles.includes("chart_admin") ? [...BASE_NAV, ADMIN_ITEM] : [...BASE_NAV];
 }
-
 
 export const NAV_ROUTE: Record<string, string> = {
   home: "/home",

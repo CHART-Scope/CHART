@@ -8,7 +8,6 @@ import { Slider } from "@/components/Slider";
 
 import styles from "./HeatLbwLinkPanel.module.css";
 
-
 type Props = {
   /** Label for the state / whole-area default (e.g. "Madhya Pradesh (State)"). */
   stateLabel: string;
@@ -19,11 +18,9 @@ type Props = {
   onAdminUnitChange?: (code: string | null) => void;
 };
 
-
 const MIN_TEMP = 30;
 const MAX_TEMP = 45;
 const DEFAULT_TEMP = 32;
-
 
 export function HeatLbwLinkPanel({
   stateLabel,
@@ -66,8 +63,8 @@ export function HeatLbwLinkPanel({
       </div>
 
       <p className={styles.stat}>
-        <strong>{Math.round(attributableFraction)}%</strong> of all low birth
-        weight cases may be attributable to maternal heat exposure
+        <strong>{Math.round(attributableFraction)}%</strong> of all low birth weight
+        cases may be attributable to maternal heat exposure
       </p>
 
       <div className={styles.precisionRow}>
@@ -94,13 +91,12 @@ export function HeatLbwLinkPanel({
       </div>
 
       <p className={styles.footnote}>
-        Drag the slider to see how hotter temperatures during pregnancy can
-        increase the likelihood of low birth weight.
+        Drag the slider to see how hotter temperatures during pregnancy can increase the
+        likelihood of low birth weight.
       </p>
     </section>
   );
 }
-
 
 /**
  * Placeholder attributable-fraction curve for the explorer slider.
@@ -116,7 +112,6 @@ function attributableFractionAt(temperatureC: number): number {
   const percent = 5 + above30 * 3;
   return Math.max(0, Math.min(100, percent));
 }
-
 
 function precisionAt(temperatureC: number): PrecisionLevel {
   if (temperatureC <= 33) return "moderate";

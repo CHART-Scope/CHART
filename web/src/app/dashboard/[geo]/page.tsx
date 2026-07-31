@@ -24,7 +24,6 @@ type PageProps = {
   searchParams: Promise<{ admin_unit?: string }>;
 };
 
-
 /**
  * MVP: the plan-page Mad Libs is locked to Extreme heat + Maternal /
  * newborn / child health. When the model registry surfaces the deployed
@@ -32,7 +31,6 @@ type PageProps = {
  */
 const DEPLOYED_HAZARD_LABEL = "Extreme heat";
 const DEPLOYED_HEALTH_DOMAIN_SHORT = "MNCH";
-
 
 export default function DashboardGeoPage(props: PageProps) {
   const params = use(props.params);
@@ -52,7 +50,6 @@ export default function DashboardGeoPage(props: PageProps) {
   );
 }
 
-
 function AuthorizedDashboard({
   session,
   geographyId,
@@ -66,8 +63,7 @@ function AuthorizedDashboard({
   const [geographies, setGeographies] = useState<GeographyRecord[]>([]);
 
   const hasAccess = useMemo(
-    () =>
-      session.user.roles.length > 0 && session.user.geographyScopes.length > 0,
+    () => session.user.roles.length > 0 && session.user.geographyScopes.length > 0,
     [session.user.roles, session.user.geographyScopes],
   );
 
@@ -119,9 +115,10 @@ function AuthorizedDashboard({
 
   const handleAdminUnitChange = useCallback(
     (code: string | null) => {
-      const target = code === null
-        ? `/dashboard/${encodeURIComponent(geographyId)}`
-        : `/dashboard/${encodeURIComponent(geographyId)}?admin_unit=${encodeURIComponent(code)}`;
+      const target =
+        code === null
+          ? `/dashboard/${encodeURIComponent(geographyId)}`
+          : `/dashboard/${encodeURIComponent(geographyId)}?admin_unit=${encodeURIComponent(code)}`;
       router.push(target);
     },
     [geographyId, router],
@@ -173,8 +170,8 @@ function AuthorizedDashboard({
           <section className={styles.recommendedActions}>
             <p className={styles.recommendedEyebrow}>Recommended actions</p>
             <p className={styles.recommendedBody}>
-              Actions from the reviewed solutions repository will appear here
-              once your first prediction has completed.
+              Actions from the reviewed solutions repository will appear here once your
+              first prediction has completed.
             </p>
           </section>
         </main>
@@ -182,7 +179,6 @@ function AuthorizedDashboard({
     </>
   );
 }
-
 
 function countryFromPath(path: string): string {
   const parts = path.split("/").filter(Boolean);
@@ -192,7 +188,6 @@ function countryFromPath(path: string): string {
     .map((piece) => piece.charAt(0).toUpperCase() + piece.slice(1))
     .join(" ");
 }
-
 
 /**
  * The geography seed stores division names as "Bhopal Division". The

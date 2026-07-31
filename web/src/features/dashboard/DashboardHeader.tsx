@@ -4,7 +4,6 @@ import { Icon } from "@/components/Icon";
 
 import styles from "./DashboardHeader.module.css";
 
-
 type Props = {
   country: string;
   areaName: string;
@@ -12,7 +11,6 @@ type Props = {
   healthDomainLabel: string;
   onPlayVideo?: () => void;
 };
-
 
 /**
  * Top of the dashboard: breadcrumb + planning-context pill, then the
@@ -59,8 +57,8 @@ export function DashboardHeader({
         <div className={styles.cardBody}>
           <p className={styles.eyebrow}>Understand the climate-health risk</p>
           <h1 className={styles.title}>
-            Protecting mothers and babies from extreme heat: The science and
-            actions that can save lives
+            Protecting mothers and babies from extreme heat: The science and actions
+            that can save lives
           </h1>
         </div>
       </article>

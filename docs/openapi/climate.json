@@ -1340,6 +1340,72 @@
         "description": "Returns the precomputed heat-attributable series for the requested admin_unit under the seasonal ensemble and near-term projection scenarios, plus the three- and six-month horizon cards. Rows are produced upstream by the materialization bridge; the endpoint never runs an inference itself. Requires a bearer token and geography scope."
       }
     },
+    "/risk/{geography_id}/current-observation": {
+      "get": {
+        "tags": [
+          "risk"
+        ],
+        "summary": "Read the latest observed climate reading for the place",
+        "operationId": "read_current_observation_risk__geography_id__current_observation_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "admin_unit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Admin Unit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The latest observed reading plus its source and month, or a null-value payload when no observed climate rows exist yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentObservationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns the most recent reanalysis-derived climate value for the admin_unit linked to the requested geography. The dashboard's Today strip renders this reading with its source name and month, so users can see the current conditions the forecast anchors on. Falls back to any observed variable when the canonical dashboard variable is not yet ingested. Requires a bearer token and geography scope."
+      }
+    },
     "/risk/{geography_id}/long-term": {
       "get": {
         "tags": [
@@ -2078,6 +2144,99 @@
           "geographyId"
         ],
         "title": "CreateWorkspaceInput"
+      },
+      "CurrentObservationResponse": {
+        "properties": {
+          "admin_unit_id": {
+            "type": "integer",
+            "title": "Admin Unit Id"
+          },
+          "admin_unit_code": {
+            "type": "string",
+            "title": "Admin Unit Code"
+          },
+          "period_month": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Month"
+          },
+          "variable": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variable"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "source_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Name"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "admin_unit_id",
+          "admin_unit_code",
+          "period_month",
+          "variable",
+          "value",
+          "unit",
+          "source_name",
+          "updated_at"
+        ],
+        "title": "CurrentObservationResponse",
+        "description": "Latest reanalysis-based climate reading for the selected place.\n\nEmpty when no observed rows exist yet for the admin_unit; the caller\nrenders a \"no reading yet\" state rather than treating this as an\nerror. ``period_month`` is the first day of the calendar month the\nvalue belongs to (matches ``district_climate.period_month``)."
       },
       "CurrentUserContext": {
         "properties": {

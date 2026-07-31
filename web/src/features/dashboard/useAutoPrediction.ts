@@ -8,7 +8,6 @@ import {
   type PredictionRequest,
 } from "@/lib/planningClient";
 
-
 export type AutoPredictionPhase =
   | "idle"
   | "submitting"
@@ -18,7 +17,6 @@ export type AutoPredictionPhase =
   | "failed"
   | "not_configured";
 
-
 export type AutoPredictionState = {
   phase: AutoPredictionPhase;
   requestId: number | null;
@@ -27,7 +25,6 @@ export type AutoPredictionState = {
   completedAt: string | null;
 };
 
-
 type Options = {
   geographyId: string;
   accessToken: string;
@@ -35,9 +32,7 @@ type Options = {
   disabled?: boolean;
 };
 
-
 const POLL_INTERVAL_MS = 5_000;
-
 
 /**
  * Submit one LBW prediction for today's planning date on mount and poll
@@ -106,7 +101,9 @@ export function useAutoPrediction({
       } catch (error) {
         if (cancelled.current) return;
         const message =
-          error instanceof Error ? error.message : "The prediction could not be started.";
+          error instanceof Error
+            ? error.message
+            : "The prediction could not be started.";
         setState({
           phase: isNotConfigured(message) ? "not_configured" : "failed",
           requestId: null,
@@ -132,8 +129,7 @@ export function useAutoPrediction({
             requestId,
             stage: current.stage,
             error: current.error_code ?? null,
-            completedAt:
-              current.status === "completed" ? current.updated_at : null,
+            completedAt: current.status === "completed" ? current.updated_at : null,
           });
           if (current.status === "completed" || current.status === "failed") {
             return;
@@ -142,8 +138,7 @@ export function useAutoPrediction({
           if (cancelled.current) return;
           setState((prev) => ({
             ...prev,
-            error:
-              error instanceof Error ? error.message : "Polling failed.",
+            error: error instanceof Error ? error.message : "Polling failed.",
           }));
         }
         timer.current = setTimeout(tick, POLL_INTERVAL_MS);
@@ -165,13 +160,11 @@ export function useAutoPrediction({
   return state;
 }
 
-
 const NOT_CONFIGURED_CODES = new Set([
   "MODEL_NOT_AVAILABLE_FOR_PLACE",
   "MODEL_RELEASE_NOT_AVAILABLE_FOR_PLACE",
   "CLIMATE_NOT_CONFIGURED_FOR_PLACE",
 ]);
-
 
 function isNotConfigured(message: string): boolean {
   for (const code of NOT_CONFIGURED_CODES) {
@@ -179,7 +172,6 @@ function isNotConfigured(message: string): boolean {
   }
   return false;
 }
-
 
 function isCompletedResult(
   value: Awaited<ReturnType<typeof submitPrediction>>,
@@ -190,7 +182,6 @@ function isCompletedResult(
   );
 }
 
-
 function todayPlanningMonth(): string {
   const now = new Date();
   const year = now.getFullYear();
@@ -198,10 +189,7 @@ function todayPlanningMonth(): string {
   return `${year}-${month}`;
 }
 
-
-function mapStatusToPhase(
-  status: PredictionRequest["status"],
-): AutoPredictionPhase {
+function mapStatusToPhase(status: PredictionRequest["status"]): AutoPredictionPhase {
   switch (status) {
     case "completed":
       return "completed";

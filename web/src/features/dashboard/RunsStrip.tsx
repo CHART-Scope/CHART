@@ -3,13 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import {
-  listPredictionRequests,
-  type PredictionSummary,
-} from "@/lib/planningClient";
+import { listPredictionRequests, type PredictionSummary } from "@/lib/planningClient";
 
 import styles from "./RunsStrip.module.css";
-
 
 type Props = {
   geographyId: string;
@@ -22,12 +18,10 @@ type Props = {
   refreshKey?: string | null;
 };
 
-
 type Load =
   | { status: "loading" }
   | { status: "ready"; items: PredictionSummary[] }
   | { status: "error"; message: string };
-
 
 const STATUS_COLOR: Record<string, string> = {
   completed: "var(--color-success)",
@@ -36,7 +30,6 @@ const STATUS_COLOR: Record<string, string> = {
   waiting: "var(--color-text-muted)",
   failed: "var(--color-sem-low)",
 };
-
 
 export function RunsStrip({
   geographyId,
@@ -66,10 +59,7 @@ export function RunsStrip({
     };
   }, [accessToken, geographyId, refreshKey]);
 
-  const chips = useMemo(
-    () => (load.status === "ready" ? load.items : []),
-    [load],
-  );
+  const chips = useMemo(() => (load.status === "ready" ? load.items : []), [load]);
 
   return (
     <section className={styles.wrap} aria-label="Recent planning runs">
@@ -95,7 +85,9 @@ export function RunsStrip({
               >
                 <span
                   className={styles.dot}
-                  style={{ background: STATUS_COLOR[run.status] ?? "var(--color-text-muted)" }}
+                  style={{
+                    background: STATUS_COLOR[run.status] ?? "var(--color-text-muted)",
+                  }}
                   aria-hidden
                 />
                 <span>{formatRunDate(run.created_at)}</span>
@@ -108,7 +100,6 @@ export function RunsStrip({
     </section>
   );
 }
-
 
 function formatRunDate(iso: string): string {
   const d = new Date(iso);

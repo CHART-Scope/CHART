@@ -62,3 +62,4 @@ pipelines/inference/models/
 build-storybook.log
 .backlog
 new_design
+*.rds

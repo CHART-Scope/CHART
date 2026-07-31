@@ -4,7 +4,6 @@ import { FillFigure } from "@/components/FillFigure";
 
 import styles from "./RiskProtectionPanel.module.css";
 
-
 export function RiskProtectionPanel() {
   return (
     <section className={styles.panel} aria-labelledby="risk-protection-heading">
@@ -53,9 +52,9 @@ export function RiskProtectionPanel() {
         </div>
       </div>
       <p className={styles.body}>
-        Exposure to extreme heat during pregnancy directly increases the risk of
-        a baby being born with low birth weight (LBW), while maintaining a
-        cooler environment significantly reduces this risk.
+        Exposure to extreme heat during pregnancy directly increases the risk of a baby
+        being born with low birth weight (LBW), while maintaining a cooler environment
+        significantly reduces this risk.
       </p>
     </section>
   );

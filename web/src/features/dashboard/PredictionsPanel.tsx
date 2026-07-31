@@ -63,7 +63,6 @@ export function PredictionsPanel({ geographyId, adminUnit, accessToken }: Props)
   );
 }
 
-
 function AutoPredictionStatus({
   phase,
   stage,

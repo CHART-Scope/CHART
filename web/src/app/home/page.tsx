@@ -9,15 +9,9 @@ import { RequireAuth } from "@/features/auth/RequireAuth";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
 
-
 export default function HomePage() {
-  return (
-    <RequireAuth>
-      {(session) => <AuthorizedHome session={session} />}
-    </RequireAuth>
-  );
+  return <RequireAuth>{(session) => <AuthorizedHome session={session} />}</RequireAuth>;
 }
-
 
 function AuthorizedHome({ session }: { session: AuthSession }) {
   const router = useRouter();
@@ -53,8 +47,7 @@ function AuthorizedHome({ session }: { session: AuthSession }) {
           </p>
           <h1
             style={{
-              fontFamily:
-                "var(--font-serif, Georgia, 'Times New Roman', serif)",
+              fontFamily: "var(--font-serif, Georgia, 'Times New Roman', serif)",
               fontSize: "1.6rem",
               margin: "0.4rem 0 1rem",
               fontWeight: 500,

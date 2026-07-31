@@ -6,10 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { IconSprite } from "@/components/Icon";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
-import {
-  listGeographies,
-  type GeographyRecord,
-} from "@/lib/planningClient";
+import { listGeographies, type GeographyRecord } from "@/lib/planningClient";
 import { PlanningSetup } from "./PlanningSetup";
 import { defaultPlanningSelection, type PlanningSelection } from "./planningWireframe";
 import { UserManagement } from "./UserManagement";

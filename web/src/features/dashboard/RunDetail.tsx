@@ -3,13 +3,9 @@
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/Button";
-import {
-  getPredictionRequest,
-  type PredictionRequest,
-} from "@/lib/planningClient";
+import { getPredictionRequest, type PredictionRequest } from "@/lib/planningClient";
 
 import styles from "./RunDetail.module.css";
-
 
 type Props = {
   requestId: number;
@@ -17,12 +13,10 @@ type Props = {
   backHref: string;
 };
 
-
 type Load =
   | { status: "loading" }
   | { status: "ready"; run: PredictionRequest }
   | { status: "error"; message: string };
-
 
 /**
  * Standalone view of one prediction request. Reachable at a stable URL
@@ -44,8 +38,7 @@ export function RunDetail({ requestId, accessToken, backHref }: Props) {
         if (cancelled) return;
         setLoad({
           status: "error",
-          message:
-            error instanceof Error ? error.message : "Run could not be loaded.",
+          message: error instanceof Error ? error.message : "Run could not be loaded.",
         });
       });
     return () => {

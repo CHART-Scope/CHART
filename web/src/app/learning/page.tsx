@@ -9,15 +9,11 @@ import { RequireAuth } from "@/features/auth/RequireAuth";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
 
-
 export default function LearningPage() {
   return (
-    <RequireAuth>
-      {(session) => <AuthorizedLearning session={session} />}
-    </RequireAuth>
+    <RequireAuth>{(session) => <AuthorizedLearning session={session} />}</RequireAuth>
   );
 }
-
 
 function AuthorizedLearning({ session }: { session: AuthSession }) {
   const router = useRouter();
@@ -53,8 +49,7 @@ function AuthorizedLearning({ session }: { session: AuthSession }) {
           </p>
           <h1
             style={{
-              fontFamily:
-                "var(--font-serif, Georgia, 'Times New Roman', serif)",
+              fontFamily: "var(--font-serif, Georgia, 'Times New Roman', serif)",
               fontSize: "1.6rem",
               margin: "0.4rem 0 1rem",
               fontWeight: 500,
@@ -63,9 +58,9 @@ function AuthorizedLearning({ session }: { session: AuthSession }) {
             Learning hub
           </h1>
           <p style={{ color: "#4a4a4a", lineHeight: 1.6 }}>
-            The Learning hub is coming soon. It will host guides on interpreting
-            the risk maps, the science behind heat-attributable low birth
-            weight, and CHART&apos;s methodology.
+            The Learning hub is coming soon. It will host guides on interpreting the
+            risk maps, the science behind heat-attributable low birth weight, and
+            CHART&apos;s methodology.
           </p>
         </main>
       </AppShell>

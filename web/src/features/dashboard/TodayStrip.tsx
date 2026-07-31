@@ -9,19 +9,16 @@ import {
 
 import styles from "./TodayStrip.module.css";
 
-
 type Props = {
   geographyId: string;
   adminUnit: string | null;
   accessToken?: string;
 };
 
-
 type Load =
   | { status: "loading" }
   | { status: "ready"; data: CurrentObservationResponse }
   | { status: "error"; message: string };
-
 
 const MONTH_NAMES = [
   "January",
@@ -38,13 +35,11 @@ const MONTH_NAMES = [
   "December",
 ];
 
-
 const VARIABLE_LABELS: Record<string, string> = {
   tmax_monthly_mean_c: "monthly mean max",
   tmax_monthly_max_c: "monthly peak max",
   heatwave_days: "heatwave days this month",
 };
-
 
 export function TodayStrip({ geographyId, adminUnit, accessToken }: Props) {
   const [state, setState] = useState<Load>({ status: "loading" });
@@ -61,7 +56,8 @@ export function TodayStrip({ geographyId, adminUnit, accessToken }: Props) {
         if (cancelled) return;
         setState({
           status: "error",
-          message: error instanceof Error ? error.message : "Could not load current reading.",
+          message:
+            error instanceof Error ? error.message : "Could not load current reading.",
         });
       });
     return () => {
@@ -81,17 +77,16 @@ export function TodayStrip({ geographyId, adminUnit, accessToken }: Props) {
   );
 }
 
-
 function renderValue(state: Load): string {
   if (state.status === "loading") return "…";
   if (state.status === "error") return "—";
   const { data } = state;
   if (data.value === null) return "No reading yet";
   const rounded = Math.round(data.value * 10) / 10;
-  const unit = data.unit === "celsius" || data.variable?.endsWith("_c") ? "°C" : (data.unit ?? "");
+  const unit =
+    data.unit === "celsius" || data.variable?.endsWith("_c") ? "°C" : (data.unit ?? "");
   return `${rounded}${unit}`;
 }
-
 
 function renderSource(state: Load): string {
   if (state.status !== "ready") return "";
@@ -99,14 +94,15 @@ function renderSource(state: Load): string {
   if (data.value === null) {
     return "Reanalysis has not yet reached this place.";
   }
-  const label = data.variable ? VARIABLE_LABELS[data.variable] ?? data.variable : "observed";
+  const label = data.variable
+    ? (VARIABLE_LABELS[data.variable] ?? data.variable)
+    : "observed";
   const month = data.period_month ? formatPeriod(data.period_month) : null;
   const parts = [label];
   if (month) parts.push(`as of ${month}`);
   if (data.source_name) parts.push(`(${data.source_name})`);
   return parts.join(" · ");
 }
-
 
 function todayLabel(): string {
   const now = new Date();
@@ -116,7 +112,6 @@ function todayLabel(): string {
     month: "long",
   });
 }
-
 
 function formatPeriod(iso: string): string {
   if (iso.length < 7) return iso;

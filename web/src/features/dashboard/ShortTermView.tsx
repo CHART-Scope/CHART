@@ -32,7 +32,12 @@ type Props = {
   refreshKey?: string | null;
 };
 
-export function ShortTermView({ geographyId, adminUnit, accessToken, refreshKey }: Props) {
+export function ShortTermView({
+  geographyId,
+  adminUnit,
+  accessToken,
+  refreshKey,
+}: Props) {
   const fetcher = useCallback(
     () => fetchShortTermRisk(geographyId, adminUnit, accessToken),
     [geographyId, adminUnit, accessToken],
