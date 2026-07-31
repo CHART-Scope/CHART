@@ -1,6 +1,10 @@
+import { NEXT_ACTION_NOT_FOUND_HEADER } from "next/dist/client/components/app-router-headers";
 import { NextResponse } from "next/server";
 
-const defaultLegacyApiUrl = "http://127.0.0.1:3200";
+const ApiUrl = process.env.CHART_PYTHON_API_INTERNAL_URL || "http://127.0.0.1:3210";
+
+
+
 
 type RepositorySolution = {
   sourceRecordId?: string | null;
@@ -17,7 +21,7 @@ export async function GET() {
   const apiUrl = (
     process.env.CHART_API_INTERNAL_URL ??
     process.env.NEXT_PUBLIC_CHART_API_URL ??
-    defaultLegacyApiUrl
+    ApiUrl
   ).replace(/\/$/, "");
 
   try {

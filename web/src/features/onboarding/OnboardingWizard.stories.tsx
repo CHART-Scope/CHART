@@ -63,7 +63,7 @@ export const WorkspaceReview: Story = {
         level: "State",
         geo: "Madhya Pradesh",
         primarySectorId: "water",
-        collaboratingSectorIds: new Set(["agriculture"]),
+        collaboratingSectorIds: ["agriculture"],
         adminName: "CHART Administrator",
         adminEmail: "admin@example.org",
         adminPassword: "example-password",

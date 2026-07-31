@@ -1,12 +1,15 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
+import { Modal } from "@/components/Modal";
 import { Panel } from "@/components/Panel";
 import { Select } from "@/components/Select";
 import { TextInput } from "@/components/TextInput";
+import { resetInstallation } from "@/lib/setupClient";
 import {
   inviteUser,
   listAdminGeographies,
@@ -49,7 +52,10 @@ const initialForm: FormState = {
   geographyId: "",
 };
 
+const RESET_CONFIRM_PHRASE = "RESET";
+
 export function UserManagement({ accessToken }: { accessToken: string }) {
+  const router = useRouter();
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [geographies, setGeographies] = useState<AdminGeography[]>([]);
   const [form, setForm] = useState<FormState>(initialForm);
@@ -57,6 +63,27 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+
+  async function performReset() {
+    setIsResetting(true);
+    setResetError(null);
+    try {
+      await resetInstallation(accessToken);
+      router.replace("/onboarding");
+    } catch (thrown) {
+      setResetError(
+        thrown instanceof Error
+          ? thrown.message
+          : "CHART could not reset the installation.",
+      );
+    } finally {
+      setIsResetting(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -259,6 +286,75 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
           )}
         </Panel>
       </div>
+
+      <div className={styles.dangerZone}>
+        <div>
+          <strong>Reset this CHART installation</strong>
+          <p>
+            Deletes all workspaces and their members, and returns CHART to the
+            first-run setup wizard. Sign-in identities in Keycloak are not touched.
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setResetError(null);
+            setResetConfirmText("");
+            setShowResetDialog(true);
+          }}
+        >
+          Reset installation
+        </Button>
+      </div>
+
+      <Modal
+        open={showResetDialog}
+        onClose={() => {
+          if (!isResetting) setShowResetDialog(false);
+        }}
+        title="Reset this CHART installation"
+        description="This cannot be undone. All workspaces and their members will be removed and CHART will require first-run setup again."
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setShowResetDialog(false)}
+              disabled={isResetting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void performReset()}
+              disabled={
+                resetConfirmText !== RESET_CONFIRM_PHRASE || isResetting
+              }
+            >
+              {isResetting ? "Resetting…" : "Reset installation"}
+            </Button>
+          </>
+        }
+      >
+        <div className={styles.dangerConfirm}>
+          <label htmlFor="reset-confirm">
+            Type <code>{RESET_CONFIRM_PHRASE}</code> to confirm.
+          </label>
+          <TextInput
+            id="reset-confirm"
+            label=""
+            value={resetConfirmText}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setResetConfirmText(value);
+            }}
+            autoComplete="off"
+          />
+          {resetError ? (
+            <p className={styles.error} role="alert">
+              {resetError}
+            </p>
+          ) : null}
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -5,3 +5,4 @@ export { Login } from "./Login";
 export { exampleSetupSectors, OnboardingWizard } from "./OnboardingWizard";
 export type { OnboardingState, SetupSector } from "./OnboardingWizard";
 export { OnboardingFlow } from "./OnboardingFlow";
+export { useOnboardingStore } from "./store";

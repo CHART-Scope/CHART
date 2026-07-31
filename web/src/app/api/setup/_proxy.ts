@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 
-const defaultPythonApiUrl = "http://127.0.0.1:3210";
+const ApiUrl = process.env.CHART_PYTHON_API_INTERNAL_URL || "http://127.0.0.1:3210";
 
 export async function proxySetupRequest(
   request: Request,
   path: "" | "/options" | "/bootstrap",
 ) {
   const baseUrl = (
-    process.env.CHART_PYTHON_API_INTERNAL_URL ?? defaultPythonApiUrl
+   ApiUrl 
   ).replace(/\/$/, "");
   const bootstrapToken = process.env.CHART_BOOTSTRAP_TOKEN?.trim();
 

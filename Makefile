@@ -5,7 +5,7 @@ export PATH := $(dir $(NPM)):$(PATH)
 CHART_REPOSITORY_DIR := chart-repository
 CHART_REPOSITORY_COMPOSE := $(DOCKER) compose -f $(CHART_REPOSITORY_DIR)/docker-compose.yml
 
-.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run
+.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run bootstrap-token
 
 help:
 	@printf "\nQuick start (climate pipeline)\n"
@@ -24,6 +24,7 @@ help:
 	@printf "  make local-setup    Start Docker services, migrate, seed, and sync identity\n"
 	@printf "  make services       Start local Postgres and Keycloak\n"
 	@printf "  make mail           Start local Mailpit (SMTP :1025, inbox :8025)\n"
+	@printf "  make bootstrap-token  Ensure CHART_BOOTSTRAP_TOKEN exists in web/.env.local\n"
 	@printf "  make identity-sync  Re-apply local Keycloak seed users and groups\n"
 	@printf "  make identity-test  Test Keycloak SSO and redirect configuration\n"
 	@printf "  make identity-restart  Restart Keycloak, preserving data, then sync it\n"
@@ -111,7 +112,22 @@ identity: services
 install:
 	$(NPM) install
 
-web:
+WEB_ENV_LOCAL := web/.env.local
+
+bootstrap-token:
+	@if [ ! -f "$(WEB_ENV_LOCAL)" ] || ! grep -q "^CHART_BOOTSTRAP_TOKEN=" "$(WEB_ENV_LOCAL)"; then \
+		if command -v openssl >/dev/null 2>&1; then \
+			token=$$(openssl rand -hex 32); \
+		else \
+			token=$$(xxd -l 32 -p /dev/urandom | tr -d '\n'); \
+		fi; \
+		mkdir -p web; \
+		touch "$(WEB_ENV_LOCAL)"; \
+		printf "CHART_BOOTSTRAP_TOKEN=%s\n" "$$token" >> "$(WEB_ENV_LOCAL)"; \
+		printf "Generated CHART_BOOTSTRAP_TOKEN and appended to %s\n" "$(WEB_ENV_LOCAL)"; \
+	fi
+
+web: bootstrap-token
 	$(NPM) run dev:web
 
 web-build:
@@ -330,8 +346,11 @@ climate-install: climate-venv
 climate-api: climate-migrate
 	$(MAKE) climate-api-run
 
-climate-api-run:
-	DATABASE_URL="$(CHART_DATABASE_URL)" LBW_SERVICE_URL="$${LBW_SERVICE_URL:-http://127.0.0.1:8000}" \
+climate-api-run: bootstrap-token
+	@token=$$(sed -n 's/^CHART_BOOTSTRAP_TOKEN=//p' "$(WEB_ENV_LOCAL)" | head -1); \
+	DATABASE_URL="$(CHART_DATABASE_URL)" \
+	  LBW_SERVICE_URL="$${LBW_SERVICE_URL:-http://127.0.0.1:8000}" \
+	  CHART_BOOTSTRAP_TOKEN="$$token" \
 	  $(VENV_PYTHON) -m chart
 
 climate-openapi: climate-install

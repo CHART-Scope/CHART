@@ -154,6 +154,35 @@ function toBootstrapInput(state: OnboardingState) {
   };
 }
 
+export async function resetInstallation(accessToken: string) {
+  const response = await fetch("/api/setup/reset", {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+    throw new Error(resetErrorMessage(body?.error));
+  }
+  return (await response.json()) as SetupStatus;
+}
+
+function resetErrorMessage(code?: string) {
+  switch (code) {
+    case "SETUP_FORBIDDEN":
+      return "Only a CHART administrator can reset the installation.";
+    case "SETUP_UNAUTHENTICATED":
+      return "Sign in again to reset the installation.";
+    case "SETUP_SERVICE_UNAVAILABLE":
+      return "The CHART setup service is unavailable.";
+    default:
+      return "CHART could not reset the installation. Please try again.";
+  }
+}
+
 function slugify(value: string) {
   return value
     .normalize("NFKD")
