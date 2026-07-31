@@ -35,9 +35,10 @@ type Props = {
   geographyId: string;
   adminUnit: string | null;
   accessToken?: string;
+  refreshKey?: string | null;
 };
 
-export function LongTermView({ geographyId, adminUnit, accessToken }: Props) {
+export function LongTermView({ geographyId, adminUnit, accessToken, refreshKey }: Props) {
   const fetcher = useCallback(
     () => fetchLongTermRisk(geographyId, adminUnit, accessToken),
     [geographyId, adminUnit, accessToken],
@@ -48,6 +49,7 @@ export function LongTermView({ geographyId, adminUnit, accessToken }: Props) {
     isEmpty: (payload) =>
       payload.scenarios.every((scenario) => scenario.series.length === 0),
     pollIntervalMs: LONG_TERM_POLL_MS,
+    refreshKey,
   });
 
   return (

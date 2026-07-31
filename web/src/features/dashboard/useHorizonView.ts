@@ -12,6 +12,12 @@ type Options<T> = {
   isEmpty: (payload: T) => boolean;
   /** Milliseconds between empty-state re-polls; 0 disables auto-poll. */
   pollIntervalMs?: number;
+  /**
+   * When this changes, the hook re-fetches immediately without waiting for
+   * the empty-state poll. Use it to nudge the view after a prediction has
+   * just completed.
+   */
+  refreshKey?: string | null;
 };
 
 /**
@@ -26,6 +32,7 @@ export function useHorizonView<T>({
   fetcher,
   isEmpty,
   pollIntervalMs = 0,
+  refreshKey = null,
 }: Options<T>) {
   const [state, setState] = useState<FetchState<T>>({ status: "idle" });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,7 +78,7 @@ export function useHorizonView<T>({
         timer.current = null;
       }
     };
-  }, [load]);
+  }, [load, refreshKey]);
 
   useEffect(() => {
     if (pollIntervalMsRef.current <= 0) return;
