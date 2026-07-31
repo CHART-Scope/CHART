@@ -7,12 +7,14 @@ here.
 
 from .service import (
     NoAdminUnitForGeography,
+    load_current_observation,
     load_long_term_view,
     load_short_term_view,
 )
 
 __all__ = [
     "NoAdminUnitForGeography",
+    "load_current_observation",
     "load_long_term_view",
     "load_short_term_view",
 ]

@@ -59,3 +59,22 @@ class LongTermRiskResponse(BaseModel):
     admin_unit_code: str
     scenarios: list[LongTermScenario]
     socioeconomic_baseline: str
+
+
+class CurrentObservationResponse(BaseModel):
+    """Latest reanalysis-based climate reading for the selected place.
+
+    Empty when no observed rows exist yet for the admin_unit; the caller
+    renders a "no reading yet" state rather than treating this as an
+    error. ``period_month`` is the first day of the calendar month the
+    value belongs to (matches ``district_climate.period_month``).
+    """
+
+    admin_unit_id: int
+    admin_unit_code: str
+    period_month: date | None
+    variable: str | None
+    value: float | None
+    unit: str | None
+    source_name: str | None
+    updated_at: date | None

@@ -62,6 +62,18 @@ export type LongTermRiskResponse = {
 };
 
 
+export type CurrentObservationResponse = {
+  admin_unit_id: number;
+  admin_unit_code: string;
+  period_month: string | null;
+  variable: string | null;
+  value: number | null;
+  unit: string | null;
+  source_name: string | null;
+  updated_at: string | null;
+};
+
+
 function authHeaders(accessToken?: string): Record<string, string> {
   return accessToken ? { authorization: `Bearer ${accessToken}` } : {};
 }
@@ -117,4 +129,24 @@ export async function fetchLongTermRisk(
     throw new Error(await readDashboardError(response));
   }
   return (await response.json()) as LongTermRiskResponse;
+}
+
+
+export async function fetchCurrentObservation(
+  geographyId: string,
+  adminUnit: string | null,
+  accessToken?: string,
+): Promise<CurrentObservationResponse> {
+  const base = `/api/chart/risk/${encodeURIComponent(geographyId)}/current-observation`;
+  const url = adminUnit
+    ? `${base}?${new URLSearchParams({ admin_unit: adminUnit })}`
+    : base;
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: authHeaders(accessToken),
+  });
+  if (!response.ok) {
+    throw new Error(await readDashboardError(response));
+  }
+  return (await response.json()) as CurrentObservationResponse;
 }

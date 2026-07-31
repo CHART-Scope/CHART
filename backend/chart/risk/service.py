@@ -16,9 +16,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from chart.climate.scenarios import DASHBOARD_LONG_TERM_RCPS
-from chart.shared.db.models import AdminUnit, HealthImpact
+from chart.shared.db.models import AdminUnit, ClimateRun, DistrictClimate, HealthImpact
 
 from .schemas import (
+    CurrentObservationResponse,
     HealthImpactPoint,
     HorizonCard,
     LongTermRiskResponse,
@@ -26,6 +27,14 @@ from .schemas import (
     LongTermTableRow,
     ShortTermRiskResponse,
 )
+
+
+CURRENT_OBSERVATION_VARIABLE = "tmax_monthly_mean_c"
+"""The variable the dashboard's Today strip renders when it is present.
+
+Falls back to whichever observed variable is most recent for the
+admin_unit if this exact variable has not been ingested yet.
+"""
 
 
 SHORT_TERM_SCENARIOS: tuple[str, ...] = ("seas5_ensemble", "rcp45")
@@ -223,6 +232,92 @@ def load_long_term_view(
         admin_unit_code=admin_unit.code,
         scenarios=scenarios,
         socioeconomic_baseline=SOCIOECONOMIC_BASELINE,
+    )
+
+
+def load_current_observation(
+    session: Session,
+    app_geography_id: str,
+    admin_unit_code: str | None = None,
+) -> CurrentObservationResponse:
+    """Read the most recent observed climate value for one place.
+
+    Prefers the canonical dashboard variable (``tmax_monthly_mean_c``)
+    but falls back to the newest observed row of any variable so the
+    strip renders as soon as any reanalysis data has landed.
+    """
+
+    try:
+        admin_unit = _resolve_admin_unit(
+            session, app_geography_id, admin_unit_code
+        )
+    except NoAdminUnitForGeography:
+        if admin_unit_code is not None:
+            raise
+        return _empty_current_observation()
+
+    row = _select_latest_observed(
+        session, admin_unit.id, CURRENT_OBSERVATION_VARIABLE
+    )
+    if row is None:
+        row = _select_latest_observed(session, admin_unit.id, variable=None)
+
+    if row is None:
+        return CurrentObservationResponse(
+            admin_unit_id=admin_unit.id,
+            admin_unit_code=admin_unit.code,
+            period_month=None,
+            variable=None,
+            value=None,
+            unit=None,
+            source_name=None,
+            updated_at=None,
+        )
+
+    district_row, source_name = row
+    return CurrentObservationResponse(
+        admin_unit_id=admin_unit.id,
+        admin_unit_code=admin_unit.code,
+        period_month=district_row.period_month,
+        variable=district_row.variable,
+        value=district_row.value,
+        unit=district_row.unit,
+        source_name=source_name,
+        updated_at=district_row.period_month,
+    )
+
+
+def _select_latest_observed(
+    session: Session,
+    admin_unit_id: int,
+    variable: str | None,
+) -> tuple[DistrictClimate, str | None] | None:
+    query = (
+        select(DistrictClimate, ClimateRun.source_name)
+        .join(ClimateRun, ClimateRun.id == DistrictClimate.climate_run_id)
+        .where(
+            DistrictClimate.admin_unit_id == admin_unit_id,
+            ClimateRun.tier == "observed",
+        )
+        .order_by(DistrictClimate.period_month.desc(), DistrictClimate.id.desc())
+        .limit(1)
+    )
+    if variable is not None:
+        query = query.where(DistrictClimate.variable == variable)
+    result = session.execute(query).first()
+    return None if result is None else (result[0], result[1])
+
+
+def _empty_current_observation() -> CurrentObservationResponse:
+    return CurrentObservationResponse(
+        admin_unit_id=0,
+        admin_unit_code="",
+        period_month=None,
+        variable=None,
+        value=None,
+        unit=None,
+        source_name=None,
+        updated_at=None,
     )
 
 

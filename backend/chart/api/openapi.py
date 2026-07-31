@@ -341,6 +341,24 @@ OPERATION_DOCUMENTATION: dict[
             )
         },
     ),
+    ("get", "/risk/{geography_id}/current-observation"): OperationDocumentation(
+        summary="Read the latest observed climate reading for the place",
+        description=(
+            "Returns the most recent reanalysis-derived climate value for the "
+            "admin_unit linked to the requested geography. The dashboard's "
+            "Today strip renders this reading with its source name and month, "
+            "so users can see the current conditions the forecast anchors on. "
+            "Falls back to any observed variable when the canonical dashboard "
+            "variable is not yet ingested. Requires a bearer token and "
+            "geography scope."
+        ),
+        success_responses={
+            "200": (
+                "The latest observed reading plus its source and month, or a "
+                "null-value payload when no observed climate rows exist yet."
+            )
+        },
+    ),
     ("get", "/risk/{geography_id}/long-term"): OperationDocumentation(
         summary="Read the Long-term dashboard scenarios and horizon table",
         description=(
