@@ -14,7 +14,7 @@ on:
       - "pipelines/seasonal_c3s/**"
       - "pipelines/isimip_projection/**"
       - "pipelines/boundaries/**"
-      - "pipelines/LBW_demo/**"
+      - "pipelines/models/lbw/**"
       - "web/**"
   push:
     branches:
@@ -33,7 +33,7 @@ on:
       - "pipelines/seasonal_c3s/**"
       - "pipelines/isimip_projection/**"
       - "pipelines/boundaries/**"
-      - "pipelines/LBW_demo/**"
+      - "pipelines/models/lbw/**"
       - "web/**"
   workflow_dispatch:
     inputs:
@@ -132,7 +132,7 @@ jobs:
         run: python -m alembic check
 
       - name: Test Python API and data flow
-        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests pipelines/LBW_demo/tests -q
+        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests pipelines/models/lbw/tests -q
 
       - name: Typecheck current frontend
         run: npm run typecheck:web
@@ -165,7 +165,7 @@ jobs:
             chart-python:ci dagster instance info
 
       - name: Validate LBW prediction image
-        run: docker build --target test -f pipelines/LBW_demo/Dockerfile -t chart-lbw:ci pipelines/LBW_demo
+        run: docker build --target test -f pipelines/models/lbw/Dockerfile -t chart-lbw:ci pipelines/models/lbw
 
       - name: Build current frontend image
         run: docker build --build-arg "CHART_BUILD_ID=$GITHUB_SHA" -f web/Dockerfile -t chart-web:ci .

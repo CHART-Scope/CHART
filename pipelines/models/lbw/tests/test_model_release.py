@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelines.LBW_demo.model_release import (
+from pipelines.models.lbw.model_release import (
     ReleaseValidationError,
     load_and_verify_release,
 )

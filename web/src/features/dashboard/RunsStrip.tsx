@@ -1,11 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  getPredictionRequest,
   listPredictionRequests,
-  type PredictionRequest,
   type PredictionSummary,
 } from "@/lib/planningClient";
 
@@ -15,6 +14,10 @@ import styles from "./RunsStrip.module.css";
 type Props = {
   geographyId: string;
   accessToken: string;
+  /** Build the URL each chip links to. */
+  linkForRun: (requestId: number) => string;
+  /** Highlight the chip for the run currently being viewed, if any. */
+  activeRunId?: number | null;
   /** Bump this when a new run completes to force a reload of the list. */
   refreshKey?: string | null;
 };
@@ -27,25 +30,29 @@ type Load =
 
 
 const STATUS_COLOR: Record<string, string> = {
-  completed: "#4b8b3b",
-  running: "#c9922e",
-  queued: "#c9922e",
-  waiting: "#4a4a4a",
-  failed: "#c04747",
+  completed: "var(--color-success)",
+  running: "var(--color-amber)",
+  queued: "var(--color-amber)",
+  waiting: "var(--color-text-muted)",
+  failed: "var(--color-sem-low)",
 };
 
 
-export function RunsStrip({ geographyId, accessToken, refreshKey }: Props) {
+export function RunsStrip({
+  geographyId,
+  accessToken,
+  linkForRun,
+  activeRunId = null,
+  refreshKey,
+}: Props) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
-  const [openRunId, setOpenRunId] = useState<number | null>(null);
-  const [detail, setDetail] = useState<PredictionRequest | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoad({ status: "loading" });
     listPredictionRequests(geographyId, accessToken)
       .then((items) => {
-        if (!cancelled) setLoad({ status: "ready", items: items.slice(0, 8) });
+        if (!cancelled) setLoad({ status: "ready", items: items.slice(0, 12) });
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -58,25 +65,6 @@ export function RunsStrip({ geographyId, accessToken, refreshKey }: Props) {
       cancelled = true;
     };
   }, [accessToken, geographyId, refreshKey]);
-
-  useEffect(() => {
-    if (openRunId === null) {
-      setDetail(null);
-      return;
-    }
-    let cancelled = false;
-    setDetail(null);
-    getPredictionRequest(openRunId, accessToken)
-      .then((run) => {
-        if (!cancelled) setDetail(run);
-      })
-      .catch(() => {
-        if (!cancelled) setDetail(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, openRunId]);
 
   const chips = useMemo(
     () => (load.status === "ready" ? load.items : []),
@@ -100,89 +88,24 @@ export function RunsStrip({ geographyId, accessToken, refreshKey }: Props) {
         <ul className={styles.chips}>
           {chips.map((run) => (
             <li key={run.request_id}>
-              <button
-                type="button"
-                data-active={run.request_id === openRunId}
+              <Link
+                href={linkForRun(run.request_id)}
+                data-active={run.request_id === activeRunId}
                 className={styles.chip}
-                onClick={() =>
-                  setOpenRunId((current) =>
-                    current === run.request_id ? null : run.request_id,
-                  )
-                }
               >
                 <span
                   className={styles.dot}
-                  style={{ background: STATUS_COLOR[run.status] ?? "#4a4a4a" }}
+                  style={{ background: STATUS_COLOR[run.status] ?? "var(--color-text-muted)" }}
                   aria-hidden
                 />
                 <span>{formatRunDate(run.created_at)}</span>
                 <span className={styles.chipStatus}>{run.status}</span>
-              </button>
+              </Link>
             </li>
           ))}
         </ul>
       )}
-      {detail ? <RunDetail run={detail} /> : null}
     </section>
-  );
-}
-
-
-function RunDetail({ run }: { run: PredictionRequest }) {
-  const prediction = run.result?.prediction ?? null;
-  const climate = run.result?.climate ?? run.climate;
-  const orderedClimate = [...climate].sort((left, right) =>
-    left.month.localeCompare(right.month),
-  );
-  return (
-    <div className={styles.detail}>
-      <div className={styles.detailHeader}>
-        <p>
-          <strong>Planning date:</strong> {run.planning_date}
-        </p>
-        <p>
-          <strong>Status:</strong> {run.status}
-          {run.error_code ? ` · ${run.error_code}` : null}
-        </p>
-      </div>
-      {prediction ? (
-        <div className={styles.detailStats}>
-          <div>
-            <span>Odds ratio</span>
-            <strong>{prediction.odds_ratio.toFixed(2)}</strong>
-          </div>
-          <div>
-            <span>95% CI</span>
-            <strong>
-              {prediction.ci95_low.toFixed(2)} – {prediction.ci95_high.toFixed(2)}
-            </strong>
-          </div>
-          <div>
-            <span>Model</span>
-            <strong>{prediction.model_version}</strong>
-          </div>
-        </div>
-      ) : (
-        <p className={styles.detailPending}>
-          The model result is not ready for this run yet.
-        </p>
-      )}
-      {orderedClimate.length > 0 ? (
-        <ul className={styles.climateRow}>
-          {orderedClimate.map((month) => (
-            <li key={month.month}>
-              <span>{month.month}</span>
-              <strong>
-                {month.temperature_c !== null
-                  ? `${month.temperature_c.toFixed(1)}°C`
-                  : "—"}
-              </strong>
-              <small>{month.source_name ?? "—"}</small>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
   );
 }
 

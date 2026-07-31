@@ -11,6 +11,7 @@ import {
   HeatLbwLinkPanel,
   PredictionsPanel,
   RiskProtectionPanel,
+  RunsStrip,
 } from "@/features/dashboard";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
@@ -51,6 +52,7 @@ export default function DashboardGeoPage(props: PageProps) {
   );
 }
 
+
 function AuthorizedDashboard({
   session,
   geographyId,
@@ -64,7 +66,8 @@ function AuthorizedDashboard({
   const [geographies, setGeographies] = useState<GeographyRecord[]>([]);
 
   const hasAccess = useMemo(
-    () => session.user.roles.length > 0 && session.user.geographyScopes.length > 0,
+    () =>
+      session.user.roles.length > 0 && session.user.geographyScopes.length > 0,
     [session.user.roles, session.user.geographyScopes],
   );
 
@@ -99,7 +102,10 @@ function AuthorizedDashboard({
     return geographies
       .filter((geo) => geo.path.startsWith(parentPrefix))
       .filter((geo) => geo.supportsPrediction !== false)
-      .map((geo) => ({ code: geo.id, name: geo.name }));
+      .map((geo) => ({
+        code: geo.id,
+        name: cleanDisplayName(geo.name, geo.levelLabel),
+      }));
   }, [currentGeography, geographies]);
 
   const nav = appNavForRoles(session.user.roles);
@@ -156,6 +162,14 @@ function AuthorizedDashboard({
             />
           </div>
 
+          <RunsStrip
+            geographyId={geographyId}
+            accessToken={session.accessToken}
+            linkForRun={(id) =>
+              `/dashboard/${encodeURIComponent(geographyId)}/runs/${id}`
+            }
+          />
+
           <section className={styles.recommendedActions}>
             <p className={styles.recommendedEyebrow}>Recommended actions</p>
             <p className={styles.recommendedBody}>
@@ -177,4 +191,19 @@ function countryFromPath(path: string): string {
     .split("-")
     .map((piece) => piece.charAt(0).toUpperCase() + piece.slice(1))
     .join(" ");
+}
+
+
+/**
+ * The geography seed stores division names as "Bhopal Division". The
+ * mockup shows just "Bhopal", so strip a trailing level-label suffix
+ * when it is present, but leave state-level names ("Madhya Pradesh")
+ * alone.
+ */
+function cleanDisplayName(name: string, levelLabel: string): string {
+  const suffix = ` ${levelLabel}`;
+  if (levelLabel && name.endsWith(suffix)) {
+    return name.slice(0, -suffix.length);
+  }
+  return name;
 }

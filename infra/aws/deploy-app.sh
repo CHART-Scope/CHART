@@ -465,13 +465,13 @@ docker build \
 docker build -f "$APP_DIR/backend/Dockerfile" -t "$PYTHON_IMAGE" "$APP_DIR"
 if [ -n "$LBW_ENABLED" ]; then
   docker build \
-    -f "$APP_DIR/pipelines/LBW_demo/Dockerfile" \
+    -f "$APP_DIR/pipelines/models/lbw/Dockerfile" \
     -t "$LBW_IMAGE" \
-    "$APP_DIR/pipelines/LBW_demo"
+    "$APP_DIR/pipelines/models/lbw"
 
   MODEL_METADATA="$(
     docker run --rm "$PYTHON_IMAGE" python -c \
-      'import json; p=json.load(open("/app/pipelines/LBW_demo/model-release.example.json")); f={x["filename"]:x["sha256"] for x in p["model_files"]}; d=next(x for x in f if "_division_" in x); s=next(x for x in f if "_state_" in x); print("\t".join((p["id"],p["version"],f[d],f[s])))'
+      'import json; p=json.load(open("/app/pipelines/models/lbw/model-release.example.json")); f={x["filename"]:x["sha256"] for x in p["model_files"]}; d=next(x for x in f if "_division_" in x); s=next(x for x in f if "_state_" in x); print("\t".join((p["id"],p["version"],f[d],f[s])))'
   )"
   IFS=$'\t' read -r \
     LBW_MODEL_RELEASE_ID \
@@ -622,7 +622,7 @@ docker run --rm \
   "$PYTHON_IMAGE" chart-bootstrap-mp \
     --source-manifest /app/pipelines/boundaries/manifests/mp_model_areas_v1.json \
     --crosswalk /app/pipelines/boundaries/data/mp_district_division_crosswalk.csv \
-    --model-release /app/pipelines/LBW_demo/model-release.example.json \
+    --model-release /app/pipelines/models/lbw/model-release.example.json \
     $BOOTSTRAP_MODEL_ARG
 
 docker run --rm \

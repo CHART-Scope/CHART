@@ -73,6 +73,7 @@ export type CurrentObservationResponse = {
   updated_at: string | null;
 };
 
+
 function authHeaders(accessToken?: string): Record<string, string> {
   return accessToken ? { authorization: `Bearer ${accessToken}` } : {};
 }

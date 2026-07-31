@@ -109,6 +109,28 @@ def read_current_observation(
 
 
 @router.get(
+    "/{geography_id}/current-observation",
+    response_model=CurrentObservationResponse,
+    summary="Read the latest observed climate reading for the place",
+)
+def read_current_observation(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    admin_unit: Annotated[
+        str | None, Query(min_length=1, max_length=64)
+    ] = None,
+) -> CurrentObservationResponse:
+    _require_read_access(user, geography_id)
+    with get_session_factory()() as session:
+        try:
+            return load_current_observation(session, geography_id, admin_unit)
+        except NoAdminUnitForGeography as exc:
+            raise HTTPException(
+                status_code=404, detail="ADMIN_UNIT_NOT_FOUND"
+            ) from exc
+
+
+@router.get(
     "/{geography_id}/long-term",
     response_model=LongTermRiskResponse,
     summary="Read Long-term dashboard scenarios and horizon table",
