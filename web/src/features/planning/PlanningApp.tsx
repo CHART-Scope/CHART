@@ -59,19 +59,27 @@ export function PlanningApp({
     listGeographies()
       .then((records) => {
         if (cancelled) return;
-        const available = records
-          .filter((area) => area.supportsPrediction)
-          .filter((area) => isInScope(area, geographyScopes));
+        // Don't filter by supportsPrediction: the dashboard renders an
+        // empty-state skeleton when nothing has been materialized yet,
+        // and the onboarded location may not yet have a registered
+        // model release. Geography scope from Keycloak still applies.
+        const inScope = records.filter((area) =>
+          isInScope(area, geographyScopes),
+        );
         const active =
-          available.find(
+          inScope.find(
             (area) => area.id === activeGeographyId || area.path === activeGeographyId,
           ) ??
-          available.find((area) => area.id === "geo-in-madhya-pradesh") ??
-          available[0];
-        setAreas(available);
+          inScope.find((area) => area.id === "geo-in-madhya-pradesh") ??
+          inScope[0];
+        setAreas(inScope);
         setSelection((current) => ({ ...current, area: active?.id ?? "" }));
         if (!active) {
-          setError("No approved model area is available for this account.");
+          setError(
+            geographyScopes.length === 0
+              ? "This account has no geography assigned yet."
+              : "No area matched your geography scope.",
+          );
         }
         setIsLoading(false);
       })
