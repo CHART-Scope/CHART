@@ -9,15 +9,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "SETUP_UNAUTHENTICATED" }, { status: 401 });
   }
   try {
-    const response = await fetch(
-      `${BACKEND_URL.replace(/\/$/, "")}/setup/reset`,
-      {
-        method: "POST",
-        headers: { authorization },
-        cache: "no-store",
-        signal: AbortSignal.timeout(20_000),
-      },
-    );
+    const response = await fetch(`${BACKEND_URL.replace(/\/$/, "")}/setup/reset`, {
+      method: "POST",
+      headers: { authorization },
+      cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
+    });
     return new Response(response.body, {
       status: response.status,
       headers: {

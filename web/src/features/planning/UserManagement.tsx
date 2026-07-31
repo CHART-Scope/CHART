@@ -291,8 +291,8 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
         <div>
           <strong>Reset this CHART installation</strong>
           <p>
-            Deletes all workspaces and their members, and returns CHART to the
-            first-run setup wizard. Sign-in identities in Keycloak are not touched.
+            Deletes all workspaces and their members, and returns CHART to the first-run
+            setup wizard. Sign-in identities in Keycloak are not touched.
           </p>
         </div>
         <Button
@@ -325,9 +325,7 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
             </Button>
             <Button
               onClick={() => void performReset()}
-              disabled={
-                resetConfirmText !== RESET_CONFIRM_PHRASE || isResetting
-              }
+              disabled={resetConfirmText !== RESET_CONFIRM_PHRASE || isResetting}
             >
               {isResetting ? "Resetting…" : "Reset installation"}
             </Button>

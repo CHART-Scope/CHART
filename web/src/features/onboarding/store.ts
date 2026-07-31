@@ -20,7 +20,10 @@ type Actions = {
   setSubgeo: (subgeo: string) => void;
   selectPrimarySector: (id: string) => void;
   toggleCollaboratingSector: (id: string) => void;
-  setAdminField: (field: "adminName" | "adminEmail" | "adminPassword", value: string) => void;
+  setAdminField: (
+    field: "adminName" | "adminEmail" | "adminPassword",
+    value: string,
+  ) => void;
   setStep: (step: number) => void;
   hydrate: (state: Partial<OnboardingState>) => void;
   reset: () => void;
@@ -41,13 +44,15 @@ const emptyState: OnboardingState = {
 
 type Persisted = Omit<OnboardingState, "adminPassword">;
 
-export const useOnboardingStore = createPersistedStore<OnboardingState & Actions, Persisted>(
+export const useOnboardingStore = createPersistedStore<
+  OnboardingState & Actions,
+  Persisted
+>(
   (set) => ({
     ...emptyState,
     setCountry: (country) =>
       set({ country: country || null, level: null, geo: null, subgeo: null }),
-    setLevel: (level) =>
-      set({ level: level || null, geo: null, subgeo: null }),
+    setLevel: (level) => set({ level: level || null, geo: null, subgeo: null }),
     setGeo: (geo) => set({ geo: geo || null, subgeo: null }),
     setSubgeo: (subgeo) => set({ subgeo: subgeo || null }),
     selectPrimarySector: (id) =>
@@ -61,7 +66,8 @@ export const useOnboardingStore = createPersistedStore<OnboardingState & Actions
           ? s.collaboratingSectorIds.filter((x) => x !== id)
           : [...s.collaboratingSectorIds, id],
       })),
-    setAdminField: (field, value) => set({ [field]: value } as Pick<OnboardingState, typeof field>),
+    setAdminField: (field, value) =>
+      set({ [field]: value } as Pick<OnboardingState, typeof field>),
     setStep: (step) => set({ currentStep: Math.max(0, step) }),
     hydrate: (state) => set(state),
     reset: () => set(emptyState),

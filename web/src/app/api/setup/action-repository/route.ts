@@ -3,9 +3,6 @@ import { NextResponse } from "next/server";
 
 const ApiUrl = process.env.CHART_PYTHON_API_INTERNAL_URL || "http://127.0.0.1:3210";
 
-
-
-
 type RepositorySolution = {
   sourceRecordId?: string | null;
 };

@@ -6,9 +6,7 @@ export async function proxySetupRequest(
   request: Request,
   path: "" | "/options" | "/bootstrap",
 ) {
-  const baseUrl = (
-   ApiUrl 
-  ).replace(/\/$/, "");
+  const baseUrl = ApiUrl.replace(/\/$/, "");
   const bootstrapToken = process.env.CHART_BOOTSTRAP_TOKEN?.trim();
 
   try {
