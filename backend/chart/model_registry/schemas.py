@@ -14,6 +14,8 @@ class ModelFileSpec(BaseModel):
 
 class ModelAreaSpec(BaseModel):
     place_code: str = Field(min_length=1)
+    country_code: str | None = None
+    level: str | None = None
     model_file: str = Field(min_length=1)
     model_area_name: str = Field(min_length=1)
     validated_pregnancy_windows: tuple[PregnancyWindow, ...] = (1, 2, 3)
@@ -33,6 +35,7 @@ class ModelReleaseSpec(BaseModel):
     id: str = Field(min_length=1)
     module: str = Field(min_length=1)
     outcome: str = Field(min_length=1)
+    climate_hazard: str | None = None
     version: str = Field(min_length=1)
     base_uri: str = Field(min_length=1)
     temperature_input: str = Field(min_length=1)
