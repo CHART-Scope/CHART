@@ -1,0 +1,169 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.85rem 1.15rem;
+  border: 1px solid var(--color-border-subtle, #e6e6e6);
+  border-radius: 6px;
+  background: var(--surface-card, #fafafa);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted, #4a4a4a);
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-muted, #4a4a4a);
+  font-size: 0.8rem;
+}
+
+.chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--color-border-subtle, #e6e6e6);
+  border-radius: 999px;
+  background: var(--color-white, #fff);
+  color: var(--color-charcoal, #111);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.chip:hover {
+  border-color: var(--color-accent, #7a1a4a);
+}
+
+.chip[data-active="true"] {
+  background: var(--color-nexus-tint, #e6ecff);
+  border-color: var(--color-accent, #7a1a4a);
+  color: var(--color-accent, #7a1a4a);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.chipStatus {
+  color: var(--color-muted, #4a4a4a);
+  font-size: 0.72rem;
+}
+
+.detail {
+  margin-top: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border-subtle, #e6e6e6);
+  border-radius: 6px;
+  background: var(--color-white, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.detailHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: var(--color-charcoal, #111);
+}
+
+.detailHeader p {
+  margin: 0;
+}
+
+.detailStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+}
+
+.detailStats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  background: var(--surface-card, #fafafa);
+}
+
+.detailStats span {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted, #4a4a4a);
+}
+
+.detailStats strong {
+  font-family: var(--font-serif, Georgia, "Times New Roman", serif);
+  font-size: 1rem;
+  color: var(--color-accent, #7a1a4a);
+  font-weight: 500;
+}
+
+.detailPending {
+  margin: 0;
+  color: var(--color-muted, #4a4a4a);
+  font-size: 0.8rem;
+}
+
+.climateRow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.5rem;
+}
+
+.climateRow li {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border-subtle, #e6e6e6);
+  border-radius: 4px;
+  background: var(--surface-card, #fafafa);
+  gap: 0.15rem;
+}
+
+.climateRow span {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted, #4a4a4a);
+}
+
+.climateRow strong {
+  font-size: 0.95rem;
+  color: var(--color-charcoal, #111);
+}
+
+.climateRow small {
+  font-size: 0.7rem;
+  color: var(--color-muted, #4a4a4a);
+}
