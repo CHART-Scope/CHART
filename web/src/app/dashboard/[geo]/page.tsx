@@ -6,7 +6,7 @@ import { use, useCallback, useEffect, useMemo } from "react";
 import { AppShell } from "@/components/AppShell";
 import { IconSprite } from "@/components/Icon";
 import { RequireAuth } from "@/features/auth/RequireAuth";
-import { PredictionsPanel, TodayStrip } from "@/features/dashboard";
+import { PredictionsPanel, RunsStrip, TodayStrip } from "@/features/dashboard";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
 
@@ -96,6 +96,10 @@ function AuthorizedDashboard({
               <TodayStrip
                 geographyId={geographyId}
                 adminUnit={adminUnit}
+                accessToken={session.accessToken}
+              />
+              <RunsStrip
+                geographyId={geographyId}
                 accessToken={session.accessToken}
               />
               <PredictionsPanel
