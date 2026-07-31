@@ -246,7 +246,7 @@ def dashboard_client(isolated_session_factory, monkeypatch) -> Iterator[TestClie
     monkeypatch.setattr(
         risk_routes, "get_session_factory", lambda: isolated_session_factory
     )
-    monkeypatch.setattr(risk_routes, "get_place_path", lambda _id: PLACE_PATH)
+    monkeypatch.setattr(risk_routes, "_resolve_place_path", lambda _id: PLACE_PATH)
     app.dependency_overrides[require_current_user] = lambda: _override_user()
     try:
         yield TestClient(app)
@@ -317,7 +317,7 @@ def test_short_term_denies_geography_the_user_cannot_access(
     monkeypatch.setattr(
         risk_routes, "get_session_factory", lambda: isolated_session_factory
     )
-    monkeypatch.setattr(risk_routes, "get_place_path", lambda _id: PLACE_PATH)
+    monkeypatch.setattr(risk_routes, "_resolve_place_path", lambda _id: PLACE_PATH)
     app.dependency_overrides[require_current_user] = lambda: _override_user(
         geography_scopes=["/kenya/kajiado"]
     )
