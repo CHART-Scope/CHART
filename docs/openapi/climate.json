@@ -1274,6 +1274,197 @@
         "description": "Returns a durable planning workspace only when the signed-in user has the required ownership, role, and geography access. Callers cannot use a known workspace identifier to cross authorization boundaries."
       }
     },
+    "/risk/{geography_id}/short-term": {
+      "get": {
+        "tags": [
+          "risk"
+        ],
+        "summary": "Read the Short-term dashboard series and horizon cards",
+        "operationId": "read_short_term_risk__geography_id__short_term_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "admin_unit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Admin Unit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The Short-term dashboard payload for the requested admin_unit including chart series and horizon cards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShortTermRiskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns the precomputed heat-attributable series for the requested admin_unit under the seasonal ensemble and near-term projection scenarios, plus the three- and six-month horizon cards. Rows are produced upstream by the materialization bridge; the endpoint never runs an inference itself. Requires a bearer token and geography scope."
+      }
+    },
+    "/risk/{geography_id}/long-term": {
+      "get": {
+        "tags": [
+          "risk"
+        ],
+        "summary": "Read the Long-term dashboard scenarios and horizon table",
+        "operationId": "read_long_term_risk__geography_id__long_term_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "admin_unit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Admin Unit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The Long-term dashboard payload for the requested admin_unit including per-scenario series and horizon tables.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermRiskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns three overlaid RCP scenarios and their 5- / 15- / 25-year horizon rows for the requested admin_unit under an SSP2 population baseline. Missing scenarios are omitted, so the client renders the scenarios that are available today. Requires a bearer token and geography scope."
+      }
+    },
+    "/internal/erf-parameters": {
+      "post": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "Publish a fitted exposure-response curve for a geography",
+        "operationId": "publish_erf_curve_internal_erf_parameters_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErfParametersSpec"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The fitted curve was persisted; when the same git_ref was already on file the existing row is returned unchanged with created=false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErfParametersPublished"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Fitted curve already published; returned unchanged."
+          },
+          "401": {
+            "description": "Missing or wrong internal token."
+          },
+          "404": {
+            "description": "Geography slug does not exist."
+          },
+          "503": {
+            "description": "Internal API token not configured on this deployment."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "chart-internal-token": []
+          }
+        ],
+        "description": "Records a fitted heat-health curve produced offline by the modeler in R. CHART never fits: publishing this row is the sole path for a new curve to become addressable by the projection pipeline. The endpoint is idempotent on (geography, outcome, git_ref) and requires the internal service token from the CHART_INTERNAL_API_TOKEN environment variable."
+      }
+    },
     "/live": {
       "get": {
         "tags": [
@@ -1955,6 +2146,117 @@
         ],
         "title": "CurrentUserContext"
       },
+      "ErfParametersPublished": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "geography_slug": {
+            "type": "string",
+            "title": "Geography Slug"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "git_ref": {
+            "type": "string",
+            "title": "Git Ref"
+          },
+          "reference_percentile": {
+            "type": "number",
+            "title": "Reference Percentile"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "geography_slug",
+          "outcome",
+          "git_ref",
+          "reference_percentile",
+          "created"
+        ],
+        "title": "ErfParametersPublished",
+        "description": "Response shape confirming a publication (or an idempotent hit)."
+      },
+      "ErfParametersSpec": {
+        "properties": {
+          "geography_slug": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Geography Slug"
+          },
+          "outcome": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Outcome"
+          },
+          "spline_coefficients": {
+            "additionalProperties": true,
+            "type": "object",
+            "minProperties": 1,
+            "title": "Spline Coefficients"
+          },
+          "lag_window": {
+            "$ref": "#/components/schemas/LagWindowSpec"
+          },
+          "reference_percentile": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Reference Percentile"
+          },
+          "projection_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projection Source"
+          },
+          "git_ref": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Git Ref"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "geography_slug",
+          "outcome",
+          "spline_coefficients",
+          "lag_window",
+          "reference_percentile",
+          "git_ref"
+        ],
+        "title": "ErfParametersSpec",
+        "description": "Wire-format spec for one exposure-response curve publication.\n\n``geography_slug`` uses the human-readable identifier already used\nthroughout the API rather than the internal integer id, so the\nmodeler never has to look up ids."
+      },
       "ErrorResponse": {
         "properties": {
           "error": {
@@ -2246,6 +2548,75 @@
         ],
         "title": "HazardSolution"
       },
+      "HealthImpactPoint": {
+        "properties": {
+          "valid_month": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid Month"
+          },
+          "relative_risk_milli": {
+            "type": "integer",
+            "title": "Relative Risk Milli"
+          },
+          "rr_ci_low_milli": {
+            "type": "integer",
+            "title": "Rr Ci Low Milli"
+          },
+          "rr_ci_high_milli": {
+            "type": "integer",
+            "title": "Rr Ci High Milli"
+          },
+          "attributable_fraction_milli": {
+            "type": "integer",
+            "title": "Attributable Fraction Milli"
+          },
+          "attributable_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributable Number"
+          },
+          "ensemble_spread_milli": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ensemble Spread Milli"
+          },
+          "scenario": {
+            "type": "string",
+            "title": "Scenario"
+          },
+          "data_label": {
+            "type": "string",
+            "title": "Data Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valid_month",
+          "relative_risk_milli",
+          "rr_ci_low_milli",
+          "rr_ci_high_milli",
+          "attributable_fraction_milli",
+          "attributable_number",
+          "ensemble_spread_milli",
+          "scenario",
+          "data_label"
+        ],
+        "title": "HealthImpactPoint",
+        "description": "One point on a dashboard chart series."
+      },
       "HealthResponse": {
         "properties": {
           "status": {
@@ -2323,6 +2694,92 @@
           "source_uri"
         ],
         "title": "HeatSeasonOptionResponse"
+      },
+      "HorizonCard": {
+        "properties": {
+          "horizon": {
+            "type": "string",
+            "title": "Horizon"
+          },
+          "valid_month": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid Month"
+          },
+          "attributable_fraction_milli": {
+            "type": "integer",
+            "title": "Attributable Fraction Milli"
+          },
+          "attributable_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributable Number"
+          },
+          "rr_ci_low_milli": {
+            "type": "integer",
+            "title": "Rr Ci Low Milli"
+          },
+          "rr_ci_high_milli": {
+            "type": "integer",
+            "title": "Rr Ci High Milli"
+          },
+          "precision": {
+            "type": "string",
+            "title": "Precision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "horizon",
+          "valid_month",
+          "attributable_fraction_milli",
+          "attributable_number",
+          "rr_ci_low_milli",
+          "rr_ci_high_milli",
+          "precision"
+        ],
+        "title": "HorizonCard",
+        "description": "One \"IN 3 MONTHS\" / \"IN 6 MONTHS\" style card."
+      },
+      "LagWindowSpec": {
+        "properties": {
+          "months": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Months"
+          },
+          "trimester_weights": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trimester Weights"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "months"
+        ],
+        "title": "LagWindowSpec",
+        "description": "Distributed-lag window applied by the exposure-response function.\n\n``months`` is the ordered list of lag months (1..N). ``trimester_weights``\nis optional but, when provided, must have the same length and sum to\n``1.000`` within a small epsilon."
       },
       "LbwPrediction": {
         "properties": {
@@ -2487,6 +2944,107 @@
           "source_uri"
         ],
         "title": "LongTermProjectionOptionResponse"
+      },
+      "LongTermRiskResponse": {
+        "properties": {
+          "admin_unit_id": {
+            "type": "integer",
+            "title": "Admin Unit Id"
+          },
+          "admin_unit_code": {
+            "type": "string",
+            "title": "Admin Unit Code"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/LongTermScenario"
+            },
+            "type": "array",
+            "title": "Scenarios"
+          },
+          "socioeconomic_baseline": {
+            "type": "string",
+            "title": "Socioeconomic Baseline"
+          }
+        },
+        "type": "object",
+        "required": [
+          "admin_unit_id",
+          "admin_unit_code",
+          "scenarios",
+          "socioeconomic_baseline"
+        ],
+        "title": "LongTermRiskResponse"
+      },
+      "LongTermScenario": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/HealthImpactPoint"
+            },
+            "type": "array",
+            "title": "Series"
+          },
+          "table": {
+            "items": {
+              "$ref": "#/components/schemas/LongTermTableRow"
+            },
+            "type": "array",
+            "title": "Table"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "series",
+          "table"
+        ],
+        "title": "LongTermScenario"
+      },
+      "LongTermTableRow": {
+        "properties": {
+          "horizon": {
+            "type": "string",
+            "title": "Horizon"
+          },
+          "valid_month": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid Month"
+          },
+          "attributable_fraction_milli": {
+            "type": "integer",
+            "title": "Attributable Fraction Milli"
+          },
+          "attributable_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributable Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "horizon",
+          "valid_month",
+          "attributable_fraction_milli",
+          "attributable_number"
+        ],
+        "title": "LongTermTableRow"
       },
       "PlaceListResponse": {
         "properties": {
@@ -3589,6 +4147,40 @@
         ],
         "title": "SetupStatus"
       },
+      "ShortTermRiskResponse": {
+        "properties": {
+          "admin_unit_id": {
+            "type": "integer",
+            "title": "Admin Unit Id"
+          },
+          "admin_unit_code": {
+            "type": "string",
+            "title": "Admin Unit Code"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/HealthImpactPoint"
+            },
+            "type": "array",
+            "title": "Series"
+          },
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/HorizonCard"
+            },
+            "type": "array",
+            "title": "Cards"
+          }
+        },
+        "type": "object",
+        "required": [
+          "admin_unit_id",
+          "admin_unit_code",
+          "series",
+          "cards"
+        ],
+        "title": "ShortTermRiskResponse"
+      },
       "UserGeographyScope": {
         "properties": {
           "geographyId": {
@@ -3810,6 +4402,10 @@
       "bearerAuth": {
         "type": "http",
         "description": "Keycloak access token",
+        "scheme": "bearer"
+      },
+      "chart-internal-token": {
+        "type": "http",
         "scheme": "bearer"
       }
     }
