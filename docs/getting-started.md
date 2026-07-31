@@ -68,6 +68,17 @@ The response should be:
 
 Then open the CHART web application at `http://127.0.0.1:3100`.
 
+## Complete installation setup
+
+A fresh installation has no users, workspaces, or geographies configured. The
+web application redirects to `/onboarding` and walks you through a four-step
+wizard: country, administrative area, sector and collaborators, and the first
+administrator account. Sign in with the administrator credentials once the
+wizard finishes.
+
+The wizard, reset flow, and troubleshooting for stuck bootstraps are covered
+in [Installation setup](installation-setup.md).
+
 ## Climate pipeline only
 
 To work on the climate data path without starting the complete web application:

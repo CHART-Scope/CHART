@@ -12,7 +12,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
 from chart.auth.schemas import CurrentUserContext
-from chart.identity import IdentityError, upsert_user
+from chart.identity import IdentityError, delete_user, upsert_user
 from chart.shared.db.models import (
     AppGeography,
     AppUser,
@@ -108,14 +108,13 @@ def bootstrap(
             operation_id=operation_id,
         )
     except IdentityError as error:
-        _mark_bootstrap_failed(
-            operation_id,
-            error.code.replace("USER_", "SETUP_"),
-            session_factory,
+        setup_code = (
+            "SETUP_" + error.code[len("USER_") :]
+            if error.code.startswith("USER_")
+            else error.code
         )
-        raise SetupError(
-            error.code.replace("USER_", "SETUP_"), error.status_code
-        ) from error
+        _mark_bootstrap_failed(operation_id, setup_code, session_factory)
+        raise SetupError(setup_code, error.status_code) from error
     user = CurrentUserContext(
         userId=identity.user_id,
         username=identity.username,
@@ -140,6 +139,7 @@ def bootstrap(
             getattr(error, "code", type(error).__name__),
             session_factory,
         )
+        _rollback_provisioned_identity(identity.user_id, session_factory)
         raise
     return BootstrapSetupResponse(
         setup=result,
@@ -281,21 +281,36 @@ def reset(user: CurrentUserContext) -> SetupStatus:
     if "chart_admin" not in user.roles:
         raise SetupError("SETUP_FORBIDDEN", 403)
     with get_session_factory()() as session:
+        state = session.get(SetupStateRecord, SETUP_ID)
+        first_admin_user_id = state.first_admin_user_id if state else None
+
         session.execute(delete(WorkspaceMemberRecord))
         session.execute(delete(WorkspaceRecord))
-        state = session.get(SetupStateRecord, SETUP_ID)
+        if first_admin_user_id:
+            session.execute(delete(AppUser).where(AppUser.id == first_admin_user_id))
+
         if state is None:
             state = SetupStateRecord(id=SETUP_ID)
             session.add(state)
         state.completed = False
-        state.phase = "requires_admin"
+        state.phase = "uninitialized"
         state.provisioning_token = None
         state.provisioning_request_hash = None
         state.provisioning_started_at = None
+        state.last_error_code = None
+        state.first_admin_user_id = None
+        state.first_admin_email = None
         state.primary_sector_id = None
         state.collaborating_sector_ids = []
         state.selected_hazards = []
         session.commit()
+
+    if first_admin_user_id:
+        try:
+            delete_user(first_admin_user_id)
+        except IdentityError:
+            pass
+
     return get_status()
 
 
@@ -360,6 +375,19 @@ def _mark_bootstrap_failed(operation_id: str, error_code: str, session_factory) 
         state.phase = "failed"
         state.last_error_code = error_code[:128]
         session.commit()
+
+
+def _rollback_provisioned_identity(user_id: str, session_factory) -> None:
+    try:
+        with session_factory() as session:
+            session.execute(delete(AppUser).where(AppUser.id == user_id))
+            session.commit()
+    except Exception:
+        pass
+    try:
+        delete_user(user_id)
+    except IdentityError:
+        pass
 
 
 def _aware(value: datetime) -> datetime:

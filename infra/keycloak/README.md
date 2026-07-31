@@ -61,13 +61,7 @@ do not use the EC2 IP address when users browse CHART through a domain.
 
 ## Seed users
 
-| Username             | Password   |
-| -------------------- | ---------- |
-| `chart-admin`        | `password` |
-| `u1-health-region`   | `password` |
-| `u2-sector-region`   | `password` |
-| `u3-health-district` | `password` |
-| `u4-sector-district` | `password` |
+None. The realm ships without any pre-seeded users. Create the first administrator by completing the CHART installation setup wizard at `/onboarding`.
 
 ## Roles
 
@@ -83,11 +77,4 @@ Client roles on `chart-api`:
 
 ## Geography groups
 
-Geography scope is represented by Keycloak groups. The local realm uses fixture groups; real deployments should load their own.
-
-```
-/india/madhya-pradesh
-/india/madhya-pradesh/bhopal
-/kenya/kajiado
-/kenya/kajiado/kajiado-central
-```
+Geography scope is represented by Keycloak groups. The realm ships without any pre-seeded groups — the installation setup wizard and `_ensure_group_path` in `backend/chart/identity/service.py` create the required groups on demand from the country and administrative-area choices made during onboarding.

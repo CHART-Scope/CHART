@@ -60,6 +60,7 @@ flowchart LR
 | Page | Use it for |
 |---|---|
 | [Getting started](getting-started.md) | Install and run CHART locally |
+| [Installation setup](installation-setup.md) | Complete the first-run onboarding wizard, reset an installation, or recover from a stuck bootstrap |
 | [Python backend overview](python-backend.md) | Build FastAPI modules |
 | [Modeling](modeling.md) | Understand the LBW model, inputs, outputs, and limitations |
 | [Climate API](climate-api.md) | Understand preview and prediction parameters |

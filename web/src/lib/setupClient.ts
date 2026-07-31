@@ -196,6 +196,12 @@ function setupErrorMessage(code?: string) {
   switch (code) {
     case "SETUP_BOOTSTRAP_LOCKED":
       return "This CHART installation has already been set up. Return to sign in.";
+    case "SETUP_BOOTSTRAP_IN_PROGRESS":
+      return "A CHART setup attempt is already running. Wait a few minutes and retry.";
+    case "SETUP_BOOTSTRAP_REQUEST_MISMATCH":
+      return "A previous setup attempt is stuck with a different payload. Reset the installation in the database and try again.";
+    case "SETUP_PROVISIONING_LOST":
+      return "The CHART setup session was interrupted. Reset the installation and try again.";
     case "SETUP_ADMIN_PASSWORD_REQUIRED":
     case "SETUP_IDENTITY_PASSWORD_REJECTED":
       return "Use an administrator password with at least eight characters.";

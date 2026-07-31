@@ -138,6 +138,18 @@ def disable_user(user_id: str) -> None:
     )
 
 
+def delete_user(user_id: str) -> None:
+    config = _config()
+    token = _admin_token(config)
+    _request(
+        config,
+        token,
+        "DELETE",
+        f"/users/{urllib.parse.quote(user_id)}",
+        expected={204, 404},
+    )
+
+
 def recover_admin(*, username: str, email: str, password: str) -> IdentityUser:
     """Recover an existing administrator through an explicit operator action."""
     config = _config()
