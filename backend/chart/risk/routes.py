@@ -16,9 +16,14 @@ from chart.auth.service import (
 from chart.shared.db.models import AppGeography
 from chart.shared.db.session import get_session_factory
 
-from .schemas import LongTermRiskResponse, ShortTermRiskResponse
+from .schemas import (
+    CurrentObservationResponse,
+    LongTermRiskResponse,
+    ShortTermRiskResponse,
+)
 from .service import (
     NoAdminUnitForGeography,
+    load_current_observation,
     load_long_term_view,
     load_short_term_view,
 )
@@ -79,6 +84,28 @@ def read_short_term(
             return load_short_term_view(session, geography_id, admin_unit)
         except NoAdminUnitForGeography as exc:
             raise HTTPException(status_code=404, detail="ADMIN_UNIT_NOT_FOUND") from exc
+
+
+@router.get(
+    "/{geography_id}/current-observation",
+    response_model=CurrentObservationResponse,
+    summary="Read the latest observed climate reading for the place",
+)
+def read_current_observation(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    admin_unit: Annotated[
+        str | None, Query(min_length=1, max_length=64)
+    ] = None,
+) -> CurrentObservationResponse:
+    _require_read_access(user, geography_id)
+    with get_session_factory()() as session:
+        try:
+            return load_current_observation(session, geography_id, admin_unit)
+        except NoAdminUnitForGeography as exc:
+            raise HTTPException(
+                status_code=404, detail="ADMIN_UNIT_NOT_FOUND"
+            ) from exc
 
 
 @router.get(
