@@ -325,6 +325,38 @@ OPERATION_DOCUMENTATION: dict[
             "200": "The compatibility readiness check completed successfully."
         },
     ),
+    ("get", "/risk/{geography_id}/short-term"): OperationDocumentation(
+        summary="Read the Short-term dashboard series and horizon cards",
+        description=(
+            "Returns the precomputed heat-attributable series for the requested "
+            "admin_unit under the seasonal ensemble and near-term projection "
+            "scenarios, plus the three- and six-month horizon cards. Rows are "
+            "produced upstream by the materialization bridge; the endpoint never "
+            "runs an inference itself. Requires a bearer token and geography scope."
+        ),
+        success_responses={
+            "200": (
+                "The Short-term dashboard payload for the requested admin_unit "
+                "including chart series and horizon cards."
+            )
+        },
+    ),
+    ("get", "/risk/{geography_id}/long-term"): OperationDocumentation(
+        summary="Read the Long-term dashboard scenarios and horizon table",
+        description=(
+            "Returns three overlaid RCP scenarios and their 5- / 15- / 25-year "
+            "horizon rows for the requested admin_unit under an SSP2 population "
+            "baseline. Missing scenarios are omitted, so the client renders the "
+            "scenarios that are available today. Requires a bearer token and "
+            "geography scope."
+        ),
+        success_responses={
+            "200": (
+                "The Long-term dashboard payload for the requested admin_unit "
+                "including per-scenario series and horizon tables."
+            )
+        },
+    ),
     ("post", "/internal/erf-parameters"): OperationDocumentation(
         summary="Publish a fitted exposure-response curve for a geography",
         description=(
