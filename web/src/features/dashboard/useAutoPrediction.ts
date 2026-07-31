@@ -15,7 +15,8 @@ export type AutoPredictionPhase =
   | "queued"
   | "running"
   | "completed"
-  | "failed";
+  | "failed"
+  | "not_configured";
 
 
 export type AutoPredictionState = {
@@ -104,12 +105,13 @@ export function useAutoPrediction({
         pollUntilDone(accepted.request_id);
       } catch (error) {
         if (cancelled.current) return;
+        const message =
+          error instanceof Error ? error.message : "The prediction could not be started.";
         setState({
-          phase: "failed",
+          phase: isNotConfigured(message) ? "not_configured" : "failed",
           requestId: null,
           stage: null,
-          error:
-            error instanceof Error ? error.message : "The prediction could not be started.",
+          error: message,
           completedAt: null,
         });
       }
@@ -161,6 +163,21 @@ export function useAutoPrediction({
   }, [accessToken, disabled, geographyId]);
 
   return state;
+}
+
+
+const NOT_CONFIGURED_CODES = new Set([
+  "MODEL_NOT_AVAILABLE_FOR_PLACE",
+  "MODEL_RELEASE_NOT_AVAILABLE_FOR_PLACE",
+  "CLIMATE_NOT_CONFIGURED_FOR_PLACE",
+]);
+
+
+function isNotConfigured(message: string): boolean {
+  for (const code of NOT_CONFIGURED_CODES) {
+    if (message.includes(code)) return true;
+  }
+  return false;
 }
 
 
