@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import (
@@ -12,7 +13,7 @@ from chart.auth.service import (
     require_current_user,
     require_geography_access,
 )
-from chart.climate.service import ClimateServiceError, get_place_path
+from chart.shared.db.models import AppGeography
 from chart.shared.db.session import get_session_factory
 
 from .schemas import LongTermRiskResponse, ShortTermRiskResponse
@@ -37,12 +38,28 @@ risk_reader_roles = frozenset(
 )
 
 
+def _resolve_place_path(geography_id: str) -> str:
+    """Return the AppGeography.path used for scope checks.
+
+    Deliberately does *not* require a linked admin_unit or an active
+    model release, so the dashboard stays reachable for accounts whose
+    onboarded geography has not yet had its admin_unit or model
+    registered. The dashboard's read endpoints render their own empty
+    state when no health_impact rows exist for that place.
+    """
+
+    with get_session_factory()() as session:
+        path = session.scalar(
+            select(AppGeography.path).where(AppGeography.id == geography_id)
+        )
+    if path is None:
+        raise HTTPException(status_code=404, detail="GEOGRAPHY_NOT_FOUND")
+    return path
+
+
 def _require_read_access(user: CurrentUserContext, geography_id: str) -> None:
     require_any_role(user, risk_reader_roles)
-    try:
-        place_path = get_place_path(geography_id)
-    except ClimateServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
+    place_path = _resolve_place_path(geography_id)
     require_geography_access(user, place_path)
 
 
