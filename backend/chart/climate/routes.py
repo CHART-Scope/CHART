@@ -5,6 +5,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 
+from sqlalchemy import select
+
+from chart.shared.db.models import AppGeography
+from chart.shared.db.session import get_session_factory
+
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import (
     require_any_role,
@@ -140,7 +145,7 @@ def get_prediction_requests(
     limit: Annotated[int, Query(ge=1, le=25)] = 10,
 ) -> PredictionRequestListResponse:
     try:
-        _require_place_access(user, geography_id)
+        _require_geography_only_access(user, geography_id)
         return list_prediction_requests(
             requested_by_user_id=user.user_id,
             geography_id=geography_id,
@@ -175,6 +180,27 @@ def get_prediction_request_status(
 def _require_place_access(user: CurrentUserContext, geography_id: str) -> None:
     require_any_role(user, prediction_roles)
     require_geography_access(user, get_place_path(geography_id))
+
+
+def _require_geography_only_access(
+    user: CurrentUserContext, geography_id: str
+) -> None:
+    """Guard for endpoints that need scope but not a configured admin_unit.
+
+    ``get_place_path`` walks AppGeography -> admin_unit -> active model
+    release and raises 409 CLIMATE_NOT_CONFIGURED_FOR_PLACE if any link
+    is missing. Read-only listings do not need any of that; they just
+    need the caller to have a role and a matching geography scope.
+    """
+
+    require_any_role(user, prediction_roles)
+    with get_session_factory()() as session:
+        path = session.scalar(
+            select(AppGeography.path).where(AppGeography.id == geography_id)
+        )
+    if path is None:
+        raise ClimateServiceError("GEOGRAPHY_NOT_FOUND", 404)
+    require_geography_access(user, path)
 
 
 def _http_error(error: ClimateServiceError) -> HTTPException:

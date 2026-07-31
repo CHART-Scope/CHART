@@ -29,6 +29,7 @@ const PHASE_LABEL: Record<AutoPredictionPhase, string> = {
   running: "Running the LBW model…",
   completed: "Latest prediction ready",
   failed: "Latest prediction failed",
+  not_configured: "No LBW model registered for this area yet",
 };
 
 export function PredictionsPanel({ geographyId, adminUnit, accessToken }: Props) {
