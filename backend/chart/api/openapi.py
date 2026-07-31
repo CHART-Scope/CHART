@@ -325,6 +325,22 @@ OPERATION_DOCUMENTATION: dict[
             "200": "The compatibility readiness check completed successfully."
         },
     ),
+    ("post", "/internal/erf-parameters"): OperationDocumentation(
+        summary="Publish a fitted exposure-response curve for a geography",
+        description=(
+            "Records a fitted heat-health curve produced offline by the modeler in R. "
+            "CHART never fits: publishing this row is the sole path for a new curve to "
+            "become addressable by the projection pipeline. The endpoint is idempotent "
+            "on (geography, outcome, git_ref) and requires the internal service token "
+            "from the CHART_INTERNAL_API_TOKEN environment variable."
+        ),
+        success_responses={
+            "201": (
+                "The fitted curve was persisted; when the same git_ref was already "
+                "on file the existing row is returned unchanged with created=false."
+            )
+        },
+    ),
 }
 
 
