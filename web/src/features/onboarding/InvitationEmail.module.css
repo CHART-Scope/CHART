@@ -1,12 +1,11 @@
 .frame {
   display: flex;
   flex-direction: column;
-  height: 590px;
-  max-width: 900px;
-  margin: 40px auto;
-  border-radius: var(--radius-xl);
+  width: 100%;
+  min-height: 100dvh;
+  height: 100dvh;
+  margin: 0;
   overflow: hidden;
-  border: 1px solid var(--border-subtle);
   background: var(--color-white);
 }
 
@@ -176,29 +175,24 @@
   font-size: 11px;
   color: var(--color-text-light);
 }
-.content {
-  font-size: 12.5px;
-  color: var(--color-charcoal);
-  line-height: var(--lh-loose);
-  max-width: 560px;
-}
-.content p {
-  margin-bottom: 14px;
-}
-.content h4 {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--color-charcoal);
-  letter-spacing: 0.02em;
-  margin-bottom: 6px;
-}
-.content a {
-  color: var(--surface-outlook);
-  text-decoration: none;
-}
-.sign {
-  font-size: 12px;
-  color: var(--color-text-muted);
-  margin-top: 4px;
+@media (max-width: 720px) {
+  .sidebar {
+    display: none;
+  }
+
+  .toolbar {
+    overflow-x: auto;
+  }
+
+  .toolbar span:nth-child(n + 5) {
+    display: none;
+  }
+
+  .date {
+    display: none;
+  }
+
+  .mailbody {
+    padding: 18px 20px 28px;
+  }
 }

@@ -12,7 +12,9 @@ from chart.email import (
     EmailDeliveryError,
     EmailService,
     EmailSettings,
+    InvitationEmail,
     OutboundEmail,
+    build_invitation_email,
     build_email_service,
 )
 from chart.email.smtp import SmtpEmailGateway
@@ -67,6 +69,56 @@ def test_outbound_email_rejects_header_newlines() -> None:
             subject="Subject\nBcc: other@example.org",
             text_body="Body",
         )
+
+
+def test_invitation_template_builds_plain_and_html_email() -> None:
+    message = build_invitation_email(
+        InvitationEmail(
+            recipient_email="grace@scopeimpact.fi",
+            recipient_name="Grace Lemayian",
+            inviter_name="Kenya Ministry of Health",
+            geography_name="Kajiado County",
+            role_name="County planning lead",
+            start_date="1 January 2026",
+            end_date="31 December 2026",
+            activation_url="https://chart.scopeimpact.fi/",
+        )
+    )
+
+    assert message.to == ("grace@scopeimpact.fi",)
+    assert message.subject == "You've been invited to CHART by Kenya Ministry of Health"
+    assert "Kajiado County" in message.text_body
+    assert "https://chart.scopeimpact.fi/" in message.text_body
+    assert message.html_body is not None
+    assert 'href="https://chart.scopeimpact.fi/"' in message.html_body
+
+
+def test_invitation_template_escapes_html_and_rejects_unsafe_urls() -> None:
+    invitation = InvitationEmail(
+        recipient_email="grace@scopeimpact.fi",
+        recipient_name="<Grace>",
+        inviter_name="Ministry & partners",
+        geography_name="Kajiado",
+        role_name="Planning lead",
+        start_date="1 January",
+        end_date="31 December",
+        activation_url="javascript:alert(1)",
+    )
+
+    with pytest.raises(ValueError, match="absolute HTTP"):
+        build_invitation_email(invitation)
+
+    safe_message = build_invitation_email(
+        InvitationEmail(
+            **{
+                **invitation.__dict__,
+                "activation_url": "https://chart.scopeimpact.fi/",
+            }
+        )
+    )
+    assert safe_message.html_body is not None
+    assert "&lt;Grace&gt;" in safe_message.html_body
+    assert "Ministry &amp; partners" in safe_message.html_body
 
 
 def test_email_is_disabled_by_default() -> None:

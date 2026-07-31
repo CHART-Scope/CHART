@@ -7,6 +7,7 @@ from .service import (
     EmailSettings,
     build_email_service,
 )
+from .templates import InvitationEmail, build_invitation_email
 
 __all__ = [
     "DeliveryResult",
@@ -16,6 +17,8 @@ __all__ = [
     "EmailGateway",
     "EmailService",
     "EmailSettings",
+    "InvitationEmail",
     "OutboundEmail",
+    "build_invitation_email",
     "build_email_service",
 ]
