@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import secrets
@@ -25,6 +26,11 @@ from chart.shared.db.models import (
 )
 from chart.shared.db.session import get_session_factory
 
+from .model_configs import configs_for_country
+from .place_bootstrap import (
+    PlaceBootstrapError,
+    bootstrap_place_from_manifest,
+)
 from .schemas import (
     BootstrapAdminResponse,
     BootstrapSetupInput,
@@ -35,6 +41,8 @@ from .schemas import (
     SetupOptions,
     SetupStatus,
 )
+
+logger = logging.getLogger(__name__)
 
 SETUP_ID = "default"
 SETUP_SECTORS = (
@@ -151,6 +159,41 @@ def bootstrap(
     )
 
 
+def _auto_seed_deployed_models(session, country_code: str) -> None:
+    """Seed admin_units + model release for the country that just onboarded.
+
+    Runs inside the setup-complete transaction, best-effort: a network
+    hiccup or a missing manifest logs a warning but does not fail the
+    setup itself. On success the dashboard for that place reports
+    supportsPrediction=true without any manual CLI step.
+    """
+
+    configs = configs_for_country(country_code)
+    if not configs:
+        return
+    for config in configs:
+        try:
+            bootstrap_place_from_manifest(
+                session,
+                source_manifest_path=config.source_manifest,
+                crosswalk_path=config.crosswalk,
+                model_release_path=config.model_release,
+                activate=True,
+            )
+        except PlaceBootstrapError:
+            logger.warning(
+                "Setup auto-seed could not download boundaries for %s; retry "
+                "later via POST /internal/bootstrap-place.",
+                country_code,
+            )
+        except Exception:  # noqa: BLE001 - best-effort, must not fail setup
+            logger.exception(
+                "Setup auto-seed failed unexpectedly for %s; setup completed "
+                "but the deployed model is not yet registered.",
+                country_code,
+            )
+
+
 def complete(
     input_data: CompleteSetupInput,
     user: CurrentUserContext,
@@ -259,6 +302,7 @@ def complete(
                     role="owner",
                 )
             )
+        _auto_seed_deployed_models(session, country_code)
         state.completed = True
         state.phase = "complete"
         state.provisioning_token = None
