@@ -13,21 +13,22 @@ const meta: Meta<typeof HeatLbwLinkPanel> = {
 export default meta;
 type Story = StoryObj<typeof HeatLbwLinkPanel>;
 
-export const Default: Story = {
+export const WholeStateDefault: Story = {
   render: () => (
     <div style={{ maxWidth: 420 }}>
-      <HeatLbwLinkPanel />
+      <HeatLbwLinkPanel stateLabel="Madhya Pradesh (State)" />
     </div>
   ),
 };
 
 export const WithDistrictSwitcher: Story = {
   render: () => {
-    const [active, setActive] = useState<string>("MP-BAR");
+    const [active, setActive] = useState<string | null>(null);
     return (
       <div style={{ maxWidth: 420 }}>
         <HeatLbwLinkPanel
-          adminUnits={[
+          stateLabel="Madhya Pradesh (State)"
+          districts={[
             { code: "MP-BAR", name: "Barwani" },
             { code: "MP-BHO", name: "Bhopal" },
             { code: "MP-IND", name: "Indore" },

@@ -7,34 +7,6 @@
   gap: var(--space-5);
 }
 
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-card);
-}
-
-.eyebrow {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-eyebrow);
-  letter-spacing: var(--ls-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-h1);
-  font-weight: 500;
-  color: var(--color-charcoal);
-  line-height: var(--lh-tight);
-}
-
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1.15fr;
