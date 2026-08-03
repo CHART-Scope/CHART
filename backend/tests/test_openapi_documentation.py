@@ -18,7 +18,7 @@ def test_every_openapi_operation_has_distinct_detailed_documentation() -> None:
     summaries = [operation["summary"] for operation in operations]
     descriptions = [operation["description"] for operation in operations]
 
-    assert len(operations) == 31
+    assert len(operations) == 35
     assert len(summaries) == len(set(summaries))
     assert len(descriptions) == len(set(descriptions))
     assert all(len(summary) >= 24 for summary in summaries)

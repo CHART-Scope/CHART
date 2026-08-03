@@ -943,11 +943,21 @@ class RecommendedAction(Base):
     source_record_id: Mapped[str | None] = mapped_column(String(64))
     title: Mapped[str] = mapped_column(String(256), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    climate_hazards: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    solution_types: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    # JSONB on Postgres (matches migration 017); portable JSON on SQLite so
+    # unit tests that hit Base.metadata.create_all can render the table.
+    climate_hazards: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    solution_types: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
     cost_of_implementation: Mapped[str | None] = mapped_column(String(32))
-    useful_links: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    case_studies: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    useful_links: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    case_studies: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
     source: Mapped[str] = mapped_column(
         String(32), nullable=False, server_default="seed"
     )
