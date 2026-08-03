@@ -85,7 +85,15 @@ def list_events(
         rows = _fetch_rows(session, user_id=user_id, limit=limit, before=before)
         run_summaries = _load_run_summaries(session, rows)
         items = [
-            _to_out(row, run_summaries.get(row.prediction_request_id)) for row in rows
+            _to_out(
+                row,
+                (
+                    run_summaries.get(row.prediction_request_id)
+                    if row.prediction_request_id is not None
+                    else None
+                ),
+            )
+            for row in rows
         ]
         next_before = rows[-1].occurred_at if len(rows) == limit else None
         return AuditListResponse(items=items, next_before=next_before)

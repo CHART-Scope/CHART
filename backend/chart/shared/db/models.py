@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 from geoalchemy2 import Geometry
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     Date,
@@ -14,10 +15,12 @@ from sqlalchemy import (
     ForeignKey,
     ForeignKeyConstraint,
     Index,
+    Integer,
     JSON,
     String,
     Text,
     UniqueConstraint,
+    desc,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -660,7 +663,13 @@ class AuditEventRecord(Base):
 
     __tablename__ = "audit_event"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    # BigInteger on Postgres (matches migration); Integer on SQLite so the
+    # test suite's rowid-backed autoincrement fires.
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer(), "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
     user_id: Mapped[str] = mapped_column(
         String(128), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
@@ -681,9 +690,12 @@ class AuditEventRecord(Base):
     prediction_request_id: Mapped[int | None] = mapped_column(
         ForeignKey("prediction_request.id", ondelete="SET NULL")
     )
-    # Portable JSON in the ORM (SQLite unit tests). Migration 018 creates the
-    # column as Postgres JSONB, and SQLAlchemy reads either shape transparently.
-    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    # JSONB on Postgres (matches migration 018); portable JSON on SQLite so
+    # the unit tests can render the table. SQLAlchemy resolves the variant per
+    # dialect, and both encode/decode the same dict shape.
+    payload: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=dict
+    )
 
     __table_args__ = (
         UniqueConstraint(
@@ -695,7 +707,7 @@ class AuditEventRecord(Base):
         Index(
             "ix_audit_event_user_occurred",
             "user_id",
-            "occurred_at",
+            desc("occurred_at"),
         ),
         Index("ix_audit_event_received_at", "received_at"),
         Index("ix_audit_event_geography", "geography_id"),
