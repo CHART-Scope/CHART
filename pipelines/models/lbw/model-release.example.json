@@ -3,6 +3,7 @@
   "module": "prediction",
   "outcome": "lbw",
   "climate_hazard": "extreme_heat",
+  "health_domain": "maternal_newborn_child_health",
   "version": "1.0.0",
   "base_uri": "s3://replace-with-your-model-bucket/lbw/1.0.0",
   "temperature_input": "tmax_lag: planning month, previous month, two months before; newest first; degrees Celsius",

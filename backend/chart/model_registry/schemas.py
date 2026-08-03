@@ -36,6 +36,7 @@ class ModelReleaseSpec(BaseModel):
     module: str = Field(min_length=1)
     outcome: str = Field(min_length=1)
     climate_hazard: str | None = None
+    health_domain: str | None = None
     version: str = Field(min_length=1)
     base_uri: str = Field(min_length=1)
     temperature_input: str = Field(min_length=1)

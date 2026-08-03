@@ -411,6 +411,72 @@ OPERATION_DOCUMENTATION: dict[
             )
         },
     ),
+    ("post", "/climate/what-if"): OperationDocumentation(
+        summary="Score one interactive what-if temperature against the LBW model",
+        description=(
+            "On-demand scorer that backs the dashboard's what-if slider. Resolves "
+            "the caller's geography_id to its admin_unit and active model block, "
+            "calls the R DLNM scorer with a flat three-month temperature profile at "
+            "the requested Celsius value, and returns the odds ratio, 95% CI, "
+            "attributable fraction, training-support flag, and the model's "
+            "training temperature range. Stateless: nothing is persisted, so this "
+            "path can handle high slider-drag volume without touching the durable "
+            "prediction queue."
+        ),
+        success_responses={
+            "200": (
+                "The scored what-if response including odds ratio, CI, attributable "
+                "fraction, training-support metadata, and the model's temperature range."
+            )
+        },
+    ),
+    ("get", "/model-catalog"): OperationDocumentation(
+        summary="List active model releases known to this installation",
+        description=(
+            "Returns each currently active ModelRelease with its climate hazard, "
+            "health outcome, and covered admin_units so the planning UI can render "
+            "hazard and outcome pickers straight from the registry instead of a "
+            "client-side lookup table. Records reflect the ActiveModelAssignment "
+            "state at the moment of the call."
+        ),
+        success_responses={
+            "200": (
+                "The active model releases with taxonomy fields and the admin_units "
+                "each release is currently assigned to."
+            )
+        },
+    ),
+    ("post", "/audit/events"): OperationDocumentation(
+        summary="Batch-insert one user's client-buffered activity events",
+        description=(
+            "Idempotent batch insert of user-action events emitted from the "
+            "Activity buffer in the web client. Dedupe key is "
+            "(session_id, flush_id, client_seq); retried batches drop duplicates "
+            "silently. Each row is stamped with the current user id server-side, "
+            "and the row is joined to prediction_request when present so the "
+            "Activity drawer can surface run status alongside the click. "
+            "Retention runs from chart-purge-audit-events (30-day rolling)."
+        ),
+        success_responses={
+            "200": "The batch was applied; response reports the number of new rows persisted."
+        },
+    ),
+    ("get", "/audit/events"): OperationDocumentation(
+        summary="List the signed-in user's persisted activity events",
+        description=(
+            "Returns one page of the caller's own recorded activity events in "
+            "newest-first order for the Activity drawer's durable history feed. "
+            "Records referencing a prediction_request are hydrated with a compact "
+            "run summary (status, planning_date, admin_unit_name). Users can only "
+            "read their own events; there is no cross-user access."
+        ),
+        success_responses={
+            "200": (
+                "The user's recent events with any hydrated run summary and a "
+                "next_before cursor for pagination."
+            )
+        },
+    ),
 }
 
 

@@ -138,6 +138,23 @@ export async function listGeographies() {
   return request<GeographyRecord[]>("/api/chart/geographies");
 }
 
+export type ModelCatalogEntry = {
+  climate_hazard: string;
+  climate_hazard_label: string;
+  health_domain: string;
+  health_domain_label: string;
+  outcome: string;
+  outcome_label: string;
+  release_ids: string[];
+};
+
+export async function listModelCatalog() {
+  const response = await request<{ items: ModelCatalogEntry[] }>(
+    "/api/chart/model-catalog",
+  );
+  return response.items;
+}
+
 export async function getPlanningOptions(geographyId: string, accessToken: string) {
   return request<PlanningOptions>(
     `/api/chart/climate/planning-options/${encodeURIComponent(geographyId)}`,
@@ -161,6 +178,155 @@ export async function getPredictionRequest(requestId: number, accessToken: strin
   );
 }
 
+export type RecommendedActionAsset = {
+  filename: string;
+  type?: string;
+  size?: number;
+  url?: string;
+};
+
+export type RecommendedActionLink = {
+  url: string;
+  label: string;
+};
+
+export type RecommendedAction = {
+  slug: string;
+  title: string;
+  description: string;
+  categories: string[];
+  hazards: string[];
+  cost: "low" | "medium" | "high" | null;
+  links: RecommendedActionLink[];
+  caseStudies: RecommendedActionAsset[];
+};
+
+type SolutionsPayload = {
+  items?: {
+    slug: string;
+    name?: string;
+    title?: string;
+    description?: string;
+    taxonomies?: { type: string; label: string }[];
+    solutionTypes?: string[];
+    climateHazards?: string[];
+    costOfImplementation?: string;
+    links?: { url: string; label?: string }[];
+    usefulLinks?: string[];
+    assets?: { filename?: string; type?: string; size?: number; url?: string }[];
+    caseStudies?: { filename?: string; type?: string; size?: number }[];
+  }[];
+};
+
+export async function listRecommendedActions(
+  options: { limit?: number; hazard?: string } = {},
+) {
+  const { limit = 7, hazard } = options;
+  const params = new URLSearchParams({
+    limit: String(limit),
+    status: "published",
+  });
+  if (hazard) params.set("hazard", hazard);
+  const payload = await request<SolutionsPayload>(
+    `/api/chart/recommended-actions?${params}`,
+  );
+  return (payload.items ?? []).map(toRecommendedAction);
+}
+
+function toRecommendedAction(
+  item: NonNullable<SolutionsPayload["items"]>[number],
+): RecommendedAction {
+  const categoriesFromTax = (item.taxonomies ?? [])
+    .filter((tax) => tax.type === "solution_type")
+    .map((tax) => tax.label);
+  const hazardsFromTax = (item.taxonomies ?? [])
+    .filter((tax) => tax.type === "hazard")
+    .map((tax) => tax.label);
+  const links: RecommendedActionLink[] = (item.links ?? []).map((link) => ({
+    url: link.url,
+    label: link.label ?? hostnameOf(link.url),
+  }));
+  if (links.length === 0) {
+    for (const url of item.usefulLinks ?? []) {
+      links.push({ url, label: hostnameOf(url) });
+    }
+  }
+  const caseStudies: RecommendedActionAsset[] = (item.assets ?? item.caseStudies ?? [])
+    .filter(
+      (
+        asset,
+      ): asset is { filename?: string; type?: string; size?: number; url?: string } =>
+        Boolean(asset),
+    )
+    .map((asset) => ({
+      filename: asset.filename ?? "Attachment",
+      type: asset.type,
+      size: asset.size,
+      url: "url" in asset ? asset.url : undefined,
+    }));
+
+  return {
+    slug: item.slug,
+    title: item.name ?? item.title ?? item.slug,
+    description: item.description ?? "",
+    categories:
+      categoriesFromTax.length > 0 ? categoriesFromTax : (item.solutionTypes ?? []),
+    hazards: hazardsFromTax.length > 0 ? hazardsFromTax : (item.climateHazards ?? []),
+    cost: normalizeCost(item.costOfImplementation),
+    links,
+    caseStudies,
+  };
+}
+
+function normalizeCost(value?: string): RecommendedAction["cost"] {
+  const key = value?.toLowerCase();
+  if (key === "low" || key === "medium" || key === "high") return key;
+  return null;
+}
+
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+export type WhatIfScore = {
+  geography_id: string;
+  temperature_c: number;
+  area: string;
+  geography_level: string;
+  pregnancy_window: 1 | 2 | 3;
+  tmax_lag: number[];
+  reference_temperature_c: number;
+  odds_ratio: number;
+  ci95_low: number;
+  ci95_high: number;
+  attributable_fraction_percent: number;
+  on_training_support: boolean;
+  warning: string | null;
+  n_training: number | null;
+  modelled_temperature_range_c: number[] | null;
+  model_version: string;
+};
+
+export async function submitWhatIfScore(
+  accessToken: string,
+  input: { geographyId: string; temperatureC: number },
+  init: { signal?: AbortSignal } = {},
+) {
+  return request<WhatIfScore>("/api/chart/climate/what-if", accessToken, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      geography_id: input.geographyId,
+      temperature_c: input.temperatureC,
+    }),
+    signal: init.signal,
+  });
+}
+
 export async function submitPrediction(
   accessToken: string,
   input: {
@@ -181,9 +347,12 @@ export async function submitPrediction(
         geography_id: input.geographyId,
         planning_date: `${input.planningMonth}-01`,
         outcome: "lbw",
-        // The dashboard reports the third-trimester signal only; that
-        // is where the LBW model's evidence is strongest.
-        pregnancy_windows: [3],
+        // The state-level MP model release validates window 1 only.
+        // Divisions default to (1, 2, 3). Sending [1] keeps the state
+        // default working; when the dashboard lets the user pick a
+        // division and the API surfaces per-place validated windows,
+        // send the largest available.
+        pregnancy_windows: [1],
         planning_target: input.target,
         projection_scenario: input.scenario,
         projection_period: input.projectionPeriod,

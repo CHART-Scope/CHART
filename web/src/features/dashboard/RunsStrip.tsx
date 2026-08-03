@@ -9,6 +9,13 @@ import styles from "./RunsStrip.module.css";
 
 type Props = {
   geographyId: string;
+  /**
+   * Optional district geo id. When set, the strip lists runs scoped to that
+   * district instead of the containing state — matching the "Viewing for"
+   * dropdown on the heat/LBW panel and the effective id that
+   * useAutoPrediction submits with.
+   */
+  adminUnit?: string | null;
   accessToken: string;
   /** Build the URL each chip links to. */
   linkForRun: (requestId: number) => string;
@@ -33,17 +40,19 @@ const STATUS_COLOR: Record<string, string> = {
 
 export function RunsStrip({
   geographyId,
+  adminUnit = null,
   accessToken,
   linkForRun,
   activeRunId = null,
   refreshKey,
 }: Props) {
   const [load, setLoad] = useState<Load>({ status: "loading" });
+  const effectiveGeographyId = adminUnit ?? geographyId;
 
   useEffect(() => {
     let cancelled = false;
     setLoad({ status: "loading" });
-    listPredictionRequests(geographyId, accessToken)
+    listPredictionRequests(effectiveGeographyId, accessToken)
       .then((items) => {
         if (!cancelled) setLoad({ status: "ready", items: items.slice(0, 12) });
       })
@@ -57,7 +66,7 @@ export function RunsStrip({
     return () => {
       cancelled = true;
     };
-  }, [accessToken, geographyId, refreshKey]);
+  }, [accessToken, effectiveGeographyId, refreshKey]);
 
   const chips = useMemo(() => (load.status === "ready" ? load.items : []), [load]);
 

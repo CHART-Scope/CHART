@@ -6,15 +6,16 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { IconSprite } from "@/components/Icon";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
-import { listGeographies, type GeographyRecord } from "@/lib/planningClient";
+import {
+  listGeographies,
+  listModelCatalog,
+  type GeographyRecord,
+  type ModelCatalogEntry,
+} from "@/lib/planningClient";
 import { PlanningSetup } from "./PlanningSetup";
 import { defaultPlanningSelection, type PlanningSelection } from "./planningWireframe";
-import { UserManagement } from "./UserManagement";
-
-type View = "planning" | "users";
 
 type Props = {
-  accessToken: string;
   username: string;
   roles: string[];
   geographyScopes: string[];
@@ -23,7 +24,6 @@ type Props = {
 };
 
 export function PlanningApp({
-  accessToken,
   username,
   roles,
   geographyScopes,
@@ -31,11 +31,11 @@ export function PlanningApp({
   onSignOut,
 }: Props) {
   const router = useRouter();
-  const [view, setView] = useState<View>("planning");
   const [selection, setSelection] = useState<PlanningSelection>(
     defaultPlanningSelection,
   );
   const [areas, setAreas] = useState<GeographyRecord[]>([]);
+  const [catalog, setCatalog] = useState<ModelCatalogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +43,15 @@ export function PlanningApp({
 
   useEffect(() => {
     let cancelled = false;
+    listModelCatalog()
+      .then((items) => {
+        if (!cancelled) setCatalog(items);
+      })
+      .catch(() => {
+        // Catalog is best-effort — planning still works if it can't be
+        // loaded; the pill selects just render an empty list.
+        if (!cancelled) setCatalog([]);
+      });
     listGeographies()
       .then((records) => {
         if (cancelled) return;
@@ -95,35 +104,24 @@ export function PlanningApp({
       <IconSprite />
       <AppShell
         nav={nav}
-        activeNav={view === "users" ? "users" : "planning"}
+        activeNav="planning"
         onNavigate={(id) => {
-          if (id === "users") {
-            setView("users");
-            return;
-          }
-          if (id === "planning") {
-            setView("planning");
-            return;
-          }
           const target = NAV_ROUTE[id];
           if (target) router.push(target);
         }}
         onSignOut={onSignOut}
         userLabel={username}
       >
-        {view === "users" ? (
-          <UserManagement accessToken={accessToken} />
-        ) : (
-          <PlanningSetup
-            selection={selection}
-            areas={areas}
-            isLoading={isLoading}
-            isSubmitting={isSubmitting}
-            error={error}
-            onChange={changeSelection}
-            onStart={openDashboard}
-          />
-        )}
+        <PlanningSetup
+          selection={selection}
+          areas={areas}
+          catalog={catalog}
+          isLoading={isLoading}
+          isSubmitting={isSubmitting}
+          error={error}
+          onChange={changeSelection}
+          onStart={openDashboard}
+        />
       </AppShell>
     </>
   );
@@ -131,7 +129,18 @@ export function PlanningApp({
 
 function isInScope(area: GeographyRecord, scopes: string[]) {
   if (scopes.length === 0) return false;
-  return scopes.some(
-    (scope) => area.path === scope || area.path.startsWith(`${scope}/`),
-  );
+  const areaPath = normalizeScope(area.path);
+  return scopes.some((raw) => {
+    const scope = normalizeScope(raw);
+    if (!scope) return false;
+    if (scope === area.id) return true;
+    if (scope === areaPath) return true;
+    return areaPath.startsWith(`${scope}/`);
+  });
+}
+
+function normalizeScope(value: string) {
+  const trimmed = value.trim().replace(/\/+$/, "");
+  if (!trimmed) return "";
+  return trimmed.startsWith("/") || !trimmed.includes("/") ? trimmed : `/${trimmed}`;
 }

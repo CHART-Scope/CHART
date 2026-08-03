@@ -211,6 +211,60 @@ access, and stores durable request status. Dagster obtains the required climate
 window and calls the R service. See [Climate API](climate-api.md) for the
 authenticated request and polling contract.
 
+### How a place picks a model block
+
+Every scored request — batch (`/climate/predict`) or interactive slider
+(`/climate/what-if`) — starts from a single `geography_id` sent by the caller.
+The API resolves that id to one model block by walking three tables:
+
+```mermaid
+flowchart LR
+    Req["geography_id in request"] --> Geo["geographies (AppGeography)"]
+    Geo --> AU["admin_unit"]
+    AU --> AMM["model_area_mapping"]
+    AMM --> Block["RDS block (area × window)"]
+```
+
+- **`geographies`** — one row per selectable place in the UI (state, division,
+  district, …). The id is what the frontend sends.
+- **`admin_unit`** — one row per analytic area. Linked to `geographies` via
+  `admin_unit.app_geography_id`. Carries the stable `code` (`place_code` in the
+  release manifest).
+- **`model_area_mapping`** — binds each `admin_unit` to a `model_area_key`, a
+  `model_file`, and `validated_pregnancy_windows` for one `model_release`.
+- **`active_model_assignment`** — pins one active mapping per
+  `(admin_unit, module, outcome)` at any time.
+
+The R scorer routes on `area` name (`model_area_key`): the string is compared
+against the block-name suffix inside the `.rds` bundle (e.g.
+`cbTemp_Bhopal_Sem01` for area `Bhopal`, window `1`). A state-level place
+resolves to `Madhya Pradesh` and picks the pooled state bundle; a division
+resolves to that division's name and picks the division bundle. Two callers
+sending different `geography_id`s therefore hit **genuinely different DLNM
+blocks with different boundary knots, reference temperatures, and
+`n_training`** — this is how the "Viewing for" dropdown on the dashboard
+switches models. See [`pipelines/models/lbw/inference/score.R`](
+https://github.com/CHART-Scope/CHART/blob/main/pipelines/models/lbw/inference/score.R)
+for the block-selection logic and
+[Model artifacts](#model-artifacts) for the current bundle filenames.
+
+!!! note "Frontend contract"
+    Any UI panel that calls a per-place model endpoint must send the district
+    id when the user has picked one, not just the parent state id. On the
+    dashboard the two hooks that do this are `useAutoPrediction` and
+    `useWhatIfScore`, both computing `effectiveGeographyId = adminUnit ??
+    geographyId`. Panels that also read per-place history
+    (`listPredictionRequests`) apply the same rule.
+
+### Adding another model in the same release shape
+
+When a new outcome or country is added, the routing above stays intact as long
+as the manifest supplies one `admin_unit`-scoped row per model block. The
+release process is described in
+[Add a geography and model](add-geography-and-model.md); the block-name
+convention the R scorer expects lives beside the model in
+[`pipelines/models/`](https://github.com/CHART-Scope/CHART/tree/main/pipelines/models).
+
 ## Releasing a new model
 
 Every release should provide:

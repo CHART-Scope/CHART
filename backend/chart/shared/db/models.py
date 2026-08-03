@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 from geoalchemy2 import Geometry
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     Date,
@@ -14,10 +15,12 @@ from sqlalchemy import (
     ForeignKey,
     ForeignKeyConstraint,
     Index,
+    Integer,
     JSON,
     String,
     Text,
     UniqueConstraint,
+    desc,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -459,6 +462,8 @@ class ModelRelease(Base):
     outcome: Mapped[str] = mapped_column(String(64), nullable=False)
     version: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="uploaded")
+    climate_hazard: Mapped[str | None] = mapped_column(String(64))
+    health_domain: Mapped[str | None] = mapped_column(String(64))
     model_files: Mapped[list[dict]] = mapped_column(JSON, nullable=False)
     input_spec: Mapped[dict] = mapped_column(JSON, nullable=False)
     release_notes: Mapped[str | None] = mapped_column(Text)
@@ -650,6 +655,62 @@ class PredictionRequestRecord(Base):
             "location_slug",
             "created_at",
         ),
+    )
+
+
+class AuditEventRecord(Base):
+    """One user action recorded from the frontend Activity buffer."""
+
+    __tablename__ = "audit_event"
+
+    # BigInteger on Postgres (matches migration); Integer on SQLite so the
+    # test suite's rowid-backed autoincrement fires.
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer(), "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    session_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    flush_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    client_seq: Mapped[int] = mapped_column(nullable=False)
+    event_type: Mapped[str] = mapped_column(String(48), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    geography_id: Mapped[str | None] = mapped_column(String(128))
+    admin_unit_id: Mapped[int | None] = mapped_column(
+        ForeignKey("admin_unit.id", ondelete="SET NULL")
+    )
+    prediction_request_id: Mapped[int | None] = mapped_column(
+        ForeignKey("prediction_request.id", ondelete="SET NULL")
+    )
+    # JSONB on Postgres (matches migration 018); portable JSON on SQLite so
+    # the unit tests can render the table. SQLAlchemy resolves the variant per
+    # dialect, and both encode/decode the same dict shape.
+    payload: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=dict
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "flush_id",
+            "client_seq",
+            name="uq_audit_event_client_dedupe",
+        ),
+        Index(
+            "ix_audit_event_user_occurred",
+            "user_id",
+            desc("occurred_at"),
+        ),
+        Index("ix_audit_event_received_at", "received_at"),
+        Index("ix_audit_event_geography", "geography_id"),
     )
 
 
@@ -864,4 +925,48 @@ class HealthImpact(Base):
             "ix_health_impact_climate_run",
             "climate_run_id",
         ),
+    )
+
+
+class RecommendedAction(Base):
+    """A reviewed intervention seeded from the solution repository.
+
+    Populated at onboarding from the bundled ``solution_repository/seed.json``;
+    later a scheduler or an external repository API will refresh rows in
+    place. ``slug`` is the natural identity that survives that refresh.
+    """
+
+    __tablename__ = "recommended_action"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(160), nullable=False, unique=True)
+    source_record_id: Mapped[str | None] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    # JSONB on Postgres (matches migration 017); portable JSON on SQLite so
+    # unit tests that hit Base.metadata.create_all can render the table.
+    climate_hazards: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    solution_types: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    cost_of_implementation: Mapped[str | None] = mapped_column(String(32))
+    useful_links: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    case_studies: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    source: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="seed"
+    )
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )

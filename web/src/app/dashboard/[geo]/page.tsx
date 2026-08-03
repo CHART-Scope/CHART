@@ -10,6 +10,7 @@ import {
   DashboardHeader,
   HeatLbwLinkPanel,
   PredictionsPanel,
+  RecommendedActionsPanel,
   RiskProtectionPanel,
   RunsStrip,
 } from "@/features/dashboard";
@@ -31,6 +32,10 @@ type PageProps = {
  */
 const DEPLOYED_HAZARD_LABEL = "Extreme heat";
 const DEPLOYED_HEALTH_DOMAIN_SHORT = "MNCH";
+// Repository-native hazard label the /solutions taxonomy is keyed on. The
+// dashboard shows "Extreme heat" but the solution repository (and the
+// Airtable it mirrors) uses "Increased temperature".
+const DEPLOYED_HAZARD_REPOSITORY_KEY = "Increased temperature";
 
 export default function DashboardGeoPage(props: PageProps) {
   const params = use(props.params);
@@ -151,6 +156,8 @@ function AuthorizedDashboard({
               districts={districts}
               activeAdminUnitCode={adminUnit}
               onAdminUnitChange={handleAdminUnitChange}
+              geographyId={geographyId}
+              accessToken={session.accessToken}
             />
             <PredictionsPanel
               geographyId={geographyId}
@@ -162,19 +169,20 @@ function AuthorizedDashboard({
 
           <RunsStrip
             geographyId={geographyId}
+            adminUnit={adminUnit}
             accessToken={session.accessToken}
-            linkForRun={(id) =>
-              `/dashboard/${encodeURIComponent(geographyId)}/runs/${id}`
-            }
+            linkForRun={(id) => {
+              const base = `/dashboard/${encodeURIComponent(geographyId)}/runs/${id}`;
+              return adminUnit === null
+                ? base
+                : `${base}?admin_unit=${encodeURIComponent(adminUnit)}`;
+            }}
           />
 
-          <section className={styles.recommendedActions}>
-            <p className={styles.recommendedEyebrow}>Recommended actions</p>
-            <p className={styles.recommendedBody}>
-              Actions from the reviewed solutions repository will appear here once your
-              first prediction has completed.
-            </p>
-          </section>
+          <RecommendedActionsPanel
+            hazard={DEPLOYED_HAZARD_REPOSITORY_KEY}
+            hazardLabel={DEPLOYED_HAZARD_LABEL}
+          />
         </main>
       </AppShell>
     </>

@@ -63,26 +63,36 @@ class _Filters:
 def _resolve_admin_unit(
     session: Session,
     app_geography_id: str,
-    admin_unit_code: str | None,
+    admin_unit_selector: str | None,
 ) -> AdminUnit:
-    """Look up the admin_unit for a URL geography id, plus an optional code.
+    """Look up the admin_unit for a URL geography id + optional selector.
 
-    The URL identifier is the ``AppGeography.id`` used across the rest of
-    the API (e.g. ``geo-in-madhya-pradesh``). When ``admin_unit_code`` is
-    None, we return the admin_unit already linked to that AppGeography -
-    the default the user implicitly picked at onboarding - so the URL
-    stays clean and the caller does not have to know the district code.
-    When it is provided we still respect the exact grain, so a dashboard
-    URL can point at a specific district within a state-level geography.
+    The dashboard sends ``AppGeography.id`` values everywhere - the state
+    id as the URL path segment, and (when a division is picked in the
+    "Viewing for" dropdown) the division's own AppGeography.id as the
+    ``admin_unit`` query param. So the selector is resolved as an
+    ``AppGeography.id`` when present, and the path's state id is used
+    otherwise. Falling back to ``AdminUnit.code`` keeps the legacy CLI
+    consumers working when they pass the raw place_code.
     """
 
-    query = select(AdminUnit).where(AdminUnit.app_geography_id == app_geography_id)
-    if admin_unit_code is not None:
-        query = query.where(AdminUnit.code == admin_unit_code)
-    admin_unit = session.scalar(query)
+    target = admin_unit_selector or app_geography_id
+    admin_unit = session.scalar(
+        select(AdminUnit).where(AdminUnit.app_geography_id == target)
+    )
+    if admin_unit is None and admin_unit_selector is not None:
+        # Legacy fallback: caller passed a place_code rather than an
+        # AppGeography.id. Match on AdminUnit.code within the state scope.
+        admin_unit = session.scalar(
+            select(AdminUnit).where(
+                AdminUnit.app_geography_id == app_geography_id,
+                AdminUnit.code == admin_unit_selector,
+            )
+        )
     if admin_unit is None:
         raise NoAdminUnitForGeography(
-            f"{app_geography_id}" + (f"/{admin_unit_code}" if admin_unit_code else "")
+            f"{app_geography_id}"
+            + (f"/{admin_unit_selector}" if admin_unit_selector else "")
         )
     return admin_unit
 

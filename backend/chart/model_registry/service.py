@@ -74,6 +74,13 @@ def register_model_release(
             or not _area_mappings_match(existing, spec, admin_units)
         ):
             raise ModelRegistryError("MODEL_RELEASE_IMMUTABLE", spec.id)
+        # Taxonomy fields are late additions: backfill on re-register so
+        # older rows pick up hazard/domain from the manifest without
+        # forcing a new release version.
+        if spec.climate_hazard and existing.climate_hazard != spec.climate_hazard:
+            existing.climate_hazard = spec.climate_hazard
+        if spec.health_domain and existing.health_domain != spec.health_domain:
+            existing.health_domain = spec.health_domain
         if activate:
             _activate_release(session, existing)
             session.flush()
@@ -85,6 +92,8 @@ def register_model_release(
         outcome=spec.outcome,
         version=spec.version,
         status="validated" if model_dir is not None else "uploaded",
+        climate_hazard=spec.climate_hazard,
+        health_domain=spec.health_domain,
         model_files=payload["model_files"],
         input_spec=payload["input_spec"],
         release_notes=spec.release_notes,

@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 
+import { ActivityDrawer } from "../ActivityDrawer";
 import { Icon, type IconName } from "../Icon";
 import styles from "./AppShell.module.css";
 
@@ -35,6 +36,7 @@ export function AppShell({
   onSignOut,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const toggle = () => (onLogoClick ? onLogoClick() : setCollapsed((c) => !c));
   return (
     <div
@@ -49,7 +51,16 @@ export function AppShell({
         <span className={styles.sep}>|</span>
         <span className={styles.tagline}>{tagline}</span>
         {userLabel ? <span className={styles.account}>{userLabel}</span> : null}
+        <button
+          type="button"
+          className={styles.activityBtn}
+          aria-label="Open activity log"
+          onClick={() => setActivityOpen(true)}
+        >
+          <Icon name="dots" size={16} />
+        </button>
       </div>
+      <ActivityDrawer open={activityOpen} onClose={() => setActivityOpen(false)} />
       <div className={styles.body}>
         <aside
           className={[styles.sidebar, collapsed ? styles.collapsed : ""]

@@ -33,6 +33,8 @@ from .schemas import (
     PredictionRequestStatusResponse,
     PreviewRequest,
     PreviewResponse,
+    WhatIfRequest,
+    WhatIfResponse,
 )
 from .service import (
     ClimateServiceError,
@@ -41,6 +43,7 @@ from .service import (
     list_locations,
     preview,
 )
+from .what_if import score_what_if
 
 router = APIRouter(prefix="/climate", tags=["climate"])
 
@@ -129,6 +132,33 @@ def post_predict(
                 headers={"Retry-After": "3"},
             )
         return result
+    except ClimateServiceError as error:
+        raise _http_error(error) from error
+
+
+@router.post(
+    "/what-if",
+    response_model=WhatIfResponse,
+    summary="Score a slider-driven temperature scenario against the LBW model",
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        502: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+)
+def post_what_if(
+    request: WhatIfRequest,
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+) -> WhatIfResponse:
+    try:
+        _require_place_access(user, request.geography_id)
+        return score_what_if(
+            geography_id=request.geography_id,
+            temperature_c=request.temperature_c,
+        )
     except ClimateServiceError as error:
         raise _http_error(error) from error
 

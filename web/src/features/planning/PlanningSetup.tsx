@@ -1,16 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
-import type { GeographyRecord } from "@/lib/planningClient";
+import type { GeographyRecord, ModelCatalogEntry } from "@/lib/planningClient";
 import type { PlanningSelection } from "./planningWireframe";
 import styles from "./PlanningSetup.module.css";
 
 type Props = {
   selection: PlanningSelection;
   areas: GeographyRecord[];
+  catalog: ModelCatalogEntry[];
   isLoading: boolean;
   isSubmitting: boolean;
   error: string | null;
@@ -18,20 +19,10 @@ type Props = {
   onStart: () => void;
 };
 
-/**
- * The two variables in the "Mad Libs" sentence are locked to whatever
- * the deployed model supports. Today the only registered model is the
- * heat -> LBW curve for Madhya Pradesh, so the hazard is Extreme heat
- * and the health-domain framing is Maternal, newborn and child health.
- * When a second model lands, replace the constants with a fetch from
- * the model registry - the layout is already built around a menu.
- */
-const DEPLOYED_HAZARD = "Extreme heat";
-const DEPLOYED_HEALTH_DOMAIN = "Maternal, newborn and child health";
-
 export function PlanningSetup({
   selection,
   areas,
+  catalog,
   isLoading,
   isSubmitting,
   error,
@@ -42,6 +33,41 @@ export function PlanningSetup({
     () => areas.find((area) => area.id === selection.area) ?? null,
     [areas, selection.area],
   );
+  const switcherGroups = useMemo(() => groupAreasByCountry(areas), [areas]);
+  const hasSwitcher = areas.length > 0;
+
+  const hazards = useMemo(
+    () =>
+      dedupeBy(
+        catalog.map((entry) => ({
+          code: entry.climate_hazard,
+          label: entry.climate_hazard_label,
+        })),
+        (item) => item.code,
+      ),
+    [catalog],
+  );
+  const domains = useMemo(
+    () =>
+      dedupeBy(
+        catalog.map((entry) => ({
+          code: entry.health_domain,
+          label: entry.health_domain_label,
+        })),
+        (item) => item.code,
+      ),
+    [catalog],
+  );
+  const [hazardCode, setHazardCode] = useState<string>("");
+  const [domainCode, setDomainCode] = useState<string>("");
+  useEffect(() => {
+    if (!hazardCode && hazards[0]) setHazardCode(hazards[0].code);
+  }, [hazards, hazardCode]);
+  useEffect(() => {
+    if (!domainCode && domains[0]) setDomainCode(domains[0].code);
+  }, [domains, domainCode]);
+  const hazardLabel = hazards.find((item) => item.code === hazardCode)?.label ?? "…";
+  const domainLabel = domains.find((item) => item.code === domainCode)?.label ?? "…";
 
   const canStart = Boolean(activeArea) && !isLoading && !isSubmitting;
   const country = activeArea ? countryFromPath(activeArea.path) : null;
@@ -84,19 +110,27 @@ export function PlanningSetup({
 
         <p className={styles.sentence}>
           <span>We&apos;re planning together for the impacts of </span>
-          <ModelPill
-            label={DEPLOYED_HAZARD}
-            hint="This is the hazard the deployed model covers."
+          <PillSelect
+            label={hazardLabel}
+            value={hazardCode}
+            options={hazards}
+            onChange={setHazardCode}
+            ariaLabel="Choose the climate hazard"
+            hint="Hazard covered by the deployed model."
           />
           <span> on </span>
-          <ModelPill
-            label={DEPLOYED_HEALTH_DOMAIN}
-            hint="The deployed model estimates low birth weight within maternal, newborn, and child health."
+          <PillSelect
+            label={domainLabel}
+            value={domainCode}
+            options={domains}
+            onChange={setDomainCode}
+            ariaLabel="Choose the health domain"
+            hint="Health domain the deployed model estimates."
           />
           <span> in {areaName}.</span>
         </p>
 
-        {areas.length > 1 ? (
+        {hasSwitcher ? (
           <label className={styles.areaSwitcher}>
             <span>Switch area</span>
             <select
@@ -105,10 +139,14 @@ export function PlanningSetup({
                 onChange({ ...selection, area: event.currentTarget.value })
               }
             >
-              {areas.map((area) => (
-                <option key={area.id} value={area.id}>
-                  {area.name}
-                </option>
+              {switcherGroups.map((group) => (
+                <optgroup key={group.country} label={group.country}>
+                  {group.areas.map((area) => (
+                    <option key={area.id} value={area.id}>
+                      {optionLabel(area)}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </label>
@@ -144,13 +182,53 @@ export function PlanningSetup({
   );
 }
 
-function ModelPill({ label, hint }: { label: string; hint: string }) {
+function PillSelect({
+  label,
+  value,
+  options,
+  onChange,
+  ariaLabel,
+  hint,
+}: {
+  label: string;
+  value: string;
+  options: { code: string; label: string }[];
+  onChange: (value: string) => void;
+  ariaLabel: string;
+  hint: string;
+}) {
+  const disabled = options.length === 0;
   return (
     <span className={styles.modelPill} title={hint}>
-      {label}
+      <span className={styles.modelPillLabel}>{label}</span>
       <Icon name="chevron-down" size={12} />
+      <select
+        className={styles.modelPillSelect}
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value)}
+        aria-label={ariaLabel}
+        disabled={disabled}
+      >
+        {options.map((option) => (
+          <option key={option.code} value={option.code}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </span>
   );
+}
+
+function dedupeBy<T>(items: T[], key: (item: T) => string) {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  for (const item of items) {
+    const k = key(item);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    result.push(item);
+  }
+  return result;
 }
 
 function countryFromPath(path: string): string | null {
@@ -160,4 +238,41 @@ function countryFromPath(path: string): string | null {
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+type SwitcherGroup = { country: string; areas: GeographyRecord[] };
+
+/**
+ * Group areas by country so the switcher scales as new countries are added.
+ * Within each country top-level units (state/region) sort before their
+ * divisions; native <select> can only nest one level, so divisions live in
+ * the same country group but are prefixed to signal the hierarchy visually.
+ */
+function groupAreasByCountry(areas: GeographyRecord[]): SwitcherGroup[] {
+  const byCountry = new Map<string, GeographyRecord[]>();
+  for (const area of areas) {
+    const country = countryFromPath(area.path) ?? "Other";
+    const bucket = byCountry.get(country) ?? [];
+    bucket.push(area);
+    byCountry.set(country, bucket);
+  }
+  const groups: SwitcherGroup[] = [];
+  for (const [country, items] of byCountry) {
+    const sorted = [...items].sort(
+      (a, b) => pathDepth(a.path) - pathDepth(b.path) || a.name.localeCompare(b.name),
+    );
+    groups.push({ country, areas: sorted });
+  }
+  return groups;
+}
+
+function pathDepth(path: string): number {
+  return path.split("/").filter(Boolean).length;
+}
+
+function optionLabel(area: GeographyRecord): string {
+  const suffix = ` (${area.levelLabel.toLowerCase()})`;
+  return pathDepth(area.path) > 2
+    ? `    ${area.name}${suffix}`
+    : `${area.name}${suffix}`;
 }

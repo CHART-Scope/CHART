@@ -1,3 +1,5 @@
+import { recordAuditEvent } from "@/lib/audit";
+
 export type CurrentUser = {
   userId: string;
   username: string;
@@ -51,6 +53,7 @@ export function startKeycloakSignIn() {
 }
 
 export function signOutOfKeycloak() {
+  recordAuditEvent({ event_type: "signout" });
   currentSession = null;
   window.location.assign("/auth/signout?returnTo=/plan");
 }
@@ -86,11 +89,20 @@ async function refreshAuthSession() {
 async function storeTokenSession(tokens: TokenResponse) {
   if (!tokens.access_token) throw new Error("The access token is missing.");
   const user = await fetchCurrentUser(tokens.access_token);
+  const previous = currentSession;
   const session: AuthSession = {
     user,
     accessToken: tokens.access_token,
   };
   currentSession = session;
+  // Only fire signin when the user *becomes* logged in — refreshes rotate
+  // the token but keep the same identity, so they should not spam signin.
+  if (!previous || previous.user.userId !== user.userId) {
+    recordAuditEvent({
+      event_type: "signin",
+      payload: { username: user.username, roles: user.roles },
+    });
+  }
   return session;
 }
 
