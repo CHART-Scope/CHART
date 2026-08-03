@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -81,16 +82,41 @@ def live() -> HealthResponse:
     return HealthResponse(status="ok")
 
 
+@lru_cache(maxsize=1)
+def _expected_alembic_head() -> str:
+    """Resolve the current alembic head from the on-disk migration set.
+
+    Reading the head here (rather than hardcoding a revision string) keeps
+    ``/ready`` in step with the migrations shipped in this build, so every new
+    migration does not require updating this file — and a stale hardcoded
+    revision will not block the deploy script's readiness wait.
+    """
+
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    ini_path = Path(__file__).resolve().parents[2] / "alembic.ini"
+    config = Config(str(ini_path))
+    script_dir = ScriptDirectory.from_config(config)
+    head = script_dir.get_current_head()
+    if head is None:
+        raise RuntimeError("no alembic head is configured for this build")
+    return head
+
+
 @app.get("/ready", tags=["system"], response_model=HealthResponse)
 def ready() -> HealthResponse:
     """Verify required durable state before accepting production traffic."""
 
     try:
+        expected_head = _expected_alembic_head()
         with get_session_factory()() as session:
             session.execute(text("SELECT 1"))
             revision = session.scalar(text("SELECT version_num FROM alembic_version"))
-            if revision != "015_reconcile_legacy_application_schema":
-                raise RuntimeError(f"database revision is {revision!r}")
+            if revision != expected_head:
+                raise RuntimeError(
+                    f"database revision is {revision!r}; expected {expected_head!r}"
+                )
             if (
                 os.getenv("CHART_REQUIRE_ACTIVE_MODEL", "0") == "1"
                 or os.getenv("INFERENCE_LBW_BASE_URL", "").strip()
