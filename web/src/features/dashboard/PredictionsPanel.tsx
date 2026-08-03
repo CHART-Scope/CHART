@@ -48,6 +48,7 @@ export function PredictionsPanel({
   const auto = useAutoPrediction({
     geographyId,
     accessToken,
+    adminUnit,
     disabled: supportsPrediction === false,
   });
 

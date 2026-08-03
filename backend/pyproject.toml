@@ -23,6 +23,7 @@ chart-load-mp-boundaries = "chart.geographies.cli:main"
 chart-register-model-release = "chart.model_registry.cli:main"
 chart-bootstrap-mp = "chart.bootstrap:main"
 chart-admin-recover = "chart.identity.cli:main"
+chart-purge-audit-events = "chart.audit.retention:main"
 
 [project.optional-dependencies]
 dev = [

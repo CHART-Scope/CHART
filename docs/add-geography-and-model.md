@@ -87,6 +87,18 @@ chart-register-model-release path/to/model-release.json \
 Activation replaces the previous active release for the same outcome. Old
 results keep their original release ID and climate-input hash.
 
+## How each place picks its model block
+
+Once activated, the runtime resolves every prediction request from one
+`geography_id` through `admin_unit` → `model_area_mapping` → the RDS block
+matching `model_area_key`. Two callers sending different `geography_id`s hit
+different blocks with different training-support ranges and `n_training`.
+Ensure that `admin_unit.code` (from `place_code`) and `model_area_key` (from
+`model_area_name`) match the block names inside the artifact — the R scorer
+routes on the area name, not on the file. The routing rule is documented in
+[Modeling → How a place picks a model block](
+modeling.md#how-a-place-picks-a-model-block).
+
 ## Checks before activation
 
 - every boundary has a source, version, licence, and file hash;

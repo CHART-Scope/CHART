@@ -91,6 +91,7 @@
 }
 
 .modelPill {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -100,8 +101,35 @@
   color: var(--color-nexus, #3455d8);
   font-size: 14px;
   font-weight: 500;
-  cursor: help;
+  cursor: pointer;
   vertical-align: middle;
+}
+
+.modelPillLabel {
+  pointer-events: none;
+}
+
+.modelPillSelect {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: none;
+  background: transparent;
+  color: transparent;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+}
+
+.modelPillSelect:disabled {
+  cursor: not-allowed;
+}
+
+.modelPill:focus-within {
+  outline: 2px solid var(--color-nexus, #3455d8);
+  outline-offset: 2px;
 }
 
 .areaSwitcher {

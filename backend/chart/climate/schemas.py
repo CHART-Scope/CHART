@@ -268,3 +268,42 @@ class ErrorResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
+
+
+class WhatIfRequest(BaseModel):
+    geography_id: str = Field(min_length=1)
+    temperature_c: float = Field(ge=-30, le=60)
+
+
+class WhatIfResponse(BaseModel):
+    """Mirrors the R service /predict response so the dashboard has the same
+    shape as the reference `pipelines/models/lbw/web/index.html` demo. Fields
+    the UI does not render today are still returned so the visuals can pull
+    them in without another round-trip."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    geography_id: str
+    temperature_c: float
+    area: str
+    geography_level: str
+    pregnancy_window: PregnancyWindow
+    tmax_lag: list[float] = Field(min_length=3, max_length=3)
+    reference_temperature_c: float
+    odds_ratio: float = Field(gt=0)
+    ci95_low: float = Field(gt=0)
+    ci95_high: float = Field(gt=0)
+    attributable_fraction_percent: float = Field(ge=0, le=100)
+    on_training_support: bool
+    warning: str | None = None
+    n_training: int | None = None
+    modelled_temperature_range_c: list[float] | None = Field(
+        default=None, min_length=2, max_length=2
+    )
+    model_version: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_confidence_interval(self):
+        if not self.ci95_low <= self.odds_ratio <= self.ci95_high:
+            raise ValueError("LBW_CONFIDENCE_INTERVAL_INVALID")
+        return self

@@ -18,6 +18,7 @@ from chart.shared.db.models import (
     AppGeography,
     AppUser,
     CountryGeoConfig,
+    RecommendedAction,
     SetupStateRecord,
     UserGeographyScopeRecord,
     UserRoleRecord,
@@ -25,11 +26,12 @@ from chart.shared.db.models import (
     WorkspaceRecord,
 )
 from chart.shared.db.session import get_session_factory
+from chart.solution_repository.routes import SNAPSHOT_PATH as _SOLUTION_SEED_PATH
 
 from .model_configs import configs_for_country
 from .place_bootstrap import (
     PlaceBootstrapError,
-    bootstrap_place_from_manifest,
+    bootstrap_place_from_release,
 )
 from .schemas import (
     BootstrapAdminResponse,
@@ -159,6 +161,70 @@ def bootstrap(
     )
 
 
+def _auto_seed_recommended_actions(session) -> None:
+    """Upsert the bundled solution repository into ``recommended_action``.
+
+    Idempotent on ``slug``. Best-effort: a broken bundle logs a warning
+    but does not fail setup. Later, a scheduler or an external API will
+    refresh the same rows; the natural key stays valid across sources.
+    """
+
+    try:
+        raw = json.loads(_SOLUTION_SEED_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        logger.exception(
+            "auto_seed: could not read %s; recommended_action left empty",
+            _SOLUTION_SEED_PATH,
+        )
+        return
+
+    items = raw.get("items") or []
+    if not items:
+        logger.warning("auto_seed: solution seed has no items, skipping")
+        return
+
+    now = datetime.now(timezone.utc)
+    upserts = 0
+    for item in items:
+        slug = str(item.get("slug") or "").strip()
+        title = str(item.get("title") or "").strip()
+        description = str(item.get("description") or "").strip()
+        if not slug or not title:
+            continue
+        existing = session.scalar(
+            select(RecommendedAction).where(RecommendedAction.slug == slug)
+        )
+        if existing is None:
+            session.add(
+                RecommendedAction(
+                    slug=slug,
+                    source_record_id=item.get("sourceRecordId"),
+                    title=title,
+                    description=description,
+                    climate_hazards=list(item.get("climateHazards") or []),
+                    solution_types=list(item.get("solutionTypes") or []),
+                    cost_of_implementation=item.get("costOfImplementation"),
+                    useful_links=list(item.get("usefulLinks") or []),
+                    case_studies=list(item.get("caseStudies") or []),
+                    source="seed",
+                    synced_at=now,
+                )
+            )
+        else:
+            existing.source_record_id = item.get("sourceRecordId")
+            existing.title = title
+            existing.description = description
+            existing.climate_hazards = list(item.get("climateHazards") or [])
+            existing.solution_types = list(item.get("solutionTypes") or [])
+            existing.cost_of_implementation = item.get("costOfImplementation")
+            existing.useful_links = list(item.get("usefulLinks") or [])
+            existing.case_studies = list(item.get("caseStudies") or [])
+            existing.source = "seed"
+            existing.synced_at = now
+        upserts += 1
+    logger.warning("auto_seed: recommended_action upserts=%d", upserts)
+
+
 def _auto_seed_deployed_models(session, country_code: str) -> None:
     """Seed admin_units + model release for the country that just onboarded.
 
@@ -168,28 +234,41 @@ def _auto_seed_deployed_models(session, country_code: str) -> None:
     supportsPrediction=true without any manual CLI step.
     """
 
+    logger.warning("auto_seed: start country=%s", country_code)
     configs = configs_for_country(country_code)
     if not configs:
+        logger.warning(
+            "auto_seed: no deployed model configured for %s, skipping",
+            country_code,
+        )
         return
     for config in configs:
+        logger.warning(
+            "auto_seed: seeding from release=%s",
+            config.model_release,
+        )
         try:
-            bootstrap_place_from_manifest(
+            result = bootstrap_place_from_release(
                 session,
-                source_manifest_path=config.source_manifest,
-                crosswalk_path=config.crosswalk,
                 model_release_path=config.model_release,
                 activate=True,
             )
-        except PlaceBootstrapError:
             logger.warning(
-                "Setup auto-seed could not download boundaries for %s; retry "
-                "later via POST /internal/bootstrap-place.",
+                "auto_seed: success — areas=%d release=%s status=%s",
+                result.areas_seeded,
+                result.model_release_id,
+                result.model_status,
+            )
+        except PlaceBootstrapError:
+            logger.exception(
+                "auto_seed: PlaceBootstrapError for %s; setup will complete "
+                "but the deployed model is not registered.",
                 country_code,
             )
         except Exception:  # noqa: BLE001 - best-effort, must not fail setup
             logger.exception(
-                "Setup auto-seed failed unexpectedly for %s; setup completed "
-                "but the deployed model is not yet registered.",
+                "auto_seed: unexpected failure for %s; setup will complete "
+                "but the deployed model is not registered.",
                 country_code,
             )
 
@@ -303,6 +382,12 @@ def complete(
                 )
             )
         _auto_seed_deployed_models(session, country_code)
+        try:
+            _auto_seed_recommended_actions(session)
+        except Exception:  # noqa: BLE001 - best-effort, must not fail setup
+            logger.exception(
+                "auto_seed: recommended_action seed failed; setup will complete."
+            )
         state.completed = True
         state.phase = "complete"
         state.provisioning_token = None

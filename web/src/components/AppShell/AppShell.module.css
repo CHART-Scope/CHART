@@ -53,6 +53,34 @@
   font-size: var(--fs-caption);
 }
 
+.activityBtn {
+  margin-left: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+
+.activityBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-white);
+}
+
+.topbar .account + .activityBtn {
+  margin-left: 12px;
+}
+
+.topbar .activityBtn:only-child,
+.topbar .tagline + .activityBtn {
+  margin-left: auto;
+}
+
 .body {
   display: flex;
   flex: 1;

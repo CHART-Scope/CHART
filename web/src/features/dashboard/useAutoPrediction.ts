@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { recordAuditEvent } from "@/lib/audit";
 import {
   getPredictionRequest,
   submitPrediction,
@@ -28,6 +29,13 @@ export type AutoPredictionState = {
 type Options = {
   geographyId: string;
   accessToken: string;
+  /**
+   * When set, the submission targets this admin_unit's own AppGeography.id
+   * rather than the state-level geographyId. Picking a division in the
+   * "Viewing for" dropdown flows through here so the prediction is scoped
+   * to that division's admin_unit + its model binding.
+   */
+  adminUnit?: string | null;
   /** Skip triggering entirely, e.g. when the caller already has data. */
   disabled?: boolean;
 };
@@ -45,8 +53,10 @@ const POLL_INTERVAL_MS = 5_000;
 export function useAutoPrediction({
   geographyId,
   accessToken,
+  adminUnit = null,
   disabled = false,
 }: Options): AutoPredictionState {
+  const effectiveGeographyId = adminUnit ?? geographyId;
   const [state, setState] = useState<AutoPredictionState>({
     phase: "idle",
     requestId: null,
@@ -85,9 +95,16 @@ export function useAutoPrediction({
       setState((prev) => ({ ...prev, phase: "submitting", error: null }));
       try {
         const submitted = await submitPrediction(accessToken, {
-          geographyId,
+          geographyId: effectiveGeographyId,
           planningMonth,
           target: "month",
+        });
+
+        recordAuditEvent({
+          event_type: "prediction_submitted",
+          geography_id: effectiveGeographyId,
+          prediction_request_id: submitted.request_id,
+          payload: { planning_month: planningMonth, target: "month" },
         });
 
         if (isCompletedResult(submitted)) {
@@ -98,6 +115,11 @@ export function useAutoPrediction({
               stage: "completed",
               error: null,
               completedAt: new Date().toISOString(),
+            });
+            recordAuditEvent({
+              event_type: "prediction_completed",
+              geography_id: effectiveGeographyId,
+              prediction_request_id: submitted.request_id,
             });
           }
           return;
@@ -124,6 +146,11 @@ export function useAutoPrediction({
           error: message,
           completedAt: null,
         });
+        recordAuditEvent({
+          event_type: "prediction_failed",
+          geography_id: effectiveGeographyId,
+          payload: { error: message },
+        });
       }
     }
 
@@ -144,7 +171,21 @@ export function useAutoPrediction({
             error: current.error_code ?? null,
             completedAt: current.status === "completed" ? current.updated_at : null,
           });
-          if (current.status === "completed" || current.status === "failed") {
+          if (current.status === "completed") {
+            recordAuditEvent({
+              event_type: "prediction_completed",
+              geography_id: effectiveGeographyId,
+              prediction_request_id: requestId,
+            });
+            return;
+          }
+          if (current.status === "failed") {
+            recordAuditEvent({
+              event_type: "prediction_failed",
+              geography_id: effectiveGeographyId,
+              prediction_request_id: requestId,
+              payload: { error_code: current.error_code ?? null },
+            });
             return;
           }
         } catch (error) {
@@ -168,7 +209,7 @@ export function useAutoPrediction({
         timer.current = null;
       }
     };
-  }, [accessToken, disabled, geographyId]);
+  }, [accessToken, disabled, effectiveGeographyId]);
 
   return state;
 }

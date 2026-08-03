@@ -33,18 +33,31 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-4);
-  align-items: end;
+  align-items: start;
   margin: var(--space-2) 0 var(--space-4);
 }
 
-.figure {
+.column {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
+  text-align: center;
 }
 
-.figureLabel {
+.heat .pregnantIcon,
+.heat .newbornIcon,
+.heat .arrow {
+  color: var(--color-maroon);
+}
+
+.cool .pregnantIcon,
+.cool .newbornIcon,
+.cool .arrow {
+  color: var(--color-nexus);
+}
+
+.eyebrowLabel {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -53,21 +66,44 @@
   font-weight: 500;
 }
 
-.sunIcon {
-  color: var(--color-amber);
-  font-size: 1rem;
+.heat .eyebrowLabel {
+  color: var(--color-maroon);
 }
 
-.shadeIcon {
+.cool .eyebrowLabel {
   color: var(--color-nexus);
-  font-size: 1rem;
+}
+
+.eyebrowIcon {
+  font-size: 1.1rem;
+}
+
+.heat .eyebrowIcon {
+  color: var(--color-amber, var(--color-maroon));
+}
+
+.cool .eyebrowIcon {
+  color: var(--color-nexus);
+}
+
+.pregnantIcon {
+  display: block;
+}
+
+.arrow {
+  font-size: 1.1rem;
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+.newbornIcon {
+  display: block;
 }
 
 .figureCaption {
   margin: 0;
   font-size: var(--fs-caption);
   color: var(--color-text-muted);
-  text-align: center;
 }
 
 .body {

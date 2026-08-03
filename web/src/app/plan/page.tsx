@@ -24,7 +24,6 @@ function AuthorizedPlan({ session }: { session: AuthSession }) {
 
   return (
     <PlanningApp
-      accessToken={session.accessToken}
       username={session.user.username}
       roles={session.user.roles}
       geographyScopes={session.user.geographyScopes}
