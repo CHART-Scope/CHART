@@ -186,6 +186,12 @@ if [ "$PUBLIC_SCHEME" = "https" ] && [ "$TLS_TERMINATED_UPSTREAM" != "1" ]; then
   fi
 fi
 
+if [ "$PUBLIC_SCHEME" = "http" ]; then
+  KEYCLOAK_SSL_REQUIRED=none
+else
+  KEYCLOAK_SSL_REQUIRED=external
+fi
+
 mkdir -p "$ENV_DIR"
 
 DEPLOY_CDSAPI_KEY="${CDSAPI_KEY:-}"
@@ -563,7 +569,7 @@ docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh config credentials 
 
 docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh update realms/chart \
   -s loginTheme=chart \
-  -s sslRequired=external >/dev/null
+  -s "sslRequired=$KEYCLOAK_SSL_REQUIRED" >/dev/null
 
 WEB_CLIENT_UUID="$(
   docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh get clients \
