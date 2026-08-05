@@ -71,6 +71,16 @@ Without those optional integrations, the main app still starts and existing
 climate data remains readable. A prediction reports a clear unavailable error
 until its climate source and scorer are configured.
 
+## HTTP vs HTTPS
+
+`AWS_APP_PUBLIC_ORIGIN` (or an auto-detected fallback) chooses the scheme.
+Plain HTTP is only accepted when `ALLOW_INSECURE_HTTP=1` is also set — reserved
+for isolated development sandboxes. When the deploy runs on HTTP the Keycloak
+realm's `sslRequired` is set to `none` so the login flow stops rejecting the
+browser; on HTTPS it stays at `external`, matching `chart-realm.json`. The
+setting is re-applied on every deploy, so a sandbox that later gains a TLS
+certificate switches back to strict enforcement without any manual kcadm work.
+
 ## EC2 requirements
 
 - Docker running;

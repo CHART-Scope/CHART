@@ -69,6 +69,7 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Installation setup: installation-setup.md
+  - AWS sandbox deployment: aws-sandbox.md
   - Python backend:
       - Overview: python-backend.md
       - Add a geography and model: add-geography-and-model.md
