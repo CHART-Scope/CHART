@@ -2,10 +2,39 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {
+  buildRealmSettings,
   buildScopeGoogleIdentityProvider,
   buildWebClientSettings,
   normalizePublicOrigin,
 } = require("./sync-realm.js");
+
+const realmSeed = {
+  displayName: "CHART",
+  enabled: true,
+  loginTheme: "chart",
+  sslRequired: "external",
+};
+
+test("realm sync uses the deployment SSL mode", () => {
+  assert.deepEqual(buildRealmSettings(realmSeed, "http://sandbox.chart.example"), {
+    displayName: "CHART",
+    enabled: true,
+    loginTheme: "chart",
+    sslRequired: "none",
+  });
+  assert.equal(
+    buildRealmSettings(realmSeed, "https://sandbox.chart.example").sslRequired,
+    "external",
+  );
+  assert.equal(buildRealmSettings(realmSeed).sslRequired, "external");
+});
+
+test("realm sync rejects an invalid SSL mode", () => {
+  assert.throws(
+    () => buildRealmSettings({ ...realmSeed, sslRequired: "sometimes" }),
+    /sslRequired/,
+  );
+});
 
 test("Google SSO stays untouched when credentials are not configured", () => {
   assert.equal(buildScopeGoogleIdentityProvider({}), null);
@@ -35,6 +64,38 @@ test("Google SSO restricts brokered identities to the Scope Impact domain", () =
   assert.equal(provider.config.defaultScope, "openid profile email");
 });
 
+test("Google SSO is disabled for an HTTP domain", () => {
+  const provider = buildScopeGoogleIdentityProvider({
+    CHART_WEB_ORIGIN: "http://sandbox.chart.example",
+    KEYCLOAK_GOOGLE_CLIENT_ID: "client-id",
+    KEYCLOAK_GOOGLE_CLIENT_SECRET: "client-secret",
+  });
+
+  assert.equal(provider.enabled, false);
+});
+
+test("Google SSO remains enabled for HTTPS and local HTTP", () => {
+  const credentials = {
+    KEYCLOAK_GOOGLE_CLIENT_ID: "client-id",
+    KEYCLOAK_GOOGLE_CLIENT_SECRET: "client-secret",
+  };
+
+  assert.equal(
+    buildScopeGoogleIdentityProvider({
+      ...credentials,
+      CHART_WEB_ORIGIN: "https://sandbox.chart.example",
+    }).enabled,
+    true,
+  );
+  assert.equal(
+    buildScopeGoogleIdentityProvider({
+      ...credentials,
+      CHART_WEB_ORIGIN: "http://localhost:3100",
+    }).enabled,
+    true,
+  );
+});
+
 test("web client settings use exact callback origins", () => {
   assert.deepEqual(buildWebClientSettings("https://chart.scopeimpact.fi"), {
     redirectUris: [
@@ -54,6 +115,13 @@ test("web client settings use exact callback origins", () => {
         "http://127.0.0.1:3100##http://127.0.0.1:3100/*",
     },
   });
+});
+
+test("web client settings preserve an HTTP domain origin", () => {
+  const settings = buildWebClientSettings("http://sandbox.chart.example");
+
+  assert.equal(settings.redirectUris[0], "http://sandbox.chart.example/auth/callback");
+  assert.equal(settings.webOrigins[0], "http://sandbox.chart.example");
 });
 
 test("public origin validation rejects IP fallbacks with paths or credentials", () => {

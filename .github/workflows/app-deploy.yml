@@ -258,6 +258,7 @@ jobs:
             public_host="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
             base_url="${PUBLIC_SCHEME}://${public_host}"
           fi
+          callback_uri="$(jq -rn --arg value "$base_url/auth/callback" '$value | @uri')"
 
           for attempt in $(seq 1 12); do
             web_status="$(curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/" || true)"
@@ -265,9 +266,10 @@ jobs:
             api_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$base_url/chart-api/ready" || true)"
             auth_status="$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/chart-api/auth/me" || true)"
             keycloak_status="$(curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/identity/realms/chart" || true)"
+            keycloak_auth_status="$(curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/identity/realms/chart/protocol/openid-connect/auth?client_id=chart-web&redirect_uri=$callback_uri&response_type=code&scope=openid&state=deploy-check&code_challenge=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&code_challenge_method=S256" || true)"
 
-            if [ "$web_status" != "200" ] || [ "$build_id" != "$GITHUB_SHA" ] || [ "$api_body" != '{"status":"ok"}' ] || [ "$auth_status" != "401" ] || [ "$keycloak_status" != "200" ]; then
-              echo "::error title=Public smoke check failed::attempt ${attempt}: web=${web_status:-000} build=${build_id:-empty} api=${api_body:-empty} auth=${auth_status:-000} keycloak=${keycloak_status:-000}"
+            if [ "$web_status" != "200" ] || [ "$build_id" != "$GITHUB_SHA" ] || [ "$api_body" != '{"status":"ok"}' ] || [ "$auth_status" != "401" ] || [ "$keycloak_status" != "200" ] || [ "$keycloak_auth_status" != "200" ]; then
+              echo "::error title=Public smoke check failed::attempt ${attempt}: web=${web_status:-000} build=${build_id:-empty} api=${api_body:-empty} auth=${auth_status:-000} keycloak=${keycloak_status:-000} keycloak_auth=${keycloak_auth_status:-000}"
               if [ "$attempt" -eq 12 ]; then
                 exit 1
               fi

@@ -175,6 +175,13 @@ if [ "$PUBLIC_SCHEME" != "https" ] && [ "$PUBLIC_SCHEME" != "http" ]; then
   echo "PUBLIC_SCHEME must be https or http." >&2
   exit 1
 fi
+if [[ "$PUBLIC_HOST" != *:* ]]; then
+  if [ "$PUBLIC_SCHEME" = "https" ]; then
+    PUBLIC_PORT=443
+  else
+    PUBLIC_PORT=80
+  fi
+fi
 if [ "$PUBLIC_SCHEME" = "http" ] && [ "$ALLOW_INSECURE_HTTP" != "1" ]; then
   echo "Plain HTTP is disabled. Configure TLS or explicitly set ALLOW_INSECURE_HTTP=1 for an isolated development deployment." >&2
   exit 1
@@ -184,12 +191,6 @@ if [ "$PUBLIC_SCHEME" = "https" ] && [ "$TLS_TERMINATED_UPSTREAM" != "1" ]; then
     echo "HTTPS requires readable TLS_CERT_FILE and TLS_KEY_FILE, or TLS_TERMINATED_UPSTREAM=1 behind an HTTPS load balancer." >&2
     exit 1
   fi
-fi
-
-if [ "$PUBLIC_SCHEME" = "http" ]; then
-  KEYCLOAK_SSL_REQUIRED=none
-else
-  KEYCLOAK_SSL_REQUIRED=external
 fi
 
 mkdir -p "$ENV_DIR"
@@ -367,7 +368,7 @@ EOF
   NGINX_REDIRECT_SERVER="$(cat <<EOF
   server {
     listen 80;
-    return 301 https://\$host\$request_uri;
+    return 308 $PUBLIC_ORIGIN\$request_uri;
   }
 EOF
 )"
@@ -387,72 +388,76 @@ $NGINX_REDIRECT_SERVER
 $NGINX_LISTEN
     client_max_body_size 25m;
 
+    if (\$http_host != "$PUBLIC_HOST") {
+      return 308 $PUBLIC_ORIGIN\$request_uri;
+    }
+
     location = /identity {
       return 302 /identity/;
     }
 
     location /identity/ {
       proxy_pass http://$KEYCLOAK_CONTAINER:8080;
-      proxy_set_header Host \$host;
-      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Host \$host;
-      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-For \$remote_addr;
+      proxy_set_header X-Forwarded-Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-Port $PUBLIC_PORT;
       proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
     }
 
     location = /chart-api {
       proxy_pass http://$API_CONTAINER:3210/docs;
-      proxy_set_header Host \$host;
-      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Host \$host;
-      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-For \$remote_addr;
+      proxy_set_header X-Forwarded-Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-Port $PUBLIC_PORT;
       proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
     }
 
     location = /chart-api/ {
       proxy_pass http://$API_CONTAINER:3210/docs;
-      proxy_set_header Host \$host;
-      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Host \$host;
-      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-For \$remote_addr;
+      proxy_set_header X-Forwarded-Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-Port $PUBLIC_PORT;
       proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
     }
 
     location /chart-api/ {
       proxy_pass http://$API_CONTAINER:3210/;
-      proxy_set_header Host \$host;
-      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Host \$host;
-      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-For \$remote_addr;
+      proxy_set_header X-Forwarded-Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-Port $PUBLIC_PORT;
       proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
     }
 
     location = /climate-api/health {
       proxy_pass http://$API_CONTAINER:3210/health;
-      proxy_set_header Host \$host;
-      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Host \$host;
-      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-For \$remote_addr;
+      proxy_set_header X-Forwarded-Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-Port $PUBLIC_PORT;
       proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
     }
 
     location /climate/ {
       proxy_pass http://$API_CONTAINER:3210;
       proxy_read_timeout 30s;
-      proxy_set_header Host \$host;
-      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Host \$host;
-      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-For \$remote_addr;
+      proxy_set_header X-Forwarded-Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-Port $PUBLIC_PORT;
       proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
     }
 
     location / {
       proxy_pass http://$WEB_CONTAINER:3100;
       proxy_http_version 1.1;
-      proxy_set_header Host \$host;
-      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Host \$host;
-      proxy_set_header X-Forwarded-Port \$server_port;
+      proxy_set_header Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-For \$remote_addr;
+      proxy_set_header X-Forwarded-Host $PUBLIC_HOST;
+      proxy_set_header X-Forwarded-Port $PUBLIC_PORT;
       proxy_set_header X-Forwarded-Proto $PUBLIC_SCHEME;
       proxy_set_header Upgrade \$http_upgrade;
       proxy_set_header Connection "upgrade";
@@ -560,32 +565,6 @@ docker run -d \
   start --import-realm >/dev/null
 
 wait_for_command "Keycloak" curl -fsS "http://127.0.0.1:8080/identity/realms/chart"
-
-docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh config credentials \
-  --server http://localhost:8080/identity \
-  --realm master \
-  --user admin \
-  --password "$KEYCLOAK_ADMIN_PASSWORD" >/dev/null
-
-docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh update realms/chart \
-  -s loginTheme=chart \
-  -s "sslRequired=$KEYCLOAK_SSL_REQUIRED" >/dev/null
-
-WEB_CLIENT_UUID="$(
-  docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh get clients \
-    -r chart \
-    -q clientId=chart-web \
-    --fields id \
-    --format csv \
-    --noquotes | tail -n 1
-)"
-
-docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh update \
-  "clients/$WEB_CLIENT_UUID" \
-  -r chart \
-  -s "redirectUris=[\"$PUBLIC_ORIGIN/*\",\"http://localhost:3100/*\",\"http://127.0.0.1:3100/*\"]" \
-  -s "attributes={\"post.logout.redirect.uris\":\"$PUBLIC_ORIGIN##$PUBLIC_ORIGIN/*##http://localhost:3100##http://localhost:3100/*##http://127.0.0.1:3100##http://127.0.0.1:3100/*\"}" \
-  -s "webOrigins=[\"$PUBLIC_ORIGIN\"]" >/dev/null
 
 docker run --rm \
   --network "$NETWORK" \
@@ -735,6 +714,16 @@ wait_for_command "CHART climate API through proxy" \
 wait_for_command "Keycloak through proxy" \
   curl "${LOCAL_PROXY_CURL_ARGS[@]}" -H "Host: $PUBLIC_HOST" \
   "$LOCAL_PROXY_ORIGIN/identity/realms/chart"
+wait_for_command "Keycloak authorization through proxy" \
+  curl "${LOCAL_PROXY_CURL_ARGS[@]}" -H "Host: $PUBLIC_HOST" --get \
+  --data-urlencode "client_id=chart-web" \
+  --data-urlencode "redirect_uri=$PUBLIC_ORIGIN/auth/callback" \
+  --data-urlencode "response_type=code" \
+  --data-urlencode "scope=openid" \
+  --data-urlencode "state=deploy-check" \
+  --data-urlencode "code_challenge=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+  --data-urlencode "code_challenge_method=S256" \
+  "$LOCAL_PROXY_ORIGIN/identity/realms/chart/protocol/openid-connect/auth"
 echo "CHART is running at $PUBLIC_ORIGIN"
 echo "CHART API is running at $PUBLIC_ORIGIN/chart-api"
 echo "CHART planning API is also available at $PUBLIC_ORIGIN/climate"
