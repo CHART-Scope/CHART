@@ -17,7 +17,7 @@ async function main() {
   const realmSeed = JSON.parse(fs.readFileSync(realmFile, "utf8"));
   const token = await getAdminToken();
 
-  await syncRealmSettings(token, realmSeed);
+  await syncRealmSettings(token, realmSeed, process.env.CHART_WEB_ORIGIN);
   await syncClientSettings(token, realmSeed.clients ?? []);
   await ensureClientRoles(token, realmSeed.roles?.client ?? {});
   await ensureClientProtocolMappers(token, realmSeed.clients ?? []);
@@ -55,17 +55,30 @@ async function syncClientSettings(token, clients) {
   }
 }
 
-async function syncRealmSettings(token, realmSeed) {
+async function syncRealmSettings(token, realmSeed, configuredOrigin) {
   await fetchOk(`${keycloakUrl}/admin/realms/${targetRealm}`, {
     method: "PUT",
     headers: jsonHeaders(token),
-    body: JSON.stringify({
-      displayName: realmSeed.displayName,
-      enabled: realmSeed.enabled,
-      loginTheme: realmSeed.loginTheme,
-      sslRequired: realmSeed.sslRequired,
-    }),
+    body: JSON.stringify(buildRealmSettings(realmSeed, configuredOrigin)),
   });
+}
+
+function buildRealmSettings(realmSeed, configuredOrigin) {
+  const sslRequired = configuredOrigin
+    ? new URL(normalizePublicOrigin(configuredOrigin)).protocol === "http:"
+      ? "none"
+      : "external"
+    : realmSeed.sslRequired;
+  if (!["all", "external", "none"].includes(sslRequired)) {
+    throw new Error("The realm seed has an invalid sslRequired value.");
+  }
+
+  return {
+    displayName: realmSeed.displayName,
+    enabled: realmSeed.enabled,
+    loginTheme: realmSeed.loginTheme,
+    sslRequired,
+  };
 }
 
 async function getAdminToken() {
@@ -319,7 +332,7 @@ function buildScopeGoogleIdentityProvider(env) {
     alias: env.KEYCLOAK_GOOGLE_ALIAS?.trim() || "scope-google",
     displayName: env.KEYCLOAK_GOOGLE_DISPLAY_NAME?.trim() || "Scope Impact Google",
     providerId: "google",
-    enabled: true,
+    enabled: googleIdentityProviderEnabled(env.CHART_WEB_ORIGIN),
     updateProfileFirstLoginMode: "missing",
     trustEmail: true,
     storeToken: false,
@@ -336,6 +349,17 @@ function buildScopeGoogleIdentityProvider(env) {
       useJwksUrl: "true",
     },
   };
+}
+
+function googleIdentityProviderEnabled(configuredOrigin) {
+  if (!configuredOrigin) return true;
+  const origin = new URL(normalizePublicOrigin(configuredOrigin));
+  return (
+    origin.protocol === "https:" ||
+    origin.hostname === "localhost" ||
+    origin.hostname === "127.0.0.1" ||
+    origin.hostname === "::1"
+  );
 }
 
 async function ensureGroups(token, groups, parentId) {
@@ -467,6 +491,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  buildRealmSettings,
   buildScopeGoogleIdentityProvider,
   buildWebClientSettings,
   normalizePublicOrigin,

@@ -45,6 +45,8 @@ Optional:
 
 - `AWS_APP_PUBLIC_HOST`
 - `AWS_APP_PUBLIC_ORIGIN`
+- `CHART_PUBLIC_SCHEME`
+- `CHART_ALLOW_INSECURE_HTTP`
 - `CHART_BOOTSTRAP_TOKEN` (generated and persisted when omitted)
 - `KEYCLOAK_GOOGLE_CLIENT_ID`
 - `KEYCLOAK_GOOGLE_CLIENT_SECRET`
@@ -73,19 +75,30 @@ until its climate source and scorer are configured.
 
 ## HTTP vs HTTPS
 
-`AWS_APP_PUBLIC_ORIGIN` (or an auto-detected fallback) chooses the scheme.
-Plain HTTP is only accepted when `ALLOW_INSECURE_HTTP=1` is also set — reserved
-for isolated development sandboxes. When the deploy runs on HTTP the Keycloak
-realm's `sslRequired` is set to `none` so the login flow stops rejecting the
-browser; on HTTPS it stays at `external`, matching `chart-realm.json`. The
-setting is re-applied on every deploy, so a sandbox that later gains a TLS
-certificate switches back to strict enforcement without any manual kcadm work.
+Authentication can use a domain or IP over explicitly enabled HTTP. Set the
+canonical browser origin, including its scheme, and allow insecure HTTP:
+
+```txt
+AWS_APP_PUBLIC_ORIGIN=http://sandbox.example.org
+CHART_ALLOW_INSECURE_HTTP=1
+```
+
+The deploy derives Keycloak's hostname, realm SSL mode, callbacks, cookies,
+issuer, CORS origin, and proxy headers from that one origin. Requests made with
+another host are redirected to the canonical origin before authentication
+starts. Switch `AWS_APP_PUBLIC_ORIGIN` to `https://...` when TLS is available;
+the deploy then restores Keycloak's external HTTPS requirement automatically.
+
+Plain HTTP exposes credentials and tokens in transit, so use it only for an
+isolated sandbox. Google Workspace sign-in cannot use an HTTP domain because
+Google requires HTTPS for non-local OAuth callbacks; Keycloak-managed accounts
+continue to work in this mode.
 
 ## EC2 requirements
 
 - Docker running;
-- port 443 open and a TLS certificate/key, or a trusted upstream load balancer
-  that terminates TLS;
+- port 80 open for an HTTP sandbox, or port 443 with a TLS certificate/key, or
+  a trusted upstream load balancer that terminates TLS;
 - deploy SSH key installed;
 - an instance role that can read both LBW model objects;
 - 4 vCPU and 16 GiB RAM when all services share the host.
