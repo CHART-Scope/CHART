@@ -35,6 +35,7 @@ export function StatCardWithBadge({
       )}
       <p className={styles.supporting}>{loading ? " " : supporting}</p>
       {range && !loading ? <p className={styles.range}>{range}</p> : null}
+      {/* Precision badge hidden for now.
       {loading ? null : (
         <PrecisionBadge
           level={precision}
@@ -43,6 +44,7 @@ export function StatCardWithBadge({
           aria-label={`Precision ${precisionLabel ?? precision}`}
         />
       )}
+      */}
     </article>
   );
 }
