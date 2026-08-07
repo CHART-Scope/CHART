@@ -8,7 +8,7 @@ type Props = {
   total?: number;
   caption?: string;
   captionSuffix?: string;
-  /** Icon rendered in each cell. Defaults to the maternal-health pictogram. */
+  /** Icon rendered in each cell. Defaults to the newborn pictogram used on the dashboard. */
   figure?: IconName;
 };
 
@@ -17,7 +17,7 @@ export function IconArray({
   total = 100,
   caption,
   captionSuffix = "increase in odds",
-  figure = "mother-baby",
+  figure = "newborn",
 }: Props) {
   const on = Math.max(0, Math.min(total, Math.round(value)));
   return (
@@ -41,10 +41,10 @@ export function IconArray({
           );
         })}
       </div>
-      <div className={styles.caption}>
+      {/* <div className={styles.caption}>
         <span className={styles.pct}>{caption ?? `${on}%`}</span>
         <div className={styles.desc}>{captionSuffix}</div>
-      </div>
+      </div> */}
     </div>
   );
 }

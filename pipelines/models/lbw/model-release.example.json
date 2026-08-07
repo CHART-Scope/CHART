@@ -5,7 +5,7 @@
   "climate_hazard": "extreme_heat",
   "health_domain": "maternal_newborn_child_health",
   "version": "1.0.0",
-  "base_uri": "s3://replace-with-your-model-bucket/lbw/1.0.0",
+  "base_uri": "s3://chart-predictive-models",
   "temperature_input": "tmax_lag: planning month, previous month, two months before; newest first; degrees Celsius",
   "months_required": 3,
   "release_notes": "Validated LBW demo release for Madhya Pradesh state and 10 model divisions.",

@@ -21,21 +21,21 @@ type Story = StoryObj<typeof IconArray>;
 export const Twelve: Story = {
   args: {
     value: 12,
-    figure: "mother-baby",
+    figure: "newborn",
     captionSuffix: "increase in odds of LBW",
   },
 };
 export const TwentySix: Story = {
   args: {
     value: 26,
-    figure: "mother-baby",
+    figure: "newborn",
     captionSuffix: "increase in odds of LBW",
   },
 };
 export const MotherBabyMaternalHeat: Story = {
   args: {
     value: 25,
-    figure: "mother-baby",
+    figure: "newborn",
     captionSuffix: "maternal heat exposure",
   },
 };

@@ -31,7 +31,7 @@ ensure_model() {
   temporary="$(mktemp "${path}.partial.XXXXXX")"
   trap 'rm -f "$temporary"' RETURN
   echo "Downloading $label LBW model from S3..."
-  aws s3 cp "$uri" "$temporary"
+  aws s3 cp --no-sign-request "$uri" "$temporary"
   printf '%s  %s\n' "$expected_sha256" "$temporary" | sha256sum -c -
   mv "$temporary" "$path"
   trap - RETURN

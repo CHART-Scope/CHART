@@ -16,7 +16,7 @@ from typing import Any, NamedTuple, Sequence
 
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 COUNTRY_CODE_PATTERN = re.compile(r"^[A-Z]{2}$")
-S3_URI_PATTERN = re.compile(r"^s3://[a-z0-9][a-z0-9.-]*[a-z0-9]/.+$")
+S3_URI_PATTERN = re.compile(r"^s3://[a-z0-9][a-z0-9.-]*[a-z0-9](/.+)?$")
 
 VALID_LEVELS: frozenset[str] = frozenset(
     {
