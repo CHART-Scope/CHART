@@ -159,14 +159,17 @@ function AuthorizedDashboard({
               geographyId={geographyId}
               accessToken={session.accessToken}
             />
+            {/* Predictions card temporarily hidden while the pipeline stabilises.
             <PredictionsPanel
               geographyId={geographyId}
               adminUnit={adminUnit}
               accessToken={session.accessToken}
               supportsPrediction={currentGeography?.supportsPrediction ?? undefined}
             />
+            */}
           </div>
 
+          {/* Recent runs moved to Settings (Dagster + DB view live together there).
           <RunsStrip
             geographyId={geographyId}
             adminUnit={adminUnit}
@@ -178,6 +181,7 @@ function AuthorizedDashboard({
                 : `${base}?admin_unit=${encodeURIComponent(adminUnit)}`;
             }}
           />
+          */}
 
           <RecommendedActionsPanel
             hazard={DEPLOYED_HAZARD_REPOSITORY_KEY}
