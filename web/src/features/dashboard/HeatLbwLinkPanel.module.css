@@ -26,27 +26,22 @@
 
 .viewingFor {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .viewingLabel {
-  font-family: var(--font-display);
-  font-size: var(--fs-eyebrow);
-  letter-spacing: var(--ls-eyebrow);
-  text-transform: uppercase;
+  font-family: var(--font-body);
+  font-size: var(--fs-caption);
   color: var(--color-text-muted);
+  flex-shrink: 0;
 }
 
-.viewingFor select {
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xs);
-  font: inherit;
-  font-size: var(--fs-body-lg);
-  color: var(--color-charcoal);
-  background: var(--surface-card);
-  width: 100%;
+.viewingFor > *:last-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .visuallyHidden {
@@ -64,6 +59,62 @@
   display: flex;
   justify-content: center;
   margin: var(--space-1) 0;
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+}
+
+.skeletonGrid {
+  width: 220px;
+  height: 128px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    100deg,
+    var(--surface-muted, #f0efe9) 30%,
+    rgba(255, 255, 255, 0.6) 50%,
+    var(--surface-muted, #f0efe9) 70%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.4s ease-in-out infinite;
+}
+
+.skeletonLine {
+  width: 78%;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(
+    100deg,
+    var(--surface-muted, #f0efe9) 30%,
+    rgba(255, 255, 255, 0.6) 50%,
+    var(--surface-muted, #f0efe9) 70%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.4s ease-in-out infinite;
+}
+
+.skeletonLineShort {
+  width: 45%;
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonGrid,
+  .skeletonLine {
+    animation: none;
+  }
 }
 
 .stat {

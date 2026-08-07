@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { AreaTree, type AreaTreeItem } from "@/components/AreaTree";
 import { IconArray } from "@/components/IconArray";
-import { PrecisionBadge, type PrecisionLevel } from "@/components/PrecisionBadge";
+import { type PrecisionLevel } from "@/components/PrecisionBadge";
 import { Slider } from "@/components/Slider";
 import { recordAuditEvent } from "@/lib/audit";
 import {
@@ -34,12 +35,9 @@ const FALLBACK_MIN_TEMP = 30;
 const FALLBACK_MAX_TEMP = 45;
 const DEFAULT_TEMP = 32;
 
-/**
- * Value the IconArray and headline % show before the model returns.
- * Chosen to match the design's headline framing (11% attributable) so
- * the visual is meaningful during the optimistic loading window.
- */
-const OPTIMISTIC_LOADING_PERCENT = 11;
+/** Sentinel id the AreaTree uses for the "whole state" row so we can map it
+ * back to the null admin_unit convention this panel exposes upstream. */
+const STATE_ROOT_ID = "__state__";
 
 const MONTH_LABELS = [
   "Jan",
@@ -134,22 +132,20 @@ export function HeatLbwLinkPanel({
   }, [accessToken, effectiveGeographyId, refreshKey]);
 
   // The slider drives the IconArray so shaded/unshaded reflects the model's
-  // current what-if. Fall back to the batch prediction, then to the design's
-  // optimistic value during first paint / when the model has not answered yet.
+  // current what-if. Fall back to the batch prediction. When neither has
+  // returned yet we render a skeleton — no fake number.
   const activePrediction: {
     percent: number;
     oddsRatio: number | null;
     ci95Low: number | null;
     ci95High: number | null;
-    precision: PrecisionLevel;
-    source: "what-if" | "batch" | "loading";
-  } = whatIf.score
+    source: "what-if" | "batch";
+  } | null = whatIf.score
     ? {
         percent: whatIf.score.attributable_fraction_percent,
         oddsRatio: whatIf.score.odds_ratio,
         ci95Low: whatIf.score.ci95_low,
         ci95High: whatIf.score.ci95_high,
-        precision: precisionFromInterval(whatIf.score.ci95_low, whatIf.score.ci95_high),
         source: "what-if",
       }
     : latest
@@ -158,34 +154,45 @@ export function HeatLbwLinkPanel({
           oddsRatio: latest.oddsRatio,
           ci95Low: latest.ci95Low,
           ci95High: latest.ci95High,
-          precision: latest.precision,
           source: "batch",
         }
-      : {
-          percent: OPTIMISTIC_LOADING_PERCENT,
-          oddsRatio: null,
-          ci95Low: null,
-          ci95High: null,
-          precision: "moderate",
-          source: "loading",
-        };
-  const showingRealResult = activePrediction.source !== "loading";
-  const displayValue = activePrediction.percent;
-  const displayPrecision: PrecisionLevel = activePrediction.precision;
+      : null;
+  const showingRealResult = activePrediction !== null;
 
   const monthPills = useMemo(() => latest?.months ?? [], [latest]);
+
+  const treeItems = useMemo<AreaTreeItem[]>(
+    () => [
+      {
+        id: STATE_ROOT_ID,
+        // stateLabel arrives as "Madhya Pradesh (State)"; strip the
+        // parenthetical so the tree renders the level label once on the
+        // right instead of duplicating it inline.
+        name: stateLabel.replace(/\s*\([^)]*\)\s*$/, ""),
+        levelLabel: "State",
+        parentId: null,
+      },
+      ...districts.map((district) => ({
+        id: district.code,
+        name: district.name,
+        levelLabel: "District",
+        parentId: STATE_ROOT_ID,
+      })),
+    ],
+    [stateLabel, districts],
+  );
 
   return (
     <section className={styles.panel} aria-labelledby="heat-lbw-heading">
       <header className={styles.header}>
         <p className={styles.eyebrow}>Link between heat and low-birth-weight</p>
-        <label className={styles.viewingFor}>
+        <div className={styles.viewingFor}>
           <span className={styles.viewingLabel}>Viewing for</span>
-          <select
-            value={activeAdminUnitCode ?? ""}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              const next = value === "" ? null : value;
+          <AreaTree
+            items={treeItems}
+            selectedId={activeAdminUnitCode ?? STATE_ROOT_ID}
+            onSelect={(id) => {
+              const next = id === STATE_ROOT_ID ? null : id;
               recordAuditEvent({
                 event_type: "district_switch",
                 geography_id: next ?? geographyId ?? null,
@@ -197,62 +204,73 @@ export function HeatLbwLinkPanel({
               });
               onAdminUnitChange?.(next);
             }}
-          >
-            <option value="">{stateLabel}</option>
-            {districts.map((district) => (
-              <option key={district.code} value={district.code}>
-                {district.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          />
+        </div>
       </header>
       <h2 id="heat-lbw-heading" className={styles.visuallyHidden}>
         Attributable fraction and precision
       </h2>
 
-      <div className={styles.iconArrayWrap}>
-        <IconArray value={displayValue} figure="newborn" />
-      </div>
+      {showingRealResult ? (
+        <>
+          <div className={styles.iconArrayWrap}>
+            <IconArray value={activePrediction.percent} figure="newborn" />
+          </div>
 
-      <p className={styles.stat} data-loading={!showingRealResult}>
-        <strong>{Math.round(displayValue)}%</strong> of all low birth weight cases may
-        be attributable to maternal heat exposure
-      </p>
+          <p className={styles.stat}>
+            <strong>{Math.round(activePrediction.percent)}%</strong> of all low birth
+            weight cases may be attributable to maternal heat exposure
+          </p>
 
-      {monthPills.length > 0 ? (
-        <ul
-          className={styles.tempPills}
-          aria-label="Temperatures used in the prediction"
+          {monthPills.length > 0 ? (
+            <ul
+              className={styles.tempPills}
+              aria-label="Temperatures used in the prediction"
+            >
+              {monthPills.map((month) => (
+                <li key={month.label} className={styles.tempPill}>
+                  <strong>{month.label}</strong>
+                  <span>
+                    {month.tempC !== null ? `${month.tempC.toFixed(1)}°C` : "—"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {activePrediction.oddsRatio !== null ? (
+            <p className={styles.modelReadout}>
+              Odds ratio <strong>{activePrediction.oddsRatio.toFixed(2)}</strong> · 95%
+              CI{" "}
+              <strong>
+                {activePrediction.ci95Low!.toFixed(2)}–
+                {activePrediction.ci95High!.toFixed(2)}
+              </strong>
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <div
+          className={styles.skeleton}
+          role="status"
+          aria-live="polite"
+          aria-label="Preparing prediction"
         >
-          {monthPills.map((month) => (
-            <li key={month.label} className={styles.tempPill}>
-              <strong>{month.label}</strong>
-              <span>{month.tempC !== null ? `${month.tempC.toFixed(1)}°C` : "—"}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+          <div className={styles.skeletonGrid} />
+          <div className={styles.skeletonLine} />
+          <div className={`${styles.skeletonLine} ${styles.skeletonLineShort}`} />
+        </div>
+      )}
 
-      {activePrediction.oddsRatio !== null ? (
-        <p className={styles.modelReadout}>
-          Odds ratio <strong>{activePrediction.oddsRatio.toFixed(2)}</strong> · 95% CI{" "}
-          <strong>
-            {activePrediction.ci95Low!.toFixed(2)}–
-            {activePrediction.ci95High!.toFixed(2)}
-          </strong>
-        </p>
-      ) : null}
-
-      <div className={styles.precisionRow}>
+      {/* <div className={styles.precisionRow}>
         <span className={styles.precisionLabel}>Precision:</span>
         <PrecisionBadge level={displayPrecision} />
-      </div>
+      </div> */}
 
       <div className={styles.explorerHeader}>
         <p className={styles.explorerLabel}>Explore what-if</p>
         <p className={styles.tempReadout} data-loading={whatIf.loading}>
-          {temperature.toFixed(0)}°C · {formatWhatIfReadout(whatIf, temperature)}
+          {formatWhatIfReadout(whatIf, temperature)}
           {isEstimateReadout(whatIf) ? (
             <span
               className={styles.estimateTag}
@@ -268,10 +286,10 @@ export function HeatLbwLinkPanel({
         <Slider
           min={sliderMin}
           max={sliderMax}
-          step={0.5}
+          step={0.1}
           value={temperature}
           onChange={setTemperature}
-          formatReadout={(value) => `${value.toFixed(0)}°C`}
+          formatReadout={(value) => `${value.toFixed(1)}°C`}
           ariaLabel="Explore temperature scenarios"
         />
         <div className={styles.sliderScale}>
