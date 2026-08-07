@@ -1,15 +1,13 @@
 FROM rocker/r-ver:4.6.0 AS runtime
 
-ARG TARGETARCH
-
 WORKDIR /app
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates curl libcurl4-openssl-dev libicu-dev libsodium-dev unzip zlib1g-dev \
-  && case "$TARGETARCH" in \
-    amd64) aws_cli_arch=x86_64 ;; \
-    arm64) aws_cli_arch=aarch64 ;; \
-    *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
+  && arch="$(uname -m)" \
+  && case "$arch" in \
+    x86_64|aarch64) aws_cli_arch="$arch" ;; \
+    *) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
   esac \
   && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-${aws_cli_arch}.zip" -o /tmp/awscliv2.zip \
   && unzip -q /tmp/awscliv2.zip -d /tmp \
