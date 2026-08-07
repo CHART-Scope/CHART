@@ -56,18 +56,22 @@ Optional:
 - `CHART_TLS_KEY_FILE`
 - `CDSAPI_URL`
 - `CDSAPI_KEY`
-- `LBW_MODEL_DIVISION_S3_URI`
-- `LBW_MODEL_STATE_S3_URI`
 - `INFERENCE_LLM_ENABLED`
 - `INFERENCE_LLM_BASE_URL`
 - `INFERENCE_LLM_MODEL`
 - `INFERENCE_LLM_API_KEY`
 
-Both LBW model URIs must be configured together. Copernicus and optional
-explanation credentials are stored in `/opt/chart-env/prediction-worker.env`
-with mode `600` and passed only to Dagster workers. Users never enter them.
-The release ID, version, and expected artifact hashes come from the checked-in
-model-release manifest rather than independent mutable deployment variables.
+Model S3 URIs are no longer deployment secrets. Each model's
+`model-release.json` manifest carries the `base_uri` (e.g.
+`s3://chart-predictive-models`) and per-file names + SHA256 hashes; the
+deploy derives the concrete URIs from it. Adding a new model means shipping
+its manifest, not adding new secrets.
+
+Copernicus and optional explanation credentials are stored in
+`/opt/chart-env/prediction-worker.env` with mode `600` and passed only to
+Dagster workers. Users never enter them. The release ID, version, and
+expected artifact hashes also come from the checked-in model-release
+manifest rather than independent mutable deployment variables.
 
 Without those optional integrations, the main app still starts and existing
 climate data remains readable. A prediction reports a clear unavailable error

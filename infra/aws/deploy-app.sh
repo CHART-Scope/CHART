@@ -197,8 +197,6 @@ mkdir -p "$ENV_DIR"
 
 DEPLOY_CDSAPI_KEY="${CDSAPI_KEY:-}"
 DEPLOY_CDSAPI_URL="${CDSAPI_URL:-}"
-DEPLOY_LBW_MODEL_DIVISION_S3_URI="${LBW_MODEL_DIVISION_S3_URI:-}"
-DEPLOY_LBW_MODEL_STATE_S3_URI="${LBW_MODEL_STATE_S3_URI:-}"
 DEPLOY_INFERENCE_LLM_ENABLED="${INFERENCE_LLM_ENABLED:-}"
 DEPLOY_INFERENCE_LLM_BASE_URL="${INFERENCE_LLM_BASE_URL:-}"
 DEPLOY_INFERENCE_LLM_MODEL="${INFERENCE_LLM_MODEL:-}"
@@ -213,15 +211,6 @@ PERSISTED_CHART_BOOTSTRAP_TOKEN="$(
 )"
 PERSISTED_CDSAPI_KEY="$(read_env_value "$PREDICTION_ENV_FILE" CDSAPI_KEY)"
 PERSISTED_CDSAPI_URL="$(read_env_value "$PREDICTION_ENV_FILE" CDSAPI_URL)"
-PERSISTED_LBW_MODEL_DIVISION_S3_URI="$(
-  read_env_value "$PREDICTION_ENV_FILE" LBW_MODEL_DIVISION_S3_URI
-)"
-PERSISTED_LBW_MODEL_STATE_S3_URI="$(
-  read_env_value "$PREDICTION_ENV_FILE" LBW_MODEL_STATE_S3_URI
-)"
-PERSISTED_LBW_MODEL_S3_URI="$(
-  read_env_value "$PREDICTION_ENV_FILE" LBW_MODEL_S3_URI
-)"
 PERSISTED_INFERENCE_LLM_ENABLED="$(
   read_env_value "$PREDICTION_ENV_FILE" INFERENCE_LLM_ENABLED
 )"
@@ -241,8 +230,6 @@ CHART_BOOTSTRAP_TOKEN="${CHART_BOOTSTRAP_TOKEN:-${PERSISTED_CHART_BOOTSTRAP_TOKE
 KEYCLOAK_DB_PASSWORD="$(random_secret)"
 CDSAPI_KEY="${DEPLOY_CDSAPI_KEY:-$PERSISTED_CDSAPI_KEY}"
 CDSAPI_URL="${DEPLOY_CDSAPI_URL:-${PERSISTED_CDSAPI_URL:-https://cds.climate.copernicus.eu/api}}"
-LBW_MODEL_DIVISION_S3_URI="${DEPLOY_LBW_MODEL_DIVISION_S3_URI:-${PERSISTED_LBW_MODEL_DIVISION_S3_URI:-$PERSISTED_LBW_MODEL_S3_URI}}"
-LBW_MODEL_STATE_S3_URI="${DEPLOY_LBW_MODEL_STATE_S3_URI:-$PERSISTED_LBW_MODEL_STATE_S3_URI}"
 INFERENCE_LLM_ENABLED="${DEPLOY_INFERENCE_LLM_ENABLED:-${PERSISTED_INFERENCE_LLM_ENABLED:-false}}"
 INFERENCE_LLM_BASE_URL="${DEPLOY_INFERENCE_LLM_BASE_URL:-$PERSISTED_INFERENCE_LLM_BASE_URL}"
 INFERENCE_LLM_MODEL="${DEPLOY_INFERENCE_LLM_MODEL:-$PERSISTED_INFERENCE_LLM_MODEL}"
@@ -250,7 +237,7 @@ INFERENCE_LLM_API_KEY="${DEPLOY_INFERENCE_LLM_API_KEY:-$PERSISTED_INFERENCE_LLM_
 
 for name in \
   POSTGRES_PASSWORD KEYCLOAK_ADMIN_PASSWORD CHART_BOOTSTRAP_TOKEN \
-  CDSAPI_KEY CDSAPI_URL LBW_MODEL_DIVISION_S3_URI LBW_MODEL_STATE_S3_URI \
+  CDSAPI_KEY CDSAPI_URL \
   INFERENCE_LLM_BASE_URL INFERENCE_LLM_MODEL INFERENCE_LLM_API_KEY; do
   value="${!name}"
   if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
@@ -263,14 +250,8 @@ if [[ ! "$POSTGRES_PASSWORD" =~ ^[A-Za-z0-9._~-]+$ ]]; then
   exit 1
 fi
 
-LBW_ENABLED=""
-LBW_SERVICE_URL=""
-if [ -n "$LBW_MODEL_DIVISION_S3_URI" ] && [ -n "$LBW_MODEL_STATE_S3_URI" ]; then
-  LBW_ENABLED=1
-  LBW_SERVICE_URL="http://$LBW_CONTAINER:8000"
-elif [ -n "$LBW_MODEL_DIVISION_S3_URI" ] || [ -n "$LBW_MODEL_STATE_S3_URI" ]; then
-  echo "LBW inference disabled: configure both model S3 URIs together." >&2
-fi
+LBW_ENABLED=1
+LBW_SERVICE_URL="http://$LBW_CONTAINER:8000"
 
 if [ -z "$CDSAPI_KEY" ]; then
   echo "ERA5 downloads disabled: CDSAPI_KEY is not configured."
@@ -482,13 +463,19 @@ if [ -n "$LBW_ENABLED" ]; then
 
   MODEL_METADATA="$(
     docker run --rm "$PYTHON_IMAGE" python -c \
-      'import json; p=json.load(open("/app/pipelines/models/lbw/model-release.example.json")); f={x["filename"]:x["sha256"] for x in p["model_files"]}; d=next(x for x in f if "_division_" in x); s=next(x for x in f if "_state_" in x); print("\t".join((p["id"],p["version"],f[d],f[s])))'
+      'import json; p=json.load(open("/app/pipelines/models/lbw/model-release.example.json")); f={x["filename"]:x["sha256"] for x in p["model_files"]}; d=next(x for x in f if "_division_" in x); s=next(x for x in f if "_state_" in x); print("\t".join((p["id"],p["version"],f[d],f[s],p["base_uri"],d,s)))'
   )"
   IFS=$'\t' read -r \
     LBW_MODEL_RELEASE_ID \
     LBW_MODEL_VERSION \
     LBW_MODEL_DIVISION_SHA256 \
-    LBW_MODEL_STATE_SHA256 <<<"$MODEL_METADATA"
+    LBW_MODEL_STATE_SHA256 \
+    LBW_MODEL_BASE_URI \
+    LBW_DIVISION_FILENAME \
+    LBW_STATE_FILENAME <<<"$MODEL_METADATA"
+  LBW_MODEL_BASE_URI="${LBW_MODEL_BASE_URI%/}"
+  LBW_MODEL_DIVISION_S3_URI="$LBW_MODEL_BASE_URI/$LBW_DIVISION_FILENAME"
+  LBW_MODEL_STATE_S3_URI="$LBW_MODEL_BASE_URI/$LBW_STATE_FILENAME"
 fi
 
 docker network create "$NETWORK" >/dev/null 2>&1 || true
@@ -729,8 +716,4 @@ echo "CHART API is running at $PUBLIC_ORIGIN/chart-api"
 echo "CHART planning API is also available at $PUBLIC_ORIGIN/climate"
 echo "Dagster UI is private at http://127.0.0.1:3000 (use an SSH tunnel)."
 echo "CHART sign-in is running at $PUBLIC_ORIGIN/identity"
-if [ -n "$LBW_ENABLED" ]; then
-  echo "LBW inference is private on the CHART container network."
-else
-  echo "LBW inference is disabled until both model S3 URIs are configured."
-fi
+echo "LBW inference is private on the CHART container network."

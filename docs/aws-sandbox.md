@@ -26,10 +26,12 @@ Prefer `AWS_APP_PUBLIC_ORIGIN`; it removes ambiguity by carrying the scheme,
 host, and optional port together. When it is set, the deploy derives the scheme
 and host from it rather than the fallback settings.
 
-Do not remove the existing `CDSAPI_*`, `LBW_MODEL_*`, `INFERENCE_LLM_*`, Google
+Do not remove the existing `CDSAPI_*`, `INFERENCE_LLM_*`, Google
 identity-provider, or bootstrap-token secrets while simplifying the public
-origin. They configure independent services. In particular, the LBW scorer
-starts only when both model S3 URIs are present.
+origin. They configure independent services. Model S3 URIs are not
+deployment secrets — each model's `model-release.json` manifest carries its
+own `base_uri` (currently `s3://chart-predictive-models` for LBW) and the
+deploy derives the concrete URIs from it.
 
 ## Files on the host
 
