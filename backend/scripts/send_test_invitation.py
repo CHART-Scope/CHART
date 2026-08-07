@@ -1,7 +1,7 @@
 """Send one rendered invitation email through the configured gateway.
 
 Useful for eyeballing the invitation template against Mailpit locally, or for
-verifying that a real SMTP provider (Gmail, SES, etc.) accepts the message.
+verifying that AWS SES accepts the message before wiring up the invite flow.
 The script does not touch the database and does not create a workspace member
 row — it exists purely to exercise the email pipeline.
 
@@ -15,14 +15,14 @@ Usage examples:
     EMAIL_SMTP_STARTTLS=false \\
       python backend/scripts/send_test_invitation.py --to you@example.com
 
-    # Against Gmail with an app-specific password
+    # Against AWS SES via SMTP (SES sandbox: recipient must also be verified)
     EMAIL_MODE=smtp \\
-    EMAIL_FROM_ADDRESS=you@gmail.com \\
-    EMAIL_SMTP_HOST=smtp.gmail.com \\
+    EMAIL_FROM_ADDRESS=no-reply@chartforclimateaction.org \\
+    EMAIL_SMTP_HOST=email-smtp.eu-north-1.amazonaws.com \\
     EMAIL_SMTP_PORT=587 \\
     EMAIL_SMTP_STARTTLS=true \\
-    EMAIL_SMTP_USERNAME=you@gmail.com \\
-    EMAIL_SMTP_PASSWORD='<gmail-app-password>' \\
+    EMAIL_SMTP_USERNAME='<SES SMTP username>' \\
+    EMAIL_SMTP_PASSWORD='<SES SMTP password>' \\
       python backend/scripts/send_test_invitation.py --to friend@example.com
 """
 
