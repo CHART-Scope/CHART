@@ -69,11 +69,20 @@ def register_model_release(
             existing.module != spec.module
             or existing.outcome != spec.outcome
             or existing.version != spec.version
-            or existing.model_files != payload["model_files"]
+            or _model_file_identities(existing.model_files)
+            != _model_file_identities(payload["model_files"])
             or existing.input_spec != payload["input_spec"]
             or not _area_mappings_match(existing, spec, admin_units)
         ):
             raise ModelRegistryError("MODEL_RELEASE_IMMUTABLE", spec.id)
+        # The URI is where the file lives, not what the file is. Update it in
+        # place when the manifest's base_uri moves (e.g. bucket rename) so
+        # the DB reflects the current source without needing a new version.
+        if existing.model_files != payload["model_files"]:
+            existing.model_files = payload["model_files"]
+            existing.release_file_uri = (
+                f"{spec.base_uri.rstrip('/')}/model-release.json"
+            )
         # Taxonomy fields are late additions: backfill on re-register so
         # older rows pick up hazard/domain from the manifest without
         # forcing a new release version.
@@ -389,6 +398,13 @@ def _area_mappings_match(
         for area in spec.areas
     }
     return current == expected
+
+
+def _model_file_identities(model_files: list[dict]) -> list[tuple[str, str]]:
+    """Content-identifying tuple per file. The URI is deliberately excluded
+    so a bucket-only move never trips the immutability check."""
+
+    return sorted((entry["filename"], entry["sha256"]) for entry in model_files)
 
 
 def _release_payload(spec: ModelReleaseSpec) -> dict:
