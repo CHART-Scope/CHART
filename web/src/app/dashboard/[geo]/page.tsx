@@ -159,12 +159,14 @@ function AuthorizedDashboard({
               geographyId={geographyId}
               accessToken={session.accessToken}
             />
+            {/* Predictions card temporarily hidden while the pipeline stabilises.
             <PredictionsPanel
               geographyId={geographyId}
               adminUnit={adminUnit}
               accessToken={session.accessToken}
               supportsPrediction={currentGeography?.supportsPrediction ?? undefined}
             />
+            */}
           </div>
 
           <RunsStrip
