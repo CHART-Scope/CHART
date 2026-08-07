@@ -92,9 +92,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Email delivery failed: {error.code}", file=sys.stderr)
         return 1
 
-    print(
-        f"Sent via {service.gateway_name} to {args.to} — status={result.status}"
-    )
+    print(f"Sent via {service.gateway_name} to {args.to} — status={result.status}")
     return 0
 
 
