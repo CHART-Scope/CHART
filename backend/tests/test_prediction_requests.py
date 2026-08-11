@@ -416,12 +416,14 @@ def test_saved_climate_window_is_the_only_input_sent_to_model(session_factory) -
         )
 
     score.assert_called_once_with(
+        model_release_id="lbw-demo-v1",
+        model_file="state.rds",
+        model_version="1.0.0",
+        model_sha256="a" * 64,
         model_area="Madhya Pradesh",
         pregnancy_window=1,
         temperatures_c=(29.1, 30.4, 31.2),
         service_url=None,
-        expected_model_version="1.0.0",
-        expected_model_sha256="a" * 64,
     )
     assert result.request_status == "completed"
     assert result.availability.input_window_id == window_id

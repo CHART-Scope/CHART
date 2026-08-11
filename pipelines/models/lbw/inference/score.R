@@ -1,6 +1,20 @@
 #!/usr/bin/env Rscript
 # Shared scoring helpers for division- and state-level LBW temperature models.
 
+score_source_path <- tryCatch(sys.frame(1)$ofile, error = function(...) NULL)
+score_script_arg <- commandArgs(trailingOnly = FALSE)
+score_script_path <- sub("^--file=", "", score_script_arg[grep("^--file=", score_script_arg)])
+score_script_dir <- if (length(score_source_path) == 1 && nzchar(score_source_path)) {
+  dirname(normalizePath(score_source_path, mustWork = TRUE))
+} else if (length(score_script_path) == 1) {
+  dirname(normalizePath(score_script_path, mustWork = TRUE))
+} else {
+  normalizePath(".", mustWork = TRUE)
+}
+if (!exists("score_dlnm_parameters")) {
+  source(file.path(score_script_dir, "score_core.R"))
+}
+
 score_temperature_profile <- function(cb, mod, analysis_data, tmax_lag, ref = NULL, ref_default = NULL) {
   tmax_lag <- as.numeric(tmax_lag)
   if (length(tmax_lag) != 3 || any(!is.finite(tmax_lag))) {
@@ -22,43 +36,18 @@ score_temperature_profile <- function(cb, mod, analysis_data, tmax_lag, ref = NU
     as.numeric(ref)
   }
 
-  support <- as.numeric(attr(cb, "argvar")$Boundary.knots)
-  on_support <- all(tmax_lag >= support[1] & tmax_lag <= support[2]) &&
-    ref_temp >= support[1] && ref_temp <= support[2]
-
-  cb_new <- suppressWarnings(crossbasis(
-    matrix(tmax_lag, 1),
-    lag = attr(cb, "lag"),
-    argvar = attr(cb, "argvar"),
-    arglag = attr(cb, "arglag")
-  ))
-  cb_ref <- crossbasis(
-    matrix(rep(ref_temp, 3), 1),
-    lag = attr(cb, "lag"),
-    argvar = attr(cb, "argvar"),
-    arglag = attr(cb, "arglag")
-  )
-
   temperature_terms <- grep("^Temp_Basis", names(coef(mod)))
-  difference <- cb_new - cb_ref
-  log_or <- as.numeric(difference %*% coef(mod)[temperature_terms])
-  se_log_or <- sqrt(as.numeric(
-    difference %*% vcov(mod)[temperature_terms, temperature_terms] %*% t(difference)
-  ))
-
-  list(
-    ref_temp = round(ref_temp, 2),
-    tmax_lag = unname(tmax_lag),
-    metric = "odds_ratio",
-    odds_ratio = round(exp(log_or), 4),
-    ci95_low = round(exp(log_or - 1.96 * se_log_or), 4),
-    ci95_high = round(exp(log_or + 1.96 * se_log_or), 4),
-    modelled_temperature_range_c = unname(round(support, 2)),
-    on_training_support = on_support,
-    warning = if (on_support) "" else paste0(
-      "At least one input or the reference temperature is outside this model block's ",
-      sprintf("training range (%.2f to %.2f C). This is an extrapolated association.", support[1], support[2])
+  score_dlnm_parameters(
+    basis = list(
+      lag = attr(cb, "lag"),
+      argvar = attr(cb, "argvar"),
+      arglag = attr(cb, "arglag")
     ),
+    coefficients = coef(mod)[temperature_terms],
+    covariance = vcov(mod)[temperature_terms, temperature_terms],
+    tmax_lag = tmax_lag,
+    ref_temp = ref_temp,
+    support = attr(cb, "argvar")$Boundary.knots,
     n_training = nrow(analysis_data)
   )
 }

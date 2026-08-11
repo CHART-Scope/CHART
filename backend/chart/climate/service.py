@@ -260,12 +260,14 @@ def score_prepared_prediction(
 
     try:
         score = score_lbw(
+            model_release_id=model.release_id,
+            model_file=model_file,
+            model_version=model_version,
+            model_sha256=model_sha256,
             model_area=model_area_name,
             pregnancy_window=pregnancy_window,
             temperatures_c=temperatures,
             service_url=lbw_service_url,
-            expected_model_version=model_version,
-            expected_model_sha256=model_sha256,
         )
     except InferenceError as error:
         unavailable_errors = {

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import os
 import math
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal, cast
 
 from .providers.lbw_r import LbwProviderError, call_lbw_r
@@ -38,12 +39,14 @@ class LbwScore:
 
 def score_lbw(
     *,
+    model_release_id: str,
+    model_file: str,
+    model_version: str,
+    model_sha256: str,
     model_area: str,
     pregnancy_window: PregnancyWindow,
     temperatures_c: tuple[float, float, float],
     service_url: str | None = None,
-    expected_model_version: str | None = None,
-    expected_model_sha256: str | None = None,
 ) -> LbwScore:
     """Run the deterministic LBW scorer; explanations are a separate concern."""
 
@@ -60,6 +63,10 @@ def score_lbw(
     try:
         payload = call_lbw_r(
             url,
+            model_release_id=model_release_id,
+            model_file=model_file,
+            model_version=model_version,
+            model_sha256=model_sha256,
             model_area=model_area,
             pregnancy_window=pregnancy_window,
             temperatures_c=temperatures_c,
@@ -76,11 +83,11 @@ def score_lbw(
         odds_ratio = float(payload["odds_ratio"])
         ci95_low = float(payload["ci95_low"])
         ci95_high = float(payload["ci95_high"])
-        model_file = str(payload["model_file"])
-        model_version = (
+        response_model_file = str(payload["model_file"])
+        response_model_version = (
             str(payload["model_version"]) if payload.get("model_version") else None
         )
-        model_sha256 = str(payload["model_sha256"])
+        response_model_sha256 = str(payload["model_sha256"])
     except (KeyError, TypeError, ValueError) as error:
         raise InferenceError("LBW_RESPONSE_INVALID", str(error)) from error
 
@@ -119,7 +126,7 @@ def score_lbw(
         raise InferenceError(
             "LBW_RESPONSE_INVALID", "confidence interval does not contain estimate"
         )
-    if not response_area or not geography_level or not model_file:
+    if not response_area or not geography_level or not response_model_file:
         raise InferenceError(
             "LBW_RESPONSE_INVALID", "identity fields must be non-empty"
         )
@@ -127,17 +134,20 @@ def score_lbw(
         raise InferenceError(
             "LBW_RESPONSE_INVALID", "on_training_support must be boolean"
         )
-    if len(model_sha256) != 64 or any(
-        character not in "0123456789abcdef" for character in model_sha256.lower()
+    if len(response_model_sha256) != 64 or any(
+        character not in "0123456789abcdef"
+        for character in response_model_sha256.lower()
     ):
         raise InferenceError("LBW_RESPONSE_INVALID", "model_sha256 is invalid")
-    if expected_model_version is not None and model_version != expected_model_version:
+    if response_model_version != model_version:
         raise InferenceError("LBW_MODEL_VERSION_MISMATCH")
-    if (
-        expected_model_sha256 is not None
-        and model_sha256.lower() != expected_model_sha256.lower()
-    ):
+    if response_model_sha256.lower() != model_sha256.lower():
         raise InferenceError("LBW_MODEL_CHECKSUM_MISMATCH")
+    if Path(response_model_file).name != Path(model_file).name:
+        raise InferenceError("LBW_MODEL_FILE_MISMATCH")
+    response_release_id = payload.get("model_release_id")
+    if response_release_id is not None and str(response_release_id) != model_release_id:
+        raise InferenceError("LBW_MODEL_RELEASE_MISMATCH")
 
     n_training_raw = payload.get("n_training")
     n_training = (
@@ -161,9 +171,9 @@ def score_lbw(
         ci95_low=ci95_low,
         ci95_high=ci95_high,
         on_training_support=payload["on_training_support"],
-        model_file=model_file,
-        model_version=model_version,
-        model_sha256=model_sha256.lower(),
+        model_file=response_model_file,
+        model_version=response_model_version,
+        model_sha256=response_model_sha256.lower(),
         warning=str(payload["warning"]) if payload.get("warning") else None,
         n_training=n_training,
         modelled_temperature_range_c=modelled_range,

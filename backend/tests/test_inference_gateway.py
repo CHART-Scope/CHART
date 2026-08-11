@@ -12,6 +12,12 @@ from chart.inference.providers.lbw_r import LbwProviderError, call_lbw_r
 from chart.inference.providers.openai_compatible import configured_explainer
 
 
+MODEL_RELEASE_ID = "lbw-test-1.0.0"
+MODEL_FILE = "state.rds"
+MODEL_VERSION = "1.0.0"
+MODEL_SHA256 = "a" * 64
+
+
 def _score() -> LbwScore:
     return LbwScore(
         area="Bhopal",
@@ -103,6 +109,10 @@ def test_lbw_provider_sends_the_r_api_temperature_field() -> None:
     ) as urlopen:
         result = call_lbw_r(
             "http://lbw.test",
+            model_release_id=MODEL_RELEASE_ID,
+            model_file=MODEL_FILE,
+            model_version=MODEL_VERSION,
+            model_sha256=MODEL_SHA256,
             model_area="Madhya Pradesh",
             pregnancy_window=1,
             temperatures_c=(31.0, 30.0, 29.0),
@@ -110,6 +120,10 @@ def test_lbw_provider_sends_the_r_api_temperature_field() -> None:
 
     sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
     assert sent["tmax_lag"] == [31.0, 30.0, 29.0]
+    assert sent["release_id"] == MODEL_RELEASE_ID
+    assert sent["model_file"] == MODEL_FILE
+    assert sent["model_version"] == MODEL_VERSION
+    assert sent["model_sha256"] == MODEL_SHA256
     assert "tmax" not in sent
     assert result["odds_ratio"] == 1.12
 
@@ -134,12 +148,14 @@ def test_score_rejects_a_response_for_different_inputs() -> None:
         pytest.raises(InferenceError) as caught,
     ):
         score_lbw(
+            model_release_id=MODEL_RELEASE_ID,
+            model_file=MODEL_FILE,
+            model_version=MODEL_VERSION,
+            model_sha256=MODEL_SHA256,
             model_area="Madhya Pradesh",
             pregnancy_window=1,
             temperatures_c=(31.0, 30.0, 29.0),
             service_url="http://lbw.test",
-            expected_model_version="1.0.0",
-            expected_model_sha256="a" * 64,
         )
 
     assert caught.value.code == "LBW_RESPONSE_INPUT_MISMATCH"
@@ -165,12 +181,14 @@ def test_score_rejects_an_invalid_response_pregnancy_window() -> None:
         pytest.raises(InferenceError) as caught,
     ):
         score_lbw(
+            model_release_id=MODEL_RELEASE_ID,
+            model_file=MODEL_FILE,
+            model_version=MODEL_VERSION,
+            model_sha256=MODEL_SHA256,
             model_area="Madhya Pradesh",
             pregnancy_window=1,
             temperatures_c=(31.0, 30.0, 29.0),
             service_url="http://lbw.test",
-            expected_model_version="1.0.0",
-            expected_model_sha256="a" * 64,
         )
 
     assert caught.value.code == "LBW_RESPONSE_INVALID"
@@ -187,6 +205,10 @@ def test_lbw_provider_reports_an_unavailable_service_clearly() -> None:
     ):
         call_lbw_r(
             "http://lbw.test",
+            model_release_id=MODEL_RELEASE_ID,
+            model_file=MODEL_FILE,
+            model_version=MODEL_VERSION,
+            model_sha256=MODEL_SHA256,
             model_area="Madhya Pradesh",
             pregnancy_window=1,
             temperatures_c=(31.0, 30.0, 29.0),

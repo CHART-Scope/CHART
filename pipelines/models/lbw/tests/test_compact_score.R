@@ -40,7 +40,8 @@ bundle <- list(
   areas = list(
     Test = list(`1` = block, `2` = block, `3` = block)
   ),
-  provenance = list(contains_respondent_rows = FALSE)
+  geography_levels = list(Test = "test_level"),
+  provenance = list(version = "test", contains_respondent_rows = FALSE)
 )
 
 validate_compact_bundle(bundle)
@@ -56,5 +57,19 @@ stopifnot(
   identical(outside_support$on_training_support, FALSE),
   nzchar(outside_support$warning)
 )
+store <- list(path = "test.rds", bundle = bundle)
+area_result <- score_compact_area(store, "test", 1, c(25, 25, 25))
+stopifnot(identical(area_result$geography_level, "test_level"))
+
+unsafe_bundle <- bundle
+unsafe_bundle$areas$Test$`1`$respondents <- data.frame(id = 1)
+unsafe_error <- tryCatch(
+  {
+    validate_compact_bundle(unsafe_bundle)
+    ""
+  },
+  error = conditionMessage
+)
+stopifnot(grepl("respondent table", unsafe_error, fixed = TRUE))
 
 message("Compact LBW scorer validates bundle, reference, and support behavior.")

@@ -1,6 +1,20 @@
 #!/usr/bin/env Rscript
 # Scoring contract for sanitized CHART LBW DLNM bundles.
 
+compact_source_path <- tryCatch(sys.frame(1)$ofile, error = function(...) NULL)
+compact_script_arg <- commandArgs(trailingOnly = FALSE)
+compact_script_path <- sub("^--file=", "", compact_script_arg[grep("^--file=", compact_script_arg)])
+compact_script_dir <- if (length(compact_source_path) == 1 && nzchar(compact_source_path)) {
+  dirname(normalizePath(compact_source_path, mustWork = TRUE))
+} else if (length(compact_script_path) == 1) {
+  dirname(normalizePath(compact_script_path, mustWork = TRUE))
+} else {
+  normalizePath(".", mustWork = TRUE)
+}
+if (!exists("score_dlnm_parameters")) {
+  source(file.path(compact_script_dir, "score_core.R"))
+}
+
 validate_compact_bundle <- function(bundle) {
   required <- c(
     "schema_version", "model_family", "country_code", "outcome",
@@ -16,8 +30,23 @@ validate_compact_bundle <- function(bundle) {
   if (!identical(bundle$model_family, "lbw_temperature_dlnm")) {
     stop("Unsupported compact model_family")
   }
+  if (is.null(bundle$provenance$version) || !nzchar(bundle$provenance$version)) {
+    stop("Compact model provenance.version is required")
+  }
+  if (!identical(bundle$provenance$contains_respondent_rows, FALSE)) {
+    stop("Compact model must declare contains_respondent_rows = FALSE")
+  }
+  if (contains_forbidden_runtime_object(bundle)) {
+    stop("Compact model contains a fitted model, crossbasis, or respondent table")
+  }
   if (!is.list(bundle$areas) || !length(bundle$areas) || is.null(names(bundle$areas))) {
     stop("Compact model bundle must contain named areas")
+  }
+  if (!is.null(bundle$geography_levels)) {
+    if (!identical(sort(names(bundle$geography_levels)), sort(names(bundle$areas))) ||
+        any(!nzchar(unlist(bundle$geography_levels)))) {
+      stop("Compact model geography_levels must name every area")
+    }
   }
 
   for (area in names(bundle$areas)) {
@@ -28,6 +57,12 @@ validate_compact_bundle <- function(bundle) {
     for (window in names(blocks)) validate_compact_block(blocks[[window]], area, window)
   }
   invisible(bundle)
+}
+
+contains_forbidden_runtime_object <- function(value) {
+  if (inherits(value, c("glm", "lm", "crossbasis", "data.frame"))) return(TRUE)
+  if (!is.list(value)) return(FALSE)
+  any(vapply(value, contains_forbidden_runtime_object, logical(1)))
 }
 
 validate_compact_block <- function(block, area = "", window = "") {
@@ -57,6 +92,17 @@ validate_compact_block <- function(block, area = "", window = "") {
   support <- as.numeric(block$modelled_temperature_range_c)
   if (length(support) != 2 || any(!is.finite(support)) || support[1] >= support[2]) {
     stop("Compact model block ", area, "/", window, " has invalid support")
+  }
+  reference <- as.numeric(block$reference_temperature_c)
+  n_training <- as.integer(block$n_training)
+  n_events <- as.integer(block$n_lbw_events)
+  if (length(reference) != 1 || !is.finite(reference)) {
+    stop("Compact model block ", area, "/", window, " has invalid reference")
+  }
+  if (length(n_training) != 1 || is.na(n_training) || n_training < 1 ||
+      length(n_events) != 1 || is.na(n_events) || n_events < 0 ||
+      n_events > n_training) {
+    stop("Compact model block ", area, "/", window, " has invalid counts")
   }
   invisible(block)
 }
@@ -101,53 +147,14 @@ score_compact_profile <- function(block, tmax_lag, ref = NULL) {
   } else {
     as.numeric(ref)
   }
-  support <- as.numeric(block$modelled_temperature_range_c)
-  on_support <- all(tmax_lag >= support[1] & tmax_lag <= support[2]) &&
-    ref_temp >= support[1] && ref_temp <= support[2]
-
-  cb_new <- suppressWarnings(dlnm::crossbasis(
-    matrix(tmax_lag, 1),
-    lag = block$basis$lag,
-    argvar = block$basis$argvar,
-    arglag = block$basis$arglag
-  ))
-  cb_ref <- dlnm::crossbasis(
-    matrix(rep(ref_temp, 3), 1),
-    lag = block$basis$lag,
-    argvar = block$basis$argvar,
-    arglag = block$basis$arglag
-  )
-  difference <- cb_new - cb_ref
-  coefficients <- as.numeric(block$coefficients)
-  covariance <- as.matrix(block$vcov)
-  if (ncol(difference) != length(coefficients)) {
-    stop("Compact model basis and coefficient dimensions do not match")
-  }
-
-  log_or <- as.numeric(difference %*% coefficients)
-  variance <- as.numeric(difference %*% covariance %*% t(difference))
-  if (!is.finite(variance) || variance < -1e-12) {
-    stop("Compact model produced invalid prediction variance")
-  }
-  se_log_or <- sqrt(max(variance, 0))
-
-  list(
-    ref_temp = round(ref_temp, 2),
-    tmax_lag = unname(tmax_lag),
-    metric = "odds_ratio",
-    odds_ratio = round(exp(log_or), 4),
-    ci95_low = round(exp(log_or - 1.96 * se_log_or), 4),
-    ci95_high = round(exp(log_or + 1.96 * se_log_or), 4),
-    modelled_temperature_range_c = unname(round(support, 2)),
-    on_training_support = on_support,
-    warning = if (on_support) "" else paste0(
-      "At least one input or the reference temperature is outside this model block's ",
-      sprintf(
-        "training range (%.2f to %.2f C). This is an extrapolated association.",
-        support[1], support[2]
-      )
-    ),
-    n_training = as.integer(block$n_training),
+  score_dlnm_parameters(
+    basis = block$basis,
+    coefficients = block$coefficients,
+    covariance = block$vcov,
+    tmax_lag = tmax_lag,
+    ref_temp = ref_temp,
+    support = block$modelled_temperature_range_c,
+    n_training = block$n_training,
     n_lbw_events = as.integer(block$n_lbw_events)
   )
 }
@@ -155,11 +162,16 @@ score_compact_profile <- function(block, tmax_lag, ref = NULL) {
 score_compact_area <- function(store, area, trimester, tmax_lag, ref = NULL) {
   selected <- compact_area_block(store, area, trimester)
   result <- score_compact_profile(selected$block, tmax_lag, ref)
+  geography_level <- if (is.null(store$bundle$geography_levels)) {
+    "climate_zone"
+  } else {
+    unname(store$bundle$geography_levels[[selected$area]])
+  }
   c(
     list(
       region = store$bundle$country_code,
       area = selected$area,
-      geography_level = "climate_zone",
+      geography_level = geography_level,
       trimester = as.integer(trimester),
       exposure_metric = store$bundle$exposure$description,
       exposure_unit = store$bundle$exposure$unit,

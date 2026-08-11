@@ -343,14 +343,20 @@ update whose schema, outcome contract, and geography mappings are unchanged.
 Code deployment remains necessary for a new bundle schema, new outcome contract,
 new geography-processing rule, or inference implementation.
 
-### Current legacy gap
+### Current implementation and remaining gap
 
-The existing Madhya Pradesh runtime is not yet manifest-driven end to end. Local
-startup, the R API, Make targets, container startup, EC2 deployment, and
-bootstrap assume two environment-selected files named state and division. The
-generic registry workflow must replace those assumptions before the UI can be
-the production update path. Until then, the Kenya review manifest is suitable
-for checksum/schema/parity testing only and must not be activated.
+`api_registry.R` now starts empty, loads multiple checksum-verified compact
+artifacts from a server-side cache, and pins release identity on predictions.
+The Python gateway passes and verifies release ID, filename, version, and hash.
+Kenya passed parity for 15 blocks. MP was repackaged into one respondent-free
+artifact and passed parity for 33 blocks, proving that both releases can share
+the runtime without duplicated scoring mathematics.
+
+Production is not manifest-driven end to end yet. The backend still needs the
+artifact download/prepare action and admin UI, while Make, container startup,
+EC2 deployment, and bootstrap still start the legacy two-file MP API. Until
+those seams are switched, both compact manifests are review-only and must not be
+activated.
 
 ## Planned tracked additions
 
@@ -363,7 +369,11 @@ pipelines/models/lbw/
   model-release.kenya.json
   inference/compact_score.R
   inference/package_kenya_model.R
+  inference/package_mp_model.R
   inference/validate_kenya_model.R
+  inference/validate_mp_model.R
+  inference/api_registry.R
+  inference/score_core.R
   tests/test_compact_score.R
 
 pipelines/boundaries/

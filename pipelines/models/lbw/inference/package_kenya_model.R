@@ -88,6 +88,7 @@ bundle <- list(
     `3` = "earliest/first pregnancy window (source Sem03)"
   ),
   areas = area_blocks,
+  geography_levels = setNames(as.list(rep("climate_zone", length(areas))), areas),
   provenance = list(
     version = version,
     source_filename = basename(source_path),

@@ -4,8 +4,111 @@
 
 - [Kenya LBW model integration record](KENYA_MODEL_INTEGRATION.md) documents the
   recovered modelling artifacts, proposed CHART contract and configuration,
-  known model gaps, and modeller approval checklist. Kenya inference is not yet
-  active.
+  known model gaps, and modeller approval checklist. The Kenya review artifact
+  is runnable but is not approved or active.
+
+## Release-aware compact runtime
+
+Kenya and Madhya Pradesh can now use the same compact runtime. It starts with no
+model selected, accepts verified artifacts through an internal load endpoint,
+and requires every prediction to name the exact release ID, filename, version,
+and SHA-256. Model identity is therefore registry data, not environment
+configuration.
+
+Tracked release records:
+
+| Manifest                               | Artifact produced locally                    | Coverage                                           | State                     |
+| -------------------------------------- | -------------------------------------------- | -------------------------------------------------- | ------------------------- |
+| `model-release.kenya.review.json`      | `KE_climate_zone_LBW_tmax_v0.1.0-review.rds` | 5 climate-zone models; Kajiado review mapping only | review, inactive          |
+| `model-release.mp.compact.review.json` | `IN_MP_LBW_tmax_v1.0.0-compact.rds`          | MP state + 10 divisions                            | parity review, inactive   |
+| `model-release.example.json`           | two legacy MP artifacts                      | MP state + 10 divisions                            | current legacy deployment |
+
+The compact artifacts are ignored by Git. They contain basis settings,
+temperature coefficients, covariance matrices, reference temperatures,
+training support, and aggregate counts only. They do not contain fitted GLMs,
+respondent rows, household IDs, coordinates, or model frames.
+
+### Verified results
+
+- Kenya: exact rounded parity for all 15 source blocks (5 zones × 3 windows).
+- MP: exact rounded parity for all 33 source blocks (state + 10 divisions,
+  each with 3 windows).
+- One runtime loaded both artifacts simultaneously and returned release-pinned
+  predictions through the Python inference gateway.
+- The generated MP compact artifact is deterministic and is about 20 KB rather
+  than the roughly 155 MB combined legacy files.
+
+The MP state release still validates only pregnancy window 1. Packaging all
+three source blocks proves technical parity; it does not grant scientific
+approval to windows 2 and 3.
+
+### Build and validate the compact artifacts
+
+Kenya requires the recovered source path described in
+`KENYA_MODEL_INTEGRATION.md`:
+
+```bash
+Rscript inference/package_kenya_model.R \
+  /path/to/Dlnm_Mod_obj_by_sem_and_Climate_Regions_KE_2026_07_31.rds \
+  model/KE_climate_zone_LBW_tmax_v0.1.0-review.rds \
+  a96e1ea8d1d2a8a6516ecdb74a79f4c747ef268e8a00d13f9df5f260459ba461 \
+  0.1.0-review
+
+Rscript inference/validate_kenya_model.R \
+  /path/to/Dlnm_Mod_obj_by_sem_and_Climate_Regions_KE_2026_07_31.rds \
+  model/KE_climate_zone_LBW_tmax_v0.1.0-review.rds \
+  /tmp/kenya-parity.json
+```
+
+MP uses the two existing local artifacts:
+
+```bash
+Rscript inference/package_mp_model.R \
+  model/MP_state_LBW_tmax_DHS2015-21_v1.0.0.rds \
+  eab9e2331a30a934f6a2b97a72fc7dd744ff6a395e3dab50e0f3f7a24df6ffec \
+  model/MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds \
+  928983cfa73f485c7017060b42beb60cbbe67d77655daceff3ddf0fb998a0dfb \
+  model/IN_MP_LBW_tmax_v1.0.0-compact.rds \
+  1.0.0
+
+Rscript inference/validate_mp_model.R \
+  model/MP_state_LBW_tmax_DHS2015-21_v1.0.0.rds \
+  model/MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds \
+  model/IN_MP_LBW_tmax_v1.0.0-compact.rds \
+  /tmp/mp-parity.json
+```
+
+Verify each artifact against its tracked release record:
+
+```bash
+python model_release.py \
+  --manifest model-release.kenya.review.json \
+  --model model/KE_climate_zone_LBW_tmax_v0.1.0-review.rds
+
+python model_release.py \
+  --manifest model-release.mp.compact.review.json \
+  --model model/IN_MP_LBW_tmax_v1.0.0-compact.rds
+```
+
+### Run the registry runtime locally
+
+Only generic operational settings are supplied at startup:
+
+```bash
+MODEL_CONTROL_TOKEN=local-only-secret PORT=8000 bash run_registry_api.sh
+```
+
+The backend artifact-preparation service will call `POST /models/load` after it
+downloads and verifies an artifact. `GET /models` lists warmed releases and
+`POST /predict` refuses an identity that has not been loaded. The load endpoint
+is internal and token protected; the browser must never call it or download an
+RDS file.
+
+The existing `api.R`, `start.sh`, `run_api.sh`, legacy CLI, Make defaults, and
+AWS deployment still select the two MP files at process startup. They remain in
+place to avoid breaking the current deployment. Remove them only after the
+backend preparation/activation flow and deployment manifests use
+`api_registry.R` in production.
 
 This is a small browser/API wrapper around already fitted R Distributed Lag
 Non-linear Models (DLNM). It estimates a **conditional odds ratio for low birth
@@ -49,8 +152,8 @@ client/query.py
     Small Python client using only the standard library
 ```
 
-Both inference bundles are required at runtime. They are ignored by Git and are
-downloaded from private S3 for EC2 deployment.
+Both legacy inference bundles are required by the current MP deployment. They
+are ignored by Git and downloaded from private S3.
 
 ## Model provenance chain
 

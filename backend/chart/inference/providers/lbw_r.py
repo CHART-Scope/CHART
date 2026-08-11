@@ -24,6 +24,10 @@ class LbwProviderError(RuntimeError):
 def call_lbw_r(
     base_url: str,
     *,
+    model_release_id: str,
+    model_file: str,
+    model_version: str,
+    model_sha256: str,
     model_area: str,
     pregnancy_window: int,
     temperatures_c: tuple[float, float, float],
@@ -32,6 +36,10 @@ def call_lbw_r(
 
     body = json.dumps(
         {
+            "release_id": model_release_id,
+            "model_file": model_file,
+            "model_version": model_version,
+            "model_sha256": model_sha256,
             "area": model_area,
             "trimester": pregnancy_window,
             "tmax_lag": list(temperatures_c),

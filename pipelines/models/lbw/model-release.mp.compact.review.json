@@ -1,0 +1,99 @@
+{
+  "id": "lbw-mp-1.0.0-compact-review",
+  "module": "prediction",
+  "outcome": "lbw",
+  "climate_hazard": "extreme_heat",
+  "health_domain": "maternal_newborn_child_health",
+  "version": "1.0.0",
+  "base_uri": "s3://chart-predictive-models/india/mp/lbw/1.0.0-compact-review",
+  "temperature_input": "Three monthly means of daily maximum 2m air temperature, newest first, Celsius",
+  "months_required": 3,
+  "release_notes": "Compact parity-review release. Same fitted MP parameters as 1.0.0, combined into one respondent-free runtime artifact. Not approved for activation.",
+  "source_git_ref": "modeller-review-required",
+  "model_files": [
+    {
+      "filename": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "sha256": "a45fe6ee815929bc1a2cbbc44a6e005060059a09c2296751435802e7977987bb"
+    }
+  ],
+  "areas": [
+    {
+      "place_code": "madhya-pradesh",
+      "country_code": "IN",
+      "level": "state",
+      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "model_area_name": "Madhya Pradesh",
+      "validated_pregnancy_windows": [1]
+    },
+    {
+      "place_code": "bhopal",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "model_area_name": "Bhopal"
+    },
+    {
+      "place_code": "chambal",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "model_area_name": "Chambal"
+    },
+    {
+      "place_code": "gwalior",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "model_area_name": "Gwalior"
+    },
+    {
+      "place_code": "indore",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "model_area_name": "Indore"
+    },
+    {
+      "place_code": "jabalpur",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "model_area_name": "Jabalpur"
+    },
+    {
+      "place_code": "narmadapuram",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "model_area_name": "Narmadapuram"
+    },
+    {
+      "place_code": "rewa",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "model_area_name": "Rewa"
+    },
+    {
+      "place_code": "sagar",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "model_area_name": "Sagar"
+    },
+    {
+      "place_code": "shahdol",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "model_area_name": "Shahdol"
+    },
+    {
+      "place_code": "ujjain",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "model_area_name": "Ujjain"
+    }
+  ]
+}

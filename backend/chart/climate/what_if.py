@@ -39,6 +39,8 @@ def score_what_if(
         if window not in place.model.validated_pregnancy_windows:
             raise ClimateServiceError("MODEL_PREGNANCY_WINDOW_NOT_VALIDATED", 409)
         model_area_name = place.model.model_area_name
+        model_release_id = place.model.release_id
+        model_file = place.model.model_file
         model_version = place.model.version
         model_sha256 = place.model.artifact_sha256
 
@@ -46,12 +48,14 @@ def score_what_if(
     temperatures = (temperature, temperature, temperature)
     try:
         score = score_lbw(
+            model_release_id=model_release_id,
+            model_file=model_file,
+            model_version=model_version,
+            model_sha256=model_sha256,
             model_area=model_area_name,
             pregnancy_window=window,
             temperatures_c=temperatures,
             service_url=lbw_service_url,
-            expected_model_version=model_version,
-            expected_model_sha256=model_sha256,
         )
     except InferenceError as error:
         unavailable = {
