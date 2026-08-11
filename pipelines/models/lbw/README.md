@@ -1,5 +1,12 @@
 # LBW × maximum-temperature association — direct inference demo
 
+## Model integration records
+
+- [Kenya LBW model integration record](KENYA_MODEL_INTEGRATION.md) documents the
+  recovered modelling artifacts, proposed CHART contract and configuration,
+  known model gaps, and modeller approval checklist. Kenya inference is not yet
+  active.
+
 This is a small browser/API wrapper around already fitted R Distributed Lag
 Non-linear Models (DLNM). It estimates a **conditional odds ratio for low birth
 weight (LBW)** for a three-month temperature profile relative to a reference
@@ -50,10 +57,10 @@ downloaded from private S3 for EC2 deployment.
 The demo serves two geography levels from the same original LBW modelling
 project:
 
-| Demo bundle | Geography | Original source | Fitting script / note |
-|---|---|---|---|
-| `MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds` | 10 MP divisions | `Dlnm_Mod_obj_by_sem_and_Division_MP_2026_07_05.rds` | `Create_LBW_Madhya_Pradesh_final_Analysis_by_Division_2026_07_05.R` |
-| `MP_state_LBW_tmax_DHS2015-21_v1.0.0.rds` | Whole Madhya Pradesh | `Dlnlm_Objs.rds` for Sem01; division bundle for Sem02/Sem03 packaging | Interactive whole-state analysis in the original project `.Rhistory` |
+| Demo bundle                                  | Geography            | Original source                                                       | Fitting script / note                                                |
+| -------------------------------------------- | -------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds` | 10 MP divisions      | `Dlnm_Mod_obj_by_sem_and_Division_MP_2026_07_05.rds`                  | `Create_LBW_Madhya_Pradesh_final_Analysis_by_Division_2026_07_05.R`  |
+| `MP_state_LBW_tmax_DHS2015-21_v1.0.0.rds`    | Whole Madhya Pradesh | `Dlnlm_Objs.rds` for Sem01; division bundle for Sem02/Sem03 packaging | Interactive whole-state analysis in the original project `.Rhistory` |
 
 ### Upstream data and methods
 
@@ -233,13 +240,13 @@ curl -s -X POST http://127.0.0.1:8000/predict \
 
 Important endpoints:
 
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/health` | readiness check and loaded model filenames |
-| `GET` | `/areas` | state area plus accepted division names |
-| `GET` | `/divisions` | backward-compatible division list |
-| `POST` | `/predict` | direct temperature-association estimate |
-| `GET` | `/ui/` | browser UI |
+| Method | Path         | Purpose                                    |
+| ------ | ------------ | ------------------------------------------ |
+| `GET`  | `/health`    | readiness check and loaded model filenames |
+| `GET`  | `/areas`     | state area plus accepted division names    |
+| `GET`  | `/divisions` | backward-compatible division list          |
+| `POST` | `/predict`   | direct temperature-association estimate    |
+| `GET`  | `/ui/`       | browser UI                                 |
 
 `POST /predict` accepts `area` (preferred) or legacy `division`.
 
@@ -292,17 +299,17 @@ configuration, push trigger, and verification steps—see [DEPLOY.md](DEPLOY.md)
 
 ## Environment variables
 
-| Variable | Where | Purpose |
-|---|---|---|
-| `LBW_MODEL_DIVISION` | local API / CLI | Path to division model `.rds` |
-| `LBW_MODEL_STATE` | local API / CLI | Path to state model `.rds` |
-| `LBW_MODEL_DIR` | Docker / EC2 | Directory where models are cached (default `/models`) |
-| `LBW_MODEL_DIVISION_S3_URI` | Docker / EC2 | Private `s3://` URI for the division bundle |
-| `LBW_MODEL_STATE_S3_URI` | Docker / EC2 | Private `s3://` URI for the state bundle |
-| `LBW_MODEL_S3_URI` | EC2 deploy only | Deprecated alias for `LBW_MODEL_DIVISION_S3_URI` |
-| `HOST` | API | Bind address (default `127.0.0.1`, Docker uses `0.0.0.0`) |
-| `PORT` | API | Listen port (default `8000`) |
-| `LBW_STATE_SOURCE` | packaging only | Path to `Dlnlm_Objs_source.rds` when running `package_state_model.R` |
+| Variable                    | Where           | Purpose                                                              |
+| --------------------------- | --------------- | -------------------------------------------------------------------- |
+| `LBW_MODEL_DIVISION`        | local API / CLI | Path to division model `.rds`                                        |
+| `LBW_MODEL_STATE`           | local API / CLI | Path to state model `.rds`                                           |
+| `LBW_MODEL_DIR`             | Docker / EC2    | Directory where models are cached (default `/models`)                |
+| `LBW_MODEL_DIVISION_S3_URI` | Docker / EC2    | Private `s3://` URI for the division bundle                          |
+| `LBW_MODEL_STATE_S3_URI`    | Docker / EC2    | Private `s3://` URI for the state bundle                             |
+| `LBW_MODEL_S3_URI`          | EC2 deploy only | Deprecated alias for `LBW_MODEL_DIVISION_S3_URI`                     |
+| `HOST`                      | API             | Bind address (default `127.0.0.1`, Docker uses `0.0.0.0`)            |
+| `PORT`                      | API             | Listen port (default `8000`)                                         |
+| `LBW_STATE_SOURCE`          | packaging only  | Path to `Dlnlm_Objs_source.rds` when running `package_state_model.R` |
 
 Local defaults are set by `run_api.sh` and `run_cli.sh`. Docker and EC2 download
 both S3 objects on startup, then export `LBW_MODEL_DIVISION` and

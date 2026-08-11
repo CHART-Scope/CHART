@@ -63,3 +63,6 @@ build-storybook.log
 .backlog
 new_design
 *.rds
+
+# locally recovered research archives and restricted DHS material
+/recovered/
