@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pathlib import Path
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 PregnancyWindow = Literal[1, 2, 3]
 
@@ -10,6 +12,13 @@ PregnancyWindow = Literal[1, 2, 3]
 class ModelFileSpec(BaseModel):
     filename: str = Field(min_length=1)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @field_validator("filename")
+    @classmethod
+    def validate_filename(cls, value: str) -> str:
+        if Path(value).name != value:
+            raise ValueError("MODEL_RELEASE_FILENAME_INVALID")
+        return value
 
 
 class ModelAreaSpec(BaseModel):

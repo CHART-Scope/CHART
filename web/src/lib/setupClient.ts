@@ -220,6 +220,8 @@ function setupErrorMessage(code?: string) {
     case "SETUP_IDENTITY_UNAVAILABLE":
     case "SETUP_IDENTITY_USER_CREATE_FAILED":
       return "CHART could not create the first administrator in Keycloak. Try again.";
+    case "SETUP_MODEL_PREPARATION_FAILED":
+      return "The selected geography model could not be verified and started. Check the model service and artifact, then retry setup.";
     case "SETUP_SERVICE_UNAVAILABLE":
       return "The CHART setup service is unavailable. Check that the application API is running.";
     default:

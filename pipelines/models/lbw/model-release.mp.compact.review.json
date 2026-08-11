@@ -4,7 +4,7 @@
   "outcome": "lbw",
   "climate_hazard": "extreme_heat",
   "health_domain": "maternal_newborn_child_health",
-  "version": "1.0.0",
+  "version": "1.0.0-compact-review",
   "base_uri": "s3://chart-predictive-models/india/mp/lbw/1.0.0-compact-review",
   "temperature_input": "Three monthly means of daily maximum 2m air temperature, newest first, Celsius",
   "months_required": 3,
@@ -13,7 +13,7 @@
   "model_files": [
     {
       "filename": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
-      "sha256": "a45fe6ee815929bc1a2cbbc44a6e005060059a09c2296751435802e7977987bb"
+      "sha256": "187783d7d784792418129bd8cb7ccc964887e453318c2c2ff32a18ddb8d6c665"
     }
   ],
   "areas": [

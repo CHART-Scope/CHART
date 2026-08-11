@@ -34,9 +34,11 @@ from sqlalchemy.orm import Session
 from chart.geographies.load import _ensure_mp_app_places, load_mp_model_area_geojson
 from chart.model_registry.schemas import ModelReleaseSpec
 from chart.model_registry.service import _activate_release, register_model_release
-from chart.shared.db.models import AdminUnit, Geography
+from chart.shared.db.models import AdminUnit, AppGeography, Geography
 
 logger = logging.getLogger(__name__)
+
+_COUNTRY_NAMES = {"IN": "India", "KE": "Kenya"}
 
 
 @dataclass(frozen=True)
@@ -77,18 +79,31 @@ def bootstrap_place_from_release(
         len(spec.areas),
     )
 
+    country_code = next(
+        (area.country_code for area in spec.areas if area.country_code), None
+    )
+    if not country_code:
+        raise PlaceBootstrapError("model_release_country_required")
+    country_code = country_code.upper()
+    country_name = _COUNTRY_NAMES.get(country_code, country_code)
+    geography_slug = "madhya-pradesh" if country_code == "IN" else country_name.lower()
     geography = session.scalar(
-        select(Geography).where(Geography.slug == "madhya-pradesh")
+        select(Geography).where(Geography.slug == geography_slug)
     )
     if geography is None:
         geography = Geography(
-            slug="madhya-pradesh", country="India", name="Madhya Pradesh"
+            slug=geography_slug,
+            country=country_name,
+            name="Madhya Pradesh" if country_code == "IN" else country_name,
         )
         session.add(geography)
         session.flush()
-        logger.warning("bootstrap_from_release: created chart_geographies row for MP")
+        logger.warning(
+            "bootstrap_from_release: created chart_geographies row for %s",
+            country_code,
+        )
 
-    app_places = _ensure_mp_app_places(session)
+    app_places = _release_app_places(session, spec, country_code, country_name)
     logger.info(
         "bootstrap_from_release: %d AppGeography rows present",
         len(app_places),
@@ -113,9 +128,10 @@ def bootstrap_place_from_release(
         admin_unit.name = area.model_area_name
         if area.level:
             admin_unit.level = area.level
-        linked = app_places.get(area.model_area_name)
+        linked = app_places.get(area.place_code)
         if linked is not None:
             admin_unit.app_geography_id = linked.id
+            admin_unit.name = linked.name
         upserted += 1
     session.flush()
     logger.warning("bootstrap_from_release: upserted %d admin_units", upserted)
@@ -140,6 +156,31 @@ def bootstrap_place_from_release(
         model_release_id=release.id,
         model_status=release.status,
     )
+
+
+def _release_app_places(
+    session: Session,
+    spec: ModelReleaseSpec,
+    country_code: str,
+    country_name: str,
+) -> dict[str, AppGeography]:
+    if country_code == "IN":
+        mp_places = _ensure_mp_app_places(session)
+        return {
+            area.place_code: mp_places[area.model_area_name]
+            for area in spec.areas
+            if area.model_area_name in mp_places
+        }
+
+    country_slug = country_name.lower().replace(" ", "-")
+    places: dict[str, AppGeography] = {}
+    for area in spec.areas:
+        path = f"/{country_slug}/{area.place_code}"
+        place = session.scalar(select(AppGeography).where(AppGeography.path == path))
+        if place is None:
+            raise PlaceBootstrapError(f"model_release_place_missing: {path}")
+        places[area.place_code] = place
+    return places
 
 
 def bootstrap_place_from_manifest(

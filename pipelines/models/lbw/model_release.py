@@ -329,6 +329,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    release: VerifiedModelRelease | ModelRelease
     try:
         if args.model:
             if args.division is not None or args.state is not None:

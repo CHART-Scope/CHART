@@ -14,11 +14,15 @@ from sqlalchemy.exc import IntegrityError
 
 from chart.auth.schemas import CurrentUserContext
 from chart.identity import IdentityError, delete_user, upsert_user
+from chart.model_registry.runtime import warm_model_release
+from chart.model_registry.schemas import ModelReleaseSpec
+from chart.model_registry.service import ModelRegistryError, _activate_release
 from chart.shared.db.models import (
     AppGeography,
     AppUser,
     CountryGeoConfig,
     RecommendedAction,
+    ModelRelease,
     SetupStateRecord,
     UserGeographyScopeRecord,
     UserRoleRecord,
@@ -228,10 +232,9 @@ def _auto_seed_recommended_actions(session) -> None:
 def _auto_seed_deployed_models(session, country_code: str) -> None:
     """Seed admin_units + model release for the country that just onboarded.
 
-    Runs inside the setup-complete transaction, best-effort: a network
-    hiccup or a missing manifest logs a warning but does not fail the
-    setup itself. On success the dashboard for that place reports
-    supportsPrediction=true without any manual CLI step.
+    Runs inside the setup-complete transaction. Once a model is configured for
+    this environment, preparation is mandatory: setup rolls back on a missing,
+    invalid, or unwarmable artifact rather than completing without prediction.
     """
 
     logger.warning("auto_seed: start country=%s", country_code)
@@ -251,26 +254,36 @@ def _auto_seed_deployed_models(session, country_code: str) -> None:
             result = bootstrap_place_from_release(
                 session,
                 model_release_path=config.model_release,
-                activate=True,
+                activate=False,
             )
+            spec = ModelReleaseSpec.model_validate(
+                json.loads(config.model_release.read_text(encoding="utf-8"))
+            )
+            warm_model_release(spec)
+            release = session.get(ModelRelease, result.model_release_id)
+            if release is None:
+                raise RuntimeError("registered model release disappeared")
+            release.status = "validated"
+            _activate_release(session, release)
+            session.flush()
             logger.warning(
                 "auto_seed: success — areas=%d release=%s status=%s",
                 result.areas_seeded,
                 result.model_release_id,
-                result.model_status,
+                release.status,
             )
-        except PlaceBootstrapError:
+        except (PlaceBootstrapError, ModelRegistryError) as error:
             logger.exception(
-                "auto_seed: PlaceBootstrapError for %s; setup will complete "
-                "but the deployed model is not registered.",
+                "auto_seed: model preparation failed for %s",
                 country_code,
             )
-        except Exception:  # noqa: BLE001 - best-effort, must not fail setup
+            raise SetupError("SETUP_MODEL_PREPARATION_FAILED", 503) from error
+        except Exception as error:  # noqa: BLE001 - map to stable setup error
             logger.exception(
-                "auto_seed: unexpected failure for %s; setup will complete "
-                "but the deployed model is not registered.",
+                "auto_seed: unexpected model preparation failure for %s",
                 country_code,
             )
+            raise SetupError("SETUP_MODEL_PREPARATION_FAILED", 503) from error
 
 
 def complete(

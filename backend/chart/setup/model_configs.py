@@ -24,13 +24,19 @@ REPO_ROOT = Path(os.environ.get("CHART_REPO_ROOT", _DEFAULT_REPO_ROOT))
 @dataclass(frozen=True)
 class DeployedModelConfig:
     country_code: str
-    source_manifest: Path
-    crosswalk: Path
     model_release: Path
+    source_manifest: Path | None = None
+    crosswalk: Path | None = None
+    review_only: bool = False
 
 
 _MP_LBW = DeployedModelConfig(
     country_code="IN",
+    model_release=REPO_ROOT
+    / "pipelines"
+    / "models"
+    / "lbw"
+    / "model-release.mp.compact.review.json",
     source_manifest=REPO_ROOT
     / "pipelines"
     / "boundaries"
@@ -41,16 +47,23 @@ _MP_LBW = DeployedModelConfig(
     / "boundaries"
     / "data"
     / "mp_district_division_crosswalk.csv",
+    review_only=True,
+)
+
+_KENYA_LBW = DeployedModelConfig(
+    country_code="KE",
     model_release=REPO_ROOT
     / "pipelines"
     / "models"
     / "lbw"
-    / "model-release.example.json",
+    / "model-release.kenya.review.json",
+    review_only=True,
 )
 
 
 DEPLOYED_MODEL_CONFIGS: dict[str, tuple[DeployedModelConfig, ...]] = {
     "IN": (_MP_LBW,),
+    "KE": (_KENYA_LBW,),
 }
 
 
@@ -63,10 +76,16 @@ def configs_for_country(country_code: str) -> tuple[DeployedModelConfig, ...]:
     """
 
     configs = DEPLOYED_MODEL_CONFIGS.get(country_code.upper(), ())
+    allow_review = os.getenv("CHART_ENABLE_REVIEW_MODELS", "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
     return tuple(
         config
         for config in configs
-        if config.source_manifest.exists()
-        and config.crosswalk.exists()
-        and config.model_release.exists()
+        if config.model_release.exists()
+        and (config.source_manifest is None or config.source_manifest.exists())
+        and (config.crosswalk is None or config.crosswalk.exists())
+        and (not config.review_only or allow_review)
     )

@@ -352,11 +352,17 @@ Kenya passed parity for 15 blocks. MP was repackaged into one respondent-free
 artifact and passed parity for 33 blocks, proving that both releases can share
 the runtime without duplicated scoring mathematics.
 
-Production is not manifest-driven end to end yet. The backend still needs the
-artifact download/prepare action and admin UI, while Make, container startup,
-EC2 deployment, and bootstrap still start the legacy two-file MP API. Until
-those seams are switched, both compact manifests are review-only and must not be
-activated.
+Local CHART is now manifest-driven end to end for product testing. `make run`
+starts the registry runtime; Kenya onboarding creates Kajiado, verifies and
+warms the cached compact artifact, activates the Kajiado → South-eastern
+mapping, and exposes Kajiado through the backend location API used by the web.
+Review releases are gated by `CHART_ENABLE_REVIEW_MODELS` so they cannot be
+activated accidentally by a production onboarding.
+
+Production still needs the private-S3 download/prepare action, admin model UI,
+shared cache volume, and deployment migration away from the legacy two-file MP
+entrypoint. The Kenya release therefore remains a local product-test release,
+not a modeller-approved production release.
 
 ## Planned tracked additions
 

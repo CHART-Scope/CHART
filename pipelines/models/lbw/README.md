@@ -69,7 +69,7 @@ Rscript inference/package_mp_model.R \
   model/MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds \
   928983cfa73f485c7017060b42beb60cbbe67d77655daceff3ddf0fb998a0dfb \
   model/IN_MP_LBW_tmax_v1.0.0-compact.rds \
-  1.0.0
+  1.0.0-compact-review
 
 Rscript inference/validate_mp_model.R \
   model/MP_state_LBW_tmax_DHS2015-21_v1.0.0.rds \
@@ -98,17 +98,24 @@ Only generic operational settings are supplied at startup:
 MODEL_CONTROL_TOKEN=local-only-secret PORT=8000 bash run_registry_api.sh
 ```
 
-The backend artifact-preparation service will call `POST /models/load` after it
-downloads and verifies an artifact. `GET /models` lists warmed releases and
+During local onboarding, the backend verifies the selected manifest artifact in
+`MODEL_CACHE_DIR` and calls `POST /models/load` before activating the release.
+`GET /models` lists warmed releases and
 `POST /predict` refuses an identity that has not been loaded. The load endpoint
 is internal and token protected; the browser must never call it or download an
 RDS file.
 
-The existing `api.R`, `start.sh`, `run_api.sh`, legacy CLI, Make defaults, and
-AWS deployment still select the two MP files at process startup. They remain in
-place to avoid breaking the current deployment. Remove them only after the
-backend preparation/activation flow and deployment manifests use
-`api_registry.R` in production.
+`make run` now starts `api_registry.R` and passes the same generic cache and
+control settings to the Python backend. Onboarding Kenya → County → Kajiado
+registers, warms, and activates the review release when
+`CHART_ENABLE_REVIEW_MODELS=true`; the normal local Make target sets this flag.
+The web then obtains Kajiado from the backend `/climate/locations` response.
+
+The existing `api.R`, `start.sh`, `run_api.sh`, legacy CLI, container entrypoint,
+and AWS deployment still select the two MP files at process startup. They remain
+in place to avoid breaking production. Remove them only after the production
+artifact downloader, shared cache volume, and deployment manifests use
+`api_registry.R`.
 
 This is a small browser/API wrapper around already fitted R Distributed Lag
 Non-linear Models (DLNM). It estimates a **conditional odds ratio for low birth

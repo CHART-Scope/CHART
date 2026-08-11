@@ -48,6 +48,25 @@ Follow [Add a geography and model](../docs/add-geography-and-model.md). The
 model handoff file is
 [`pipelines/models/lbw/model-release.example.json`](../pipelines/models/lbw/model-release.example.json).
 
+### Test the Kenya onboarding path locally
+
+Build the ignored Kenya compact artifact as documented in
+[`KENYA_MODEL_INTEGRATION.md`](../pipelines/models/lbw/KENYA_MODEL_INTEGRATION.md),
+then run the normal stack:
+
+```bash
+make run
+```
+
+After an installation reset, choose **Kenya → County → Kajiado**. Local setup
+registers the review manifest, verifies the cached artifact, warms it in the
+internal Plumber registry runtime, and activates the Kajiado → South-eastern
+mapping. The planning web reads Kajiado from the Python backend; it does not
+read the RDS or call the model-control endpoint directly.
+
+This path is enabled locally with `CHART_ENABLE_REVIEW_MODELS=true`. Do not set
+that flag in production; the Kenya release still requires modeller approval.
+
 ## Invitation emails
 
 Use the reusable invitation template when inviting a planner:

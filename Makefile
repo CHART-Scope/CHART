@@ -264,9 +264,8 @@ VENV_DIR ?= .venv
 VENV_PYTHON := $(abspath $(VENV_DIR))/bin/python
 DOCS_PORT ?= 8001
 LBW_PORT ?= 8000
-LBW_MODEL_RELEASE_MANIFEST ?= $(abspath $(LBW_DIR)/model-release.example.json)
-LBW_MODEL_DIVISION ?= $(abspath $(LBW_DIR)/model/MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds)
-LBW_MODEL_STATE ?= $(abspath $(LBW_DIR)/model/MP_state_LBW_tmax_DHS2015-21_v1.0.0.rds)
+LBW_MODEL_CACHE_DIR ?= $(abspath $(LBW_DIR)/model)
+LBW_MODEL_CONTROL_TOKEN ?= chart-local-model-control
 DAGSTER_PORT ?= 3002
 CHART_DATABASE_URL ?= postgresql+psycopg://chart:chart@127.0.0.1:5434/chart
 migrate: climate-migrate
@@ -279,16 +278,12 @@ lbw-check:
 		printf "Rscript is required for the LBW prediction model.\n"; \
 		exit 1; \
 	fi
-	@$(PYTHON) $(LBW_DIR)/model_release.py \
-		--manifest "$(LBW_MODEL_RELEASE_MANIFEST)" \
-		--division "$(LBW_MODEL_DIVISION)" \
-		--state "$(LBW_MODEL_STATE)"
 	@Rscript $(LBW_DIR)/tests/test_serialization.R
 	@Rscript $(LBW_DIR)/tests/test_compact_score.R
 
 lbw-run: lbw-check
 	@health=$$(curl -fsS "http://127.0.0.1:$(LBW_PORT)/health" 2>/dev/null || true); \
-	if printf "%s" "$$health" | grep -q '"region"[[:space:]]*:[[:space:]]*"MP"'; then \
+	if printf "%s" "$$health" | grep -q '"runtime"[[:space:]]*:[[:space:]]*"registry"'; then \
 		printf "LBW prediction model is already ready on http://127.0.0.1:$(LBW_PORT)\n"; \
 		exit 0; \
 	fi; \
@@ -299,11 +294,9 @@ lbw-run: lbw-check
 	@printf "LBW prediction model: http://127.0.0.1:$(LBW_PORT)\n"
 	cd $(LBW_DIR) && \
 		PORT="$(LBW_PORT)" \
-		PYTHON="$(PYTHON)" \
-		LBW_MODEL_RELEASE_MANIFEST="$(LBW_MODEL_RELEASE_MANIFEST)" \
-		LBW_MODEL_DIVISION="$(LBW_MODEL_DIVISION)" \
-		LBW_MODEL_STATE="$(LBW_MODEL_STATE)" \
-		bash run_api.sh
+		MODEL_CACHE_DIR="$(LBW_MODEL_CACHE_DIR)" \
+		MODEL_CONTROL_TOKEN="$(LBW_MODEL_CONTROL_TOKEN)" \
+		bash run_registry_api.sh
 
 dagster-run:
 	@mkdir -p $(ORCH_DIR)/.dagster_home
@@ -357,6 +350,9 @@ climate-api-run: bootstrap-token
 	@token=$$(sed -n 's/^CHART_BOOTSTRAP_TOKEN=//p' "$(WEB_ENV_LOCAL)" | head -1); \
 	DATABASE_URL="$(CHART_DATABASE_URL)" \
 	  LBW_SERVICE_URL="$${LBW_SERVICE_URL:-http://127.0.0.1:8000}" \
+	  MODEL_CACHE_DIR="$(LBW_MODEL_CACHE_DIR)" \
+	  MODEL_CONTROL_TOKEN="$(LBW_MODEL_CONTROL_TOKEN)" \
+	  CHART_ENABLE_REVIEW_MODELS=true \
 	  CHART_BOOTSTRAP_TOKEN="$$token" \
 	  $(VENV_PYTHON) -m chart
 
