@@ -33,7 +33,9 @@ CMD ["./start.sh"]
 FROM runtime AS test
 
 COPY tests/test_serialization.R ./tests/test_serialization.R
+COPY tests/test_compact_score.R ./tests/test_compact_score.R
 
 RUN Rscript tests/test_serialization.R
+RUN Rscript tests/test_compact_score.R
 
 FROM runtime AS final

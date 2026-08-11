@@ -1,0 +1,29 @@
+{
+  "id": "lbw-ke-climate-zone-0.1.0-review",
+  "module": "prediction",
+  "outcome": "lbw",
+  "climate_hazard": "extreme_heat",
+  "health_domain": "maternal_newborn_child_health",
+  "version": "0.1.0-review",
+  "base_uri": "s3://chart-predictive-models/kenya/lbw/0.1.0-review",
+  "temperature_input": "Three monthly means of daily maximum 2m air temperature, newest first, Celsius",
+  "months_required": 3,
+  "release_notes": "Local review release only. Not approved for activation. Kajiado exercises the South-eastern climate-zone model.",
+  "source_git_ref": "modeller-review-required",
+  "model_files": [
+    {
+      "filename": "KE_climate_zone_LBW_tmax_v0.1.0-review.rds",
+      "sha256": "104cead97504d3c13eac242106d9099f55c063ee50522521073943a8496aa663"
+    }
+  ],
+  "areas": [
+    {
+      "place_code": "kajiado",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.1.0-review.rds",
+      "model_area_name": "South-eastern",
+      "validated_pregnancy_windows": [1, 2, 3]
+    }
+  ]
+}

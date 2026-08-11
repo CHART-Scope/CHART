@@ -51,6 +51,15 @@ class ModelRelease(NamedTuple):
         }
 
 
+class VerifiedModelRelease(NamedTuple):
+    """Manifest identity and verified local files for a generic model bundle."""
+
+    release_id: str
+    version: str
+    model_paths: dict[str, str]
+    model_hashes: dict[str, str]
+
+
 def _required_text(document: dict[str, Any], field: str) -> str:
     value = document.get(field)
     if not isinstance(value, str) or not value.strip():
@@ -103,6 +112,11 @@ def _validate_top_level(document: dict[str, Any]) -> None:
     _required_text(document, "module")
     _required_text(document, "outcome")
     _required_text(document, "climate_hazard")
+    _required_text(document, "temperature_input")
+    if document.get("months_required") != 3:
+        raise ReleaseValidationError(
+            "Model release months_required must equal the three-month LBW contract"
+        )
     base_uri = _required_text(document, "base_uri")
     if not S3_URI_PATTERN.match(base_uri):
         raise ReleaseValidationError(
@@ -233,13 +247,78 @@ def load_and_verify_release(
     )
 
 
+def load_and_verify_models(
+    manifest_path: Path, model_paths: Sequence[Path]
+) -> VerifiedModelRelease:
+    """Verify every manifest model file without assuming state/division roles."""
+
+    try:
+        document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise ReleaseValidationError(
+            f"Model release manifest does not exist: {manifest_path}"
+        ) from error
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ReleaseValidationError(
+            f"Cannot read model release manifest {manifest_path}: {error}"
+        ) from error
+    if not isinstance(document, dict):
+        raise ReleaseValidationError("Model release manifest must contain an object")
+
+    release_id = _required_text(document, "id")
+    version = _required_text(document, "version")
+    _validate_top_level(document)
+    manifest_hashes = _manifest_hashes(document)
+    _validate_areas(document, set(manifest_hashes))
+
+    paths_by_name: dict[str, Path] = {}
+    for path in model_paths:
+        resolved = path.resolve()
+        if resolved.name in paths_by_name:
+            raise ReleaseValidationError(
+                f"Duplicate local model filename {resolved.name!r}"
+            )
+        paths_by_name[resolved.name] = resolved
+    missing = sorted(set(manifest_hashes) - set(paths_by_name))
+    unexpected = sorted(set(paths_by_name) - set(manifest_hashes))
+    if missing or unexpected:
+        raise ReleaseValidationError(
+            f"Local model files do not match manifest: missing={missing}; "
+            f"unexpected={unexpected}"
+        )
+
+    verified = {
+        filename: _verify_model(
+            label="model",
+            model_path=paths_by_name[filename],
+            manifest_hashes=manifest_hashes,
+        )
+        for filename in sorted(paths_by_name)
+    }
+    return VerifiedModelRelease(
+        release_id=release_id,
+        version=version,
+        model_paths={
+            filename: str(paths_by_name[filename]) for filename in sorted(paths_by_name)
+        },
+        model_hashes=verified,
+    )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Validate local LBW models against a release manifest."
     )
     parser.add_argument("--manifest", required=True, type=Path)
-    parser.add_argument("--division", required=True, type=Path)
-    parser.add_argument("--state", required=True, type=Path)
+    parser.add_argument("--division", type=Path)
+    parser.add_argument("--state", type=Path)
+    parser.add_argument(
+        "--model",
+        action="append",
+        default=[],
+        type=Path,
+        help="Generic model file; repeat once for every model_files entry.",
+    )
     parser.add_argument(
         "command",
         nargs=argparse.REMAINDER,
@@ -251,11 +330,22 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        release = load_and_verify_release(
-            args.manifest.resolve(),
-            args.division.resolve(),
-            args.state.resolve(),
-        )
+        if args.model:
+            if args.division is not None or args.state is not None:
+                raise ReleaseValidationError(
+                    "Use either generic --model arguments or legacy --division/--state"
+                )
+            release = load_and_verify_models(args.manifest.resolve(), args.model)
+        else:
+            if args.division is None or args.state is None:
+                raise ReleaseValidationError(
+                    "Legacy releases require both --division and --state"
+                )
+            release = load_and_verify_release(
+                args.manifest.resolve(),
+                args.division.resolve(),
+                args.state.resolve(),
+            )
     except ReleaseValidationError as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
@@ -269,6 +359,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"(version {release.version})"
         )
         return 0
+
+    if isinstance(release, VerifiedModelRelease):
+        print(
+            "Error: generic model releases are prepared and activated through "
+            "the CHART model registry; command launch is supported only for the "
+            "legacy state/division runtime",
+            file=sys.stderr,
+        )
+        return 1
 
     environment = os.environ.copy()
     environment.update(release.environment())

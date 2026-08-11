@@ -8,6 +8,7 @@ import pytest
 
 from pipelines.models.lbw.model_release import (
     ReleaseValidationError,
+    load_and_verify_models,
     load_and_verify_release,
 )
 
@@ -34,6 +35,8 @@ def _write_release(tmp_path: Path) -> tuple[Path, Path, Path]:
                 "climate_hazard": "extreme_heat",
                 "version": "1.0.0",
                 "base_uri": "s3://chart-model-bucket/lbw/1.0.0",
+                "temperature_input": "Three monthly tmax values, newest first",
+                "months_required": 3,
                 "model_files": [
                     {
                         "filename": division_path.name,
@@ -163,4 +166,61 @@ def test_rejects_area_missing_model_file_reference(tmp_path: Path) -> None:
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(ReleaseValidationError, match="unknown model_file"):
+        load_and_verify_release(manifest_path, division_path, state_path)
+
+
+def test_verifies_a_generic_single_bundle_and_exports_identity(tmp_path: Path) -> None:
+    model_path = tmp_path / "kenya.rds"
+    content = b"sanitized kenya model"
+    model_path.write_bytes(content)
+    manifest_path = tmp_path / "model-release.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "id": "lbw-ke-review",
+                "module": "prediction",
+                "outcome": "lbw",
+                "climate_hazard": "extreme_heat",
+                "version": "0.1.0-review",
+                "base_uri": "s3://chart-model-bucket/kenya/review",
+                "temperature_input": "Three monthly tmax values, newest first",
+                "months_required": 3,
+                "model_files": [
+                    {"filename": model_path.name, "sha256": _sha256(content)}
+                ],
+                "areas": [
+                    {
+                        "place_code": "kajiado",
+                        "country_code": "KE",
+                        "level": "county",
+                        "model_file": model_path.name,
+                        "model_area_name": "South-eastern",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    release = load_and_verify_models(manifest_path, [model_path])
+
+    assert release.release_id == "lbw-ke-review"
+    assert release.model_hashes == {model_path.name: _sha256(content)}
+    assert release.model_paths == {model_path.name: str(model_path.resolve())}
+
+
+def test_generic_release_requires_exact_manifest_file_set(tmp_path: Path) -> None:
+    manifest_path, division_path, state_path = _write_release(tmp_path)
+
+    with pytest.raises(ReleaseValidationError, match="missing=.*state[.]rds"):
+        load_and_verify_models(manifest_path, [division_path])
+
+
+def test_rejects_non_three_month_model_contract(tmp_path: Path) -> None:
+    manifest_path, division_path, state_path = _write_release(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["months_required"] = 9
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ReleaseValidationError, match="three-month"):
         load_and_verify_release(manifest_path, division_path, state_path)

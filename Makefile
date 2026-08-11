@@ -284,6 +284,7 @@ lbw-check:
 		--division "$(LBW_MODEL_DIVISION)" \
 		--state "$(LBW_MODEL_STATE)"
 	@Rscript $(LBW_DIR)/tests/test_serialization.R
+	@Rscript $(LBW_DIR)/tests/test_compact_score.R
 
 lbw-run: lbw-check
 	@health=$$(curl -fsS "http://127.0.0.1:$(LBW_PORT)/health" 2>/dev/null || true); \

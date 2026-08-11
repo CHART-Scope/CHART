@@ -227,6 +227,10 @@ Proposed manifest path:
 
 `pipelines/models/lbw/model-release.kenya.json`
 
+The currently tracked `model-release.kenya.review.json` is deliberately limited
+to Kajiado. It exists only to exercise generic manifest and artifact validation;
+it is not a complete Kenya release and cannot be activated.
+
 Proposed shape:
 
 ```json
@@ -263,6 +267,91 @@ The final manifest will contain one entry for every supported county. Multiple
 counties may map to the same climate-zone model key. Turkana will be omitted
 until a North-western model is approved.
 
+## Target model control plane
+
+The release manifest and model registry database are the source of truth. Model
+identity, version, artifact URI, checksum, active assignment, and preparation
+status must not be selected through model-specific environment variables.
+
+Infrastructure configuration may still supply generic operational settings such
+as the artifact-cache directory, internal inference-service URL, AWS region, and
+instance-role credentials. It must not supply variables such as
+`LBW_MODEL_DIVISION`, `LBW_MODEL_STATE`, or a release-specific S3 object URI.
+
+### Admin UI
+
+An authenticated CHART administrator should have a **Models** page showing:
+
+- outcome, hazard, health domain, country, version, and release notes;
+- manifest and artifact filenames, S3 URIs, and SHA-256 values;
+- number of mapped and unsupported places;
+- modeller approval/provenance information;
+- release state: `registered`, `preparing`, `validated`, `active`, `failed`, or
+  `superseded`;
+- validation time and any explicit failure code;
+- the currently active release for each place/outcome.
+
+The UI may initiate preparation and activation, but it must never receive or
+download the RDS artifact.
+
+### Prepare update action
+
+When an administrator selects **Prepare update**, the browser calls the Python
+backend. The backend service then:
+
+1. authorizes an administrator role;
+2. reads the immutable release and artifact URI from the registry;
+3. downloads the private S3 object using the workload/instance role;
+4. writes to a temporary file in the server-side model cache;
+5. verifies filename, byte size, and SHA-256 before making it visible;
+6. validates the compact-bundle schema and every model block;
+7. runs approved parity/smoke vectors;
+8. atomically moves the verified artifact into a versioned cache directory;
+9. asks the internal inference runtime to load and warm the exact
+   release/file/hash;
+10. records `validated` or a stable `failed` error in the registry.
+
+Preparation does not change active predictions.
+
+### Activate action
+
+**Activate** is enabled only for a validated, warmed release. The backend updates
+the active model assignments transactionally. New prediction requests pin the
+selected release ID and SHA-256; requests already queued retain their original
+release. The previous artifact remains cached so an administrator can roll back
+by reactivating the prior validated release.
+
+The prediction call must include the pinned release ID, model filename, and
+checksum. The inference runtime must refuse a request when any identity differs
+from the loaded bundle.
+
+### Adding or updating a model
+
+After this control plane exists, the repeatable release procedure is:
+
+1. Package the approved source into the compact, non-sensitive bundle.
+2. Generate and review parity vectors and the packaging report.
+3. Upload the versioned artifact to private S3 without overwriting an older key.
+4. Add or import one immutable `model-release.json` manifest.
+5. Add/update the county-to-model-area crosswalk when geography coverage changes.
+6. Update release notes and model documentation.
+7. Open the Models page and select **Prepare update**.
+8. Review validation results, then select **Activate**.
+
+Application deployment should not be required for a coefficient-only model
+update whose schema, outcome contract, and geography mappings are unchanged.
+Code deployment remains necessary for a new bundle schema, new outcome contract,
+new geography-processing rule, or inference implementation.
+
+### Current legacy gap
+
+The existing Madhya Pradesh runtime is not yet manifest-driven end to end. Local
+startup, the R API, Make targets, container startup, EC2 deployment, and
+bootstrap assume two environment-selected files named state and division. The
+generic registry workflow must replace those assumptions before the UI can be
+the production update path. Until then, the Kenya review manifest is suitable
+for checksum/schema/parity testing only and must not be activated.
+
 ## Planned tracked additions
 
 No item below should be activated until the review gates are satisfied.
@@ -270,9 +359,12 @@ No item below should be activated until the review gates are satisfied.
 ```text
 pipelines/models/lbw/
   KENYA_MODEL_INTEGRATION.md
+  model-release.kenya.review.json
   model-release.kenya.json
+  inference/compact_score.R
   inference/package_kenya_model.R
-  tests/test_kenya_serialization.R
+  inference/validate_kenya_model.R
+  tests/test_compact_score.R
 
 pipelines/boundaries/
   data/kenya_county_climate_zone_crosswalk.csv
@@ -283,6 +375,11 @@ pipelines/boundaries/
 backend/chart/setup/model_configs.py
 backend/chart/climate/planning_targets.py
 backend/chart/inference/providers/lbw_r.py
+backend/chart/model_registry/routes.py
+backend/chart/model_registry/artifacts.py
+
+web/src/features/model-registry/
+web/src/app/api/chart/model-releases/
 
 orchestration/tests/
 backend/tests/
@@ -303,11 +400,16 @@ Expected behavior changes:
 6. Keep SSP1-2.6, SSP3-7.0, and SSP5-8.5; CHART already supports all three.
 7. Add parity tests comparing the sanitized scorer against modeller-approved
    test vectors from the original fitted artifact.
+8. Add admin-only release listing, preparation, activation, failure reporting,
+   and rollback controls.
+9. Remove release-specific model paths, filenames, hashes, and S3 URIs from
+   environment configuration after the legacy MP runtime is migrated.
 
-No database migration is currently expected: the existing model release and
-area-mapping tables can map many counties to the same model area and file. A
-migration would only be needed if routing metadata is stored per release rather
-than included in the inference request/service configuration.
+The existing model-release and area-mapping tables already support mapping many
+counties to the same model area and file. The admin control plane will probably
+need a focused migration for preparation state, validation timestamps, failure
+codes, and cached-artifact/warm-up metadata unless those are kept in a separate
+durable job table.
 
 ## Modeller approval checklist
 
