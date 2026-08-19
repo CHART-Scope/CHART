@@ -31,14 +31,17 @@ import certifi
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from chart.geographies.load import _ensure_mp_app_places, load_mp_model_area_geojson
+from chart.geographies.load import (
+    _ensure_release_app_places,
+    load_release_geography_geojson,
+    load_mp_model_area_geojson,
+)
+from chart.model_registry.place_sets import resolve_release_places
 from chart.model_registry.schemas import ModelReleaseSpec
-from chart.model_registry.service import _activate_release, register_model_release
-from chart.shared.db.models import AdminUnit, AppGeography, Geography
+from chart.model_registry.service import activate_release, register_model_release
+from chart.shared.db.models import AdminUnit, Geography
 
 logger = logging.getLogger(__name__)
-
-_COUNTRY_NAMES = {"IN": "India", "KE": "Kenya"}
 
 
 @dataclass(frozen=True)
@@ -58,35 +61,30 @@ def bootstrap_place_from_release(
     session: Session,
     *,
     model_release_path: Path,
+    boundary_artifact_path: Path | None = None,
     activate: bool = True,
 ) -> PlaceBootstrapResult:
     """Zero-network seed: reads only the model release JSON.
 
-    Upserts one AdminUnit per area in the release, links each to the
-    matching AppGeography, then registers the release with an active
-    assignment. Boundary polygons are left null: dashboards and
-    predictions do not need them; run bootstrap_place_from_manifest
-    only when you actually want spatial features.
+    Upserts the release places and registers their model mappings. When a
+    deployed boundary artifact is supplied, those exact polygons are loaded
+    first so climate ingestion works immediately after onboarding.
     """
 
     logger.warning("bootstrap_from_release: reading %s", model_release_path)
     spec = ModelReleaseSpec.model_validate(
         json.loads(model_release_path.read_text(encoding="utf-8"))
     )
+    resolved_places = resolve_release_places(spec)
+    release_geography = resolved_places.geography
     logger.info(
         "bootstrap_from_release: parsed release %s with %d areas",
         spec.id,
-        len(spec.areas),
+        len(release_geography.places),
     )
-
-    country_code = next(
-        (area.country_code for area in spec.areas if area.country_code), None
-    )
-    if not country_code:
-        raise PlaceBootstrapError("model_release_country_required")
-    country_code = country_code.upper()
-    country_name = _COUNTRY_NAMES.get(country_code, country_code)
-    geography_slug = "madhya-pradesh" if country_code == "IN" else country_name.lower()
+    country_code = release_geography.country_code.upper()
+    country_name = release_geography.country_name
+    geography_slug = release_geography.analytics_slug
     geography = session.scalar(
         select(Geography).where(Geography.slug == geography_slug)
     )
@@ -94,7 +92,7 @@ def bootstrap_place_from_release(
         geography = Geography(
             slug=geography_slug,
             country=country_name,
-            name="Madhya Pradesh" if country_code == "IN" else country_name,
+            name=country_name,
         )
         session.add(geography)
         session.flush()
@@ -103,14 +101,23 @@ def bootstrap_place_from_release(
             country_code,
         )
 
-    app_places = _release_app_places(session, spec, country_code, country_name)
+    shape_path = boundary_artifact_path or resolved_places.shape_path
+    if shape_path is not None:
+        load_release_geography_geojson(
+            session,
+            shape_path,
+            spec,
+            release_geography=release_geography,
+        )
+
+    app_places = _ensure_release_app_places(session, release_geography)
     logger.info(
         "bootstrap_from_release: %d AppGeography rows present",
         len(app_places),
     )
 
     upserted = 0
-    for area in spec.areas:
+    for area in release_geography.places:
         admin_unit = session.scalar(
             select(AdminUnit).where(
                 AdminUnit.geography_id == geography.id,
@@ -121,11 +128,11 @@ def bootstrap_place_from_release(
             admin_unit = AdminUnit(
                 geography_id=geography.id,
                 code=area.place_code,
-                name=area.model_area_name,
+                name=area.display_name,
                 level=area.level or "state",
             )
             session.add(admin_unit)
-        admin_unit.name = area.model_area_name
+        admin_unit.name = area.display_name
         if area.level:
             admin_unit.level = area.level
         linked = app_places.get(area.place_code)
@@ -137,13 +144,13 @@ def bootstrap_place_from_release(
     logger.warning("bootstrap_from_release: upserted %d admin_units", upserted)
 
     # register_model_release adds ModelAreaMapping rows but the production
-    # session factory runs with autoflush=False, so its own _activate_release
+    # session factory runs with autoflush=False, so its own activate_release
     # call would query an empty table. Register first, flush the mappings,
     # then activate explicitly.
     release = register_model_release(session, spec, activate=False)
     session.flush()
     if activate:
-        _activate_release(session, release)
+        activate_release(session, release)
         session.flush()
     logger.info(
         "bootstrap_from_release: registered %s (status=%s)",
@@ -152,35 +159,10 @@ def bootstrap_place_from_release(
     )
 
     return PlaceBootstrapResult(
-        areas_seeded=len(spec.areas),
+        areas_seeded=len(release_geography.places),
         model_release_id=release.id,
         model_status=release.status,
     )
-
-
-def _release_app_places(
-    session: Session,
-    spec: ModelReleaseSpec,
-    country_code: str,
-    country_name: str,
-) -> dict[str, AppGeography]:
-    if country_code == "IN":
-        mp_places = _ensure_mp_app_places(session)
-        return {
-            area.place_code: mp_places[area.model_area_name]
-            for area in spec.areas
-            if area.model_area_name in mp_places
-        }
-
-    country_slug = country_name.lower().replace(" ", "-")
-    places: dict[str, AppGeography] = {}
-    for area in spec.areas:
-        path = f"/{country_slug}/{area.place_code}"
-        place = session.scalar(select(AppGeography).where(AppGeography.path == path))
-        if place is None:
-            raise PlaceBootstrapError(f"model_release_place_missing: {path}")
-        places[area.place_code] = place
-    return places
 
 
 def bootstrap_place_from_manifest(

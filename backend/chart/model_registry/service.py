@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from chart.shared.db.models import (
@@ -34,6 +34,8 @@ class ActiveModelMapping:
     model_file: str
     artifact_sha256: str
     validated_pregnancy_windows: tuple[PregnancyWindow, ...]
+    outcome: str = "lbw"
+    input_spec: dict | None = None
 
 
 def register_model_release(
@@ -71,7 +73,9 @@ def register_model_release(
             or existing.version != spec.version
             or _model_file_identities(existing.model_files)
             != _model_file_identities(payload["model_files"])
-            or existing.input_spec != payload["input_spec"]
+            or not _input_spec_is_compatible(
+                existing.input_spec or {}, payload["input_spec"]
+            )
             or not _area_mappings_match(existing, spec, admin_units)
         ):
             raise ModelRegistryError("MODEL_RELEASE_IMMUTABLE", spec.id)
@@ -83,6 +87,11 @@ def register_model_release(
             existing.release_file_uri = (
                 f"{spec.base_uri.rstrip('/')}/model-release.json"
             )
+        merged_input_spec = _merge_additive_presentation(
+            existing.input_spec or {}, payload["input_spec"]
+        )
+        if merged_input_spec != existing.input_spec:
+            existing.input_spec = merged_input_spec
         # Taxonomy fields are late additions: backfill on re-register so
         # older rows pick up hazard/domain from the manifest without
         # forcing a new release version.
@@ -91,7 +100,7 @@ def register_model_release(
         if spec.health_domain and existing.health_domain != spec.health_domain:
             existing.health_domain = spec.health_domain
         if activate:
-            _activate_release(session, existing)
+            activate_release(session, existing)
             session.flush()
         return existing
 
@@ -119,12 +128,14 @@ def register_model_release(
                 admin_unit_id=admin_units[area.place_code].id,
                 model_area_key=area.model_area_name,
                 model_file=area.model_file,
-                validated_pregnancy_windows=list(area.validated_pregnancy_windows),
+                validated_pregnancy_windows=list(
+                    area.validated_pregnancy_windows or ()
+                ),
             )
         )
 
     if activate:
-        _activate_release(session, release)
+        activate_release(session, release)
     session.flush()
     return release
 
@@ -164,6 +175,8 @@ def get_active_model_mapping(
         model_file=mapping.model_file,
         artifact_sha256=_artifact_digest(release, mapping.model_file),
         validated_pregnancy_windows=_validated_pregnancy_windows(mapping),
+        outcome=release.outcome,
+        input_spec=release.input_spec,
     )
 
 
@@ -205,6 +218,8 @@ def get_active_model_mappings(
             model_file=mapping.model_file,
             artifact_sha256=_artifact_digest(release, mapping.model_file),
             validated_pregnancy_windows=_validated_pregnancy_windows(mapping),
+            outcome=release.outcome,
+            input_spec=release.input_spec,
         )
         for admin_unit_id, release, mapping in rows
     }
@@ -238,6 +253,8 @@ def get_model_mapping(
         model_file=mapping.model_file,
         artifact_sha256=_artifact_digest(release, mapping.model_file),
         validated_pregnancy_windows=_validated_pregnancy_windows(mapping),
+        outcome=release.outcome,
+        input_spec=release.input_spec,
     )
 
 
@@ -268,6 +285,8 @@ def get_model_mappings(
             model_file=mapping.model_file,
             artifact_sha256=_artifact_digest(release, mapping.model_file),
             validated_pregnancy_windows=_validated_pregnancy_windows(mapping),
+            outcome=release.outcome,
+            input_spec=release.input_spec,
         )
         for release, mapping in rows
         if (release.id, mapping.admin_unit_id) in keys
@@ -278,12 +297,8 @@ def _validated_pregnancy_windows(
     mapping: ModelAreaMapping,
 ) -> tuple[PregnancyWindow, ...]:
     raw_windows = tuple(mapping.validated_pregnancy_windows or ())
-    if (
-        not raw_windows
-        or len(set(raw_windows)) != len(raw_windows)
-        or any(
-            type(window) is not int or window not in (1, 2, 3) for window in raw_windows
-        )
+    if len(set(raw_windows)) != len(raw_windows) or any(
+        type(window) is not int or window not in (1, 2, 3) for window in raw_windows
     ):
         raise ModelRegistryError(
             "MODEL_RELEASE_PREGNANCY_WINDOWS_INVALID",
@@ -292,7 +307,7 @@ def _validated_pregnancy_windows(
     return cast(tuple[PregnancyWindow, ...], raw_windows)
 
 
-def _activate_release(session: Session, release: ModelRelease) -> None:
+def activate_release(session: Session, release: ModelRelease) -> None:
     mappings = list(
         session.scalars(
             select(ModelAreaMapping).where(
@@ -318,6 +333,33 @@ def _activate_release(session: Session, release: ModelRelease) -> None:
 
     replaced_release_ids: set[str] = set()
     activated_at = datetime.now(timezone.utc)
+    release_contract = (release.input_spec or {}).get("input_contract") or {}
+    superseded_release_ids = set(release_contract.get("supersedes_release_ids") or [])
+    if superseded_release_ids:
+        stale_assignment_ids = list(
+            session.scalars(
+                select(ActiveModelAssignment.admin_unit_id)
+                .join(
+                    ModelRelease,
+                    ModelRelease.id == ActiveModelAssignment.model_release_id,
+                )
+                .where(
+                    ActiveModelAssignment.model_release_id.in_(superseded_release_ids),
+                    ActiveModelAssignment.admin_unit_id.not_in(admin_unit_ids),
+                    ModelRelease.module == release.module,
+                    ModelRelease.outcome == release.outcome,
+                )
+            )
+        )
+        if stale_assignment_ids:
+            session.execute(
+                delete(ActiveModelAssignment).where(
+                    ActiveModelAssignment.admin_unit_id.in_(stale_assignment_ids),
+                    ActiveModelAssignment.module == release.module,
+                    ActiveModelAssignment.outcome == release.outcome,
+                )
+            )
+        replaced_release_ids.update(superseded_release_ids)
     for mapping in mappings:
         key = (mapping.admin_unit_id, release.module, release.outcome)
         assignment = session.get(ActiveModelAssignment, key)
@@ -393,7 +435,7 @@ def _area_mappings_match(
             admin_units[area.place_code].id,
             area.model_area_name,
             area.model_file,
-            tuple(area.validated_pregnancy_windows),
+            tuple(area.validated_pregnancy_windows or ()),
         )
         for area in spec.areas
     }
@@ -407,6 +449,55 @@ def _model_file_identities(model_files: list[dict]) -> list[tuple[str, str]]:
     return sorted((entry["filename"], entry["sha256"]) for entry in model_files)
 
 
+def _input_spec_is_compatible(current: dict, expected: dict) -> bool:
+    """Permit only additive presentation metadata on an existing release.
+
+    Runtime, model input, and model output contracts remain immutable. Existing
+    presentation values also cannot change, but a newer manifest may add UI
+    fields that were not part of the original manifest schema.
+    """
+
+    for key in ("input_contract", "output_contract", "runtime"):
+        if current.get(key) != expected.get(key):
+            return False
+    current_presentation = current.get("presentation") or {}
+    expected_presentation = expected.get("presentation") or {}
+    return _mapping_is_additive(current_presentation, expected_presentation)
+
+
+def _mapping_is_additive(current: dict, expected: dict) -> bool:
+    for key, current_value in current.items():
+        if key not in expected:
+            continue
+        expected_value = expected[key]
+        if isinstance(current_value, dict) and isinstance(expected_value, dict):
+            if not _mapping_is_additive(current_value, expected_value):
+                return False
+        elif current_value != expected_value:
+            return False
+    return True
+
+
+def _merge_additive_presentation(current: dict, expected: dict) -> dict:
+    merged = dict(current)
+    current_presentation = current.get("presentation") or {}
+    expected_presentation = expected.get("presentation") or {}
+    merged["presentation"] = _merge_mappings(
+        current_presentation, expected_presentation
+    )
+    return merged
+
+
+def _merge_mappings(current: dict, expected: dict) -> dict:
+    merged = dict(current)
+    for key, value in expected.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge_mappings(merged[key], value)
+        elif key not in merged:
+            merged[key] = value
+    return merged
+
+
 def _release_payload(spec: ModelReleaseSpec) -> dict:
     return {
         "model_files": [
@@ -418,7 +509,24 @@ def _release_payload(spec: ModelReleaseSpec) -> dict:
             for item in spec.model_files
         ],
         "input_spec": {
-            "temperature_input": spec.temperature_input,
-            "months_required": spec.months_required,
+            "input_contract": (
+                {
+                    "temperature_input": spec.temperature_input,
+                    "months_required": spec.months_required,
+                }
+                if spec.temperature_input is not None
+                else spec.input_contract
+            ),
+            "output_contract": spec.output_contract,
+            "presentation": (
+                spec.presentation.model_dump(mode="json")
+                if spec.presentation is not None
+                else None
+            ),
+            "runtime": (
+                spec.runtime.model_dump(mode="json")
+                if spec.runtime is not None
+                else None
+            ),
         },
     }

@@ -179,6 +179,19 @@ OPERATION_DOCUMENTATION: dict[
             "200": "The completed setup record and application-ready installation state."
         },
     ),
+    ("post", "/setup/models/sync"): OperationDocumentation(
+        summary="Install newly deployed model releases without resetting CHART",
+        description=(
+            "Requires a CHART administrator. Discovers enabled model manifests, "
+            "verifies and prepares their immutable artifacts, and activates their "
+            "geography assignments while preserving users, workspaces, and saved "
+            "planning data. Use this after deploying a new release to an existing "
+            "installation."
+        ),
+        success_responses={
+            "200": "The active release IDs and total planning-area assignments."
+        },
+    ),
     ("post", "/setup/reset"): OperationDocumentation(
         summary="Reset installation setup for controlled recovery",
         description=(
@@ -418,15 +431,17 @@ OPERATION_DOCUMENTATION: dict[
             "the caller's geography_id to its admin_unit and active model block, "
             "calls the R DLNM scorer with a flat three-month temperature profile at "
             "the requested Celsius value, and returns the odds ratio, 95% CI, "
-            "attributable fraction, training-support flag, and the model's "
-            "training temperature range. Stateless: nothing is persisted, so this "
+            "positive-excess attributable fraction, signed relative-odds change, "
+            "training-support flag, and the fitted block's temperature range. "
+            "Stateless: nothing is persisted, so this "
             "path can handle high slider-drag volume without touching the durable "
             "prediction queue."
         ),
         success_responses={
             "200": (
-                "The scored what-if response including odds ratio, CI, attributable "
-                "fraction, training-support metadata, and the model's temperature range."
+                "The scored what-if response including odds ratio, CI, signed odds "
+                "change, attributable fraction, support metadata, and the fitted "
+                "block's temperature range."
             )
         },
     ),
@@ -443,6 +458,38 @@ OPERATION_DOCUMENTATION: dict[
             "200": (
                 "The active model releases with taxonomy fields and the admin_units "
                 "each release is currently assigned to."
+            )
+        },
+    ),
+    ("get", "/model-releases"): OperationDocumentation(
+        summary="List every registered model release",
+        description=(
+            "Returns every ModelRelease row (active-first) with identity, "
+            "version, model_files (filename + SHA-256), area count, the "
+            "manifest source path discovered on disk, S3 base URI, git ref, and "
+            "activation timestamp. Powers the admin Models page under /settings, "
+            "where operators inspect what is loaded and trigger reloads."
+        ),
+        success_responses={
+            "200": (
+                "The registered releases, each carrying an is_active flag plus "
+                "manifest-source metadata for debugging."
+            )
+        },
+    ),
+    ("post", "/model-releases/{release_id}/reload"): OperationDocumentation(
+        summary="Re-verify and re-warm one release into the R runtime",
+        description=(
+            "Finds the manifest whose id matches the URL parameter, re-parses "
+            "its ModelReleaseSpec, and calls prepare_model_release to re-POST "
+            "/models/load to the R runtime. Does not touch the database or "
+            "reactivate the release. Useful after an R container restart or "
+            "after a manifest edit that swaps an artifact's SHA-256."
+        ),
+        success_responses={
+            "200": (
+                "The release id was found on disk and successfully warmed into "
+                "the runtime; status is 'loaded'."
             )
         },
     ),

@@ -4,25 +4,39 @@ import hashlib
 import json
 import logging
 import os
-import re
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import cast
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
 from chart.auth.schemas import CurrentUserContext
 from chart.identity import IdentityError, delete_user, upsert_user
-from chart.model_registry.runtime import warm_model_release
-from chart.model_registry.schemas import ModelReleaseSpec
-from chart.model_registry.service import ModelRegistryError, _activate_release
+from chart.model_registry.runtime import prepare_model_release
+from chart.model_registry.schemas import ModelReleaseSpec, ReleaseGeographySpec
+from chart.model_registry.place_sets import resolve_release_places
+from chart.model_registry.service import ModelRegistryError, activate_release
 from chart.shared.db.models import (
+    ActiveModelAssignment,
+    AdminUnit,
     AppGeography,
     AppUser,
+    AuditEventRecord,
+    ClimateInputMonthRecord,
+    ClimateInputWindowRecord,
+    ClimateRun,
     CountryGeoConfig,
-    RecommendedAction,
+    Covariate,
+    DistrictClimate,
+    Geography,
+    HealthImpact,
+    IngestionLeaseRecord,
+    ModelAreaMapping,
     ModelRelease,
+    PredictionRequestRecord,
+    RecommendedAction,
     SetupStateRecord,
     UserGeographyScopeRecord,
     UserRoleRecord,
@@ -32,7 +46,7 @@ from chart.shared.db.models import (
 from chart.shared.db.session import get_session_factory
 from chart.solution_repository.routes import SNAPSHOT_PATH as _SOLUTION_SEED_PATH
 
-from .model_configs import configs_for_country
+from .model_configs import configs_for_country, deployed_configs
 from .place_bootstrap import (
     PlaceBootstrapError,
     bootstrap_place_from_release,
@@ -45,7 +59,12 @@ from .schemas import (
     SectorOption,
     SetupCounts,
     SetupOptions,
+    SetupCountryOption,
+    SetupLevelOption,
+    SetupModelMappingOption,
+    SetupPlaceOption,
     SetupStatus,
+    ModelSyncResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -100,17 +119,148 @@ def get_status(*, session_factory=None) -> SetupStatus:
 
 
 def get_options() -> SetupOptions:
-    return SetupOptions(sectors=list(SETUP_SECTORS))
+    country_metadata: dict[str, tuple[str, str, str]] = {}
+    country_levels: dict[str, dict[str, SetupLevelOption]] = {}
+    country_places: dict[str, dict[str, SetupPlaceOption]] = {}
+    supported_codes: dict[str, set[str]] = {}
+    model_mappings: dict[
+        str, dict[str, dict[tuple[str, str, str], SetupModelMappingOption]]
+    ] = {}
+    for config in deployed_configs():
+        spec = ModelReleaseSpec.model_validate_json(
+            config.model_release.read_text(encoding="utf-8")
+        )
+        geography = resolve_release_places(spec).geography
+        country_code = geography.country_code
+        metadata = (
+            geography.country_name,
+            geography.root_id,
+            geography.root_path,
+        )
+        existing_metadata = country_metadata.setdefault(country_code, metadata)
+        if existing_metadata != metadata:
+            raise ValueError("MODEL_RELEASE_SETUP_COUNTRY_CONFLICT")
+
+        levels = country_levels.setdefault(country_code, {})
+        for level in geography.levels:
+            option = SetupLevelOption(
+                key=level.key,
+                label=level.label,
+                sortOrder=level.sort_order,
+            )
+            existing_level = levels.setdefault(level.key, option)
+            if existing_level != option:
+                raise ValueError("MODEL_RELEASE_SETUP_LEVEL_CONFLICT")
+
+        places = country_places.setdefault(country_code, {})
+        for area in geography.places:
+            option = SetupPlaceOption(
+                placeCode=area.place_code,
+                id=cast(str, area.geography_id),
+                name=cast(str, area.display_name),
+                level=cast(str, area.app_level),
+                levelLabel=cast(str, area.level_label),
+                parentPlaceCode=area.parent_place_code,
+                path=cast(str, area.path),
+                sortOrder=area.sort_order,
+                predictionSupported=False,
+            )
+            existing_place = places.setdefault(area.place_code, option)
+            if existing_place != option:
+                raise ValueError("MODEL_RELEASE_SETUP_PLACE_CONFLICT")
+        supported_codes.setdefault(country_code, set()).update(
+            area.place_code for area in spec.areas
+        )
+        mappings_by_place = model_mappings.setdefault(country_code, {})
+        for area in spec.areas:
+            presentation = spec.presentation
+            mapping = SetupModelMappingOption(
+                releaseId=spec.id,
+                outcome=spec.outcome,
+                outcomeLabel=(
+                    presentation.outcome_label
+                    if presentation is not None
+                    else spec.outcome.replace("_", " ").capitalize()
+                ),
+                modelAreaName=area.model_area_name,
+                modelScopeLabel=(
+                    presentation.model_scope_label
+                    if presentation is not None
+                    else "model"
+                ),
+            )
+            mappings_by_place.setdefault(area.place_code, {})[
+                (spec.outcome, area.model_area_name, spec.id)
+            ] = mapping
+
+    countries: list[SetupCountryOption] = []
+    for country_code, metadata in country_metadata.items():
+        all_places = country_places[country_code]
+        included_codes = set(supported_codes.get(country_code, set()))
+        for place_code in tuple(included_codes):
+            place = all_places.get(place_code)
+            while place is not None and place.parentPlaceCode is not None:
+                included_codes.add(place.parentPlaceCode)
+                place = all_places.get(place.parentPlaceCode)
+        visible_places = [
+            place.model_copy(
+                update={
+                    "predictionSupported": place.placeCode
+                    in supported_codes.get(country_code, set()),
+                    "modelMappings": sorted(
+                        model_mappings.get(country_code, {})
+                        .get(place.placeCode, {})
+                        .values(),
+                        key=lambda mapping: (
+                            mapping.outcomeLabel,
+                            mapping.modelAreaName,
+                            mapping.releaseId,
+                        ),
+                    ),
+                }
+            )
+            for place in all_places.values()
+            if place.placeCode in included_codes
+        ]
+        visible_level_keys = {place.level for place in visible_places}
+        countries.append(
+            SetupCountryOption(
+                countryCode=country_code,
+                countryName=metadata[0],
+                rootId=metadata[1],
+                rootPath=metadata[2],
+                levels=sorted(
+                    (
+                        level
+                        for level in country_levels[country_code].values()
+                        if level.key in visible_level_keys
+                    ),
+                    key=lambda level: (level.sortOrder, level.label),
+                ),
+                places=sorted(
+                    visible_places,
+                    key=lambda place: (place.sortOrder, place.name),
+                ),
+            )
+        )
+    return SetupOptions(
+        sectors=list(SETUP_SECTORS),
+        geographies=sorted(countries, key=lambda country: country.countryName),
+    )
 
 
 def bootstrap(
     input_data: BootstrapSetupInput, *, session_factory=None
 ) -> BootstrapSetupResponse:
+    release_geography = _validate_setup_geographies(input_data)
     session_factory = session_factory or get_session_factory()
     operation_id = _claim_bootstrap(input_data, session_factory)
-    paths = [row.path for row in input_data.geographies] or [
-        f"/{_slug(input_data.countryName)}"
-    ]
+    paths = [release_geography.root_path]
+    selected_path = (
+        input_data.geographies[-1].path
+        if input_data.geographies
+        else release_geography.root_path
+    )
     try:
         identity = upsert_user(
             name=input_data.admin.name.strip(),
@@ -135,7 +285,7 @@ def bootstrap(
         email=identity.email,
         roles=["chart_admin", "content_editor"],
         geographyScopes=paths,
-        activeGeographyId=paths[0],
+        activeGeographyId=selected_path,
         geographyLevel=(
             input_data.geographies[0].level if input_data.geographies else "country"
         ),
@@ -229,20 +379,30 @@ def _auto_seed_recommended_actions(session) -> None:
     logger.warning("auto_seed: recommended_action upserts=%d", upserts)
 
 
-def _auto_seed_deployed_models(session, country_code: str) -> None:
-    """Seed admin_units + model release for the country that just onboarded.
+def _auto_seed_deployed_models(
+    session, country_code: str, *, purge_stale: bool = False
+) -> None:
+    """Seed deployable model releases for the selected country.
 
-    Runs inside the setup-complete transaction. Once a model is configured for
-    this environment, preparation is mandatory: setup rolls back on a missing,
-    invalid, or unwarmable artifact rather than completing without prediction.
+    Setup previously registered every discovered manifest regardless of the
+    admin's country choice, which meant selecting India would still try to
+    install (and roll back on) Kenya's release. Auto-seed now scopes to the
+    selected country so an operator can succeed with just the models that
+    match the country they picked, and other countries can still be brought
+    in later via ``/setup/models/sync``.
+
+    Preparation remains mandatory for every seeded release: setup rolls back
+    on a missing, invalid, or unwarmable artifact rather than completing
+    with a partial model catalog for the chosen country.
     """
 
-    logger.warning("auto_seed: start country=%s", country_code)
-    configs = configs_for_country(country_code)
+    normalized_country = (country_code or "").strip().upper()
+    logger.warning("auto_seed: start selected_country=%s", normalized_country)
+    configs = configs_for_country(normalized_country) if normalized_country else ()
     if not configs:
         logger.warning(
-            "auto_seed: no deployed model configured for %s, skipping",
-            country_code,
+            "auto_seed: no deployable model manifests for country=%s, skipping",
+            normalized_country or "<unset>",
         )
         return
     for config in configs:
@@ -251,20 +411,64 @@ def _auto_seed_deployed_models(session, country_code: str) -> None:
             config.model_release,
         )
         try:
+            # Setup is a clean-install flow, so proactively purge any prior
+            # copy of this release before re-registering. Without this,
+            # ``register_model_release`` refuses to touch an existing row
+            # that differs from the incoming spec in any immutable field,
+            # and that check keeps tripping MODEL_RELEASE_IMMUTABLE on a
+            # rerun after a partial install left a stale row (or after
+            # startup restore re-registered it). PredictionRequest has a
+            # plain FK to model_release; ModelAreaMapping and
+            # ActiveModelAssignment cascade but we clear them explicitly to
+            # keep delete order engine-agnostic.
+            #
+            # The sync path (``restore_deployed_models``) passes
+            # ``purge_stale=False``: sync is meant to be non-destructive, so
+            # a matching row should be tolerated and a differing row is a
+            # real conflict that must surface.
+            if purge_stale:
+                preflight_spec = ModelReleaseSpec.model_validate(
+                    json.loads(config.model_release.read_text(encoding="utf-8"))
+                )
+                stale = session.get(ModelRelease, preflight_spec.id)
+                if stale is not None:
+                    logger.warning(
+                        "auto_seed: purging stale release %s before re-register",
+                        preflight_spec.id,
+                    )
+                    session.execute(
+                        delete(PredictionRequestRecord).where(
+                            PredictionRequestRecord.model_release_id
+                            == preflight_spec.id
+                        )
+                    )
+                    session.execute(
+                        delete(ActiveModelAssignment).where(
+                            ActiveModelAssignment.model_release_id == preflight_spec.id
+                        )
+                    )
+                    session.execute(
+                        delete(ModelAreaMapping).where(
+                            ModelAreaMapping.model_release_id == preflight_spec.id
+                        )
+                    )
+                    session.delete(stale)
+                    session.flush()
             result = bootstrap_place_from_release(
                 session,
                 model_release_path=config.model_release,
+                boundary_artifact_path=config.boundary_artifact,
                 activate=False,
             )
             spec = ModelReleaseSpec.model_validate(
                 json.loads(config.model_release.read_text(encoding="utf-8"))
             )
-            warm_model_release(spec)
+            prepare_model_release(spec)
             release = session.get(ModelRelease, result.model_release_id)
             if release is None:
                 raise RuntimeError("registered model release disappeared")
             release.status = "validated"
-            _activate_release(session, release)
+            activate_release(session, release)
             session.flush()
             logger.warning(
                 "auto_seed: success — areas=%d release=%s status=%s",
@@ -275,13 +479,13 @@ def _auto_seed_deployed_models(session, country_code: str) -> None:
         except (PlaceBootstrapError, ModelRegistryError) as error:
             logger.exception(
                 "auto_seed: model preparation failed for %s",
-                country_code,
+                config.country_code,
             )
             raise SetupError("SETUP_MODEL_PREPARATION_FAILED", 503) from error
         except Exception as error:  # noqa: BLE001 - map to stable setup error
             logger.exception(
                 "auto_seed: unexpected model preparation failure for %s",
-                country_code,
+                config.country_code,
             )
             raise SetupError("SETUP_MODEL_PREPARATION_FAILED", 503) from error
 
@@ -299,9 +503,10 @@ def complete(
         input_data.primarySectorId,
         input_data.collaboratingSectorIds,
     )
+    release_geography = _validate_setup_geographies(input_data)
     country_code = input_data.countryCode.strip().upper()
-    root_id = f"geo-{country_code.lower()}"
-    root_path = f"/{_slug(input_data.countryName)}"
+    root_id = release_geography.root_id
+    root_path = release_geography.root_path
     session_factory = session_factory or get_session_factory()
     with session_factory() as session:
         state = session.get(SetupStateRecord, SETUP_ID, with_for_update=True)
@@ -361,11 +566,19 @@ def complete(
                 row.sortOrder,
             )
         session.flush()
-        scopes = input_data.geographies or []
+        # First-run administrators manage the installed country and may switch
+        # among its model-backed areas. Later user assignments stay scoped to
+        # their explicitly selected place.
+        scopes = input_data.geographies[-1:] if input_data.geographies else []
+        persisted_scope_ids = (
+            [root_id]
+            if provisioning_token is not None
+            else [row.id for row in scopes] or [root_id]
+        )
         _persist_user(
             session,
             user,
-            [row.id for row in scopes] or [root_id],
+            persisted_scope_ids,
         )
         workspace_id = f"workspace-{country_code.lower()}-default"
         workspace = session.get(WorkspaceRecord, workspace_id)
@@ -394,7 +607,7 @@ def complete(
                     role="owner",
                 )
             )
-        _auto_seed_deployed_models(session, country_code)
+        _auto_seed_deployed_models(session, country_code, purge_stale=True)
         try:
             _auto_seed_recommended_actions(session)
         except Exception:  # noqa: BLE001 - best-effort, must not fail setup
@@ -419,6 +632,55 @@ def complete(
     return get_status(session_factory=session_factory)
 
 
+def sync_deployed_models(
+    user: CurrentUserContext,
+    *,
+    session_factory=None,
+) -> ModelSyncResponse:
+    """Install newly deployed manifests without resetting user or workspace data."""
+
+    if "chart_admin" not in user.roles:
+        raise SetupError("SETUP_FORBIDDEN", 403)
+    return restore_deployed_models(
+        session_factory=session_factory, require_complete=True
+    )
+
+
+def restore_deployed_models(
+    *,
+    session_factory=None,
+    require_complete: bool = False,
+) -> ModelSyncResponse:
+    """Reconcile manifests and warm artifacts after an application restart.
+
+    This is the same non-destructive operation exposed to administrators by
+    ``/setup/models/sync``. It never resets users, workspaces, geographies, or
+    prediction history.
+    """
+
+    session_factory = session_factory or get_session_factory()
+    with session_factory() as session:
+        state = session.get(SetupStateRecord, SETUP_ID)
+        if state is None or not state.completed:
+            if require_complete:
+                raise SetupError("SETUP_NOT_COMPLETE", 409)
+            return ModelSyncResponse(activeReleaseIds=[], assignmentCount=0)
+        _auto_seed_deployed_models(session, state.country_code or "")
+        active_release_ids = sorted(
+            session.scalars(
+                select(ActiveModelAssignment.model_release_id).distinct()
+            ).all()
+        )
+        assignment_count = (
+            session.scalar(select(func.count()).select_from(ActiveModelAssignment)) or 0
+        )
+        session.commit()
+    return ModelSyncResponse(
+        activeReleaseIds=active_release_ids,
+        assignmentCount=int(assignment_count),
+    )
+
+
 def reset(user: CurrentUserContext) -> SetupStatus:
     if "chart_admin" not in user.roles:
         raise SetupError("SETUP_FORBIDDEN", 403)
@@ -426,10 +688,33 @@ def reset(user: CurrentUserContext) -> SetupStatus:
         state = session.get(SetupStateRecord, SETUP_ID)
         first_admin_user_id = state.first_admin_user_id if state else None
 
+        # Nuke everything a re-run of setup/bootstrap could collide with —
+        # the previous reset only cleared workspace/user state and left the
+        # model registry and its dependents behind, which is exactly what
+        # tripped MODEL_RELEASE_IMMUTABLE on the second install. Order
+        # respects the FK graph (children first). Country config, seed
+        # reference tables (data_source, provenance), and RecommendedAction
+        # (upserted every setup) are intentionally not touched.
         session.execute(delete(WorkspaceMemberRecord))
         session.execute(delete(WorkspaceRecord))
-        if first_admin_user_id:
-            session.execute(delete(AppUser).where(AppUser.id == first_admin_user_id))
+        session.execute(delete(HealthImpact))
+        session.execute(delete(Covariate))
+        session.execute(delete(AuditEventRecord))
+        session.execute(delete(PredictionRequestRecord))
+        session.execute(delete(IngestionLeaseRecord))
+        session.execute(delete(DistrictClimate))
+        session.execute(delete(ClimateInputMonthRecord))
+        session.execute(delete(ClimateInputWindowRecord))
+        session.execute(delete(ClimateRun))
+        session.execute(delete(ActiveModelAssignment))
+        session.execute(delete(ModelAreaMapping))
+        session.execute(delete(ModelRelease))
+        session.execute(delete(AdminUnit))
+        session.execute(delete(AppGeography))
+        session.execute(delete(Geography))
+        session.execute(delete(UserGeographyScopeRecord))
+        session.execute(delete(UserRoleRecord))
+        session.execute(delete(AppUser))
 
         if state is None:
             state = SetupStateRecord(id=SETUP_ID)
@@ -483,7 +768,7 @@ def _claim_bootstrap(input_data, session_factory) -> str:
         if state.completed or member_count or state.phase == "requires_admin":
             raise SetupError("SETUP_BOOTSTRAP_LOCKED", 409)
 
-        if state.phase in {"provisioning", "failed"}:
+        if state.phase == "provisioning":
             if state.provisioning_request_hash != request_hash:
                 raise SetupError("SETUP_BOOTSTRAP_REQUEST_MISMATCH", 409)
             if (
@@ -498,6 +783,10 @@ def _claim_bootstrap(input_data, session_factory) -> str:
                 raise SetupError("SETUP_BOOTSTRAP_IN_PROGRESS", 409)
             operation_id = state.provisioning_token or secrets.token_hex(24)
         else:
+            # A failed first-run attempt has already rolled back its database
+            # and identity changes. It is safe to replace it with the latest
+            # wizard payload; requiring an authenticated reset here creates a
+            # dead end because no administrator exists yet.
             operation_id = secrets.token_hex(24)
 
         state.phase = "provisioning"
@@ -598,5 +887,80 @@ def _selected_sectors(
     return primary_id, [item for item in unique_collaborators if item != primary_id]
 
 
-def _slug(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+def _validate_setup_geographies(
+    input_data: CompleteSetupInput,
+) -> ReleaseGeographySpec:
+    """Reject geography payloads that are not declared by a deployed manifest."""
+
+    declared = {}
+    declared_by_code = {}
+    country_name = None
+    root_id = None
+    release_geography = None
+    supported_place_codes: set[str] = set()
+    for config in configs_for_country(input_data.countryCode):
+        spec = ModelReleaseSpec.model_validate_json(
+            config.model_release.read_text(encoding="utf-8")
+        )
+        geography = resolve_release_places(spec).geography
+        if country_name is not None and (
+            country_name != geography.country_name or root_id != geography.root_id
+        ):
+            raise SetupError("SETUP_GEOGRAPHY_INVALID", 400)
+        country_name = geography.country_name
+        root_id = geography.root_id
+        release_geography = geography
+        for area in geography.places:
+            existing_id = declared.get(area.geography_id)
+            existing_code = declared_by_code.get(area.place_code)
+            if (
+                existing_id is not None
+                and existing_id != area
+                or existing_code is not None
+                and existing_code != area
+            ):
+                raise SetupError("SETUP_GEOGRAPHY_INVALID", 400)
+            declared[area.geography_id] = area
+            declared_by_code[area.place_code] = area
+        supported_place_codes.update(area.place_code for area in spec.areas)
+    if (
+        not declared
+        or country_name != input_data.countryName
+        or not input_data.geographies
+    ):
+        raise SetupError("SETUP_GEOGRAPHY_INVALID", 400)
+    for row in input_data.geographies:
+        area = declared.get(row.id)
+        if area is None or (
+            row.name != area.display_name
+            or row.level != area.app_level
+            or row.levelLabel != area.level_label
+            or row.path != area.path
+            or row.sortOrder != area.sort_order
+        ):
+            raise SetupError("SETUP_GEOGRAPHY_INVALID", 400)
+        expected_parent = (
+            declared_by_code[area.parent_place_code].geography_id
+            if area.parent_place_code
+            else root_id
+        )
+        if row.parentId != expected_parent:
+            raise SetupError("SETUP_GEOGRAPHY_INVALID", 400)
+    selected = declared[input_data.geographies[-1].id]
+    if selected.place_code not in supported_place_codes:
+        raise SetupError("SETUP_GEOGRAPHY_MODEL_UNAVAILABLE", 400)
+
+    expected_chain = [selected]
+    parent_code = selected.parent_place_code
+    while parent_code is not None:
+        parent = declared_by_code[parent_code]
+        expected_chain.insert(0, parent)
+        parent_code = parent.parent_place_code
+    if [row.id for row in input_data.geographies] != [
+        area.geography_id for area in expected_chain
+    ]:
+        raise SetupError("SETUP_GEOGRAPHY_INVALID", 400)
+    if input_data.geographyLevelLabel != expected_chain[0].level_label:
+        raise SetupError("SETUP_GEOGRAPHY_INVALID", 400)
+    assert release_geography is not None
+    return release_geography
