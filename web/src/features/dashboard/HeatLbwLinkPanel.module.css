@@ -2,17 +2,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-5);
+  padding: var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-card);
   min-height: 22rem;
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
 }
 
 .eyebrow {
@@ -24,35 +18,86 @@
   color: var(--color-text-muted);
 }
 
-.viewingFor {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.viewingLabel {
+.question {
+  margin: 0;
   font-family: var(--font-body);
-  font-size: var(--fs-caption);
-  color: var(--color-text-muted);
-  flex-shrink: 0;
+  font-size: var(--fs-body-lg);
+  font-weight: 400;
+  color: var(--color-charcoal);
+  /* Extra line-height so the pill dropdowns get vertical breathing room
+   * as the question wraps across lines. */
+  line-height: 1.7;
+  /* Prevent English-language leading-space collapse — the JSX inserts
+   * a real space around each inline select and we want it preserved. */
+  word-spacing: 0.05em;
 }
 
-.viewingFor > *:last-child {
-  flex: 1;
-  min-width: 0;
+/* Keep each "…of [dropdown]" / "in [dropdown]" chunk together so the
+ * sentence only wraps at phrase boundaries, never mid-clause or right
+ * before the closing text. */
+.phrase {
+  white-space: nowrap;
 }
 
-.visuallyHidden {
+.inlineStatic {
+  font-weight: 500;
+  color: var(--color-nexus);
+}
+
+.inlineSelect {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  /* Sit the pill nicely on the text baseline. */
+  vertical-align: baseline;
+  margin: 0 2px;
+}
+
+.inlineSelect select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 4px 24px 4px 12px;
+  border: 1px solid var(--color-nexus-tint, rgba(56, 62, 233, 0.2));
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-nexus-tint, rgba(56, 62, 233, 0.08));
+  color: var(--color-nexus);
+  font-family: var(--font-body);
+  font-size: inherit;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.inlineSelect select:hover {
+  background: rgba(56, 62, 233, 0.14);
+  border-color: rgba(56, 62, 233, 0.35);
+}
+
+.inlineSelect select:focus-visible {
+  outline: 2px solid var(--color-nexus);
+  outline-offset: 2px;
+}
+
+.inlineSelectChevron {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--color-nexus);
+}
+
+.modelScopeNote {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-left: 3px solid var(--color-accent, #2f6f62);
+  background: var(--surface-muted, #f5f4ef);
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+  line-height: 1.45;
 }
 
 .iconArrayWrap {
@@ -61,17 +106,10 @@
   margin: var(--space-1) 0;
 }
 
-.skeleton {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4) 0;
-}
-
 .skeletonGrid {
+  align-self: center;
   width: 220px;
-  height: 128px;
+  height: 200px;
   border-radius: var(--radius-md);
   background: linear-gradient(
     100deg,
@@ -81,24 +119,6 @@
   );
   background-size: 200% 100%;
   animation: skeletonShimmer 1.4s ease-in-out infinite;
-}
-
-.skeletonLine {
-  width: 78%;
-  height: 12px;
-  border-radius: 6px;
-  background: linear-gradient(
-    100deg,
-    var(--surface-muted, #f0efe9) 30%,
-    rgba(255, 255, 255, 0.6) 50%,
-    var(--surface-muted, #f0efe9) 70%
-  );
-  background-size: 200% 100%;
-  animation: skeletonShimmer 1.4s ease-in-out infinite;
-}
-
-.skeletonLineShort {
-  width: 45%;
 }
 
 @keyframes skeletonShimmer {
@@ -111,8 +131,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeletonGrid,
-  .skeletonLine {
+  .skeletonGrid {
     animation: none;
   }
 }
@@ -132,15 +151,9 @@
   font-weight: 500;
 }
 
-.stat[data-loading="true"] strong {
-  opacity: 0.7;
-}
-
-.stat[data-loading="true"]::after {
-  content: " (preparing…)";
+.stat[data-loading] {
   color: var(--color-text-muted);
-  font-size: var(--fs-caption);
-  font-weight: 400;
+  font-style: italic;
 }
 
 .precisionRow {
@@ -158,7 +171,7 @@
 .tempReadout {
   margin: 0;
   text-align: center;
-  color: var(--color-maroon);
+  color: var(--color-blue, #1c4e9a);
   font-family: var(--font-display);
   font-size: var(--fs-h3);
   font-weight: 500;
@@ -177,88 +190,12 @@
   color: var(--color-text-muted);
 }
 
-.sliderNote {
-  margin: var(--space-1) 0 0;
-  font-size: var(--fs-caption);
-  color: var(--color-text-muted);
-  text-align: center;
-}
-
-.estimateTag {
-  margin-left: 0.4rem;
-  padding: 1px 6px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-body);
-  font-size: 0.65rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  background: var(--surface-muted);
-  vertical-align: middle;
-}
-
 .footnote {
   margin: var(--space-2) 0 0;
-  font-size: var(--fs-caption);
-  color: var(--color-text-muted);
-  text-align: center;
-  line-height: var(--lh-body);
-}
-
-.tempPills {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  justify-content: center;
-}
-
-.tempPill {
-  display: inline-flex;
-  gap: var(--space-1);
-  padding: 4px var(--space-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-  background: var(--surface-muted);
-  font-size: var(--fs-caption);
-  color: var(--color-charcoal);
-}
-
-.tempPill strong {
-  color: var(--color-text-muted);
-  font-weight: 500;
-  font-family: var(--font-display);
-}
-
-.modelReadout {
-  margin: 0;
-  text-align: center;
-  font-size: var(--fs-body-sm);
-  color: var(--color-text-muted);
-}
-
-.modelReadout strong {
-  color: var(--color-maroon);
-  font-family: var(--font-display);
-}
-
-.explorerHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
   padding-top: var(--space-3);
-  border-top: 1px dashed var(--border-subtle);
-}
-
-.explorerLabel {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-eyebrow);
-  letter-spacing: var(--ls-eyebrow);
-  text-transform: uppercase;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--fs-caption);
   color: var(--color-text-muted);
+  text-align: left;
+  line-height: var(--lh-body);
 }

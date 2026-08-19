@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { AreaTree, type AreaTreeItem } from "@/components/AreaTree";
+import { Icon, type IconName } from "@/components/Icon";
 import { IconArray } from "@/components/IconArray";
-import { type PrecisionLevel } from "@/components/PrecisionBadge";
+import { PrecisionBadge } from "@/components/PrecisionBadge";
+import { PrecisionInfoModal } from "@/components/PrecisionInfoModal";
 import { Slider } from "@/components/Slider";
 import { recordAuditEvent } from "@/lib/audit";
 import {
@@ -12,97 +13,104 @@ import {
   listPredictionRequests,
   type PredictionRequest,
 } from "@/lib/planningClient";
+import { precisionFromCi, type PrecisionLevel } from "@/lib/precision";
 
 import styles from "./HeatLbwLinkPanel.module.css";
+import { relativeOddsChangePercent } from "./oddsRatio";
 import { useWhatIfScore } from "./useWhatIfScore";
+
+type Outcome = { code: string; label: string };
+type District = { code: string; name: string; levelLabel?: string };
 
 type Props = {
   /** Label for the state / whole-area default (e.g. "Madhya Pradesh (State)"). */
   stateLabel: string;
-  /** Districts the model covers under this state. */
-  districts?: readonly { code: string; name: string }[];
+  districts?: readonly District[];
+  modelAreaName?: string | null;
+  parentSelectable?: boolean;
+  outcome?: string;
+  outcomeLabel?: string;
+  outcomes?: readonly Outcome[];
+  onOutcomeChange?: (code: string) => void;
+  /** Figure rendered in each cell of the icon array. Defaults to the same
+   * newborn pictogram the Risk-vs-Protection card uses so the two dashboard
+   * panels read as a single visual family. */
+  figure?: IconName;
+  batchEnabled?: boolean;
   /** Selected district code, or ``null`` for the whole-state view. */
   activeAdminUnitCode?: string | null;
   onAdminUnitChange?: (code: string | null) => void;
-  /** Geography id and token needed to look up the latest run. */
   geographyId?: string;
   accessToken?: string;
   /** Bump this to force a re-fetch when a new run completes. */
   refreshKey?: string | null;
+  /**
+   * Demo prediction rendered when there is no live geography/token wired up
+   * (used by Storybook so the pictogram / precision badge / stat sentence
+   * preview the shape the real app renders). Ignored as soon as the live
+   * what-if or batch prediction resolves.
+   */
+  previewPrediction?: {
+    percent: number;
+    ci95Low: number;
+    ci95High: number;
+  };
 };
 
 const FALLBACK_MIN_TEMP = 30;
 const FALLBACK_MAX_TEMP = 45;
 const DEFAULT_TEMP = 32;
 
-/** Sentinel id the AreaTree uses for the "whole state" row so we can map it
- * back to the null admin_unit convention this panel exposes upstream. */
-const STATE_ROOT_ID = "__state__";
-
-const MONTH_LABELS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
-type LatestPrediction = {
-  attributableFractionPercent: number;
-  oddsRatio: number;
-  ci95Low: number;
-  ci95High: number;
-  precision: PrecisionLevel;
-  months: readonly { label: string; tempC: number | null }[];
-  planningDate: string;
-};
+/** Sentinel value the place select uses for the "whole state" option so we
+ * can map it back to the null admin_unit convention this panel exposes. */
+const STATE_ROOT_VALUE = "__state__";
 
 export function HeatLbwLinkPanel({
   stateLabel,
   districts = [],
+  modelAreaName = null,
+  parentSelectable = true,
+  outcome = "lbw",
+  outcomeLabel = "low birth weight",
+  outcomes,
+  onOutcomeChange,
+  figure = "newborn",
+  batchEnabled = true,
   activeAdminUnitCode = null,
   onAdminUnitChange,
   geographyId,
   accessToken,
   refreshKey,
+  previewPrediction,
 }: Props) {
   const [temperature, setTemperature] = useState<number>(DEFAULT_TEMP);
-  const [latest, setLatest] = useState<LatestPrediction | null>(null);
+  const [latest, setLatest] = useState<{
+    oddsRatio: number;
+    ci95Low: number;
+    ci95High: number;
+    referenceTemperatureC: number;
+  } | null>(null);
+  const [precisionModalOpen, setPrecisionModalOpen] = useState(false);
+
   // The district picker changes which model block (state vs division) is
   // hit. Route both the what-if score and the "latest completed run" lookup
-  // through the same effective id the batch predictor uses in
-  // useAutoPrediction, so all three views stay on the same model.
+  // through the same effective id the batch predictor uses so all views
+  // stay on the same model.
   const effectiveGeographyId = activeAdminUnitCode ?? geographyId;
   const whatIf = useWhatIfScore({
     geographyId: effectiveGeographyId,
     accessToken,
     temperatureC: temperature,
+    outcome,
   });
 
-  // The what-if response carries the LBW model's training-support range
-  // and its sample size. Track them so the slider stays within the model's
-  // validity band and the model readout can show how many pregnancies the
-  // fit was based on. Reset when the district changes — a division block
-  // has its own boundary knots and its own n_training.
   const [modelRange, setModelRange] = useState<[number, number] | null>(null);
-  const [nTraining, setNTraining] = useState<number | null>(null);
   useEffect(() => {
     setModelRange(null);
-    setNTraining(null);
   }, [effectiveGeographyId]);
   useEffect(() => {
     const range = whatIf.score?.modelled_temperature_range_c;
     if (range && range.length === 2) setModelRange([range[0], range[1]]);
-    if (typeof whatIf.score?.n_training === "number") {
-      setNTraining(whatIf.score.n_training);
-    }
   }, [whatIf.score]);
 
   const sliderMin = modelRange?.[0] ?? FALLBACK_MIN_TEMP;
@@ -112,6 +120,10 @@ export function HeatLbwLinkPanel({
   }, [sliderMin, sliderMax]);
 
   useEffect(() => {
+    if (!batchEnabled) {
+      setLatest(null);
+      return;
+    }
     if (!effectiveGeographyId || !accessToken) return;
     let cancelled = false;
     setLatest(null);
@@ -123,164 +135,187 @@ export function HeatLbwLinkPanel({
         if (!cancelled) setLatest(toLatestPrediction(full));
       })
       .catch(() => {
-        // Latest prediction is a courtesy display; failure keeps the
-        // slider explorer usable, so we swallow errors silently.
+        // Latest prediction is a courtesy display; a failure keeps the
+        // slider usable so we swallow errors silently.
       });
     return () => {
       cancelled = true;
     };
-  }, [accessToken, effectiveGeographyId, refreshKey]);
+  }, [accessToken, batchEnabled, effectiveGeographyId, refreshKey]);
 
-  // The slider drives the IconArray so shaded/unshaded reflects the model's
-  // current what-if. Fall back to the batch prediction. When neither has
-  // returned yet we render a skeleton — no fake number.
   const activePrediction: {
     percent: number;
     oddsRatio: number | null;
+    referenceTemperatureC: number | null;
     ci95Low: number | null;
     ci95High: number | null;
-    source: "what-if" | "batch";
   } | null = whatIf.score
     ? {
-        percent: whatIf.score.attributable_fraction_percent,
+        percent:
+          whatIf.score.relative_odds_change_percent ??
+          relativeOddsChangePercent(whatIf.score.odds_ratio),
         oddsRatio: whatIf.score.odds_ratio,
+        referenceTemperatureC: whatIf.score.reference_temperature_c,
         ci95Low: whatIf.score.ci95_low,
         ci95High: whatIf.score.ci95_high,
-        source: "what-if",
       }
-    : latest
+    : latest && batchEnabled
       ? {
-          percent: latest.attributableFractionPercent,
+          percent: relativeOddsChangePercent(latest.oddsRatio),
           oddsRatio: latest.oddsRatio,
+          referenceTemperatureC: latest.referenceTemperatureC,
           ci95Low: latest.ci95Low,
           ci95High: latest.ci95High,
-          source: "batch",
         }
-      : null;
+      : previewPrediction
+        ? {
+            ...previewPrediction,
+            oddsRatio: null,
+            referenceTemperatureC: null,
+          }
+        : null;
   const showingRealResult = activePrediction !== null;
 
-  const monthPills = useMemo(() => latest?.months ?? [], [latest]);
+  const precisionLevel: PrecisionLevel | null =
+    activePrediction &&
+    activePrediction.ci95Low !== null &&
+    activePrediction.ci95High !== null
+      ? precisionFromCi(activePrediction.ci95Low, activePrediction.ci95High)
+      : null;
 
-  const treeItems = useMemo<AreaTreeItem[]>(
-    () => [
-      {
-        id: STATE_ROOT_ID,
-        // stateLabel arrives as "Madhya Pradesh (State)"; strip the
-        // parenthetical so the tree renders the level label once on the
-        // right instead of duplicating it inline.
-        name: stateLabel.replace(/\s*\([^)]*\)\s*$/, ""),
-        levelLabel: "State",
-        parentId: null,
-      },
-      ...districts.map((district) => ({
-        id: district.code,
-        name: district.name,
-        levelLabel: "District",
-        parentId: STATE_ROOT_ID,
-      })),
-    ],
-    [stateLabel, districts],
-  );
+  const showOutcomeSelect = Boolean(outcomes && outcomes.length > 1 && onOutcomeChange);
+  const showPlaceSelect = parentSelectable || districts.length > 0;
+  const placeValue = activeAdminUnitCode ?? STATE_ROOT_VALUE;
 
   return (
     <section className={styles.panel} aria-labelledby="heat-lbw-heading">
-      <header className={styles.header}>
-        <p className={styles.eyebrow}>Link between heat and low-birth-weight</p>
-        <div className={styles.viewingFor}>
-          <span className={styles.viewingLabel}>Viewing for</span>
-          <AreaTree
-            items={treeItems}
-            selectedId={activeAdminUnitCode ?? STATE_ROOT_ID}
-            onSelect={(id) => {
-              const next = id === STATE_ROOT_ID ? null : id;
-              recordAuditEvent({
-                event_type: "district_switch",
-                geography_id: next ?? geographyId ?? null,
-                payload: {
-                  from: activeAdminUnitCode,
-                  to: next,
-                  parent_geography_id: geographyId ?? null,
+      <p className={styles.eyebrow}>Climate &amp; health linkage / correlation</p>
+
+      <h2 id="heat-lbw-heading" className={styles.question}>
+        How do the modelled odds{" "}
+        <span className={styles.phrase}>
+          of{" "}
+          {showOutcomeSelect ? (
+            <InlineSelect
+              aria-label="Health outcome"
+              value={outcome}
+              onChange={(value) => onOutcomeChange?.(value)}
+              options={outcomes!.map((o) => ({ value: o.code, label: o.label }))}
+            />
+          ) : (
+            <span className={styles.inlineStatic}>{outcomeLabel.toLowerCase()}</span>
+          )}
+        </span>{" "}
+        <span className={styles.phrase}>
+          in{" "}
+          {showPlaceSelect ? (
+            <InlineSelect
+              aria-label="Place"
+              value={placeValue}
+              onChange={(value) => {
+                const next = value === STATE_ROOT_VALUE ? null : value;
+                recordAuditEvent({
+                  event_type: "district_switch",
+                  geography_id: next ?? geographyId ?? null,
+                  payload: {
+                    from: activeAdminUnitCode,
+                    to: next,
+                    parent_geography_id: geographyId ?? null,
+                  },
+                });
+                onAdminUnitChange?.(next);
+              }}
+              groups={[
+                {
+                  label: "Whole area",
+                  options: [
+                    {
+                      value: STATE_ROOT_VALUE,
+                      label: stateLabel,
+                      disabled: !parentSelectable,
+                    },
+                  ],
                 },
-              });
-              onAdminUnitChange?.(next);
-            }}
-          />
-        </div>
-      </header>
-      <h2 id="heat-lbw-heading" className={styles.visuallyHidden}>
-        Attributable fraction and precision
+                districts.length > 0
+                  ? {
+                      label: districts[0].levelLabel
+                        ? `${districts[0].levelLabel}s`
+                        : "Districts",
+                      options: districts.map((d) => ({
+                        value: d.code,
+                        label: d.levelLabel ? `${d.name} (${d.levelLabel})` : d.name,
+                      })),
+                    }
+                  : null,
+              ]}
+            />
+          ) : (
+            <span className={styles.inlineStatic}>{stateLabel}</span>
+          )}
+        </span>{" "}
+        compare with the fitted reference temperature?
       </h2>
 
+      {modelAreaName ? (
+        <p className={styles.modelScopeNote}>
+          Health response calculated with the <strong>{modelAreaName}</strong> fitted
+          model area.
+        </p>
+      ) : null}
+
       {showingRealResult ? (
-        <>
-          <div className={styles.iconArrayWrap}>
-            <IconArray value={activePrediction.percent} figure="newborn" />
-          </div>
-
-          <p className={styles.stat}>
-            <strong>{Math.round(activePrediction.percent)}%</strong> of all low birth
-            weight cases may be attributable to maternal heat exposure
-          </p>
-
-          {monthPills.length > 0 ? (
-            <ul
-              className={styles.tempPills}
-              aria-label="Temperatures used in the prediction"
-            >
-              {monthPills.map((month) => (
-                <li key={month.label} className={styles.tempPill}>
-                  <strong>{month.label}</strong>
-                  <span>
-                    {month.tempC !== null ? `${month.tempC.toFixed(1)}°C` : "—"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {activePrediction.oddsRatio !== null ? (
-            <p className={styles.modelReadout}>
-              Odds ratio <strong>{activePrediction.oddsRatio.toFixed(2)}</strong> · 95%
-              CI{" "}
-              <strong>
-                {activePrediction.ci95Low!.toFixed(2)}–
-                {activePrediction.ci95High!.toFixed(2)}
-              </strong>
-            </p>
-          ) : null}
-        </>
+        <div className={styles.iconArrayWrap}>
+          <IconArray value={Math.abs(activePrediction.percent)} figure={figure} />
+        </div>
       ) : (
         <div
-          className={styles.skeleton}
+          className={styles.skeletonGrid}
           role="status"
           aria-live="polite"
           aria-label="Preparing prediction"
-        >
-          <div className={styles.skeletonGrid} />
-          <div className={styles.skeletonLine} />
-          <div className={`${styles.skeletonLine} ${styles.skeletonLineShort}`} />
-        </div>
+        />
       )}
 
-      {/* <div className={styles.precisionRow}>
-        <span className={styles.precisionLabel}>Precision:</span>
-        <PrecisionBadge level={displayPrecision} />
-      </div> */}
-
-      <div className={styles.explorerHeader}>
-        <p className={styles.explorerLabel}>Explore what-if</p>
-        <p className={styles.tempReadout} data-loading={whatIf.loading}>
-          {formatWhatIfReadout(whatIf, temperature)}
-          {isEstimateReadout(whatIf) ? (
-            <span
-              className={styles.estimateTag}
-              title="Estimated from a local fallback curve, not the LBW model."
-            >
-              est.
-            </span>
-          ) : null}
+      {showingRealResult ? (
+        <p className={styles.stat}>
+          {activePrediction.oddsRatio === null ? (
+            <>
+              <strong>{Math.round(activePrediction.percent)}%</strong> modelled
+              difference from the reference
+            </>
+          ) : activePrediction.percent === 0 ? (
+            <>
+              Modelled odds are <strong>the same</strong> as at the{" "}
+              {activePrediction.referenceTemperatureC?.toFixed(1)}°C reference
+            </>
+          ) : (
+            <>
+              Modelled odds are{" "}
+              <strong>{Math.abs(activePrediction.percent).toFixed(1)}%</strong>{" "}
+              {activePrediction.percent < 0 ? "lower" : "higher"} than at the{" "}
+              {activePrediction.referenceTemperatureC?.toFixed(1)}°C reference
+            </>
+          )}
         </p>
-      </div>
+      ) : (
+        <p className={styles.stat} data-loading>
+          Preparing prediction…
+        </p>
+      )}
+
+      {precisionLevel ? (
+        <div className={styles.precisionRow}>
+          <span className={styles.precisionLabel}>Precision:</span>
+          <PrecisionBadge
+            level={precisionLevel}
+            onClick={() => setPrecisionModalOpen(true)}
+          />
+        </div>
+      ) : null}
+
+      <p className={styles.tempReadout} data-loading={whatIf.loading}>
+        {`${temperature.toFixed(1)}°C`}
+      </p>
 
       <div className={styles.sliderWrap}>
         <Slider
@@ -293,86 +328,86 @@ export function HeatLbwLinkPanel({
           ariaLabel="Explore temperature scenarios"
         />
         <div className={styles.sliderScale}>
-          <span>{sliderMin.toFixed(0)}°C</span>
-          <span>{sliderMax.toFixed(0)}°C</span>
+          <span>{sliderMin.toFixed(1)}°C</span>
+          <span>
+            {typeof whatIf.score?.n_training === "number"
+              ? `Observed sample: ${whatIf.score.n_training.toLocaleString()}`
+              : "Fitted model range"}
+          </span>
+          <span>{sliderMax.toFixed(1)}°C</span>
         </div>
-        {modelRange ? (
-          <p className={styles.sliderNote}>
-            Range set by the model's training support
-            {nTraining !== null
-              ? ` · n = ${nTraining.toLocaleString()} pregnancies`
-              : ""}
-          </p>
-        ) : null}
       </div>
 
       <p className={styles.footnote}>
-        {showingRealResult
-          ? "The icons and pills reflect the latest completed prediction. Drag the slider to explore hypothetical temperatures."
-          : "Drag the slider to see how hotter temperatures during pregnancy can increase the likelihood of low birth weight. Once a prediction completes for this area, the icons will switch to the model's own attribution."}
+        Drag the slider to compare the selected location&apos;s fitted association.
+        Highlighting shows the magnitude of the change in modelled odds, not a count of
+        individual cases.
       </p>
+
+      <PrecisionInfoModal
+        open={precisionModalOpen}
+        onClose={() => setPrecisionModalOpen(false)}
+        activeLevel={precisionLevel ?? undefined}
+      />
     </section>
   );
 }
 
-function toLatestPrediction(run: PredictionRequest): LatestPrediction | null {
+type InlineSelectOption = { value: string; label: string; disabled?: boolean };
+type InlineSelectGroup = { label: string; options: readonly InlineSelectOption[] };
+
+function InlineSelect({
+  value,
+  onChange,
+  options,
+  groups,
+  "aria-label": ariaLabel,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options?: readonly InlineSelectOption[];
+  groups?: readonly (InlineSelectGroup | null)[];
+  "aria-label": string;
+}) {
+  const renderOption = (option: InlineSelectOption) => (
+    <option key={option.value} value={option.value} disabled={option.disabled}>
+      {option.label}
+    </option>
+  );
+  return (
+    <span className={styles.inlineSelect}>
+      <select
+        aria-label={ariaLabel}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {groups
+          ? groups
+              .filter((group): group is InlineSelectGroup => group !== null)
+              .map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.options.map(renderOption)}
+                </optgroup>
+              ))
+          : options?.map(renderOption)}
+      </select>
+      <Icon name="chevron-down" size={12} className={styles.inlineSelectChevron} />
+    </span>
+  );
+}
+
+function toLatestPrediction(run: PredictionRequest): {
+  oddsRatio: number;
+  ci95Low: number;
+  ci95High: number;
+  referenceTemperatureC: number;
+} | null {
   const prediction = run.result?.prediction;
   if (!prediction) return null;
-  const or_ = prediction.odds_ratio;
-  const rawAf = or_ > 1 ? (or_ - 1) / or_ : 0;
-  const attributableFractionPercent = Math.round(rawAf * 1000) / 10;
-  const climate = run.result?.climate ?? run.climate;
-  const months = [...climate]
-    .sort((left, right) => left.month.localeCompare(right.month))
-    .map((month) => ({
-      label: monthLabel(month.month),
-      tempC: month.temperature_c,
-    }));
   return {
-    attributableFractionPercent,
     oddsRatio: prediction.odds_ratio,
     ci95Low: prediction.ci95_low,
     ci95High: prediction.ci95_high,
-    precision: precisionFromInterval(prediction.ci95_low, prediction.ci95_high),
-    months,
-    planningDate: run.planning_date,
+    referenceTemperatureC: prediction.reference_temperature_c,
   };
-}
-
-function monthLabel(iso: string): string {
-  if (iso.length < 7) return iso;
-  const monthIndex = Number.parseInt(iso.slice(5, 7), 10) - 1;
-  return MONTH_LABELS[monthIndex] ?? iso.slice(5, 7);
-}
-
-function precisionFromInterval(low: number, high: number): PrecisionLevel {
-  const spread = Math.max(high - low, 0);
-  if (spread <= 0.1) return "high";
-  if (spread <= 0.3) return "moderate";
-  return "low";
-}
-
-// Pre-auth / error fallback so the slider stays meaningful when the model
-// call cannot run. The real % comes from useWhatIfScore -> /climate/what-if.
-function attributableFractionAt(temperatureC: number): number {
-  const clamped = Math.max(
-    FALLBACK_MIN_TEMP,
-    Math.min(FALLBACK_MAX_TEMP, temperatureC),
-  );
-  const above30 = clamped - 30;
-  const percent = 5 + above30 * 3;
-  return Math.max(0, Math.min(100, percent));
-}
-
-function formatWhatIfReadout(
-  state: ReturnType<typeof useWhatIfScore>,
-  temperature: number,
-): string {
-  if (state.score) return `${state.score.attributable_fraction_percent.toFixed(1)}%`;
-  if (state.loading) return "…";
-  return `~${Math.round(attributableFractionAt(temperature))}%`;
-}
-
-function isEstimateReadout(state: ReturnType<typeof useWhatIfScore>): boolean {
-  return !state.score && !state.loading;
 }

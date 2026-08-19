@@ -1,17 +1,22 @@
 .page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: var(--space-6) var(--space-7) var(--space-8);
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.15fr;
-  gap: var(--space-4);
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-3);
   align-items: stretch;
+}
+
+.unsupportedVisualization {
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  color: var(--color-text-muted);
 }
 
 @media (max-width: 1080px) {

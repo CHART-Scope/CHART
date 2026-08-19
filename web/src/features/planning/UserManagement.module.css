@@ -1,6 +1,5 @@
 .page {
   max-width: 1120px;
-  margin: 0 auto;
 }
 
 .header {
@@ -30,11 +29,73 @@
   line-height: 1.65;
 }
 
+.contextCard {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(280px, 0.8fr);
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+}
+
+.modelUpdates {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+}
+
+.modelUpdates strong {
+  color: var(--color-charcoal);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+.modelUpdates p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+}
+
+.modelUpdates .modelSyncMessage {
+  color: var(--color-env);
+}
+
+.contextCard strong {
+  color: var(--color-charcoal);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+.contextCard p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+}
+
 .grid {
   display: grid;
   grid-template-columns: minmax(300px, 0.9fr) minmax(360px, 1.1fr);
   gap: 18px;
   align-items: start;
+}
+
+@media (max-width: 760px) {
+  .contextCard,
+  .modelUpdates,
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .form {

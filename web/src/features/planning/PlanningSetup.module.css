@@ -1,6 +1,5 @@
 .wrap {
   max-width: 780px;
-  margin: 0 auto;
   padding-top: var(--space-4);
 }
 
@@ -136,11 +135,21 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  padding-right: 3rem;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
   font-size: var(--fs-caption);
   color: var(--color-text-muted);
 }
 
+.areaSwitcher > span {
+  min-width: 72px;
+  font-weight: 500;
+  color: var(--color-charcoal);
+}
+
 .areaSwitcher select {
+  min-width: 280px;
   padding: 6px 10px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -153,6 +162,15 @@
   padding: var(--space-3) var(--space-4);
   border-left: 3px solid var(--color-amber);
   background: rgba(201, 102, 47, 0.08);
+  color: var(--color-charcoal);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-body);
+}
+
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--color-nexus);
+  background: var(--color-nexus-tint);
   color: var(--color-charcoal);
   font-size: var(--fs-caption);
   line-height: var(--lh-body);
@@ -197,6 +215,17 @@
   .sentence {
     padding-right: 0;
     font-size: 14px;
+  }
+
+  .areaSwitcher {
+    align-items: stretch;
+    flex-direction: column;
+    padding-right: 0;
+  }
+
+  .areaSwitcher select {
+    width: 100%;
+    min-width: 0;
   }
 
   .ctaRow {
