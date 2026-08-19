@@ -12,6 +12,7 @@ import {
   type GeographyRecord,
   type ModelCatalogEntry,
 } from "@/lib/planningClient";
+import { rememberActiveGeography } from "@/lib/authClient";
 import { PlanningSetup } from "./PlanningSetup";
 import { defaultPlanningSelection, type PlanningSelection } from "./planningWireframe";
 
@@ -43,23 +44,12 @@ export function PlanningApp({
 
   useEffect(() => {
     let cancelled = false;
-    listModelCatalog()
-      .then((items) => {
-        if (!cancelled) setCatalog(items);
-      })
-      .catch(() => {
-        // Catalog is best-effort — planning still works if it can't be
-        // loaded; the pill selects just render an empty list.
-        if (!cancelled) setCatalog([]);
-      });
     listGeographies()
       .then((records) => {
         if (cancelled) return;
-        // Don't filter by supportsPrediction: the dashboard renders an
-        // empty-state skeleton when nothing has been materialized yet,
-        // and the onboarded location may not yet have a registered
-        // model release. Geography scope from Keycloak still applies.
-        const inScope = records.filter((area) => isInScope(area, geographyScopes));
+        const inScope = records.filter(
+          (area) => area.supportsPrediction && isInScope(area, geographyScopes),
+        );
         const active =
           inScope.find(
             (area) => area.id === activeGeographyId || area.path === activeGeographyId,
@@ -88,13 +78,38 @@ export function PlanningApp({
     };
   }, [activeGeographyId, geographyScopes]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!selection.area) {
+      setCatalog([]);
+      return;
+    }
+    listModelCatalog(selection.area, { includeDescendants: true })
+      .then((items) => {
+        if (!cancelled) setCatalog(items);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalog([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selection.area]);
+
   const openDashboard = useCallback(() => {
     if (!selection.area) return;
     setIsSubmitting(true);
-    router.push(`/dashboard/${encodeURIComponent(selection.area)}`);
+    const query = selection.outcome
+      ? `?outcome=${encodeURIComponent(selection.outcome)}`
+      : "";
+    router.push(`/dashboard/${encodeURIComponent(selection.area)}${query}`);
   }, [router, selection.area]);
 
   function changeSelection(next: PlanningSelection) {
+    if (next.area !== selection.area) {
+      const nextArea = areas.find((area) => area.id === next.area);
+      if (nextArea) rememberActiveGeography(nextArea.path);
+    }
     setSelection(next);
     setError(null);
   }
@@ -135,6 +150,9 @@ function isInScope(area: GeographyRecord, scopes: string[]) {
     if (!scope) return false;
     if (scope === area.id) return true;
     if (scope === areaPath) return true;
+    // A parent scope grants its descendants. A child scope must not pull its
+    // ancestors into the picker, otherwise a sub-area user can navigate back
+    // to a parent geography that was not selected during onboarding.
     return areaPath.startsWith(`${scope}/`);
   });
 }

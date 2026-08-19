@@ -19,6 +19,7 @@ import {
   loadActionRepository,
   type ActionRepositoryStatus,
 } from "@/lib/setupClient";
+import type { SetupCountryOption } from "@/features/onboarding/data/geo";
 import styles from "./setup-state.module.css";
 
 type LoadingStage = "setup" | "repository";
@@ -28,6 +29,7 @@ type PageState =
   | {
       phase: "setup";
       sectors: SetupSector[];
+      geographies: SetupCountryOption[];
       repository: ActionRepositoryStatus;
     }
   | { phase: "complete"; repository: ActionRepositoryStatus }
@@ -55,6 +57,7 @@ export default function OnboardingPage() {
       setPageState({
         phase: "setup",
         sectors: options.sectors?.length ? options.sectors : exampleSetupSectors,
+        geographies: options.geographies ?? [],
         repository,
       });
     } catch (error) {
@@ -75,7 +78,7 @@ export default function OnboardingPage() {
   async function launch(state: OnboardingState) {
     if (pageState.phase !== "setup") return;
 
-    await bootstrapChartSetup(state);
+    await bootstrapChartSetup(state, pageState.geographies);
     useOnboardingStore.getState().reset();
     setPageState({ phase: "complete", repository: pageState.repository });
   }
@@ -84,6 +87,7 @@ export default function OnboardingPage() {
     return (
       <OnboardingWizard
         sectors={pageState.sectors}
+        geographyCatalog={pageState.geographies}
         actionRepositoryCount={pageState.repository.actionCount}
         onLaunch={(state) => launch(state)}
       />

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from chart.climate.scenarios import DASHBOARD_LONG_TERM_RCPS
 from chart.shared.db.models import AdminUnit, ClimateRun, DistrictClimate, HealthImpact
 
+from .precision import precision_for_ci
 from .schemas import (
     CurrentObservationResponse,
     HealthImpactPoint,
@@ -110,17 +111,6 @@ def _fetch_rows(session: Session, filters: _Filters) -> list[HealthImpact]:
     )
 
 
-def _precision_for_ci(low_milli: int, high_milli: int) -> str:
-    """Rough precision badge derived from the CI width."""
-
-    spread_milli = max(high_milli - low_milli, 0)
-    if spread_milli <= 100:
-        return "high"
-    if spread_milli <= 300:
-        return "moderate"
-    return "low"
-
-
 def _to_point(row: HealthImpact) -> HealthImpactPoint:
     return HealthImpactPoint(
         valid_month=row.valid_month,
@@ -152,7 +142,7 @@ def _cards_from_rows(rows: list[HealthImpact]) -> list[HorizonCard]:
                 attributable_number=entry.attributable_number,
                 rr_ci_low_milli=entry.rr_ci_low_milli,
                 rr_ci_high_milli=entry.rr_ci_high_milli,
-                precision=_precision_for_ci(
+                precision=precision_for_ci(
                     entry.rr_ci_low_milli, entry.rr_ci_high_milli
                 ),
             )

@@ -1,19 +1,65 @@
 {
-  "id": "lbw-mp-1.0.0-compact-review",
+  "id": "lbw-mp-1.0.1-compact-review",
   "module": "prediction",
   "outcome": "lbw",
   "climate_hazard": "extreme_heat",
   "health_domain": "maternal_newborn_child_health",
-  "version": "1.0.0-compact-review",
-  "base_uri": "s3://chart-predictive-models/india/mp/lbw/1.0.0-compact-review",
+  "version": "1.0.1-compact-review",
+  "runtime": {
+    "adapter": "compact_r_registry",
+    "artifact_type": "rds"
+  },
+  "input_contract": {
+    "supersedes_release_ids": ["lbw-mp-1.0.0-compact-review"],
+    "variables": [
+      {
+        "name": "tmax_lag",
+        "description": "Three monthly means of daily maximum 2m air temperature",
+        "unit": "Celsius",
+        "order": "newest_first",
+        "length": 3
+      }
+    ]
+  },
+  "output_contract": {
+    "effect_measure": "odds_ratio",
+    "confidence_level": 0.95,
+    "attributable_fraction": "positive_excess_only"
+  },
+  "presentation": {
+    "climate_hazard_label": "Extreme heat",
+    "health_domain_label": "Maternal, newborn and child health",
+    "outcome_label": "Low birth weight",
+    "dashboard_title": "Protecting mothers and babies from extreme heat",
+    "population_label": "pregnancies",
+    "model_scope_label": "administrative model",
+    "visualization": {
+      "kind": "odds_ratio_icon_array",
+      "figure": "newborn",
+      "context_figure": "pregnant-woman"
+    },
+    "risk_description": "Exposure to extreme heat during pregnancy is associated with increased low-birth-weight risk, while cooler environments can reduce exposure."
+  },
+  "base_uri": "s3://chart-predictive-models/india/mp/lbw/1.0.1-compact-review",
   "temperature_input": "Three monthly means of daily maximum 2m air temperature, newest first, Celsius",
   "months_required": 3,
-  "release_notes": "Compact parity-review release. Same fitted MP parameters as 1.0.0, combined into one respondent-free runtime artifact. Not approved for activation.",
+  "release_notes": "Modeller-only compact parity-review release: one supplied MP-wide window-1 fit and ten supplied division fits for windows 1-3 (31 blocks). CHART-derived state fits are excluded. Not approved for activation.",
   "source_git_ref": "modeller-review-required",
+  "geography": {
+    "country_code": "IN",
+    "country_name": "India",
+    "root_id": "geo-in",
+    "root_path": "/india",
+    "analytics_slug": "madhya-pradesh",
+    "levels": [
+      { "key": "geo_level_1", "label": "State", "sort_order": 10 },
+      { "key": "geo_level_2", "label": "Division", "sort_order": 20 }
+    ]
+  },
   "model_files": [
     {
-      "filename": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
-      "sha256": "187783d7d784792418129bd8cb7ccc964887e453318c2c2ff32a18ddb8d6c665"
+      "filename": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
+      "sha256": "b7460b4772eb006fd01ffc997deb1fe26e8a9e2b651d6c387553dd6befb98069"
     }
   ],
   "areas": [
@@ -21,7 +67,14 @@
       "place_code": "madhya-pradesh",
       "country_code": "IN",
       "level": "state",
-      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "display_name": "Madhya Pradesh",
+      "geography_id": "geo-in-madhya-pradesh",
+      "app_level": "geo_level_1",
+      "level_label": "State",
+      "path": "/india/madhya-pradesh",
+      "sort_order": 10,
+      "boundary_key": "madhya-pradesh",
+      "model_file": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
       "model_area_name": "Madhya Pradesh",
       "validated_pregnancy_windows": [1]
     },
@@ -29,70 +82,150 @@
       "place_code": "bhopal",
       "country_code": "IN",
       "level": "division",
-      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "display_name": "Bhopal Division",
+      "geography_id": "geo-in-madhya-pradesh-division-bhopal",
+      "app_level": "geo_level_2",
+      "level_label": "Division",
+      "parent_place_code": "madhya-pradesh",
+      "path": "/india/madhya-pradesh/divisions/bhopal",
+      "sort_order": 10,
+      "boundary_key": "bhopal",
+      "model_file": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
       "model_area_name": "Bhopal"
     },
     {
       "place_code": "chambal",
       "country_code": "IN",
       "level": "division",
-      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "display_name": "Chambal Division",
+      "geography_id": "geo-in-madhya-pradesh-division-chambal",
+      "app_level": "geo_level_2",
+      "level_label": "Division",
+      "parent_place_code": "madhya-pradesh",
+      "path": "/india/madhya-pradesh/divisions/chambal",
+      "sort_order": 20,
+      "boundary_key": "chambal",
+      "model_file": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
       "model_area_name": "Chambal"
     },
     {
       "place_code": "gwalior",
       "country_code": "IN",
       "level": "division",
-      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "display_name": "Gwalior Division",
+      "geography_id": "geo-in-madhya-pradesh-division-gwalior",
+      "app_level": "geo_level_2",
+      "level_label": "Division",
+      "parent_place_code": "madhya-pradesh",
+      "path": "/india/madhya-pradesh/divisions/gwalior",
+      "sort_order": 30,
+      "boundary_key": "gwalior",
+      "model_file": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
       "model_area_name": "Gwalior"
     },
     {
       "place_code": "indore",
       "country_code": "IN",
       "level": "division",
-      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "display_name": "Indore Division",
+      "geography_id": "geo-in-madhya-pradesh-division-indore",
+      "app_level": "geo_level_2",
+      "level_label": "Division",
+      "parent_place_code": "madhya-pradesh",
+      "path": "/india/madhya-pradesh/divisions/indore",
+      "sort_order": 40,
+      "boundary_key": "indore",
+      "model_file": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
       "model_area_name": "Indore"
     },
     {
       "place_code": "jabalpur",
       "country_code": "IN",
       "level": "division",
-      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "display_name": "Jabalpur Division",
+      "geography_id": "geo-in-madhya-pradesh-division-jabalpur",
+      "app_level": "geo_level_2",
+      "level_label": "Division",
+      "parent_place_code": "madhya-pradesh",
+      "path": "/india/madhya-pradesh/divisions/jabalpur",
+      "sort_order": 50,
+      "boundary_key": "jabalpur",
+      "model_file": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
       "model_area_name": "Jabalpur"
     },
     {
       "place_code": "narmadapuram",
       "country_code": "IN",
       "level": "division",
-      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "display_name": "Narmadapuram Division",
+      "geography_id": "geo-in-madhya-pradesh-division-narmadapuram",
+      "app_level": "geo_level_2",
+      "level_label": "Division",
+      "parent_place_code": "madhya-pradesh",
+      "path": "/india/madhya-pradesh/divisions/narmadapuram",
+      "sort_order": 60,
+      "boundary_key": "narmadapuram",
+      "model_file": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
       "model_area_name": "Narmadapuram"
     },
     {
       "place_code": "rewa",
       "country_code": "IN",
       "level": "division",
-      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "display_name": "Rewa Division",
+      "geography_id": "geo-in-madhya-pradesh-division-rewa",
+      "app_level": "geo_level_2",
+      "level_label": "Division",
+      "parent_place_code": "madhya-pradesh",
+      "path": "/india/madhya-pradesh/divisions/rewa",
+      "sort_order": 70,
+      "boundary_key": "rewa",
+      "model_file": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
       "model_area_name": "Rewa"
     },
     {
       "place_code": "sagar",
       "country_code": "IN",
       "level": "division",
-      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "display_name": "Sagar Division",
+      "geography_id": "geo-in-madhya-pradesh-division-sagar",
+      "app_level": "geo_level_2",
+      "level_label": "Division",
+      "parent_place_code": "madhya-pradesh",
+      "path": "/india/madhya-pradesh/divisions/sagar",
+      "sort_order": 80,
+      "boundary_key": "sagar",
+      "model_file": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
       "model_area_name": "Sagar"
     },
     {
       "place_code": "shahdol",
       "country_code": "IN",
       "level": "division",
-      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "display_name": "Shahdol Division",
+      "geography_id": "geo-in-madhya-pradesh-division-shahdol",
+      "app_level": "geo_level_2",
+      "level_label": "Division",
+      "parent_place_code": "madhya-pradesh",
+      "path": "/india/madhya-pradesh/divisions/shahdol",
+      "sort_order": 90,
+      "boundary_key": "shahdol",
+      "model_file": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
       "model_area_name": "Shahdol"
     },
     {
       "place_code": "ujjain",
       "country_code": "IN",
       "level": "division",
-      "model_file": "IN_MP_LBW_tmax_v1.0.0-compact.rds",
+      "display_name": "Ujjain Division",
+      "geography_id": "geo-in-madhya-pradesh-division-ujjain",
+      "app_level": "geo_level_2",
+      "level_label": "Division",
+      "parent_place_code": "madhya-pradesh",
+      "path": "/india/madhya-pradesh/divisions/ujjain",
+      "sort_order": 100,
+      "boundary_key": "ujjain",
+      "model_file": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
       "model_area_name": "Ujjain"
     }
   ]

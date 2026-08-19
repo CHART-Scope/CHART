@@ -61,6 +61,7 @@ flowchart LR
 |---|---|
 | [Getting started](getting-started.md) | Install and run CHART locally |
 | [Installation setup](installation-setup.md) | Complete the first-run onboarding wizard, reset an installation, or recover from a stuck bootstrap |
+| [System architecture and requirements](system-architecture-and-requirements.md) | Review users, end-to-end boundaries, functional requirements, capacity targets, and production quality goals |
 | [Python backend overview](python-backend.md) | Build FastAPI modules |
 | [Modeling](modeling.md) | Understand the LBW model, inputs, outputs, and limitations |
 | [Climate API](climate-api.md) | Understand preview and prediction parameters |

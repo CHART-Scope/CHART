@@ -1,0 +1,54 @@
+.list {
+  list-style: none;
+  margin: var(--space-3) 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+
+.row[data-active] {
+  border-color: var(--color-maroon);
+  box-shadow: 0 0 0 1px var(--color-maroon);
+}
+
+.badgeCell {
+  align-self: start;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.headline {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.threshold {
+  margin: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+}
+
+.desc {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}

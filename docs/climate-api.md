@@ -63,10 +63,10 @@ this service. The generated OpenAPI file is the full route reference.
 month and the previous two months.
 
 The current Madhya Pradesh state mapping accepts only `[1]`, representing the
-one original pooled state model. CHART does not attach a pregnancy-stage label
-to that result. Division mappings may accept `[3, 2, 1]` because their release
-contains three distinct fitted blocks. Unsupported window requests return
-`MODEL_PREGNANCY_WINDOW_NOT_VALIDATED`.
+one separately supplied MP-wide model. CHART does not attach a pregnancy-stage
+label to that result. Division mappings may accept `[3, 2, 1]` because their
+release contains three distinct fitted blocks. Unsupported window requests
+return `MODEL_PREGNANCY_WINDOW_NOT_VALIDATED`.
 
 A new request returns `202 Accepted`:
 

@@ -9,6 +9,7 @@ type Props = {
   areaName: string;
   hazardLabel: string;
   healthDomainLabel: string;
+  title?: string;
   onPlayVideo?: () => void;
 };
 
@@ -26,6 +27,7 @@ export function DashboardHeader({
   areaName,
   hazardLabel,
   healthDomainLabel,
+  title = "Understand the climate-health risk and the actions that can save lives",
   onPlayVideo,
 }: Props) {
   const pill = `${hazardLabel} + ${healthDomainLabel}`;
@@ -56,10 +58,7 @@ export function DashboardHeader({
         </button>
         <div className={styles.cardBody}>
           <p className={styles.eyebrow}>Understand the climate-health risk</p>
-          <h1 className={styles.title}>
-            Protecting mothers and babies from extreme heat: The science and actions
-            that can save lives
-          </h1>
+          <h1 className={styles.title}>{title}</h1>
         </div>
       </article>
     </header>

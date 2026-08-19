@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 
-import { ActivityDrawer } from "../ActivityDrawer";
+import { ActivityDrawer } from "../ActivityDrawer/ActivityDrawer";
 import { Icon, type IconName } from "../Icon";
 import styles from "./AppShell.module.css";
 

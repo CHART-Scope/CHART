@@ -1,28 +1,1007 @@
 {
-  "id": "lbw-ke-climate-zone-0.1.0-review",
+  "id": "lbw-ke-climate-zone-0.2.1-review",
   "module": "prediction",
   "outcome": "lbw",
   "climate_hazard": "extreme_heat",
   "health_domain": "maternal_newborn_child_health",
-  "version": "0.1.0-review",
-  "base_uri": "s3://chart-predictive-models/kenya/lbw/0.1.0-review",
-  "temperature_input": "Three monthly means of daily maximum 2m air temperature, newest first, Celsius",
-  "months_required": 3,
-  "release_notes": "Local review release only. Not approved for activation. Kajiado exercises the South-eastern climate-zone model.",
+  "version": "0.2.1-review",
+  "runtime": {
+    "adapter": "compact_r_registry",
+    "artifact_type": "rds"
+  },
+  "input_contract": {
+    "variables": [
+      {
+        "name": "tmax_lag",
+        "description": "Three monthly means of daily maximum 2m air temperature",
+        "unit": "Celsius",
+        "order": "newest_first",
+        "length": 3
+      }
+    ],
+    "supersedes_release_ids": [
+      "lbw-ke-climate-zone-0.1.1-review",
+      "lbw-ke-climate-zone-0.1.2-review",
+      "lbw-ke-climate-zone-0.1.3-review",
+      "lbw-ke-climate-zone-0.2.0-review"
+    ]
+  },
+  "output_contract": {
+    "effect_measure": "odds_ratio",
+    "confidence_level": 0.95,
+    "attributable_fraction": "positive_excess_only"
+  },
+  "presentation": {
+    "climate_hazard_label": "Extreme heat",
+    "health_domain_label": "Maternal, newborn and child health",
+    "outcome_label": "Low birth weight",
+    "dashboard_title": "Protecting mothers and babies from extreme heat",
+    "population_label": "pregnancies",
+    "model_scope_label": "climate-zone model",
+    "visualization": {
+      "kind": "odds_ratio_icon_array",
+      "figure": "newborn",
+      "context_figure": "pregnant-woman"
+    },
+    "risk_description": "Exposure to extreme heat during pregnancy is associated with increased low-birth-weight risk, while cooler environments can reduce exposure."
+  },
+  "base_uri": "s3://chart-predictive-models/kenya/lbw/0.2.1-review",
+  "release_notes": "Local review release only. All 47 Kenya counties are navigation and climate-extraction geographies. The 46 supported counties map explicitly to one of five fitted climate-zone response blocks. Turkana remains visible but prediction is unavailable because the recovered artifact has no North-western fitted block.",
   "source_git_ref": "modeller-review-required",
+  "geography": {
+    "country_code": "KE",
+    "country_name": "Kenya",
+    "root_id": "geo-ke",
+    "root_path": "/kenya",
+    "analytics_slug": "kenya",
+    "boundary_artifact": "pipelines/boundaries/data/kenya_counties_climate_zones.geojson",
+    "levels": [
+      {
+        "key": "geo_level_1",
+        "label": "County",
+        "sort_order": 10
+      }
+    ],
+    "places": [
+      {
+        "place_code": "baringo",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Baringo",
+        "geography_id": "geo-ke-baringo",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/baringo",
+        "sort_order": 10,
+        "boundary_key": "baringo"
+      },
+      {
+        "place_code": "bomet",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Bomet",
+        "geography_id": "geo-ke-bomet",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/bomet",
+        "sort_order": 20,
+        "boundary_key": "bomet"
+      },
+      {
+        "place_code": "bungoma",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Bungoma",
+        "geography_id": "geo-ke-bungoma",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/bungoma",
+        "sort_order": 30,
+        "boundary_key": "bungoma"
+      },
+      {
+        "place_code": "busia",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Busia",
+        "geography_id": "geo-ke-busia",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/busia",
+        "sort_order": 40,
+        "boundary_key": "busia"
+      },
+      {
+        "place_code": "elgeyo-marakwet",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Elgeyo-Marakwet",
+        "geography_id": "geo-ke-elgeyo-marakwet",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/elgeyo-marakwet",
+        "sort_order": 50,
+        "boundary_key": "elgeyo-marakwet"
+      },
+      {
+        "place_code": "embu",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Embu",
+        "geography_id": "geo-ke-embu",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/embu",
+        "sort_order": 60,
+        "boundary_key": "embu"
+      },
+      {
+        "place_code": "garissa",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Garissa",
+        "geography_id": "geo-ke-garissa",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/garissa",
+        "sort_order": 70,
+        "boundary_key": "garissa"
+      },
+      {
+        "place_code": "homa-bay",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Homa Bay",
+        "geography_id": "geo-ke-homa-bay",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/homa-bay",
+        "sort_order": 80,
+        "boundary_key": "homa-bay"
+      },
+      {
+        "place_code": "isiolo",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Isiolo",
+        "geography_id": "geo-ke-isiolo",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/isiolo",
+        "sort_order": 90,
+        "boundary_key": "isiolo"
+      },
+      {
+        "place_code": "kajiado",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Kajiado",
+        "geography_id": "geo-ke-kajiado",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/kajiado",
+        "sort_order": 100,
+        "boundary_key": "kajiado"
+      },
+      {
+        "place_code": "kakamega",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Kakamega",
+        "geography_id": "geo-ke-kakamega",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/kakamega",
+        "sort_order": 110,
+        "boundary_key": "kakamega"
+      },
+      {
+        "place_code": "kericho",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Kericho",
+        "geography_id": "geo-ke-kericho",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/kericho",
+        "sort_order": 120,
+        "boundary_key": "kericho"
+      },
+      {
+        "place_code": "kiambu",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Kiambu",
+        "geography_id": "geo-ke-kiambu",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/kiambu",
+        "sort_order": 130,
+        "boundary_key": "kiambu"
+      },
+      {
+        "place_code": "kilifi",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Kilifi",
+        "geography_id": "geo-ke-kilifi",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/kilifi",
+        "sort_order": 140,
+        "boundary_key": "kilifi"
+      },
+      {
+        "place_code": "kirinyaga",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Kirinyaga",
+        "geography_id": "geo-ke-kirinyaga",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/kirinyaga",
+        "sort_order": 150,
+        "boundary_key": "kirinyaga"
+      },
+      {
+        "place_code": "kisii",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Kisii",
+        "geography_id": "geo-ke-kisii",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/kisii",
+        "sort_order": 160,
+        "boundary_key": "kisii"
+      },
+      {
+        "place_code": "kisumu",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Kisumu",
+        "geography_id": "geo-ke-kisumu",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/kisumu",
+        "sort_order": 170,
+        "boundary_key": "kisumu"
+      },
+      {
+        "place_code": "kitui",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Kitui",
+        "geography_id": "geo-ke-kitui",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/kitui",
+        "sort_order": 180,
+        "boundary_key": "kitui"
+      },
+      {
+        "place_code": "kwale",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Kwale",
+        "geography_id": "geo-ke-kwale",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/kwale",
+        "sort_order": 190,
+        "boundary_key": "kwale"
+      },
+      {
+        "place_code": "laikipia",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Laikipia",
+        "geography_id": "geo-ke-laikipia",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/laikipia",
+        "sort_order": 200,
+        "boundary_key": "laikipia"
+      },
+      {
+        "place_code": "lamu",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Lamu",
+        "geography_id": "geo-ke-lamu",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/lamu",
+        "sort_order": 210,
+        "boundary_key": "lamu"
+      },
+      {
+        "place_code": "machakos",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Machakos",
+        "geography_id": "geo-ke-machakos",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/machakos",
+        "sort_order": 220,
+        "boundary_key": "machakos"
+      },
+      {
+        "place_code": "makueni",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Makueni",
+        "geography_id": "geo-ke-makueni",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/makueni",
+        "sort_order": 230,
+        "boundary_key": "makueni"
+      },
+      {
+        "place_code": "mandera",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Mandera",
+        "geography_id": "geo-ke-mandera",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/mandera",
+        "sort_order": 240,
+        "boundary_key": "mandera"
+      },
+      {
+        "place_code": "marsabit",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Marsabit",
+        "geography_id": "geo-ke-marsabit",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/marsabit",
+        "sort_order": 250,
+        "boundary_key": "marsabit"
+      },
+      {
+        "place_code": "meru",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Meru",
+        "geography_id": "geo-ke-meru",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/meru",
+        "sort_order": 260,
+        "boundary_key": "meru"
+      },
+      {
+        "place_code": "migori",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Migori",
+        "geography_id": "geo-ke-migori",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/migori",
+        "sort_order": 270,
+        "boundary_key": "migori"
+      },
+      {
+        "place_code": "mombasa",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Mombasa",
+        "geography_id": "geo-ke-mombasa",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/mombasa",
+        "sort_order": 280,
+        "boundary_key": "mombasa"
+      },
+      {
+        "place_code": "muranga",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Murang'a",
+        "geography_id": "geo-ke-muranga",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/muranga",
+        "sort_order": 290,
+        "boundary_key": "muranga"
+      },
+      {
+        "place_code": "nairobi",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Nairobi",
+        "geography_id": "geo-ke-nairobi",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/nairobi",
+        "sort_order": 300,
+        "boundary_key": "nairobi"
+      },
+      {
+        "place_code": "nakuru",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Nakuru",
+        "geography_id": "geo-ke-nakuru",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/nakuru",
+        "sort_order": 310,
+        "boundary_key": "nakuru"
+      },
+      {
+        "place_code": "nandi",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Nandi",
+        "geography_id": "geo-ke-nandi",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/nandi",
+        "sort_order": 320,
+        "boundary_key": "nandi"
+      },
+      {
+        "place_code": "narok",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Narok",
+        "geography_id": "geo-ke-narok",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/narok",
+        "sort_order": 330,
+        "boundary_key": "narok"
+      },
+      {
+        "place_code": "nyamira",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Nyamira",
+        "geography_id": "geo-ke-nyamira",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/nyamira",
+        "sort_order": 340,
+        "boundary_key": "nyamira"
+      },
+      {
+        "place_code": "nyandarua",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Nyandarua",
+        "geography_id": "geo-ke-nyandarua",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/nyandarua",
+        "sort_order": 350,
+        "boundary_key": "nyandarua"
+      },
+      {
+        "place_code": "nyeri",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Nyeri",
+        "geography_id": "geo-ke-nyeri",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/nyeri",
+        "sort_order": 360,
+        "boundary_key": "nyeri"
+      },
+      {
+        "place_code": "samburu",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Samburu",
+        "geography_id": "geo-ke-samburu",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/samburu",
+        "sort_order": 370,
+        "boundary_key": "samburu"
+      },
+      {
+        "place_code": "siaya",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Siaya",
+        "geography_id": "geo-ke-siaya",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/siaya",
+        "sort_order": 380,
+        "boundary_key": "siaya"
+      },
+      {
+        "place_code": "taita-taveta",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Taita-Taveta",
+        "geography_id": "geo-ke-taita-taveta",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/taita-taveta",
+        "sort_order": 390,
+        "boundary_key": "taita-taveta"
+      },
+      {
+        "place_code": "tana-river",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Tana River",
+        "geography_id": "geo-ke-tana-river",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/tana-river",
+        "sort_order": 400,
+        "boundary_key": "tana-river"
+      },
+      {
+        "place_code": "tharaka-nithi",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Tharaka-Nithi",
+        "geography_id": "geo-ke-tharaka-nithi",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/tharaka-nithi",
+        "sort_order": 410,
+        "boundary_key": "tharaka-nithi"
+      },
+      {
+        "place_code": "trans-nzoia",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Trans Nzoia",
+        "geography_id": "geo-ke-trans-nzoia",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/trans-nzoia",
+        "sort_order": 420,
+        "boundary_key": "trans-nzoia"
+      },
+      {
+        "place_code": "turkana",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Turkana",
+        "geography_id": "geo-ke-turkana",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/turkana",
+        "sort_order": 430,
+        "boundary_key": "turkana"
+      },
+      {
+        "place_code": "uasin-gishu",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Uasin Gishu",
+        "geography_id": "geo-ke-uasin-gishu",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/uasin-gishu",
+        "sort_order": 440,
+        "boundary_key": "uasin-gishu"
+      },
+      {
+        "place_code": "vihiga",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Vihiga",
+        "geography_id": "geo-ke-vihiga",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/vihiga",
+        "sort_order": 450,
+        "boundary_key": "vihiga"
+      },
+      {
+        "place_code": "wajir",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "Wajir",
+        "geography_id": "geo-ke-wajir",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/wajir",
+        "sort_order": 460,
+        "boundary_key": "wajir"
+      },
+      {
+        "place_code": "west-pokot",
+        "country_code": "KE",
+        "level": "county",
+        "display_name": "West Pokot",
+        "geography_id": "geo-ke-west-pokot",
+        "app_level": "geo_level_1",
+        "level_label": "County",
+        "path": "/kenya/west-pokot",
+        "sort_order": 470,
+        "boundary_key": "west-pokot"
+      }
+    ]
+  },
   "model_files": [
     {
-      "filename": "KE_climate_zone_LBW_tmax_v0.1.0-review.rds",
-      "sha256": "b00fc13ee3fb677c57b5302280ab1e575d64f4f87501f10e1bd4ec01748af7b7"
+      "filename": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "sha256": "ffc9ed89723f7d2a54e09fe2274dac7f7d2466c9c674b79cd6be8e240addd58a"
     }
   ],
   "areas": [
     {
+      "place_code": "baringo",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "bomet",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "bungoma",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "busia",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "elgeyo-marakwet",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "embu",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Central Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "garissa",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "North-eastern",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "homa-bay",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "isiolo",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "North-eastern",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
       "place_code": "kajiado",
       "country_code": "KE",
       "level": "county",
-      "model_file": "KE_climate_zone_LBW_tmax_v0.1.0-review.rds",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
       "model_area_name": "South-eastern",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "kakamega",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "kericho",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "kiambu",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Central Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "kilifi",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Coastal Strip",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "kirinyaga",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Central Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "kisii",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "kisumu",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "kitui",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "South-eastern",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "kwale",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Coastal Strip",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "laikipia",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "lamu",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Coastal Strip",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "machakos",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "South-eastern",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "makueni",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "South-eastern",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "mandera",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "North-eastern",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "marsabit",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "North-eastern",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "meru",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Central Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "migori",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "mombasa",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Coastal Strip",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "muranga",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Central Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "nairobi",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Central Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "nakuru",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "nandi",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "narok",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "nyamira",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "nyandarua",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Central Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "nyeri",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Central Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "samburu",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "North-eastern",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "siaya",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "taita-taveta",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "South-eastern",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "tana-river",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "South-eastern",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "tharaka-nithi",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Central Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "trans-nzoia",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "uasin-gishu",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "vihiga",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "wajir",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "North-eastern",
+      "validated_pregnancy_windows": [1, 2, 3]
+    },
+    {
+      "place_code": "west-pokot",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands",
       "validated_pregnancy_windows": [1, 2, 3]
     }
   ]

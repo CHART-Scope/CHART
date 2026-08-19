@@ -95,6 +95,27 @@ def test_auth_me_applies_an_allowed_active_geography(
     assert response.json()["geographyLevel"] == "geo_level_2"
 
 
+def test_admin_can_switch_within_assigned_country_but_not_to_another_country(
+    client: TestClient, signed_token
+) -> None:
+    token = signed_token(resource_access={"chart-api": {"roles": ["chart_admin"]}})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    profile = client.get("/auth/me", headers=headers)
+    sibling = client.get(
+        "/auth/geography-access?geography=/country-b/region-c", headers=headers
+    )
+    other_country = client.get(
+        "/auth/geography-access?geography=/country-a/region-a", headers=headers
+    )
+
+    assert profile.status_code == 200
+    assert profile.json()["geographyScopes"] == ["/country-b"]
+    assert profile.json()["activeGeographyId"] == "/country-b/region-b"
+    assert sibling.status_code == 200
+    assert other_country.status_code == 403
+
+
 def test_auth_me_rejects_invalid_issuer(client: TestClient, signed_token) -> None:
     response = client.get(
         "/auth/me",

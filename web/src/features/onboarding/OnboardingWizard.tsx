@@ -8,7 +8,12 @@ import { Pill } from "@/components/Pill";
 import { Select } from "@/components/Select";
 import { Stepper, type Step } from "@/components/Stepper";
 import { TextInput } from "@/components/TextInput";
-import { COUNTRIES, GEO_DATA, geoLabelForLevel, subGeoLabelForLevel } from "./data/geo";
+import {
+  buildGeoData,
+  geoLabelForLevel,
+  subGeoLabelForLevel,
+  type SetupCountryOption,
+} from "./data/geo";
 import { SECTORS } from "./data/sectors";
 import styles from "./OnboardingWizard.module.css";
 import { useOnboardingStore, type OnboardingState } from "./store";
@@ -38,6 +43,7 @@ type Props = {
   initialStep?: number;
   initialState?: Partial<OnboardingState>;
   onLaunch?: (state: OnboardingState) => void | Promise<void>;
+  geographyCatalog?: SetupCountryOption[];
 };
 
 export function OnboardingWizard({
@@ -46,6 +52,7 @@ export function OnboardingWizard({
   initialStep,
   initialState,
   onLaunch,
+  geographyCatalog = [],
 }: Props) {
   const state = useOnboardingStore();
   const {
@@ -77,13 +84,27 @@ export function OnboardingWizard({
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [showAdminDialog, setShowAdminDialog] = useState(false);
 
+  const geoData = useMemo(() => buildGeoData(geographyCatalog), [geographyCatalog]);
+  const countries = useMemo(() => Object.keys(geoData), [geoData]);
   const levels = useMemo(
-    () => (state.country ? Object.keys(GEO_DATA[state.country]) : []),
-    [state.country],
+    () => (state.country ? Object.keys(geoData[state.country] ?? {}) : []),
+    [geoData, state.country],
   );
   const levelCfg =
-    state.country && state.level ? GEO_DATA[state.country][state.level] : undefined;
+    state.country && state.level ? geoData[state.country]?.[state.level] : undefined;
   const subOptions = levelCfg?.sub && state.geo ? levelCfg.sub[state.geo] : null;
+  const selectedCountry = geographyCatalog.find(
+    (country) => country.countryName === state.country,
+  );
+  const selectedPlaceName = state.subgeo ?? state.geo;
+  const selectedPlace = selectedCountry?.places.find(
+    (place) => place.name === selectedPlaceName,
+  );
+  const selectedModelMappings = selectedPlace?.modelMappings ?? [];
+  const levelModelPlaces = (selectedCountry?.places ?? []).filter(
+    (place) =>
+      place.levelLabel === state.level && (place.modelMappings?.length ?? 0) > 0,
+  );
   const adminReady =
     state.adminName.trim().length >= 2 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.adminEmail) &&
@@ -175,16 +196,18 @@ export function OnboardingWizard({
                       placeholder="— Choose a country —"
                       value={state.country ?? ""}
                       onChange={(event) => setCountry(event.currentTarget.value)}
-                      options={COUNTRIES.map((country) => ({
+                      options={countries.map((country) => ({
                         value: country,
                         label: country,
                       }))}
                     />
                   </div>
                   <div className={styles.infoNote}>
-                    <strong>More countries coming soon</strong>
-                    CHART currently supports India and Kenya. Expansion to additional
-                    countries in Africa and Asia is underway.
+                    <strong>Manifest-configured countries</strong>
+                    This installation currently provides {countries.length} configured
+                    {countries.length === 1 ? " country" : " countries"}. New countries
+                    appear here after their model release and geography manifest is
+                    installed.
                   </div>
                 </section>
               ) : null}
@@ -211,9 +234,7 @@ export function OnboardingWizard({
                   </div>
                   {levelCfg ? (
                     <div className={styles.subsection}>
-                      <NumberedLabel n={2}>
-                        {geoLabelForLevel(state.level!)}
-                      </NumberedLabel>
+                      <NumberedLabel n={2}>{geoLabelForLevel(levelCfg)}</NumberedLabel>
                       <Select
                         className={styles.setupSelect}
                         placeholder="— Choose —"
@@ -221,7 +242,7 @@ export function OnboardingWizard({
                         onChange={(event) => setGeo(event.currentTarget.value)}
                         options={levelCfg.options.map((option) => ({
                           value: option,
-                          label: option,
+                          label: onboardingPlaceLabel(option, selectedCountry),
                         }))}
                       />
                     </div>
@@ -229,7 +250,7 @@ export function OnboardingWizard({
                   {subOptions ? (
                     <div className={styles.subsection}>
                       <NumberedLabel n={3}>
-                        {subGeoLabelForLevel(state.level!)}
+                        {subGeoLabelForLevel(levelCfg!)}
                       </NumberedLabel>
                       <Select
                         className={styles.setupSelect}
@@ -238,9 +259,32 @@ export function OnboardingWizard({
                         onChange={(event) => setSubgeo(event.currentTarget.value)}
                         options={subOptions.map((option) => ({
                           value: option,
-                          label: option,
+                          label: onboardingPlaceLabel(option, selectedCountry),
                         }))}
                       />
+                    </div>
+                  ) : null}
+                  {levelCfg ? (
+                    <ModelMappingDirectory
+                      levelLabel={state.level ?? "Area"}
+                      places={levelModelPlaces}
+                    />
+                  ) : null}
+                  {selectedPlace && selectedModelMappings.length > 0 ? (
+                    <div className={styles.modelMapping} role="status">
+                      <strong>Model mapping from the installed manifest</strong>
+                      <span>
+                        {selectedPlace.name} · {selectedPlace.levelLabel}
+                      </span>
+                      <ul>
+                        {selectedModelMappings.map((mapping) => (
+                          <li key={`${mapping.releaseId}-${mapping.outcome}`}>
+                            <b>{mapping.outcomeLabel}</b>
+                            <span aria-hidden> → </span>
+                            {mapping.modelAreaName} ({mapping.modelScopeLabel})
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   ) : null}
                 </section>
@@ -424,6 +468,81 @@ export function OnboardingWizard({
       ) : null}
     </>
   );
+}
+
+function ModelMappingDirectory({
+  levelLabel,
+  places,
+}: {
+  levelLabel: string;
+  places: SetupCountryOption["places"];
+}) {
+  if (places.length === 0) {
+    return (
+      <div className={styles.mappingUnavailable} role="alert">
+        <strong>Model mapping details are not available</strong>
+        The setup service has not returned the fitted model areas. Restart the backend
+        before verifying or launching onboarding.
+      </div>
+    );
+  }
+
+  const modelAreas = [
+    ...new Set(
+      places.flatMap((place) =>
+        (place.modelMappings ?? []).map(
+          (mapping) => `${mapping.modelAreaName} · ${mapping.modelScopeLabel}`,
+        ),
+      ),
+    ),
+  ];
+  return (
+    <section className={styles.mappingDirectory} aria-label="Manifest model mappings">
+      <strong>{levelLabel} → fitted model area</strong>
+      <p>
+        The installed manifests map {places.length} {levelLabel.toLowerCase()}
+        {places.length === 1 ? "" : "s"} to {modelAreas.length} fitted model area
+        {modelAreas.length === 1 ? "" : "s"}.
+      </p>
+      <div className={styles.mappingAreas}>
+        {modelAreas.map((area) => (
+          <span key={area}>{area}</span>
+        ))}
+      </div>
+      <details open>
+        <summary>{levelLabel} and model-area mappings</summary>
+        <ul>
+          {places.map((place) => (
+            <li key={place.id}>
+              <b>{place.name}</b>
+              <span>
+                {(place.modelMappings ?? [])
+                  .map(
+                    (mapping) => `${mapping.modelAreaName} (${mapping.outcomeLabel})`,
+                  )
+                  .join("; ")}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </details>
+    </section>
+  );
+}
+
+function onboardingPlaceLabel(name: string, country: SetupCountryOption | undefined) {
+  const place = country?.places.find((item) => item.name === name);
+  const mappings = place?.modelMappings ?? [];
+  if (mappings.length === 0) return name;
+  const summaries = [
+    ...new Set(
+      mappings.map(
+        (mapping) => `${mapping.modelAreaName} · ${mapping.modelScopeLabel}`,
+      ),
+    ),
+  ];
+  const remainder = summaries.length > 1 ? ` +${summaries.length - 1} model` : "";
+  return `${name} — ${summaries[0]}${remainder}`;
 }
 
 function snapshot(state: OnboardingState): OnboardingState {

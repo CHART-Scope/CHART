@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { recordAuditEvent } from "@/lib/audit";
 import { submitWhatIfScore, type WhatIfScore } from "@/lib/planningClient";
+import { affectedPercentFromOddsRatio } from "./oddsRatio";
 
 export type WhatIfScoreState = {
   score: WhatIfScore | null;
@@ -15,6 +16,7 @@ type Options = {
   geographyId: string | undefined;
   accessToken: string | undefined;
   temperatureC: number;
+  outcome?: string;
   debounceMs?: number;
 };
 
@@ -29,6 +31,7 @@ export function useWhatIfScore({
   geographyId,
   accessToken,
   temperatureC,
+  outcome = "lbw",
   debounceMs = 250,
 }: Options): WhatIfScoreState {
   const [state, setState] = useState<WhatIfScoreState>({
@@ -44,7 +47,7 @@ export function useWhatIfScore({
   useEffect(() => {
     if (!geographyId || !accessToken) return;
     const rounded = Math.round(temperatureC * 2) / 2;
-    const key = `${geographyId}:${rounded.toFixed(1)}`;
+    const key = `${geographyId}:${outcome}:${rounded.toFixed(1)}`;
 
     const cached = cache.current.get(key);
     if (cached) {
@@ -54,14 +57,16 @@ export function useWhatIfScore({
 
     if (timer.current) clearTimeout(timer.current);
     if (abort.current) abort.current.abort();
-    setState((prev) => ({ ...prev, loading: true, error: null }));
+    // A different place/outcome must not temporarily reuse the previous
+    // block's score or fitted temperature range while its request is loading.
+    setState({ score: null, loading: true, error: null });
 
     timer.current = setTimeout(() => {
       const controller = new AbortController();
       abort.current = controller;
       submitWhatIfScore(
         accessToken,
-        { geographyId, temperatureC: rounded },
+        { geographyId, temperatureC: rounded, outcome },
         { signal: controller.signal },
       )
         .then((score) => {
@@ -73,11 +78,13 @@ export function useWhatIfScore({
             geography_id: geographyId,
             payload: {
               temperature_c: rounded,
-              af_percent: score.attributable_fraction_percent,
+              af_percent: affectedPercentFromOddsRatio(score.odds_ratio),
+              relative_odds_change_percent: score.relative_odds_change_percent,
               odds_ratio: score.odds_ratio,
               on_training_support: score.on_training_support,
               pregnancy_window: score.pregnancy_window,
               model_version: score.model_version,
+              outcome: score.outcome,
             },
           });
           if (settleTimer.current) clearTimeout(settleTimer.current);
@@ -87,7 +94,8 @@ export function useWhatIfScore({
               geography_id: geographyId,
               payload: {
                 temperature_c: rounded,
-                af_percent: score.attributable_fraction_percent,
+                af_percent: affectedPercentFromOddsRatio(score.odds_ratio),
+                relative_odds_change_percent: score.relative_odds_change_percent,
                 odds_ratio: score.odds_ratio,
               },
             });
@@ -110,7 +118,7 @@ export function useWhatIfScore({
       if (timer.current) clearTimeout(timer.current);
       if (settleTimer.current) clearTimeout(settleTimer.current);
     };
-  }, [geographyId, accessToken, temperatureC, debounceMs]);
+  }, [geographyId, accessToken, temperatureC, outcome, debounceMs]);
 
   return state;
 }

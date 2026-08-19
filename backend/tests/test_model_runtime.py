@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from chart.model_registry.runtime import warm_model_release
+from chart.model_registry.runtime import prepare_model_release, warm_model_release
 from chart.model_registry.schemas import ModelReleaseSpec
 from chart.model_registry.service import ModelRegistryError
 
@@ -19,6 +19,10 @@ def _spec(digest: str, *, filename: str = "kenya.rds") -> ModelReleaseSpec:
             "module": "prediction",
             "outcome": "lbw",
             "version": "0.1.0-review",
+            "runtime": {
+                "adapter": "compact_r_registry",
+                "artifact_type": "rds",
+            },
             "base_uri": "s3://private/models",
             "temperature_input": "three monthly temperatures",
             "months_required": 3,
@@ -99,3 +103,59 @@ def test_warm_model_release_rejects_checksum_mismatch(tmp_path: Path) -> None:
 def test_model_release_rejects_artifact_path_traversal() -> None:
     with pytest.raises(ValueError, match="MODEL_RELEASE_FILENAME_INVALID"):
         _spec("a" * 64, filename="../kenya.rds")
+
+
+def test_prepare_model_release_rejects_unknown_runtime_adapter() -> None:
+    spec = _spec("a" * 64)
+    spec.runtime.adapter = "future_python_adapter"
+    with pytest.raises(ModelRegistryError) as caught:
+        prepare_model_release(spec)
+    assert caught.value.code == "MODEL_RUNTIME_ADAPTER_UNSUPPORTED"
+
+
+def test_model_release_rejects_place_label_that_disagrees_with_level() -> None:
+    document = {
+        "id": "label-test",
+        "module": "prediction",
+        "outcome": "lbw",
+        "version": "1.0.0",
+        "base_uri": "s3://private/models",
+        "temperature_input": "three monthly temperatures",
+        "months_required": 3,
+        "model_files": [{"filename": "model.rds", "sha256": "a" * 64}],
+        "geography": {
+            "country_code": "IN",
+            "country_name": "India",
+            "root_id": "geo-in",
+            "root_path": "/india",
+            "analytics_slug": "madhya-pradesh",
+            "levels": [{"key": "geo_level_1", "label": "State", "sort_order": 10}],
+            "places": [
+                {
+                    "place_code": "madhya-pradesh",
+                    "country_code": "IN",
+                    "level": "state",
+                    "display_name": "Madhya Pradesh",
+                    "geography_id": "geo-in-madhya-pradesh",
+                    "app_level": "geo_level_1",
+                    "level_label": "County",
+                    "path": "/india/madhya-pradesh",
+                    "boundary_key": "madhya-pradesh",
+                }
+            ],
+        },
+        "areas": [
+            {
+                "place_code": "madhya-pradesh",
+                "country_code": "IN",
+                "level": "state",
+                "model_file": "model.rds",
+                "model_area_name": "Madhya Pradesh",
+            }
+        ],
+    }
+
+    with pytest.raises(
+        ValueError, match="MODEL_RELEASE_GEOGRAPHY_LEVEL_LABEL_MISMATCH"
+    ):
+        ModelReleaseSpec.model_validate(document)

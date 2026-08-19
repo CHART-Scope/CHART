@@ -13,6 +13,9 @@ export type ClimateScenario = "ssp126" | "ssp370" | "ssp585";
 
 export type PlanningSelection = {
   area: string;
+  hazard: string;
+  healthDomain: string;
+  outcome: string;
   period: PlanningPeriod;
   scenario: ClimateScenario | "";
   specificMonth: string;
@@ -20,6 +23,9 @@ export type PlanningSelection = {
 
 export const defaultPlanningSelection = (): PlanningSelection => ({
   area: "",
+  hazard: "",
+  healthDomain: "",
+  outcome: "",
   period: "next-three-months",
   scenario: "",
   specificMonth: "",
@@ -97,6 +103,9 @@ export function selectionFromRequest(request: PredictionRequest): PlanningSelect
           : "specific-month";
   return {
     area: request.geography_id,
+    hazard: "extreme_heat",
+    healthDomain: "maternal_newborn_child_health",
+    outcome: "lbw",
     period,
     scenario: request.projection_scenario ?? "",
     specificMonth: request.planning_date.slice(0, 7),

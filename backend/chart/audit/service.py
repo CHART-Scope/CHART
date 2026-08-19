@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from chart.shared.db.models import (
     AdminUnit,
+    AppUser,
     AuditEventRecord,
     PredictionRequestRecord,
 )
@@ -36,6 +37,15 @@ def insert_events(
 
     session_factory = session_factory or get_session_factory()
     with session_factory() as session:
+        # Reset removes the provisioned CHART user before the browser has had
+        # a chance to clear its buffered audit queue. Lock a present user for
+        # the duration of this insert, or discard the stale batch. Audit is
+        # best-effort and must not turn a successful reset into repeated 500s.
+        user_exists = session.scalar(
+            select(AppUser.id).where(AppUser.id == user_id).with_for_update()
+        )
+        if user_exists is None:
+            return 0
         seqs = [event.client_seq for event in batch.events]
         existing = set(
             session.scalars(

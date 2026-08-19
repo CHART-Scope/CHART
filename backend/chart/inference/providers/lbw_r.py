@@ -32,10 +32,9 @@ def call_lbw_r(
     pregnancy_window: int,
     temperatures_c: tuple[float, float, float],
 ) -> dict:
-    global _circuit_failures, _circuit_open_until
-
-    body = json.dumps(
-        {
+    return call_compact_r(
+        base_url,
+        body={
             "release_id": model_release_id,
             "model_file": model_file,
             "model_version": model_version,
@@ -43,12 +42,71 @@ def call_lbw_r(
             "area": model_area,
             "trimester": pregnancy_window,
             "tmax_lag": list(temperatures_c),
-        }
-    ).encode("utf-8")
-    idempotency_key = hashlib.sha256(body).hexdigest()
+        },
+        required={
+            "area",
+            "geography_level",
+            "tmax_lag",
+            "ref_temp",
+            "odds_ratio",
+            "ci95_low",
+            "ci95_high",
+            "on_training_support",
+            "model_file",
+            "model_version",
+            "model_sha256",
+        },
+    )
+
+
+def call_association_r(
+    base_url: str,
+    *,
+    model_release_id: str,
+    model_file: str,
+    model_version: str,
+    model_sha256: str,
+    model_area: str,
+    outcome: str,
+    exposure_values_c: tuple[float, ...],
+) -> dict:
+    return call_compact_r(
+        base_url,
+        body={
+            "release_id": model_release_id,
+            "model_file": model_file,
+            "model_version": model_version,
+            "model_sha256": model_sha256,
+            "area": model_area,
+            "outcome": outcome,
+            "exposure_values_c": list(exposure_values_c),
+        },
+        required={
+            "area",
+            "geography_level",
+            "outcome",
+            "exposure_values_c",
+            "ref_temp",
+            "effect_measure",
+            "odds_ratio",
+            "ci95_low",
+            "ci95_high",
+            "on_training_support",
+            "model_file",
+            "model_version",
+            "model_sha256",
+        },
+    )
+
+
+def call_compact_r(base_url: str, *, body: dict, required: set[str]) -> dict:
+    global _circuit_failures, _circuit_open_until
+
+    encoded_body = json.dumps(body).encode("utf-8")
+    idempotency_key = hashlib.sha256(encoded_body).hexdigest()
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/predict",
-        data=body,
+        data=encoded_body,
         method="POST",
         headers={
             "Content-Type": "application/json",
@@ -94,19 +152,6 @@ def call_lbw_r(
     else:
         raise LbwProviderError("LBW_SERVICE_UNAVAILABLE")
 
-    required = {
-        "area",
-        "geography_level",
-        "tmax_lag",
-        "ref_temp",
-        "odds_ratio",
-        "ci95_low",
-        "ci95_high",
-        "on_training_support",
-        "model_file",
-        "model_version",
-        "model_sha256",
-    }
     missing = sorted(required - set(payload))
     if missing:
         raise LbwProviderError("LBW_RESPONSE_INVALID", ", ".join(missing))

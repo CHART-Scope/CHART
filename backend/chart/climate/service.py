@@ -8,7 +8,7 @@ from typing import Literal, cast
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from chart.inference import InferenceError, score_lbw
+from chart.inference import InferenceError
 from chart.model_registry.service import (
     ActiveModelMapping,
     get_active_model_mapping,
@@ -52,6 +52,7 @@ from .schemas import (
     PreviewRequest,
     PreviewResponse,
 )
+from .model_scoring import score_lbw_model
 from .source_policy import resolve_month_source
 
 
@@ -259,12 +260,8 @@ def score_prepared_prediction(
         model_sha256 = model.artifact_sha256
 
     try:
-        score = score_lbw(
-            model_release_id=model.release_id,
-            model_file=model_file,
-            model_version=model_version,
-            model_sha256=model_sha256,
-            model_area=model_area_name,
+        score = score_lbw_model(
+            model,
             pregnancy_window=pregnancy_window,
             temperatures_c=temperatures,
             service_url=lbw_service_url,
@@ -275,6 +272,9 @@ def score_prepared_prediction(
             "LBW_SERVICE_TIMEOUT",
             "LBW_SERVICE_UNAVAILABLE",
             "LBW_CIRCUIT_OPEN",
+            "MODEL_RUNTIME_NOT_CONFIGURED",
+            "MODEL_RUNTIME_UNAVAILABLE",
+            "MODEL_RELEASE_FILE_MISSING",
         }
         status = 503 if error.code in unavailable_errors else 502
         raise ClimateServiceError(error.code, status, error.detail) from error
@@ -524,7 +524,9 @@ def _month_response(
     )
 
 
-def _resolve_place(session: Session, geography_id: str) -> ResolvedPlace:
+def _resolve_place(
+    session: Session, geography_id: str, *, outcome: str = "lbw"
+) -> ResolvedPlace:
     geography = session.get(AppGeography, geography_id)
     if geography is None:
         raise ClimateServiceError("GEOGRAPHY_NOT_FOUND", 404)
@@ -533,7 +535,9 @@ def _resolve_place(session: Session, geography_id: str) -> ResolvedPlace:
     )
     if admin_unit is None:
         raise ClimateServiceError("CLIMATE_NOT_CONFIGURED_FOR_PLACE", 409)
-    model = get_active_model_mapping(session, admin_unit_id=admin_unit.id)
+    model = get_active_model_mapping(
+        session, admin_unit_id=admin_unit.id, outcome=outcome
+    )
     return ResolvedPlace(geography=geography, admin_unit=admin_unit, model=model)
 
 
@@ -551,6 +555,7 @@ def _place_response(
         path=geography.path,
         supports_prediction=model is not None,
         model_version=model.version if model else None,
+        model_area_name=model.model_area_name if model else None,
     )
 
 

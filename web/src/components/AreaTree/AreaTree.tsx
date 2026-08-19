@@ -11,6 +11,7 @@ export type AreaTreeItem = {
   name: string;
   levelLabel: string;
   parentId?: string | null;
+  disabled?: boolean;
 };
 
 type Props = {
@@ -87,6 +88,7 @@ function AreaTreeNode({
         type="button"
         role="option"
         aria-selected={isActive}
+        disabled={node.item.disabled}
         className={[styles.node, isActive ? styles.nodeActive : ""]
           .filter(Boolean)
           .join(" ")}

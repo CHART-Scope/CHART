@@ -14,6 +14,7 @@ import {
   type HorizonCard,
   type ShortTermRiskResponse,
 } from "@/lib/dashboardClient";
+import { precisionLabel } from "@/lib/precision";
 
 import styles from "./ShortTermView.module.css";
 import { useHorizonView } from "./useHorizonView";
@@ -175,7 +176,7 @@ function renderCard(card: HorizonCard) {
       supporting="heat attributable LBW cases"
       range={`${low}-${high}% range`}
       precision={card.precision}
-      precisionLabel={card.precision[0].toUpperCase() + card.precision.slice(1)}
+      precisionLabel={precisionLabel(card.precision)}
     />
   );
 }

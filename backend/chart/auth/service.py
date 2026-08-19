@@ -168,6 +168,19 @@ def _map_claims(claims: dict[str, Any], client_id: str) -> CurrentUserContext:
             if (normalized := _normalize_geography_path(group)) != "/"
         )
     )
+    default_active_geography = geography_scopes[0] if geography_scopes else None
+    if "chart_admin" in roles:
+        # Installation administrators manage the whole country represented by
+        # each assigned Keycloak group, while ordinary users remain at their
+        # explicitly assigned state/county/division scope. This enables context
+        # switching without granting access to another installed country.
+        geography_scopes = list(
+            dict.fromkeys(
+                country_scope
+                for scope in geography_scopes
+                if (country_scope := _country_scope(scope)) is not None
+            )
+        )
     username = claims.get("preferred_username") or claims.get("email") or subject
     email = claims.get("email")
     return CurrentUserContext.model_validate(
@@ -177,10 +190,8 @@ def _map_claims(claims: dict[str, Any], client_id: str) -> CurrentUserContext:
             "email": email if isinstance(email, str) else None,
             "roles": roles,
             "geography_scopes": geography_scopes,
-            "active_geography_id": geography_scopes[0] if geography_scopes else None,
-            "geography_level": _infer_geography_level(
-                geography_scopes[0] if geography_scopes else None
-            ),
+            "active_geography_id": default_active_geography,
+            "geography_level": _infer_geography_level(default_active_geography),
         }
     )
 
@@ -189,6 +200,11 @@ def _strings(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, str)]
+
+
+def _country_scope(scope: str) -> str | None:
+    parts = [part for part in scope.split("/") if part]
+    return f"/{parts[0]}" if parts else None
 
 
 def _normalize_geography_path(path: str) -> str:

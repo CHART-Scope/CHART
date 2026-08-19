@@ -548,8 +548,8 @@ def _load_observed(context, place: dict, months: list[date], session_factory) ->
     with session_factory() as session:
         run = load_era5_monthly_frame(
             session,
-            preset_slug="madhya-pradesh",
-            admin_unit_code=place["code"],
+            preset_slug=place["country_preset"],
+            admin_unit_id=place["id"],
             df=df,
             meta=meta,
             csv_path=str(csv_path),
@@ -756,6 +756,7 @@ def _place_snapshot(admin_unit: AdminUnit) -> dict:
         "bbox": coordinates,
         "geometry": geometry,
         "boundary_version": admin_unit.boundary_version or "unknown",
+        "country_preset": admin_unit.geography.slug,
     }
 
 

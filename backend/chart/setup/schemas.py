@@ -26,8 +26,50 @@ class SetupStatus(BaseModel):
     counts: SetupCounts
 
 
+class ModelSyncResponse(BaseModel):
+    activeReleaseIds: list[str]
+    assignmentCount: int
+
+
 class SetupOptions(BaseModel):
     sectors: list[SectorOption]
+    geographies: list[SetupCountryOption] = Field(default_factory=list)
+
+
+class SetupLevelOption(BaseModel):
+    key: str
+    label: str
+    sortOrder: int = 0
+
+
+class SetupModelMappingOption(BaseModel):
+    releaseId: str
+    outcome: str
+    outcomeLabel: str
+    modelAreaName: str
+    modelScopeLabel: str
+
+
+class SetupPlaceOption(BaseModel):
+    placeCode: str
+    id: str
+    name: str
+    level: str
+    levelLabel: str
+    parentPlaceCode: str | None = None
+    path: str
+    sortOrder: int
+    predictionSupported: bool
+    modelMappings: list[SetupModelMappingOption] = Field(default_factory=list)
+
+
+class SetupCountryOption(BaseModel):
+    countryCode: str
+    countryName: str
+    rootId: str
+    rootPath: str
+    levels: list[SetupLevelOption]
+    places: list[SetupPlaceOption]
 
 
 class SetupGeographyInput(BaseModel):

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
@@ -47,29 +47,81 @@ export function PlanningSetup({
       ),
     [catalog],
   );
+  const selectedHazard = selection.hazard || hazards[0]?.code || "";
   const domains = useMemo(
     () =>
       dedupeBy(
-        catalog.map((entry) => ({
-          code: entry.health_domain,
-          label: entry.health_domain_label,
-        })),
+        catalog
+          .filter((entry) => entry.climate_hazard === selectedHazard)
+          .map((entry) => ({
+            code: entry.health_domain,
+            label: entry.health_domain_label,
+          })),
         (item) => item.code,
       ),
-    [catalog],
+    [catalog, selectedHazard],
   );
-  const [hazardCode, setHazardCode] = useState<string>("");
-  const [domainCode, setDomainCode] = useState<string>("");
+  const selectedDomain = selection.healthDomain || domains[0]?.code || "";
+  const outcomes = useMemo(
+    () =>
+      dedupeBy(
+        catalog
+          .filter(
+            (entry) =>
+              entry.climate_hazard === selectedHazard &&
+              entry.health_domain === selectedDomain,
+          )
+          .map((entry) => ({ code: entry.outcome, label: entry.outcome_label })),
+        (item) => item.code,
+      ),
+    [catalog, selectedDomain, selectedHazard],
+  );
+  const selectedOutcome = selection.outcome || outcomes[0]?.code || "";
+  const selectedAreaSupportsOutcome = Boolean(
+    activeArea && supportsOutcome(activeArea, selectedOutcome),
+  );
+  const descendantModelAreas = useMemo(
+    () =>
+      activeArea
+        ? areas.filter(
+            (area) =>
+              area.path.startsWith(`${activeArea.path.replace(/\/+$/, "")}/`) &&
+              supportsOutcome(area, selectedOutcome),
+          )
+        : [],
+    [activeArea, areas, selectedOutcome],
+  );
+  const selectedScopeSupportsOutcome =
+    selectedAreaSupportsOutcome || descendantModelAreas.length > 0;
   useEffect(() => {
-    if (!hazardCode && hazards[0]) setHazardCode(hazards[0].code);
-  }, [hazards, hazardCode]);
-  useEffect(() => {
-    if (!domainCode && domains[0]) setDomainCode(domains[0].code);
-  }, [domains, domainCode]);
-  const hazardLabel = hazards.find((item) => item.code === hazardCode)?.label ?? "…";
-  const domainLabel = domains.find((item) => item.code === domainCode)?.label ?? "…";
+    if (
+      selectedHazard &&
+      selectedDomain &&
+      selectedOutcome &&
+      (selection.hazard !== selectedHazard ||
+        selection.healthDomain !== selectedDomain ||
+        selection.outcome !== selectedOutcome)
+    ) {
+      onChange({
+        ...selection,
+        hazard: selectedHazard,
+        healthDomain: selectedDomain,
+        outcome: selectedOutcome,
+      });
+    }
+  }, [onChange, selectedDomain, selectedHazard, selectedOutcome, selection]);
+  const hazardLabel =
+    hazards.find((item) => item.code === selectedHazard)?.label ?? "…";
+  const domainLabel =
+    domains.find((item) => item.code === selectedDomain)?.label ?? "…";
+  const outcomeLabel =
+    outcomes.find((item) => item.code === selectedOutcome)?.label ?? "…";
 
-  const canStart = Boolean(activeArea) && !isLoading && !isSubmitting;
+  const canStart =
+    Boolean(activeArea && selectedOutcome && selectedScopeSupportsOutcome) &&
+    !isLoading &&
+    !isSubmitting;
+  const modelUnavailable = Boolean(activeArea) && !isLoading && catalog.length === 0;
   const country = activeArea ? countryFromPath(activeArea.path) : null;
   const areaName = activeArea?.name ?? "your area";
 
@@ -108,36 +160,26 @@ export function PlanningSetup({
           <Icon name="bookmark" size={16} />
         </button>
 
-        <p className={styles.sentence}>
-          <span>We&apos;re planning together for the impacts of </span>
-          <PillSelect
-            label={hazardLabel}
-            value={hazardCode}
-            options={hazards}
-            onChange={setHazardCode}
-            ariaLabel="Choose the climate hazard"
-            hint="Hazard covered by the deployed model."
-          />
-          <span> on </span>
-          <PillSelect
-            label={domainLabel}
-            value={domainCode}
-            options={domains}
-            onChange={setDomainCode}
-            ariaLabel="Choose the health domain"
-            hint="Health domain the deployed model estimates."
-          />
-          <span> in {areaName}.</span>
-        </p>
-
         {hasSwitcher ? (
           <label className={styles.areaSwitcher}>
             <span>Switch area</span>
             <select
               value={selection.area}
-              onChange={(event) =>
-                onChange({ ...selection, area: event.currentTarget.value })
-              }
+              onChange={(event) => {
+                const area = areas.find(
+                  (item) => item.id === event.currentTarget.value,
+                );
+                const keepsCurrentOutcome = Boolean(
+                  area && supportsOutcomeInTree(area, selectedOutcome, areas),
+                );
+                onChange({
+                  ...selection,
+                  area: event.currentTarget.value,
+                  hazard: keepsCurrentOutcome ? selection.hazard : "",
+                  healthDomain: keepsCurrentOutcome ? selection.healthDomain : "",
+                  outcome: keepsCurrentOutcome ? selection.outcome : "",
+                });
+              }}
             >
               {switcherGroups.map((group) => (
                 <optgroup key={group.country} label={group.country}>
@@ -152,9 +194,75 @@ export function PlanningSetup({
           </label>
         ) : null}
 
+        <p className={styles.sentence}>
+          <span>We&apos;re planning together for the impacts of </span>
+          <PillSelect
+            label={hazardLabel}
+            value={selectedHazard}
+            options={hazards}
+            onChange={(hazard) =>
+              onChange({
+                ...selection,
+                hazard,
+                healthDomain: "",
+                outcome: "",
+              })
+            }
+            ariaLabel="Choose the climate hazard"
+            hint="Hazard covered by the deployed model."
+          />
+          <span> on </span>
+          <PillSelect
+            label={domainLabel}
+            value={selectedDomain}
+            options={domains}
+            onChange={(healthDomain) =>
+              onChange({ ...selection, healthDomain, outcome: "" })
+            }
+            ariaLabel="Choose the health domain"
+            hint="Health domain the deployed model estimates."
+          />
+          <span>, focusing on </span>
+          <PillSelect
+            label={outcomeLabel}
+            value={selectedOutcome}
+            options={outcomes}
+            onChange={(outcome) => onChange({ ...selection, outcome })}
+            ariaLabel="Choose the health outcome"
+            hint="Specific outcome estimated by the deployed model."
+          />
+          <span> in {areaName}.</span>
+        </p>
+
         {error ? (
           <div className={styles.error} role="alert">
             {error}
+          </div>
+        ) : null}
+        {activeArea &&
+        selectedOutcome &&
+        !selectedAreaSupportsOutcome &&
+        descendantModelAreas.length > 0 ? (
+          <div className={styles.notice} role="status">
+            {outcomeLabel} is available for {descendantModelAreas.length}{" "}
+            {pluralizeLevel(
+              descendantModelAreas[0]?.levelLabel,
+              descendantModelAreas.length,
+            )}{" "}
+            within {areaName}. The dashboard will open at a supported area, and you can
+            switch between the other model-backed areas there.
+          </div>
+        ) : null}
+        {activeArea && selectedOutcome && !selectedScopeSupportsOutcome ? (
+          <div className={styles.error} role="status">
+            {outcomeLabel} is not fitted for {areaName} or any available area below it.
+          </div>
+        ) : null}
+        {modelUnavailable ? (
+          <div className={styles.error} role="status">
+            No fitted model is available for {areaName}. You can keep this county in
+            your workspace, but predictions and model-based planning remain disabled
+            until a compatible model mapping is released.
           </div>
         ) : null}
 
@@ -180,6 +288,28 @@ export function PlanningSetup({
       </section>
     </div>
   );
+}
+
+function supportsOutcome(area: GeographyRecord, outcome: string) {
+  return Boolean(outcome && area.models?.some((model) => model.outcome === outcome));
+}
+
+function supportsOutcomeInTree(
+  area: GeographyRecord,
+  outcome: string,
+  areas: GeographyRecord[],
+) {
+  if (supportsOutcome(area, outcome)) return true;
+  const rootPath = area.path.replace(/\/+$/, "");
+  return areas.some(
+    (candidate) =>
+      candidate.path.startsWith(`${rootPath}/`) && supportsOutcome(candidate, outcome),
+  );
+}
+
+function pluralizeLevel(levelLabel: string | undefined, count: number) {
+  const label = levelLabel?.toLowerCase() || "sub-area";
+  return count === 1 ? label : `${label}s`;
 }
 
 function PillSelect({

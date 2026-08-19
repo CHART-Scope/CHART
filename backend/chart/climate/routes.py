@@ -139,7 +139,7 @@ def post_predict(
 @router.post(
     "/what-if",
     response_model=WhatIfResponse,
-    summary="Score a slider-driven temperature scenario against the LBW model",
+    summary="Score a slider-driven temperature scenario against an active model",
     responses={
         401: {"model": ErrorResponse},
         403: {"model": ErrorResponse},
@@ -158,6 +158,7 @@ def post_what_if(
         return score_what_if(
             geography_id=request.geography_id,
             temperature_c=request.temperature_c,
+            outcome=request.outcome,
         )
     except ClimateServiceError as error:
         raise _http_error(error) from error

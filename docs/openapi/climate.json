@@ -529,7 +529,7 @@
         },
         "responses": {
           "200": {
-            "description": "The scored what-if response including odds ratio, CI, attributable fraction, training-support metadata, and the model's temperature range.",
+            "description": "The scored what-if response including odds ratio, CI, signed odds change, attributable fraction, support metadata, and the fitted block's temperature range.",
             "content": {
               "application/json": {
                 "schema": {
@@ -614,7 +614,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "On-demand scorer that backs the dashboard's what-if slider. Resolves the caller's geography_id to its admin_unit and active model block, calls the R DLNM scorer with a flat three-month temperature profile at the requested Celsius value, and returns the odds ratio, 95% CI, attributable fraction, training-support flag, and the model's training temperature range. Stateless: nothing is persisted, so this path can handle high slider-drag volume without touching the durable prediction queue."
+        "description": "On-demand scorer that backs the dashboard's what-if slider. Resolves the caller's geography_id to its admin_unit and active model block, calls the R DLNM scorer with a flat three-month temperature profile at the requested Celsius value, and returns the odds ratio, 95% CI, positive-excess attributable fraction, signed relative-odds change, training-support flag, and the fitted block's temperature range. Stateless: nothing is persisted, so this path can handle high slider-drag volume without touching the durable prediction queue."
       }
     },
     "/climate/prediction-requests": {
@@ -951,6 +951,33 @@
           }
         ],
         "description": "Returns setup state to the recoverable pre-completion phase after verifying the caller's administrative authority. Use this operational endpoint only when intentionally re-running installation setup."
+      }
+    },
+    "/setup/models/sync": {
+      "post": {
+        "tags": [
+          "setup"
+        ],
+        "summary": "Install newly deployed model releases without resetting CHART",
+        "operationId": "sync_models_route_setup_models_sync_post",
+        "responses": {
+          "200": {
+            "description": "The active release IDs and total planning-area assignments.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelSyncResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Requires a CHART administrator. Discovers enabled model manifests, verifies and prepares their immutable artifacts, and activates their geography assignments while preserving users, workspaces, and saved planning data. Use this after deploying a new release to an existing installation."
       }
     },
     "/hazards": {
@@ -1646,6 +1673,34 @@
         "summary": "List active model releases known to this installation",
         "description": "Returns each currently active ModelRelease with its climate hazard, health outcome, and covered admin_units so the planning UI can render hazard and outcome pickers straight from the registry instead of a client-side lookup table. Records reflect the ActiveModelAssignment state at the moment of the call.",
         "operationId": "list_catalog_model_catalog_get",
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "include_descendants",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Descendants"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "The active model releases with taxonomy fields and the admin_units each release is currently assigned to.",
@@ -1653,6 +1708,81 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CatalogResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/model-releases": {
+      "get": {
+        "tags": [
+          "model-releases"
+        ],
+        "summary": "List every registered model release",
+        "description": "Returns every ModelRelease row (active-first) with identity, version, model_files (filename + SHA-256), area count, the manifest source path discovered on disk, S3 base URI, git ref, and activation timestamp. Powers the admin Models page under /settings, where operators inspect what is loaded and trigger reloads.",
+        "operationId": "list_releases_model_releases_get",
+        "responses": {
+          "200": {
+            "description": "The registered releases, each carrying an is_active flag plus manifest-source metadata for debugging.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleasesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/model-releases/{release_id}/reload": {
+      "post": {
+        "tags": [
+          "model-releases"
+        ],
+        "summary": "Re-verify and re-warm one release into the R runtime",
+        "description": "Finds the manifest whose id matches the URL parameter, re-parses its ModelReleaseSpec, and calls prepare_model_release to re-POST /models/load to the R runtime. Does not touch the database or reactivate the release. Useful after an R container restart or after a manifest edit that swaps an artifact's SHA-256.",
+        "operationId": "reload_release_model_releases__release_id__reload_post",
+        "parameters": [
+          {
+            "name": "release_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Release Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The release id was found on disk and successfully warmed into the runtime; status is 'loaded'.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReloadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2467,6 +2597,105 @@
             "type": "string",
             "title": "Outcome Label"
           },
+          "dashboard_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dashboard Title"
+          },
+          "population_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Population Label"
+          },
+          "model_scope_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Scope Label"
+          },
+          "effect_measure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effect Measure"
+          },
+          "batch_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Status"
+          },
+          "visualization_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visualization Type"
+          },
+          "visualization_figure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visualization Figure"
+          },
+          "visualization_context_figure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visualization Context Figure"
+          },
+          "risk_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Description"
+          },
           "release_ids": {
             "items": {
               "type": "string"
@@ -3173,6 +3402,29 @@
         ],
         "title": "GeographyAccessResponse"
       },
+      "GeographyModelResponse": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "modelAreaName": {
+            "type": "string",
+            "title": "Modelareaname"
+          },
+          "releaseId": {
+            "type": "string",
+            "title": "Releaseid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome",
+          "modelAreaName",
+          "releaseId"
+        ],
+        "title": "GeographyModelResponse"
+      },
       "GeographyResponse": {
         "properties": {
           "id": {
@@ -3228,6 +3480,24 @@
           "supportsPrediction": {
             "type": "boolean",
             "title": "Supportsprediction"
+          },
+          "modelAreaName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelareaname"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/GeographyModelResponse"
+            },
+            "type": "array",
+            "title": "Models"
           }
         },
         "type": "object",
@@ -3926,6 +4196,45 @@
         ],
         "title": "LongTermTableRow"
       },
+      "ModelFileInfo": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "sha256"
+        ],
+        "title": "ModelFileInfo"
+      },
+      "ModelSyncResponse": {
+        "properties": {
+          "activeReleaseIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Activereleaseids"
+          },
+          "assignmentCount": {
+            "type": "integer",
+            "title": "Assignmentcount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "activeReleaseIds",
+          "assignmentCount"
+        ],
+        "title": "ModelSyncResponse"
+      },
       "PlaceListResponse": {
         "properties": {
           "items": {
@@ -3978,6 +4287,17 @@
               }
             ],
             "title": "Model Version"
+          },
+          "model_area_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Area Name"
           }
         },
         "type": "object",
@@ -4805,6 +5125,206 @@
         ],
         "title": "ProjectionScenarioOptionResponse"
       },
+      "ReleaseInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "outcome_label": {
+            "type": "string",
+            "title": "Outcome Label"
+          },
+          "climate_hazard": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Climate Hazard"
+          },
+          "climate_hazard_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Climate Hazard Label"
+          },
+          "health_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Domain"
+          },
+          "health_domain_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Domain Label"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "activated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activated At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "model_files": {
+            "items": {
+              "$ref": "#/components/schemas/ModelFileInfo"
+            },
+            "type": "array",
+            "title": "Model Files"
+          },
+          "area_count": {
+            "type": "integer",
+            "title": "Area Count"
+          },
+          "manifest_source_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest Source Path"
+          },
+          "base_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Uri"
+          },
+          "source_git_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Git Ref"
+          },
+          "release_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Notes"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "outcome",
+          "outcome_label",
+          "climate_hazard",
+          "climate_hazard_label",
+          "health_domain",
+          "health_domain_label",
+          "status",
+          "activated_at",
+          "created_at",
+          "model_files",
+          "area_count",
+          "manifest_source_path",
+          "base_uri",
+          "source_git_ref",
+          "release_notes",
+          "is_active"
+        ],
+        "title": "ReleaseInfo"
+      },
+      "ReleasesResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseInfo"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ReleasesResponse"
+      },
+      "ReloadResponse": {
+        "properties": {
+          "release_id": {
+            "type": "string",
+            "title": "Release Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "release_id",
+          "status"
+        ],
+        "title": "ReloadResponse"
+      },
       "SectorOption": {
         "properties": {
           "id": {
@@ -4854,6 +5374,50 @@
           "password"
         ],
         "title": "SetupAdminInput"
+      },
+      "SetupCountryOption": {
+        "properties": {
+          "countryCode": {
+            "type": "string",
+            "title": "Countrycode"
+          },
+          "countryName": {
+            "type": "string",
+            "title": "Countryname"
+          },
+          "rootId": {
+            "type": "string",
+            "title": "Rootid"
+          },
+          "rootPath": {
+            "type": "string",
+            "title": "Rootpath"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/SetupLevelOption"
+            },
+            "type": "array",
+            "title": "Levels"
+          },
+          "places": {
+            "items": {
+              "$ref": "#/components/schemas/SetupPlaceOption"
+            },
+            "type": "array",
+            "title": "Places"
+          }
+        },
+        "type": "object",
+        "required": [
+          "countryCode",
+          "countryName",
+          "rootId",
+          "rootPath",
+          "levels",
+          "places"
+        ],
+        "title": "SetupCountryOption"
       },
       "SetupCounts": {
         "properties": {
@@ -4922,6 +5486,62 @@
         ],
         "title": "SetupGeographyInput"
       },
+      "SetupLevelOption": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "title": "Sortorder",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "SetupLevelOption"
+      },
+      "SetupModelMappingOption": {
+        "properties": {
+          "releaseId": {
+            "type": "string",
+            "title": "Releaseid"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "outcomeLabel": {
+            "type": "string",
+            "title": "Outcomelabel"
+          },
+          "modelAreaName": {
+            "type": "string",
+            "title": "Modelareaname"
+          },
+          "modelScopeLabel": {
+            "type": "string",
+            "title": "Modelscopelabel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "releaseId",
+          "outcome",
+          "outcomeLabel",
+          "modelAreaName",
+          "modelScopeLabel"
+        ],
+        "title": "SetupModelMappingOption"
+      },
       "SetupOptions": {
         "properties": {
           "sectors": {
@@ -4930,6 +5550,13 @@
             },
             "type": "array",
             "title": "Sectors"
+          },
+          "geographies": {
+            "items": {
+              "$ref": "#/components/schemas/SetupCountryOption"
+            },
+            "type": "array",
+            "title": "Geographies"
           }
         },
         "type": "object",
@@ -4937,6 +5564,72 @@
           "sectors"
         ],
         "title": "SetupOptions"
+      },
+      "SetupPlaceOption": {
+        "properties": {
+          "placeCode": {
+            "type": "string",
+            "title": "Placecode"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "levelLabel": {
+            "type": "string",
+            "title": "Levellabel"
+          },
+          "parentPlaceCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parentplacecode"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "title": "Sortorder"
+          },
+          "predictionSupported": {
+            "type": "boolean",
+            "title": "Predictionsupported"
+          },
+          "modelMappings": {
+            "items": {
+              "$ref": "#/components/schemas/SetupModelMappingOption"
+            },
+            "type": "array",
+            "title": "Modelmappings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "placeCode",
+          "id",
+          "name",
+          "level",
+          "levelLabel",
+          "path",
+          "sortOrder",
+          "predictionSupported"
+        ],
+        "title": "SetupPlaceOption"
       },
       "SetupStatus": {
         "properties": {
@@ -5207,6 +5900,12 @@
             "maximum": 60.0,
             "minimum": -30.0,
             "title": "Temperature C"
+          },
+          "outcome": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Outcome",
+            "default": "lbw"
           }
         },
         "type": "object",
@@ -5226,6 +5925,11 @@
             "type": "number",
             "title": "Temperature C"
           },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "default": "lbw"
+          },
           "area": {
             "type": "string",
             "title": "Area"
@@ -5235,26 +5939,44 @@
             "title": "Geography Level"
           },
           "pregnancy_window": {
-            "type": "integer",
-            "enum": [
-              1,
-              2,
-              3
+            "anyOf": [
+              {
+                "type": "integer",
+                "enum": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
             "title": "Pregnancy Window"
+          },
+          "exposure_values_c": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Exposure Values C"
           },
           "tmax_lag": {
             "items": {
               "type": "number"
             },
             "type": "array",
-            "maxItems": 3,
-            "minItems": 3,
             "title": "Tmax Lag"
           },
           "reference_temperature_c": {
             "type": "number",
             "title": "Reference Temperature C"
+          },
+          "effect_measure": {
+            "type": "string",
+            "title": "Effect Measure",
+            "default": "odds_ratio"
           },
           "odds_ratio": {
             "type": "number",
@@ -5275,7 +5997,14 @@
             "type": "number",
             "maximum": 100.0,
             "minimum": 0.0,
-            "title": "Attributable Fraction Percent"
+            "title": "Attributable Fraction Percent",
+            "description": "Positive-excess attributable fraction; zero when odds ratio <= 1."
+          },
+          "relative_odds_change_percent": {
+            "type": "number",
+            "exclusiveMinimum": -100.0,
+            "title": "Relative Odds Change Percent",
+            "description": "Signed change in modelled odds relative to the fitted reference."
           },
           "on_training_support": {
             "type": "boolean",
@@ -5292,6 +6021,17 @@
             ],
             "title": "Warning"
           },
+          "n_model_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Model Rows"
+          },
           "n_training": {
             "anyOf": [
               {
@@ -5302,6 +6042,28 @@
               }
             ],
             "title": "N Training"
+          },
+          "n_events": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Events"
+          },
+          "n_subjects": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Subjects"
           },
           "modelled_temperature_range_c": {
             "anyOf": [
@@ -5317,12 +6079,68 @@
                 "type": "null"
               }
             ],
-            "title": "Modelled Temperature Range C"
+            "title": "Modelled Temperature Range C",
+            "description": "Location- and model-window-specific fitted basis support copied from the modeller artifact Boundary.knots."
           },
           "model_version": {
             "type": "string",
             "minLength": 1,
             "title": "Model Version"
+          },
+          "climate_hazard_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Climate Hazard Label"
+          },
+          "health_domain_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Domain Label"
+          },
+          "outcome_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Label"
+          },
+          "dashboard_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dashboard Title"
+          },
+          "population_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Population Label"
           }
         },
         "type": "object",
@@ -5331,18 +6149,17 @@
           "temperature_c",
           "area",
           "geography_level",
-          "pregnancy_window",
-          "tmax_lag",
           "reference_temperature_c",
           "odds_ratio",
           "ci95_low",
           "ci95_high",
           "attributable_fraction_percent",
+          "relative_odds_change_percent",
           "on_training_support",
           "model_version"
         ],
         "title": "WhatIfResponse",
-        "description": "Mirrors the R service /predict response so the dashboard has the same\nshape as the reference `pipelines/models/lbw/web/index.html` demo. Fields\nthe UI does not render today are still returned so the visuals can pull\nthem in without another round-trip."
+        "description": "Mirrors the R service /predict response. Fields the UI does not render\ntoday are still returned so the visuals can pull them in without another\nround-trip."
       },
       "WorkspaceResponse": {
         "properties": {
