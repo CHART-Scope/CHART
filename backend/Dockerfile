@@ -22,7 +22,6 @@ COPY pipelines/boundaries/pyproject.toml pipelines/boundaries/pyproject.toml
 COPY pipelines/boundaries/src pipelines/boundaries/src
 COPY pipelines/boundaries/data pipelines/boundaries/data
 COPY pipelines/boundaries/manifests pipelines/boundaries/manifests
-COPY pipelines/models/lbw/model-release.example.json pipelines/models/lbw/model-release.example.json
 COPY pipelines/models/lbw/model-release.kenya.review.json pipelines/models/lbw/model-release.kenya.review.json
 COPY pipelines/models/lbw/model-release.mp.compact.review.json pipelines/models/lbw/model-release.mp.compact.review.json
 COPY orchestration/pyproject.toml orchestration/pyproject.toml

@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Release-aware LBW runtime. It starts empty and loads verified server-side
+# Release-aware compact-model runtime. It starts empty and loads verified server-side
 # artifacts through an internal control endpoint; model selection is never read
 # from release-specific environment variables.
 
@@ -12,13 +12,16 @@ suppressMessages({
 script_arg <- commandArgs(trailingOnly = FALSE)
 script_path <- sub("^--file=", "", script_arg[grep("^--file=", script_arg)])
 script_dir <- dirname(normalizePath(script_path, mustWork = TRUE))
-source(file.path(script_dir, "compact_score.R"))
 source(file.path(script_dir, "serialization.R"))
+# Adapters live in inference/adapters/. Sourcing compact_score.R also
+# pulls in score_core.R via its own source() at the top. Register a new
+# adapter here (or introduce on-demand loading if the surface grows).
+source(file.path(script_dir, "adapters", "compact_score.R"))
 
 port <- as.integer(Sys.getenv("PORT", "8000"))
 host <- Sys.getenv("HOST", "127.0.0.1")
 cache_dir <- normalizePath(
-  Sys.getenv("MODEL_CACHE_DIR", unset = file.path(script_dir, "..", "model")),
+  Sys.getenv("MODEL_CACHE_DIR", unset = file.path(script_dir, "..")),
   mustWork = TRUE
 )
 control_token <- Sys.getenv("MODEL_CONTROL_TOKEN")
@@ -96,6 +99,8 @@ public_model <- function(model) {
     model_file = model$model_file,
     model_sha256 = model$model_sha256,
     country_code = model$store$bundle$country_code,
+    outcome = model$store$bundle$outcome,
+    model_family = model$store$bundle$model_family,
     areas = names(model$store$bundle$areas),
     loaded_at = model$loaded_at
   )
@@ -104,7 +109,12 @@ public_model <- function(model) {
 pr <- plumber::pr() |>
   plumber::pr_set_serializer(json) |>
   plumber::pr_get("/health", function() {
-    list(status = "ok", runtime = "registry", loaded_models = length(ls(loaded_models)))
+    list(
+      status = "ok",
+      runtime = "registry",
+      model_cache_dir = cache_dir,
+      loaded_models = length(ls(loaded_models))
+    )
   }, serializer = json) |>
   plumber::pr_get("/models", function() {
     list(models = lapply(mget(ls(loaded_models), loaded_models), public_model))
@@ -131,13 +141,27 @@ pr <- plumber::pr() |>
       requested_version <- required_text(body$model_version, "model_version")
       if (!identical(requested_version, model$version)) stop("MODEL_VERSION_MISMATCH")
 
-      result <- score_compact_area(
-        store = model$store,
-        area = body$area,
-        trimester = body$trimester,
-        tmax_lag = body$tmax_lag,
-        ref = body$ref %||% NULL
-      )
+      if (identical(model$store$bundle$model_family, "lbw_temperature_dlnm")) {
+        result <- score_compact_area(
+          store = model$store,
+          area = body$area,
+          trimester = body$trimester,
+          tmax_lag = body$tmax_lag,
+          ref = body$ref %||% NULL
+        )
+      } else {
+        requested_outcome <- required_text(body$outcome, "outcome")
+        if (!identical(requested_outcome, model$store$bundle$outcome)) {
+          stop("MODEL_OUTCOME_MISMATCH")
+        }
+        exposure_values <- body$exposure_values_c %||% body$tmax_lag
+        result <- score_compact_association(
+          store = model$store,
+          area = body$area,
+          exposure_values_c = exposure_values,
+          ref = body$ref %||% NULL
+        )
+      }
       c(
         list(model_release_id = model$release_id),
         result,

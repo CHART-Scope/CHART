@@ -31,7 +31,7 @@ import FastAPI or Dagster.
 |---|---|---|
 | Climate predict API | `make climate-api` | 3210 |
 | Dagster | `make dev` | 3002 |
-| LBW inference (R) | `pipelines/models/lbw/inference` | 8000 |
+| Model registry runtime (R) | `pipelines/models/inference` | 8000 |
 
 Climate predict reads `district_climate` from Postgres when `DATABASE_URL` is set,
 then optionally calls the LBW Plumber service for `outcome.type=lbw`.

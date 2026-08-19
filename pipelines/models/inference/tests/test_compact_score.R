@@ -5,7 +5,7 @@ suppressMessages(library(dlnm))
 script_arg <- commandArgs(trailingOnly = FALSE)
 script_path <- sub("^--file=", "", script_arg[grep("^--file=", script_arg)])
 test_dir <- dirname(normalizePath(script_path, mustWork = TRUE))
-source(file.path(test_dir, "..", "inference", "compact_score.R"))
+source(file.path(test_dir, "..", "adapters", "compact_score.R"))
 
 argvar <- list(
   fun = "bs",
@@ -60,6 +60,19 @@ stopifnot(
 store <- list(path = "test.rds", bundle = bundle)
 area_result <- score_compact_area(store, "test", 1, c(25, 25, 25))
 stopifnot(identical(area_result$geography_level, "test_level"))
+
+single_window_bundle <- bundle
+single_window_bundle$areas$Test <- list(`1` = block)
+validate_compact_bundle(single_window_bundle)
+single_window_store <- list(path = "single-window.rds", bundle = single_window_bundle)
+missing_window_error <- tryCatch(
+  {
+    compact_area_block(single_window_store, "Test", 2)
+    ""
+  },
+  error = conditionMessage
+)
+stopifnot(grepl("MODEL_PREGNANCY_WINDOW_NOT_AVAILABLE", missing_window_error, fixed = TRUE))
 
 unsafe_bundle <- bundle
 unsafe_bundle$areas$Test$`1`$respondents <- data.frame(id = 1)

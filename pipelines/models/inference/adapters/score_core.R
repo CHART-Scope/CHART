@@ -17,8 +17,15 @@ score_dlnm_parameters <- function(
   coefficients <- as.numeric(coefficients)
   covariance <- as.matrix(covariance)
 
-  if (length(tmax_lag) != 3 || any(!is.finite(tmax_lag))) {
-    stop("tmax_lag must contain exactly three finite Celsius values: lag 0, lag 1, lag 2")
+  expected_values <- as.integer(diff(as.numeric(basis$lag)) + 1L)
+  if (length(expected_values) != 1 || !is.finite(expected_values) || expected_values < 1) {
+    stop("model basis has an invalid lag definition")
+  }
+  if (length(tmax_lag) != expected_values || any(!is.finite(tmax_lag))) {
+    stop(
+      "temperature profile must contain exactly ", expected_values,
+      " finite Celsius values"
+    )
   }
   if (length(ref_temp) != 1 || !is.finite(ref_temp)) {
     stop("ref must be one finite Celsius value")
@@ -46,7 +53,7 @@ score_dlnm_parameters <- function(
     arglag = basis$arglag
   ))
   cb_ref <- dlnm::crossbasis(
-    matrix(rep(ref_temp, 3), 1),
+    matrix(rep(ref_temp, expected_values), 1),
     lag = basis$lag,
     argvar = basis$argvar,
     arglag = basis$arglag

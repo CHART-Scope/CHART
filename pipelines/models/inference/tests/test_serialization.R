@@ -14,7 +14,7 @@ script_dir <- function() {
   normalizePath(".", mustWork = TRUE)
 }
 
-source(file.path(script_dir(), "..", "inference", "serialization.R"))
+source(file.path(script_dir(), "..", "serialization.R"))
 
 temperatures <- c(
   31.123456789012345,
