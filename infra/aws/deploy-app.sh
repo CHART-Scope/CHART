@@ -209,6 +209,9 @@ PERSISTED_KEYCLOAK_ADMIN_PASSWORD="$(
 PERSISTED_CHART_BOOTSTRAP_TOKEN="$(
   read_env_value "$ENV_FILE" CHART_BOOTSTRAP_TOKEN
 )"
+PERSISTED_MODEL_CONTROL_TOKEN="$(
+  read_env_value "$ENV_FILE" MODEL_CONTROL_TOKEN
+)"
 PERSISTED_CDSAPI_KEY="$(read_env_value "$PREDICTION_ENV_FILE" CDSAPI_KEY)"
 PERSISTED_CDSAPI_URL="$(read_env_value "$PREDICTION_ENV_FILE" CDSAPI_URL)"
 PERSISTED_INFERENCE_LLM_ENABLED="$(
@@ -227,6 +230,7 @@ PERSISTED_INFERENCE_LLM_API_KEY="$(
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-${PERSISTED_POSTGRES_PASSWORD:-$(random_secret)}}"
 KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-${PERSISTED_KEYCLOAK_ADMIN_PASSWORD:-$(random_secret)}}"
 CHART_BOOTSTRAP_TOKEN="${CHART_BOOTSTRAP_TOKEN:-${PERSISTED_CHART_BOOTSTRAP_TOKEN:-$(random_secret)}}"
+MODEL_CONTROL_TOKEN="${MODEL_CONTROL_TOKEN:-${PERSISTED_MODEL_CONTROL_TOKEN:-$(random_secret)}}"
 KEYCLOAK_DB_PASSWORD="$(random_secret)"
 CDSAPI_KEY="${DEPLOY_CDSAPI_KEY:-$PERSISTED_CDSAPI_KEY}"
 CDSAPI_URL="${DEPLOY_CDSAPI_URL:-${PERSISTED_CDSAPI_URL:-https://cds.climate.copernicus.eu/api}}"
@@ -237,6 +241,7 @@ INFERENCE_LLM_API_KEY="${DEPLOY_INFERENCE_LLM_API_KEY:-$PERSISTED_INFERENCE_LLM_
 
 for name in \
   POSTGRES_PASSWORD KEYCLOAK_ADMIN_PASSWORD CHART_BOOTSTRAP_TOKEN \
+  MODEL_CONTROL_TOKEN \
   CDSAPI_KEY CDSAPI_URL \
   INFERENCE_LLM_BASE_URL INFERENCE_LLM_MODEL INFERENCE_LLM_API_KEY; do
   value="${!name}"
@@ -251,7 +256,7 @@ if [[ ! "$POSTGRES_PASSWORD" =~ ^[A-Za-z0-9._~-]+$ ]]; then
 fi
 
 LBW_ENABLED=1
-LBW_SERVICE_URL="http://$LBW_CONTAINER:8000"
+INFERENCE_LBW_BASE_URL="http://$LBW_CONTAINER:8000"
 
 if [ -z "$CDSAPI_KEY" ]; then
   echo "ERA5 downloads disabled: CDSAPI_KEY is not configured."
@@ -288,8 +293,9 @@ CHART_CORS_ORIGINS=$PUBLIC_ORIGIN
 CHART_WEB_ORIGIN=$PUBLIC_ORIGIN
 CHART_BOOTSTRAP_TOKEN=$CHART_BOOTSTRAP_TOKEN
 CHART_REQUIRE_ACTIVE_MODEL=${LBW_ENABLED:-0}
-LBW_SERVICE_URL=$LBW_SERVICE_URL
-INFERENCE_LBW_BASE_URL=$LBW_SERVICE_URL
+INFERENCE_LBW_BASE_URL=$INFERENCE_LBW_BASE_URL
+MODEL_CONTROL_TOKEN=$MODEL_CONTROL_TOKEN
+MODEL_CACHE_DIR=/models
 EOF
 
 chmod 600 "$ENV_FILE"
@@ -324,9 +330,8 @@ chmod 600 "$DAGSTER_ENV_FILE"
 cat >"$PREDICTION_ENV_FILE" <<EOF
 CDSAPI_URL=$CDSAPI_URL
 CDSAPI_KEY=$CDSAPI_KEY
-LBW_SERVICE_URL=$LBW_SERVICE_URL
 INFERENCE_STATISTICAL_PROVIDER=lbw_r
-INFERENCE_LBW_BASE_URL=$LBW_SERVICE_URL
+INFERENCE_LBW_BASE_URL=$INFERENCE_LBW_BASE_URL
 INFERENCE_LLM_ENABLED=$INFERENCE_LLM_ENABLED
 INFERENCE_LLM_BASE_URL=$INFERENCE_LLM_BASE_URL
 INFERENCE_LLM_MODEL=$INFERENCE_LLM_MODEL
@@ -459,25 +464,9 @@ docker build \
 docker build -f "$APP_DIR/backend/Dockerfile" -t "$PYTHON_IMAGE" "$APP_DIR"
 if [ -n "$LBW_ENABLED" ]; then
   docker build \
-    -f "$APP_DIR/pipelines/models/lbw/Dockerfile" \
+    -f "$APP_DIR/pipelines/models/Dockerfile" \
     -t "$LBW_IMAGE" \
-    "$APP_DIR/pipelines/models/lbw"
-
-  MODEL_METADATA="$(
-    docker run --rm "$PYTHON_IMAGE" python -c \
-      'import json; p=json.load(open("/app/pipelines/models/lbw/model-release.example.json")); f={x["filename"]:x["sha256"] for x in p["model_files"]}; d=next(x for x in f if "_division_" in x); s=next(x for x in f if "_state_" in x); print("\t".join((p["id"],p["version"],f[d],f[s],p["base_uri"],d,s)))'
-  )"
-  IFS=$'\t' read -r \
-    LBW_MODEL_RELEASE_ID \
-    LBW_MODEL_VERSION \
-    LBW_MODEL_DIVISION_SHA256 \
-    LBW_MODEL_STATE_SHA256 \
-    LBW_MODEL_BASE_URI \
-    LBW_DIVISION_FILENAME \
-    LBW_STATE_FILENAME <<<"$MODEL_METADATA"
-  LBW_MODEL_BASE_URI="${LBW_MODEL_BASE_URI%/}"
-  LBW_MODEL_DIVISION_S3_URI="$LBW_MODEL_BASE_URI/$LBW_DIVISION_FILENAME"
-  LBW_MODEL_STATE_S3_URI="$LBW_MODEL_BASE_URI/$LBW_STATE_FILENAME"
+    "$APP_DIR/pipelines/models"
 fi
 
 docker network create "$NETWORK" >/dev/null 2>&1 || true
@@ -596,7 +585,7 @@ docker run --rm \
   "$PYTHON_IMAGE" chart-bootstrap-mp \
     --source-manifest /app/pipelines/boundaries/manifests/mp_model_areas_v1.json \
     --crosswalk /app/pipelines/boundaries/data/mp_district_division_crosswalk.csv \
-    --model-release /app/pipelines/models/lbw/model-release.example.json \
+    --model-release /app/pipelines/models/lbw/model-release.mp.compact.review.json \
     $BOOTSTRAP_MODEL_ARG
 
 docker run --rm \
@@ -614,6 +603,7 @@ docker run -d \
   -e HOST=0.0.0.0 \
   -e PORT=3210 \
   -p 127.0.0.1:3210:3210 \
+  -v chart-lbw-model:/models \
   "$PYTHON_IMAGE" >/dev/null
 
 wait_for_command "CHART API" curl -fsS "http://127.0.0.1:3210/ready"
@@ -628,16 +618,21 @@ docker run -d \
   "$WEB_IMAGE" >/dev/null
 
 if [ -n "$LBW_ENABLED" ]; then
+  # NOTE: the shared model volume `chart-lbw-model:/models` is mounted on
+  # both the Python API and the LBW container so that Python's
+  # warm_model_release can hash the RDS files locally and then POST a
+  # local_path to R that both processes can resolve. The volume must be
+  # populated with the artifacts referenced in
+  # `pipelines/models/*/model-release.*.json` before setup can activate a
+  # release — either bake them into an init step here (aws s3 cp using the
+  # base_uri + filename fields from the manifest) or pre-seed the EBS
+  # volume out of band. Nothing in this script populates it yet.
   docker run -d \
     --name "$LBW_CONTAINER" \
     --network "$NETWORK" \
     --restart unless-stopped \
-    -e LBW_MODEL_DIVISION_S3_URI="$LBW_MODEL_DIVISION_S3_URI" \
-    -e LBW_MODEL_STATE_S3_URI="$LBW_MODEL_STATE_S3_URI" \
-    -e LBW_MODEL_DIVISION_SHA256="$LBW_MODEL_DIVISION_SHA256" \
-    -e LBW_MODEL_STATE_SHA256="$LBW_MODEL_STATE_SHA256" \
-    -e LBW_MODEL_RELEASE_ID="$LBW_MODEL_RELEASE_ID" \
-    -e LBW_MODEL_VERSION="$LBW_MODEL_VERSION" \
+    -e MODEL_CONTROL_TOKEN="$MODEL_CONTROL_TOKEN" \
+    -e MODEL_CACHE_DIR=/models \
     -v chart-lbw-model:/models \
     "$LBW_IMAGE" >/dev/null
 
