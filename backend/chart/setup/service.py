@@ -665,7 +665,15 @@ def restore_deployed_models(
             if require_complete:
                 raise SetupError("SETUP_NOT_COMPLETE", 409)
             return ModelSyncResponse(activeReleaseIds=[], assignmentCount=0)
-        _auto_seed_deployed_models(session, state.country_code or "")
+        # Setup picks a single country because first-run has to land somewhere,
+        # but sync is the "install anything you can find" path: every manifest
+        # under pipelines/models/ should come online regardless of which
+        # country the operator originally set up. bootstrap_place_from_release
+        # creates the geography + admin_units for a new country on demand.
+        for country_code in sorted(
+            {config.country_code for config in deployed_configs()}
+        ):
+            _auto_seed_deployed_models(session, country_code)
         active_release_ids = sorted(
             session.scalars(
                 select(ActiveModelAssignment.model_release_id).distinct()

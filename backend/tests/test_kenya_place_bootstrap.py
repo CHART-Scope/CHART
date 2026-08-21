@@ -18,6 +18,7 @@ from chart.model_registry.service import (
     register_model_release,
 )
 from chart.setup.model_configs import (
+    DeployedModelConfig,
     configs_for_country,
     deployed_geography_ids_by_country,
 )
@@ -70,10 +71,25 @@ def test_startup_restore_is_non_destructive_and_warms_completed_setup() -> None:
         )
         session.commit()
 
-    with patch("chart.setup.service._auto_seed_deployed_models") as seed:
+    fake_configs = (
+        DeployedModelConfig(
+            country_code="IN",
+            model_release=Path("/dev/null"),
+        ),
+        DeployedModelConfig(
+            country_code="KE",
+            model_release=Path("/dev/null"),
+        ),
+    )
+    with (
+        patch("chart.setup.service._auto_seed_deployed_models") as seed,
+        patch("chart.setup.service.deployed_configs", return_value=fake_configs),
+    ):
         result = restore_deployed_models(session_factory=factory)
 
-    seed.assert_called_once()
+    # Sync fans out to every country discovered on disk — not only the setup
+    # country — so a newly-dropped Kenya manifest lights up alongside India.
+    assert [call.args[1] for call in seed.call_args_list] == ["IN", "KE"]
     assert result.activeReleaseIds == []
     assert result.assignmentCount == 0
     with factory() as session:
