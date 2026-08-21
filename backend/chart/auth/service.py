@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Collection
 from dataclasses import dataclass
@@ -14,6 +15,8 @@ from jwt.exceptions import PyJWKClientError, PyJWTError
 
 from .schemas import CurrentUserContext
 
+logger = logging.getLogger(__name__)
+
 chart_roles = (
     "chart_admin",
     "content_editor",
@@ -23,13 +26,6 @@ chart_roles = (
     "cross_sector_implementation_officer",
     "public_viewer",
 )
-legacy_role_aliases = {
-    "u1_health_lead": "health_planning_lead",
-    "u2_cross_sector_lead": "cross_sector_planning_lead",
-    "u3_district_health_officer": "health_implementation_officer",
-    "u4_district_cross_sector_officer": "cross_sector_implementation_officer",
-    "u5_public_visitor": "public_viewer",
-}
 geography_levels = ("country", "geo_level_1", "geo_level_2", "geo_level_3")
 
 
@@ -108,7 +104,17 @@ def apply_active_geography(
     if active_geography_id is None:
         return user
     if not can_read_geography_path(user, active_geography_id):
-        raise _auth_error("ACTIVE_GEOGRAPHY_OUT_OF_SCOPE", 403)
+        # The header is a stale client hint (sessionStorage remembered a
+        # geography that just left scope, e.g. the admin-union flag was
+        # flipped off). Silently snap back to the user's default landing area
+        # instead of 403ing — direct queries like /auth/geography-access
+        # still enforce, but a leftover header shouldn't lock the app out.
+        logger.info(
+            "auth: dropping out-of-scope active_geography header %r for user %s",
+            active_geography_id,
+            user.user_id,
+        )
+        return user
     normalized = _normalize_geography_path(active_geography_id)
     return user.model_copy(
         update={
@@ -159,8 +165,7 @@ def _map_claims(claims: dict[str, Any], client_id: str) -> CurrentUserContext:
         client_access = resource_access.get(client_id)
         if isinstance(client_access, dict):
             raw_roles.extend(_strings(client_access.get("roles")))
-    canonical_roles = {legacy_role_aliases.get(role, role) for role in raw_roles}
-    roles = [role for role in chart_roles if role in canonical_roles]
+    roles = [role for role in chart_roles if role in set(raw_roles)]
     geography_scopes = list(
         dict.fromkeys(
             normalized
@@ -181,6 +186,19 @@ def _map_claims(claims: dict[str, Any], client_id: str) -> CurrentUserContext:
                 if (country_scope := _country_scope(scope)) is not None
             )
         )
+        # An installation admin also owns every model registered in this
+        # deployment — the model list is a public endpoint, so widening the
+        # admin's context switcher to every family with an active release
+        # doesn't leak new information, just makes it usable. Toggle off with
+        # CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES=false for stricter setups.
+        if _admin_sees_all_model_geographies():
+            geography_scopes = list(
+                dict.fromkeys([*geography_scopes, *_active_model_family_roots()])
+            )
+        # Give an admin without a Keycloak group a landing area anyway, so a
+        # bare-bones self-hosted install still opens onto something usable.
+        if default_active_geography is None and geography_scopes:
+            default_active_geography = geography_scopes[0]
     username = claims.get("preferred_username") or claims.get("email") or subject
     email = claims.get("email")
     return CurrentUserContext.model_validate(
@@ -217,6 +235,30 @@ def _infer_geography_level(scope: str | None) -> str | None:
         return None
     depth = len([part for part in scope.split("/") if part])
     return geography_levels[min(depth - 1, len(geography_levels) - 1)]
+
+
+def _admin_sees_all_model_geographies() -> bool:
+    # Strict opt-in: only the exact string "true" enables the union. Anything
+    # else (unset, empty, "1", "yes", typo) leaves admins on their Keycloak
+    # scope, so a fresh install matches the country that was set up and no
+    # surprise geographies appear.
+    return os.getenv("CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES") == "true"
+
+
+def _active_model_family_roots() -> list[str]:
+    """DB-safe wrapper: an auth request must never 500 on a registry hiccup."""
+
+    try:
+        # Local imports avoid pulling the registry module (and its ORM
+        # dependencies) into auth import time, keeping this module usable in
+        # test contexts that never touch a database.
+        from chart.model_registry.service import list_family_roots_with_active_models
+        from chart.shared.db.session import get_session_factory
+
+        with get_session_factory()() as session:
+            return list_family_roots_with_active_models(session)
+    except Exception:
+        return []
 
 
 def _auth_error(code: str, status_code: int) -> HTTPException:

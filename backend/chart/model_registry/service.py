@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from chart.shared.db.models import (
     ActiveModelAssignment,
     AdminUnit,
+    AppGeography,
     ModelAreaMapping,
     ModelRelease,
 )
@@ -256,6 +257,35 @@ def get_model_mapping(
         outcome=release.outcome,
         input_spec=release.input_spec,
     )
+
+
+def list_family_roots_with_active_models(session: Session) -> list[str]:
+    """Return one path per top-level geography that has an active model release.
+
+    Example: an active release on `/india/madhya-pradesh/indore` collapses to
+    `/india`. Used by the auth layer to widen an operator's context switcher
+    to every family present in the installation.
+    """
+
+    paths = (
+        session.execute(
+            select(AppGeography.path)
+            .join(AdminUnit, AdminUnit.app_geography_id == AppGeography.id)
+            .join(
+                ActiveModelAssignment,
+                ActiveModelAssignment.admin_unit_id == AdminUnit.id,
+            )
+            .distinct()
+        )
+        .scalars()
+        .all()
+    )
+    roots: set[str] = set()
+    for path in paths:
+        parts = [segment for segment in (path or "").split("/") if segment]
+        if parts:
+            roots.add(f"/{parts[0]}")
+    return sorted(roots)
 
 
 def get_model_mappings(

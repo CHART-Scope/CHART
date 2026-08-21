@@ -278,6 +278,18 @@ account conflict. Once setup completes, public bootstrap is locked.
 Prediction routes enforce both an allowed planning role and the user's place.
 The same place check applies when reading status or results.
 
+Ordinary users are scoped strictly to the Keycloak groups they were assigned.
+Installation administrators (`chart_admin`) get two additional broadenings so
+a self-hoster can operate their instance without editing Keycloak for every
+model: (a) each Keycloak group collapses to its country root so the admin can
+context-switch inside a country they own, and (b) the admin's scope is
+unioned with the family root of every geography that has an active model
+release. Because `/model-releases` is already a public endpoint, this union
+does not expose any information a caller could not already discover — it just
+wires the Settings context switcher to what the deployment actually holds.
+Operators who want the strict Keycloak-only behavior for admins can set
+`CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES=false`.
+
 ## 8. Inference
 
 `chart.inference` is the only Python entry point.
