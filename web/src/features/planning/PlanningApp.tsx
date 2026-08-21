@@ -13,6 +13,7 @@ import {
   type ModelCatalogEntry,
 } from "@/lib/planningClient";
 import { rememberActiveGeography } from "@/lib/authClient";
+import { isInScope } from "@/lib/geographyScope";
 import { PlanningSetup } from "./PlanningSetup";
 import { defaultPlanningSelection, type PlanningSelection } from "./planningWireframe";
 
@@ -54,6 +55,10 @@ export function PlanningApp({
           inScope.find(
             (area) => area.id === activeGeographyId || area.path === activeGeographyId,
           ) ??
+          // The Settings context picker stores the family root path (e.g. /kenya
+          // or /india/madhya-pradesh). When the root itself has no direct model,
+          // land on the first prediction-supporting descendant of that family.
+          descendantOf(activeGeographyId, inScope) ??
           inScope.find((area) => area.id === "geo-in-madhya-pradesh") ??
           inScope[0];
         setAreas(inScope);
@@ -142,23 +147,12 @@ export function PlanningApp({
   );
 }
 
-function isInScope(area: GeographyRecord, scopes: string[]) {
-  if (scopes.length === 0) return false;
-  const areaPath = normalizeScope(area.path);
-  return scopes.some((raw) => {
-    const scope = normalizeScope(raw);
-    if (!scope) return false;
-    if (scope === area.id) return true;
-    if (scope === areaPath) return true;
-    // A parent scope grants its descendants. A child scope must not pull its
-    // ancestors into the picker, otherwise a sub-area user can navigate back
-    // to a parent geography that was not selected during onboarding.
-    return areaPath.startsWith(`${scope}/`);
-  });
-}
-
-function normalizeScope(value: string) {
-  const trimmed = value.trim().replace(/\/+$/, "");
-  if (!trimmed) return "";
-  return trimmed.startsWith("/") || !trimmed.includes("/") ? trimmed : `/${trimmed}`;
+function descendantOf(
+  rootPath: string | undefined,
+  areas: GeographyRecord[],
+): GeographyRecord | undefined {
+  if (!rootPath) return undefined;
+  const root = rootPath.replace(/\/+$/, "");
+  if (!root) return undefined;
+  return areas.find((area) => area.path.startsWith(`${root}/`));
 }

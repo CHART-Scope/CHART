@@ -8,7 +8,11 @@ import { IconSprite } from "@/components/Icon";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import { RunsStrip } from "@/features/dashboard";
-import { ModelHubCard, UserManagement } from "@/features/planning";
+import {
+  GeographyContextCard,
+  ModelHubCard,
+  UserManagement,
+} from "@/features/planning";
 import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
 import { listGeographies, type GeographyRecord } from "@/lib/planningClient";
 
@@ -66,11 +70,11 @@ function AuthorizedSettings({ session }: { session: AuthSession }) {
         onSignOut={signOutOfKeycloak}
         userLabel={session.user.username}
       >
+        <GeographyContextCard session={session} />
         <ModelHubCard />
         <UserManagement
           accessToken={session.accessToken}
           geographyScopes={session.user.geographyScopes}
-          activeGeographyId={session.user.activeGeographyId}
         />
         {runsGeography ? (
           <div style={{ marginTop: "var(--space-6)" }}>
