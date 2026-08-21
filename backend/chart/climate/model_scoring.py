@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import threading
 from collections.abc import Callable
-from typing import TypeVar
+from typing import Literal, TypeVar, cast
 
 from chart.inference import (
     AssociationScore,
@@ -34,7 +34,7 @@ def score_lbw_model(
             model_version=model.version,
             model_sha256=model.artifact_sha256,
             model_area=model.model_area_name,
-            pregnancy_window=pregnancy_window,
+            pregnancy_window=cast(Literal[1, 2, 3], pregnancy_window),
             temperatures_c=temperatures_c,
             service_url=service_url,
         ),

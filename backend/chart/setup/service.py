@@ -15,7 +15,11 @@ from sqlalchemy.exc import IntegrityError
 from chart.auth.schemas import CurrentUserContext
 from chart.identity import IdentityError, delete_user, upsert_user
 from chart.model_registry.runtime import prepare_model_release
-from chart.model_registry.schemas import ModelReleaseSpec, ReleaseGeographySpec
+from chart.model_registry.schemas import (
+    GeographyPlaceSpec,
+    ModelReleaseSpec,
+    ReleaseGeographySpec,
+)
 from chart.model_registry.place_sets import resolve_release_places
 from chart.model_registry.service import ModelRegistryError, activate_release
 from chart.shared.db.models import (
@@ -153,26 +157,26 @@ def get_options() -> SetupOptions:
                 raise ValueError("MODEL_RELEASE_SETUP_LEVEL_CONFLICT")
 
         places = country_places.setdefault(country_code, {})
-        for area in geography.places:
-            option = SetupPlaceOption(
-                placeCode=area.place_code,
-                id=cast(str, area.geography_id),
-                name=cast(str, area.display_name),
-                level=cast(str, area.app_level),
-                levelLabel=cast(str, area.level_label),
-                parentPlaceCode=area.parent_place_code,
-                path=cast(str, area.path),
-                sortOrder=area.sort_order,
+        for place in geography.places:
+            place_option = SetupPlaceOption(
+                placeCode=place.place_code,
+                id=cast(str, place.geography_id),
+                name=cast(str, place.display_name),
+                level=cast(str, place.app_level),
+                levelLabel=cast(str, place.level_label),
+                parentPlaceCode=place.parent_place_code,
+                path=cast(str, place.path),
+                sortOrder=place.sort_order,
                 predictionSupported=False,
             )
-            existing_place = places.setdefault(area.place_code, option)
-            if existing_place != option:
+            existing_place = places.setdefault(place.place_code, place_option)
+            if existing_place != place_option:
                 raise ValueError("MODEL_RELEASE_SETUP_PLACE_CONFLICT")
         supported_codes.setdefault(country_code, set()).update(
-            area.place_code for area in spec.areas
+            model_area.place_code for model_area in spec.areas
         )
         mappings_by_place = model_mappings.setdefault(country_code, {})
-        for area in spec.areas:
+        for model_area in spec.areas:
             presentation = spec.presentation
             mapping = SetupModelMappingOption(
                 releaseId=spec.id,
@@ -182,15 +186,15 @@ def get_options() -> SetupOptions:
                     if presentation is not None
                     else spec.outcome.replace("_", " ").capitalize()
                 ),
-                modelAreaName=area.model_area_name,
+                modelAreaName=model_area.model_area_name,
                 modelScopeLabel=(
                     presentation.model_scope_label
                     if presentation is not None
                     else "model"
                 ),
             )
-            mappings_by_place.setdefault(area.place_code, {})[
-                (spec.outcome, area.model_area_name, spec.id)
+            mappings_by_place.setdefault(model_area.place_code, {})[
+                (spec.outcome, model_area.model_area_name, spec.id)
             ] = mapping
 
     countries: list[SetupCountryOption] = []
@@ -198,10 +202,12 @@ def get_options() -> SetupOptions:
         all_places = country_places[country_code]
         included_codes = set(supported_codes.get(country_code, set()))
         for place_code in tuple(included_codes):
-            place = all_places.get(place_code)
-            while place is not None and place.parentPlaceCode is not None:
-                included_codes.add(place.parentPlaceCode)
-                place = all_places.get(place.parentPlaceCode)
+            visible_place: SetupPlaceOption | None = all_places.get(place_code)
+            while (
+                visible_place is not None and visible_place.parentPlaceCode is not None
+            ):
+                included_codes.add(visible_place.parentPlaceCode)
+                visible_place = all_places.get(visible_place.parentPlaceCode)
         visible_places = [
             place.model_copy(
                 update={
@@ -900,11 +906,11 @@ def _validate_setup_geographies(
 ) -> ReleaseGeographySpec:
     """Reject geography payloads that are not declared by a deployed manifest."""
 
-    declared = {}
-    declared_by_code = {}
-    country_name = None
-    root_id = None
-    release_geography = None
+    declared: dict[str, GeographyPlaceSpec] = {}
+    declared_by_code: dict[str, GeographyPlaceSpec] = {}
+    country_name: str | None = None
+    root_id: str | None = None
+    release_geography: ReleaseGeographySpec | None = None
     supported_place_codes: set[str] = set()
     for config in configs_for_country(input_data.countryCode):
         spec = ModelReleaseSpec.model_validate_json(
@@ -918,19 +924,20 @@ def _validate_setup_geographies(
         country_name = geography.country_name
         root_id = geography.root_id
         release_geography = geography
-        for area in geography.places:
-            existing_id = declared.get(area.geography_id)
-            existing_code = declared_by_code.get(area.place_code)
+        for place in geography.places:
+            place_id = cast(str, place.geography_id)
+            existing_id = declared.get(place_id)
+            existing_code = declared_by_code.get(place.place_code)
             if (
                 existing_id is not None
-                and existing_id != area
+                and existing_id != place
                 or existing_code is not None
-                and existing_code != area
+                and existing_code != place
             ):
                 raise SetupError("SETUP_GEOGRAPHY_INVALID", 400)
-            declared[area.geography_id] = area
-            declared_by_code[area.place_code] = area
-        supported_place_codes.update(area.place_code for area in spec.areas)
+            declared[place_id] = place
+            declared_by_code[place.place_code] = place
+        supported_place_codes.update(model_area.place_code for model_area in spec.areas)
     if (
         not declared
         or country_name != input_data.countryName
@@ -938,18 +945,18 @@ def _validate_setup_geographies(
     ):
         raise SetupError("SETUP_GEOGRAPHY_INVALID", 400)
     for row in input_data.geographies:
-        area = declared.get(row.id)
-        if area is None or (
-            row.name != area.display_name
-            or row.level != area.app_level
-            or row.levelLabel != area.level_label
-            or row.path != area.path
-            or row.sortOrder != area.sort_order
+        declared_place = declared.get(row.id)
+        if declared_place is None or (
+            row.name != declared_place.display_name
+            or row.level != declared_place.app_level
+            or row.levelLabel != declared_place.level_label
+            or row.path != declared_place.path
+            or row.sortOrder != declared_place.sort_order
         ):
             raise SetupError("SETUP_GEOGRAPHY_INVALID", 400)
         expected_parent = (
-            declared_by_code[area.parent_place_code].geography_id
-            if area.parent_place_code
+            declared_by_code[declared_place.parent_place_code].geography_id
+            if declared_place.parent_place_code
             else root_id
         )
         if row.parentId != expected_parent:

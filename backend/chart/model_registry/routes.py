@@ -278,14 +278,15 @@ def list_releases() -> ReleasesResponse:
             ).scalars()
         )
         rows = session.execute(select(ModelRelease)).scalars().all()
-        area_counts = dict(
-            session.execute(
+        area_counts: dict[str, int] = {
+            release_id: count
+            for release_id, count in session.execute(
                 select(
                     ModelAreaMapping.model_release_id,
                     func.count(ModelAreaMapping.id),
                 ).group_by(ModelAreaMapping.model_release_id)
             ).all()
-        )
+        }
 
     items: list[ReleaseInfo] = []
     for release in rows:
