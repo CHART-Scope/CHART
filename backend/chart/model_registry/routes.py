@@ -289,7 +289,6 @@ def list_releases() -> ReleasesResponse:
 
     items: list[ReleaseInfo] = []
     for release in rows:
-        input_spec = release.input_spec or {}
         model_files = [
             ModelFileInfo(
                 filename=str(entry.get("filename") or ""),
