@@ -55,6 +55,68 @@
   cursor: not-allowed;
 }
 
+.tabs {
+  display: flex;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.tab {
+  padding: 0.5rem 0;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.tab:hover {
+  color: var(--color-charcoal);
+}
+
+.tabActive {
+  color: var(--color-charcoal);
+  border-bottom-color: var(--color-nexus);
+}
+
+.libraryPlaceholder {
+  padding: var(--space-5);
+  border: 1px dashed var(--border-subtle);
+  border-radius: 0.5rem;
+  background: var(--surface-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.libraryTitle {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-body-lg);
+  font-weight: 500;
+  color: var(--color-charcoal);
+}
+
+.libraryBody {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.libraryHint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+  font-style: italic;
+}
+
 .status {
   color: var(--color-text-muted);
   font-size: var(--fs-caption);
