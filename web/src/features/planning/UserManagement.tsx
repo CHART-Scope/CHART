@@ -10,7 +10,7 @@ import { Panel } from "@/components/Panel";
 import { Select } from "@/components/Select";
 import { TextInput } from "@/components/TextInput";
 import { resetAuditSession, stopAuditFlush } from "@/lib/audit";
-import { clearStoredAuthSession, rememberActiveGeography } from "@/lib/authClient";
+import { clearStoredAuthSession } from "@/lib/authClient";
 import { resetInstallation, syncInstalledModels } from "@/lib/setupClient";
 import {
   inviteUser,
@@ -59,14 +59,9 @@ const RESET_CONFIRM_PHRASE = "RESET";
 type Props = {
   accessToken: string;
   geographyScopes: string[];
-  activeGeographyId?: string;
 };
 
-export function UserManagement({
-  accessToken,
-  geographyScopes,
-  activeGeographyId,
-}: Props) {
+export function UserManagement({ accessToken, geographyScopes }: Props) {
   const router = useRouter();
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [geographies, setGeographies] = useState<AdminGeography[]>([]);
@@ -87,11 +82,6 @@ export function UserManagement({
       geography.supportsPrediction &&
       isGeographyInScope(geography.path, geographyScopes),
   );
-  const activeContext =
-    availableGeographies.find(
-      (geography) =>
-        geography.id === activeGeographyId || geography.path === activeGeographyId,
-    ) ?? availableGeographies[0];
 
   function updateFormField<Key extends keyof FormState>(
     field: Key,
@@ -224,36 +214,6 @@ export function UserManagement({
           </p>
         </div>
       </header>
-
-      {activeContext ? (
-        <section className={styles.contextCard} aria-labelledby="working-area-title">
-          <div>
-            <strong id="working-area-title">Current working area</strong>
-            <p>
-              Switch context without resetting CHART or changing anyone&apos;s stored
-              work.
-            </p>
-          </div>
-          <Select
-            id="working-area"
-            label="Model-backed planning area"
-            value={activeContext.id}
-            options={availableGeographies.map((geography) => ({
-              value: geography.id,
-              label: `${geography.name} · ${geography.levelLabel}`,
-            }))}
-            onChange={(event) => {
-              const geographyId = event.currentTarget.value;
-              const geography = availableGeographies.find(
-                (item) => item.id === geographyId,
-              );
-              if (!geography) return;
-              rememberActiveGeography(geography.path);
-              router.push("/plan");
-            }}
-          />
-        </section>
-      ) : null}
 
       <section className={styles.modelUpdates} aria-labelledby="model-updates-title">
         <div>
@@ -403,6 +363,7 @@ export function UserManagement({
       </div>
 
       <Modal
+        size="lg"
         open={showResetDialog}
         onClose={() => {
           if (!isResetting) setShowResetDialog(false);
