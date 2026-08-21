@@ -33,8 +33,6 @@ export function PlanningSetup({
     () => areas.find((area) => area.id === selection.area) ?? null,
     [areas, selection.area],
   );
-  const switcherGroups = useMemo(() => groupAreasByCountry(areas), [areas]);
-  const hasSwitcher = areas.length > 0;
 
   const hazards = useMemo(
     () =>
@@ -122,19 +120,10 @@ export function PlanningSetup({
     !isLoading &&
     !isSubmitting;
   const modelUnavailable = Boolean(activeArea) && !isLoading && catalog.length === 0;
-  const country = activeArea ? countryFromPath(activeArea.path) : null;
   const areaName = activeArea?.name ?? "your area";
 
   return (
     <div className={styles.wrap}>
-      {country ? (
-        <div className={styles.breadcrumb} aria-label="Current geography">
-          <span>{country}</span>
-          <Icon name="arrow-right" size={11} />
-          <strong>{areaName}</strong>
-        </div>
-      ) : null}
-
       <header className={styles.header}>
         <h1>What would you like to plan for, together?</h1>
         <p>
@@ -159,40 +148,6 @@ export function PlanningSetup({
         >
           <Icon name="bookmark" size={16} />
         </button>
-
-        {hasSwitcher ? (
-          <label className={styles.areaSwitcher}>
-            <span>Switch area</span>
-            <select
-              value={selection.area}
-              onChange={(event) => {
-                const area = areas.find(
-                  (item) => item.id === event.currentTarget.value,
-                );
-                const keepsCurrentOutcome = Boolean(
-                  area && supportsOutcomeInTree(area, selectedOutcome, areas),
-                );
-                onChange({
-                  ...selection,
-                  area: event.currentTarget.value,
-                  hazard: keepsCurrentOutcome ? selection.hazard : "",
-                  healthDomain: keepsCurrentOutcome ? selection.healthDomain : "",
-                  outcome: keepsCurrentOutcome ? selection.outcome : "",
-                });
-              }}
-            >
-              {switcherGroups.map((group) => (
-                <optgroup key={group.country} label={group.country}>
-                  {group.areas.map((area) => (
-                    <option key={area.id} value={area.id}>
-                      {optionLabel(area)}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-        ) : null}
 
         <p className={styles.sentence}>
           <span>We&apos;re planning together for the impacts of </span>
@@ -294,19 +249,6 @@ function supportsOutcome(area: GeographyRecord, outcome: string) {
   return Boolean(outcome && area.models?.some((model) => model.outcome === outcome));
 }
 
-function supportsOutcomeInTree(
-  area: GeographyRecord,
-  outcome: string,
-  areas: GeographyRecord[],
-) {
-  if (supportsOutcome(area, outcome)) return true;
-  const rootPath = area.path.replace(/\/+$/, "");
-  return areas.some(
-    (candidate) =>
-      candidate.path.startsWith(`${rootPath}/`) && supportsOutcome(candidate, outcome),
-  );
-}
-
 function pluralizeLevel(levelLabel: string | undefined, count: number) {
   const label = levelLabel?.toLowerCase() || "sub-area";
   return count === 1 ? label : `${label}s`;
@@ -359,50 +301,4 @@ function dedupeBy<T>(items: T[], key: (item: T) => string) {
     result.push(item);
   }
   return result;
-}
-
-function countryFromPath(path: string): string | null {
-  const parts = path.split("/").filter(Boolean);
-  if (parts.length === 0) return null;
-  return parts[0]
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-type SwitcherGroup = { country: string; areas: GeographyRecord[] };
-
-/**
- * Group areas by country so the switcher scales as new countries are added.
- * Within each country top-level units (state/region) sort before their
- * divisions; native <select> can only nest one level, so divisions live in
- * the same country group but are prefixed to signal the hierarchy visually.
- */
-function groupAreasByCountry(areas: GeographyRecord[]): SwitcherGroup[] {
-  const byCountry = new Map<string, GeographyRecord[]>();
-  for (const area of areas) {
-    const country = countryFromPath(area.path) ?? "Other";
-    const bucket = byCountry.get(country) ?? [];
-    bucket.push(area);
-    byCountry.set(country, bucket);
-  }
-  const groups: SwitcherGroup[] = [];
-  for (const [country, items] of byCountry) {
-    const sorted = [...items].sort(
-      (a, b) => pathDepth(a.path) - pathDepth(b.path) || a.name.localeCompare(b.name),
-    );
-    groups.push({ country, areas: sorted });
-  }
-  return groups;
-}
-
-function pathDepth(path: string): number {
-  return path.split("/").filter(Boolean).length;
-}
-
-function optionLabel(area: GeographyRecord): string {
-  const suffix = ` (${area.levelLabel.toLowerCase()})`;
-  return pathDepth(area.path) > 2
-    ? `    ${area.name}${suffix}`
-    : `${area.name}${suffix}`;
 }
