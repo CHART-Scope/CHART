@@ -363,7 +363,6 @@ climate-api-run: bootstrap-token wait-for-lbw
 	  INFERENCE_LBW_BASE_URL="$${INFERENCE_LBW_BASE_URL:-http://127.0.0.1:8000}" \
 	  MODEL_CACHE_DIR="$(CHART_MODEL_CACHE_DIR)" \
 	  MODEL_CONTROL_TOKEN="$(LBW_MODEL_CONTROL_TOKEN)" \
-	  CHART_ENABLE_REVIEW_MODELS=true \
 	  CHART_BOOTSTRAP_TOKEN="$$token" \
 	  $(VENV_PYTHON) -m chart
 

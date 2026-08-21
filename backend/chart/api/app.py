@@ -221,6 +221,13 @@ def export_openapi(output_path: Path) -> Path:
 
 def main() -> None:
     import uvicorn
+    from dotenv import load_dotenv
+
+    # backend/.env is where operators are expected to keep local overrides
+    # (feature flags, model catalog toggles). Load it before reading any env
+    # so edits to that file actually reach the process without also touching
+    # the Makefile launcher.
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "3210"))
