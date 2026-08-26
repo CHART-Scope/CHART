@@ -146,9 +146,18 @@ def register_model_release(
             )
         )
 
+    # activate_release queries ModelAreaMapping to decide whether the
+    # release has any places to activate — with the production session
+    # factory's ``autoflush=False``, the mappings we just added would be
+    # invisible to that SELECT and the activation would abort with
+    # MODEL_RELEASE_AREA_REQUIRED. Flush explicitly so both the direct
+    # ``activate=True`` path (chart-bootstrap-mp) and the two-step
+    # register-then-activate path (place_bootstrap) see the same rows.
+    session.flush()
+
     if activate:
         activate_release(session, release)
-    session.flush()
+        session.flush()
     return release
 
 
