@@ -35,7 +35,7 @@
     "model_scope_label": "administrative model",
     "visualization": {
       "kind": "odds_ratio_icon_array",
-      "figure": "newborn",
+      "figure": "mother-baby",
       "context_figure": "pregnant-woman"
     },
     "risk_description": "Exposure to extreme heat during pregnancy is associated with increased low-birth-weight risk, while cooler environments can reduce exposure."

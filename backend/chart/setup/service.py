@@ -613,7 +613,16 @@ def complete(
                     role="owner",
                 )
             )
-        _auto_seed_deployed_models(session, country_code, purge_stale=True)
+        # Seed the setup country first so its releases appear first in the
+        # auto-seed order, then fan out to every other country whose manifest
+        # is present on disk. Setup used to install only the selected country,
+        # which meant an admin who chose Kenya could not touch the MP releases
+        # already shipped in pipelines/models/ until they ran /setup/models/sync
+        # manually. Fanning out here matches the sync path's behavior.
+        all_countries = sorted({config.country_code for config in deployed_configs()})
+        seed_order = [country_code] + [c for c in all_countries if c != country_code]
+        for seed_country in seed_order:
+            _auto_seed_deployed_models(session, seed_country, purge_stale=True)
         try:
             _auto_seed_recommended_actions(session)
         except Exception:  # noqa: BLE001 - best-effort, must not fail setup

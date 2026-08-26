@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import styles from "./Modal.module.css";
 
@@ -33,6 +34,11 @@ export function Modal({
   bare,
   children,
 }: Props) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -42,8 +48,8 @@ export function Modal({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
-  return (
+  if (!open || !mounted) return null;
+  return createPortal(
     <div className={styles.backdrop} role="dialog" aria-modal="true" onClick={onClose}>
       <div
         className={[
@@ -70,6 +76,7 @@ export function Modal({
         {children}
         {!bare && footer && <div className={styles.footer}>{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
