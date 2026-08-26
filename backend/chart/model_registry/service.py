@@ -7,8 +7,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
-logger = logging.getLogger(__name__)
-
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -21,6 +19,8 @@ from chart.shared.db.models import (
 )
 
 from .schemas import ModelReleaseSpec, PregnancyWindow
+
+logger = logging.getLogger(__name__)
 
 
 class ModelRegistryError(ValueError):
