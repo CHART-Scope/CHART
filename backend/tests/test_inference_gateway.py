@@ -129,7 +129,56 @@ def test_lbw_provider_sends_the_r_api_temperature_field() -> None:
     assert sent["model_version"] == MODEL_VERSION
     assert sent["model_sha256"] == MODEL_SHA256
     assert "tmax" not in sent
+    # No editorial reference passed → provider does not send ``ref``, so the
+    # R runtime uses the per-block MMT baked into the compact ``.rds``.
+    assert "ref" not in sent
     assert result["odds_ratio"] == 1.12
+
+
+def test_lbw_provider_forwards_editorial_reference_to_r_runtime() -> None:
+    response = {
+        "area": "Madhya Pradesh",
+        "geography_level": "state",
+        "trimester": 1,
+        "tmax_lag": [31.0, 30.0, 29.0],
+        "ref_temp": 27.0,
+        "odds_ratio": 1.12,
+        "ci95_low": 1.02,
+        "ci95_high": 1.22,
+        "on_training_support": True,
+        "model_file": "state.rds",
+        "model_version": "1.0.0",
+        "model_sha256": "a" * 64,
+    }
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return json.dumps(response).encode("utf-8")
+
+    with patch(
+        "chart.inference.providers.lbw_r.urllib.request.urlopen",
+        return_value=FakeResponse(),
+    ) as urlopen:
+        call_lbw_r(
+            "http://lbw.test",
+            model_release_id=MODEL_RELEASE_ID,
+            model_file=MODEL_FILE,
+            model_version=MODEL_VERSION,
+            model_sha256=MODEL_SHA256,
+            model_area="Madhya Pradesh",
+            pregnancy_window=1,
+            temperatures_c=(31.0, 30.0, 29.0),
+            reference_temperature_c=27.0,
+        )
+
+    sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
+    assert sent["ref"] == 27.0
 
 
 def test_association_provider_and_gateway_preserve_four_day_profile() -> None:

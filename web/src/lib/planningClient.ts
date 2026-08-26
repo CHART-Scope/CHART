@@ -421,8 +421,16 @@ async function request<T>(url: string, accessToken?: string, init: RequestInit =
   const headers = new Headers(init.headers);
   if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
   const response = await fetch(url, {
-    ...init,
+    // ``cache: "no-store"`` is the safe default for this client — most
+    // endpoints (prediction status polling, what-if scoring, live
+    // catalogs after a manifest change) must never come from a stale
+    // browser cache. Callers that hit near-static reference endpoints
+    // can override ``init.cache`` explicitly to opt into normal HTTP
+    // caching. Note: process-level caches (see ``useGeographies``)
+    // already dedupe within a session, so browser caching is mainly
+    // useful across hard refreshes.
     cache: "no-store",
+    ...init,
     headers,
     signal: init.signal ?? AbortSignal.timeout(30_000),
   });

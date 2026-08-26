@@ -71,7 +71,18 @@ class ResolvedPlace:
     model: ActiveModelMapping | None
 
 
-def list_locations(*, session_factory=None) -> PlaceListResponse:
+def list_locations(
+    *, session_factory=None, include_unsupported: bool = True
+) -> PlaceListResponse:
+    """List places the app knows about.
+
+    ``include_unsupported=False`` drops leaf places that have no active
+    model. Non-leaf geographies (country / state roots) are always kept
+    so navigation can still drill down. Turkana, for example, is a
+    Kenya county with no fitted climate-zone block; the API filters it
+    out at request time rather than fabricating an empty prediction.
+    """
+
     session_factory = session_factory or get_session_factory()
     with session_factory() as session:
         rows = session.execute(
@@ -84,16 +95,21 @@ def list_locations(*, session_factory=None) -> PlaceListResponse:
         models = get_active_model_mappings(
             session, [admin_unit.id for _, admin_unit in rows]
         )
-        return PlaceListResponse(
-            items=[
+        parent_ids = {place.parent_id for place, _ in rows if place.parent_id}
+        items = []
+        for place, admin_unit in rows:
+            has_model = admin_unit.id in models
+            is_leaf = place.id not in parent_ids
+            if not include_unsupported and is_leaf and not has_model:
+                continue
+            items.append(
                 _place_response(
                     place,
                     admin_unit=admin_unit,
                     model=models.get(admin_unit.id),
                 )
-                for place, admin_unit in rows
-            ]
-        )
+            )
+        return PlaceListResponse(items=items)
 
 
 def get_place_path(geography_id: str, *, session_factory=None) -> str:

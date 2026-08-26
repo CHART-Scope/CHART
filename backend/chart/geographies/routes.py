@@ -40,7 +40,17 @@ class GeographyResponse(BaseModel):
 
 
 @router.get("", response_model=list[GeographyResponse])
-def list_geographies() -> list[GeographyResponse]:
+def list_geographies(
+    include_unsupported: bool = False,
+) -> list[GeographyResponse]:
+    """List every deployed geography.
+
+    ``include_unsupported=True`` returns leaf places that have no active
+    model — used by admin flows (user scoping, coverage analytics) that
+    need to see uncovered leaves before a model is fitted. The default
+    matches the UI expectation of only showing addressable places.
+    """
+
     with get_session_factory()() as session:
         configured_ids = deployed_geography_ids_by_country()
         rows = session.execute(
@@ -85,10 +95,23 @@ def list_geographies() -> list[GeographyResponse]:
                     releaseId=release_id,
                 )
             )
+        parent_ids = {row.parent_id for row, _ in rows if row.parent_id}
         response = []
         for row, admin_unit in rows:
             country_ids = configured_ids.get(row.country_code)
             if country_ids is not None and row.id not in country_ids:
+                continue
+            # Drop leaf geographies that have no active model for any
+            # outcome (e.g. Kenya's Turkana county — no fitted
+            # North-western climate-zone block). Non-leaves stay so the
+            # navigation tree still resolves; a state root without a
+            # direct model but with model-backed divisions is still
+            # usable as a parent.
+            is_leaf = row.id not in parent_ids
+            has_any_model = admin_unit is not None and bool(
+                models_by_admin.get(admin_unit.id)
+            )
+            if not include_unsupported and is_leaf and not has_any_model:
                 continue
             response.append(
                 GeographyResponse(

@@ -303,8 +303,18 @@ class WhatIfResponse(BaseModel):
         description="Positive-excess attributable fraction; zero when odds ratio <= 1.",
     )
     relative_odds_change_percent: float = Field(
-        gt=-100,
-        description="Signed change in modelled odds relative to the fitted reference.",
+        ge=-100,
+        description=(
+            "Signed change in modelled odds relative to the fitted reference. "
+            "Collapses to 0.0 only when the query temperature is *below* the "
+            "reference AND the release's output_contract.attributable_fraction "
+            "is 'positive_excess_only'. Above-reference readings are reported "
+            "at full precision, including OR<1 outputs from unstable "
+            "small-sample division fits — they represent what the runtime "
+            "actually computed, not a policy suppression. The floor is -100 "
+            "(inclusive) — reachable when a fit returns OR=0 (numerical "
+            "underflow); strict gt=-100 would 500 the endpoint at that edge."
+        ),
     )
     on_training_support: bool
     warning: str | None = None

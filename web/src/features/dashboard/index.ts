@@ -1,3 +1,4 @@
+export { DashboardContextBar } from "./DashboardContextBar";
 export { DashboardHeader } from "./DashboardHeader";
 export { HeatLbwLinkPanel } from "./HeatLbwLinkPanel";
 export { PredictionsPanel } from "./PredictionsPanel";

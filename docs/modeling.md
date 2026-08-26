@@ -160,12 +160,26 @@ window. Treat any result outside that block-specific range as extrapolation.
 
 The interactive response exposes two distinct derived percentages:
 
-- `relative_odds_change_percent` is signed: `OR 0.62` becomes `-38%`, while
-  `OR 1.25` becomes `+25%`. The dashboard uses this comparison so associations
-  below one are not incorrectly displayed as zero.
-- `attributable_fraction_percent` remains positive-excess-only and therefore
-  returns zero when the odds ratio is one or lower. It must not be labelled as
-  the signed change in odds.
+- `relative_odds_change_percent` is signed by default: `OR 0.62` becomes
+  `-38%`, `OR 1.25` becomes `+25%`. When the release's
+  `output_contract.attributable_fraction` is set to `"positive_excess_only"`
+  the *below-reference* tail (query temperature < reference) is collapsed
+  to `0.0` — the paper's editorial scope for that fit does not interpret
+  cooler-than-reference temperatures. Above-reference readings are always
+  reported at full precision, even when the block's fitted spline returns
+  `OR < 1` at that temperature (a small-sample instability in a division
+  fit, for example); hiding it would misrepresent what the runtime
+  actually computed.
+- `attributable_fraction_percent` is always positive-excess-only and
+  therefore returns zero when the odds ratio is one or lower. It must not
+  be labelled as the signed change in odds.
+
+The dashboard mirrors the server-side policy: when the response reports
+`OR < 1` with `relative_odds_change_percent == 0`, the slider stat sentence
+renders "At or below the reference — no heat-attributable excess" rather
+than a signed number, and the slider itself clamps its lower bound to the
+release's reference temperature so the below-reference region is
+unreachable from the UI.
 
 ## Run the inference service locally
 
@@ -257,50 +271,36 @@ https://github.com/CHART-Scope/CHART/blob/main/pipelines/models/inference/adapte
 for the block-selection logic and
 [Model artifacts](#model-artifacts) for the current bundle filenames.
 
-### India: Madhya Pradesh LBW routing
+### Supported geographies and model artifacts
 
-```mermaid
-flowchart LR
-    Select["User selects Madhya Pradesh<br/>or one of 10 divisions"] --> Boundary["Selected state or division boundary"]
-    Boundary --> Climate["Extract 3 monthly tasmax means<br/>newest first"]
+The manifest-driven routing above is country-agnostic; the differences
+between releases are entirely encoded in the manifest's `areas` mapping and
+the fitted blocks in each `.rds`. The table below lists the geographies
+currently shipped in this codebase, the artifact each release scores
+against, and the upstream source the modeller supplied.
 
-    Select --> Manifest["MP release mapping"]
-    Manifest -->|"State; window 1 only"| State["Supplied Madhya Pradesh block"]
-    Manifest -->|"Division; windows 1, 2, 3"| Division["Matching fitted division block"]
+| Geography | Outcome | Fitted-block granularity | Compact artifact | Manifest | Source |
+|---|---|---|---|---|---|
+| 🇮🇳 India — Madhya Pradesh | Low birth weight | 1 MP-wide block (window 1) + 10 division blocks (windows 1–3) | `IN_MP_LBW_tmax_v1.0.1-compact.rds` | [`model-release.mp.compact.review.json`](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/lbw/model-release.mp.compact.review.json) | Zhu Z, Zhang T, Benmarhnia T, et al. *Lancet Planet Health* 2024 |
+| 🇮🇳 India — Madhya Pradesh | Under-five mortality | 10 division blocks (no state block) | `IN_MP_U5M_tmean_v0.1.0-compact.rds` | [`model-release.mp.review.json`](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/under_five_mortality/model-release.mp.review.json) | Case-crossover DLNM using NFHS-7 birth histories |
+| 🇰🇪 Kenya — 47 counties | Low birth weight | 5 climate-zone blocks (each window 1–3), county→zone map | `KE_climate_zone_LBW_tmax_v0.2.1-review.rds` | [`model-release.kenya.review.json`](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/lbw/model-release.kenya.review.json) | Climate-zone recomposition of Kenya DHS |
 
-    Climate --> Score["Binomial DLNM scorer"]
-    State --> Score
-    Division --> Score
-    Score --> Output["Odds ratio + 95% CI<br/>reference, support, n_training, provenance"]
-```
+Two learnings the release shape encodes:
 
-The state and division paths are not interchangeable. The current manifest
-enables only pregnancy window 1 for Madhya Pradesh state, while each division
-has three directly supplied fitted windows. See the
-[MP review manifest on GitHub](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/lbw/model-release.mp.compact.review.json).
-
-### Kenya: county-to-climate-zone LBW routing
-
-```mermaid
-flowchart LR
-    County["User selects a Kenya county<br/>for example Kajiado"] --> Shape["County boundary"]
-    Shape --> Climate["Extract 3 monthly tasmax means<br/>newest first"]
-
-    County --> Mapping["Manifest county mapping<br/>Kajiado → South-eastern"]
-    Mapping --> Zone["Matching fitted climate-zone block<br/>window 1, 2, or 3"]
-
-    Climate --> Score["Binomial DLNM scorer"]
-    Zone --> Score
-    Score --> Output["Odds ratio + 95% CI<br/>reference, support, n_training, provenance"]
-```
-
-The county polygon controls climate extraction; it does not imply a
-county-fitted health model. Kajiado uses Kajiado temperatures with the fitted
-South-eastern response block. Forty-six counties map to one of five fitted
-zones. Turkana remains selectable for place and climate context but has no LBW
-prediction because the source contains no fitted North-western block. See the
-[Kenya review manifest on GitHub](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/lbw/model-release.kenya.review.json)
-and [county boundaries on GitHub](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/boundaries/data/kenya_counties_climate_zones.geojson).
+- **The polygon and the fitted block need not match one-to-one.** A place's
+  boundary controls climate extraction (its geometry), while the fitted
+  block is chosen by whatever the manifest's `areas[*].model_area_name`
+  says — often the same string ("Madhya Pradesh"), sometimes a
+  zone-of-many-counties ("South-eastern"), sometimes a pregnancy-window
+  suffix ("Bhopal_Sem01"). If a place resolves to no `model_area_name`
+  (Turkana, Kajiado sub-counties), the county is still selectable for
+  climate context but returns no prediction.
+- **Every release has its own reference anchor.** Some fits are anchored
+  at a fixed editorial reference (MP LBW: 27°C, matching the source
+  paper); others let each block use its own modeller-computed MMT (the
+  Kenya climate-zone bundle and U5M). The `presentation.editorial_reference_temperature_c`
+  field on the manifest is what tells the runtime to override the bundled
+  MMT — omit it to keep whatever the `.rds` was fit against.
 
 !!! note "Frontend contract"
     Any UI panel that calls a per-place model endpoint must send the district

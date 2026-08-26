@@ -65,6 +65,39 @@ def test_missing_runtime_model_is_reloaded_and_scored() -> None:
     )
 
 
+def test_editorial_reference_from_manifest_is_forwarded_to_scorer() -> None:
+    """When the manifest declares an editorial anchor, the wrapper reads
+    ``presentation.editorial_reference_temperature_c`` and forwards it to
+    ``score_lbw`` so the R runtime re-anchors the DLNM crosspred there
+    instead of using the block's bundled MMT."""
+
+    model = ActiveModelMapping(
+        release_id="lbw-mp-1.0.1-compact-review",
+        version="1.0.1-compact-review",
+        model_area_name="Madhya Pradesh",
+        model_file="IN_MP_LBW_tmax_v1.0.1-compact.rds",
+        artifact_sha256="a" * 64,
+        validated_pregnancy_windows=(1,),
+        input_spec={
+            "presentation": {"editorial_reference_temperature_c": 27.0},
+            "output_contract": {"attributable_fraction": "positive_excess_only"},
+        },
+    )
+    with patch("chart.climate.model_scoring.score_lbw", return_value=_score()) as score:
+        score_lbw_model(model, pregnancy_window=1, temperatures_c=(27.0, 27.0, 27.0))
+    assert score.call_args.kwargs["reference_temperature_c"] == 27.0
+
+
+def test_missing_editorial_reference_leaves_bundled_mmt_in_place() -> None:
+    """Releases without an editorial anchor (e.g. Kenya climate-zone LBW)
+    must not forward a ``reference_temperature_c`` — the R runtime should
+    keep its per-block MMT."""
+
+    with patch("chart.climate.model_scoring.score_lbw", return_value=_score()) as score:
+        score_lbw_model(_model(), pregnancy_window=1, temperatures_c=(27.0, 27.0, 27.0))
+    assert score.call_args.kwargs["reference_temperature_c"] is None
+
+
 def test_other_inference_failures_are_not_hidden_by_reload() -> None:
     failure = InferenceError("LBW_RESPONSE_INVALID", "bad response")
     with (

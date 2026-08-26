@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import os
@@ -52,7 +53,17 @@ def _allow_review_models() -> bool:
     }
 
 
-def _discover_models() -> tuple[_DiscoveredModel, ...]:
+@functools.lru_cache(maxsize=1)
+def _discover_all_models() -> tuple[_DiscoveredModel, ...]:
+    """Scan and validate every manifest on disk once per process.
+
+    The filesystem tree under ``pipelines/models/`` is static per deploy,
+    so caching the scan + JSON parse + pydantic validation removes an
+    O(manifests) cost from every ``/geographies`` / ``/model-catalog``
+    request. Tests that need to re-scan (e.g. after writing a temp
+    manifest) can call ``invalidate_discovery_cache()``.
+    """
+
     models: list[_DiscoveredModel] = []
     for path in sorted(MODEL_RELEASE_ROOT.rglob("model-release*.json")):
         try:
@@ -63,8 +74,6 @@ def _discover_models() -> tuple[_DiscoveredModel, ...]:
             geography = places.geography
             boundary = places.shape_path
             review_only = "review" in spec.version.lower()
-            if review_only and not _allow_review_models():
-                continue
             if boundary is not None and not boundary.exists():
                 continue
             models.append(
@@ -82,6 +91,28 @@ def _discover_models() -> tuple[_DiscoveredModel, ...]:
         except _DISCOVERY_ERRORS as error:
             logger.warning("model_configs: skipping %s: %r", path, error)
     return tuple(models)
+
+
+def invalidate_discovery_cache() -> None:
+    """Drop the cached manifest scan — call after writing new manifests."""
+
+    _discover_all_models.cache_clear()
+
+
+def _discover_models() -> tuple[_DiscoveredModel, ...]:
+    """Return the cached scan filtered by the current review-models flag.
+
+    The review-only filter depends on an environment variable, which
+    tests toggle at runtime; the cheap filter step runs every call so
+    those toggles keep working, while the expensive scan stays cached.
+    """
+
+    allow_review = _allow_review_models()
+    return tuple(
+        model
+        for model in _discover_all_models()
+        if allow_review or not model.config.review_only
+    )
 
 
 def configs_for_country(country_code: str) -> tuple[DeployedModelConfig, ...]:

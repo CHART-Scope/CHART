@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -92,6 +95,14 @@ def register_model_release(
             existing.input_spec or {}, payload["input_spec"]
         )
         if merged_input_spec != existing.input_spec:
+            # editorial_reference_temperature_c re-anchors the R DLNM, so
+            # a change here silently shifts every subsequent OR/CI on the
+            # same release id. Log it loudly so operators can spot the
+            # rewrite in the audit stream without needing to diff the
+            # manifest by hand.
+            _warn_if_editorial_anchor_changed(
+                existing.input_spec or {}, merged_input_spec, spec.id
+            )
             existing.input_spec = merged_input_spec
         # Taxonomy fields are late additions: backfill on re-register so
         # older rows pick up hazard/domain from the manifest without
@@ -480,50 +491,90 @@ def _model_file_identities(model_files: list[dict]) -> list[tuple[str, str]]:
 
 
 def _input_spec_is_compatible(current: dict, expected: dict) -> bool:
-    """Permit only additive presentation metadata on an existing release.
+    """Permit presentation revisions on an existing release.
 
-    Runtime, model input, and model output contracts remain immutable. Existing
-    presentation values also cannot change, but a newer manifest may add UI
-    fields that were not part of the original manifest schema.
+    Runtime, model input, and model output contracts remain immutable —
+    those determine what the scorer is and what it returns. Presentation
+    is UI metadata (labels, icons, editorial reference anchors) and the
+    latest manifest is the source of truth: values may update as well as
+    be added. Otherwise a label rebrand or figure swap would force every
+    caller to bump the release id even though the fitted parameters and
+    output shape are unchanged.
     """
 
     for key in ("input_contract", "output_contract", "runtime"):
         if current.get(key) != expected.get(key):
             return False
-    current_presentation = current.get("presentation") or {}
-    expected_presentation = expected.get("presentation") or {}
-    return _mapping_is_additive(current_presentation, expected_presentation)
-
-
-def _mapping_is_additive(current: dict, expected: dict) -> bool:
-    for key, current_value in current.items():
-        if key not in expected:
-            continue
-        expected_value = expected[key]
-        if isinstance(current_value, dict) and isinstance(expected_value, dict):
-            if not _mapping_is_additive(current_value, expected_value):
-                return False
-        elif current_value != expected_value:
-            return False
     return True
 
 
 def _merge_additive_presentation(current: dict, expected: dict) -> dict:
+    """Overlay the manifest's presentation onto the stored one.
+
+    Fields present in the manifest override the stored value; fields the
+    manifest omits are preserved (so a partial manifest can add without
+    dropping earlier UI copy). Nested dicts are merged recursively with
+    the same rule.
+    """
+
     merged = dict(current)
     current_presentation = current.get("presentation") or {}
     expected_presentation = expected.get("presentation") or {}
-    merged["presentation"] = _merge_mappings(
+    merged["presentation"] = _overlay_mappings(
         current_presentation, expected_presentation
     )
     return merged
 
 
-def _merge_mappings(current: dict, expected: dict) -> dict:
+def _warn_if_editorial_anchor_changed(
+    before: dict, after: dict, release_id: str
+) -> None:
+    """Log when editorial_reference_temperature_c changes on re-register.
+
+    The manifest field is stored under presentation, so the loosened
+    compatibility check allows it to be overwritten without a new
+    release id. That is a scoring-visible change (the R adapter uses it
+    as the crosspred anchor) — surface it in the log stream so operators
+    can trace why the same release_id now returns different odds.
+    """
+
+    def _anchor(spec: dict) -> object:
+        return (spec.get("presentation") or {}).get("editorial_reference_temperature_c")
+
+    old = _anchor(before)
+    new = _anchor(after)
+    if old != new:
+        logger.warning(
+            "model_release: editorial_reference_temperature_c changed on "
+            "release=%s (was %r, now %r). Scoring output will shift for "
+            "the same release id; consider bumping the release id if this "
+            "was not intentional.",
+            release_id,
+            old,
+            new,
+        )
+
+
+def _overlay_mappings(current: dict, expected: dict) -> dict:
+    """Recursive overlay with a "None never clobbers a real value" rule.
+
+    Two dicts merge recursively (nested overlay). Two scalars replace
+    (latest wins). A dict on either side vs. an explicit ``None`` on the
+    other is treated as a noop — a partial manifest cannot silently
+    wipe a stored subtree by omitting it (Pydantic serialises absent
+    optional fields as ``None``), which would otherwise erase the
+    visualization block or editorial_reference_temperature_c on any
+    re-register.
+    """
+
     merged = dict(current)
     for key, value in expected.items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = _merge_mappings(merged[key], value)
-        elif key not in merged:
+        current_value = merged.get(key)
+        if value is None and current_value is not None:
+            continue
+        if isinstance(value, dict) and isinstance(current_value, dict):
+            merged[key] = _overlay_mappings(current_value, value)
+        else:
             merged[key] = value
     return merged
 

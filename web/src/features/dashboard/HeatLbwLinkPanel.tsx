@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import { Icon, type IconName } from "@/components/Icon";
+import { type IconName } from "@/components/Icon";
 import { IconArray } from "@/components/IconArray";
 import { PrecisionBadge } from "@/components/PrecisionBadge";
 import { PrecisionInfoModal } from "@/components/PrecisionInfoModal";
 import { Slider } from "@/components/Slider";
-import { recordAuditEvent } from "@/lib/audit";
 import {
   getPredictionRequest,
   listPredictionRequests,
@@ -16,30 +15,22 @@ import {
 import { precisionFromCi, type PrecisionLevel } from "@/lib/precision";
 
 import styles from "./HeatLbwLinkPanel.module.css";
-import { relativeOddsChangePercent } from "./oddsRatio";
+import { affectedPercentFromOddsRatio, relativeOddsChangePercent } from "./oddsRatio";
 import { useWhatIfScore } from "./useWhatIfScore";
 
-type Outcome = { code: string; label: string };
-type District = { code: string; name: string; levelLabel?: string };
-
 type Props = {
-  /** Label for the state / whole-area default (e.g. "Madhya Pradesh (State)"). */
-  stateLabel: string;
-  districts?: readonly District[];
+  /** Label for the currently-viewed place (e.g. "Bhopal Division",
+   * "Madhya Pradesh (State)"). Rendered as static text in the question
+   * header — the actual switching lives in DashboardContextBar. */
+  placeLabel: string;
   modelAreaName?: string | null;
-  parentSelectable?: boolean;
   outcome?: string;
   outcomeLabel?: string;
-  outcomes?: readonly Outcome[];
-  onOutcomeChange?: (code: string) => void;
   /** Figure rendered in each cell of the icon array. Defaults to the same
    * newborn pictogram the Risk-vs-Protection card uses so the two dashboard
    * panels read as a single visual family. */
   figure?: IconName;
   batchEnabled?: boolean;
-  /** Selected district code, or ``null`` for the whole-state view. */
-  activeAdminUnitCode?: string | null;
-  onAdminUnitChange?: (code: string | null) => void;
   geographyId?: string;
   accessToken?: string;
   /** Bump this to force a re-fetch when a new run completes. */
@@ -54,6 +45,11 @@ type Props = {
     percent: number;
     ci95Low: number;
     ci95High: number;
+    /** Populate to exercise the OR-dependent branches of the stat sentence
+     * (at-reference, above-reference, or the positive-excess-only
+     * "no heat-attributable excess" line). */
+    oddsRatio?: number | null;
+    referenceTemperatureC?: number | null;
   };
 };
 
@@ -61,23 +57,13 @@ const FALLBACK_MIN_TEMP = 30;
 const FALLBACK_MAX_TEMP = 45;
 const DEFAULT_TEMP = 32;
 
-/** Sentinel value the place select uses for the "whole state" option so we
- * can map it back to the null admin_unit convention this panel exposes. */
-const STATE_ROOT_VALUE = "__state__";
-
 export function HeatLbwLinkPanel({
-  stateLabel,
-  districts = [],
+  placeLabel,
   modelAreaName = null,
-  parentSelectable = true,
   outcome = "lbw",
   outcomeLabel = "low birth weight",
-  outcomes,
-  onOutcomeChange,
   figure = "newborn",
   batchEnabled = true,
-  activeAdminUnitCode = null,
-  onAdminUnitChange,
   geographyId,
   accessToken,
   refreshKey,
@@ -92,28 +78,42 @@ export function HeatLbwLinkPanel({
   } | null>(null);
   const [precisionModalOpen, setPrecisionModalOpen] = useState(false);
 
-  // The district picker changes which model block (state vs division) is
-  // hit. Route both the what-if score and the "latest completed run" lookup
-  // through the same effective id the batch predictor uses so all views
-  // stay on the same model.
-  const effectiveGeographyId = activeAdminUnitCode ?? geographyId;
+  // The dashboard now owns place selection (see DashboardContextBar) and
+  // navigates whenever the user picks a different area, so the panel
+  // just uses the geographyId it was handed.
   const whatIf = useWhatIfScore({
-    geographyId: effectiveGeographyId,
+    geographyId,
     accessToken,
     temperatureC: temperature,
     outcome,
   });
 
-  const [modelRange, setModelRange] = useState<[number, number] | null>(null);
-  useEffect(() => {
-    setModelRange(null);
-  }, [effectiveGeographyId]);
-  useEffect(() => {
-    const range = whatIf.score?.modelled_temperature_range_c;
-    if (range && range.length === 2) setModelRange([range[0], range[1]]);
-  }, [whatIf.score]);
+  // Derive the range and reference straight off the current whatIf
+  // score rather than mirroring them into state — mirroring lagged by
+  // one render and triggered a *second* what-if fetch every time the
+  // clamp bumped `temperature` upward. Reading them inline means the
+  // clamp fires in the same tick the score arrives, with no second
+  // round-trip. Both are guarded with Number.isFinite so a NaN in the
+  // payload can't collapse the slider bounds.
+  const rangeFromScore = whatIf.score?.modelled_temperature_range_c;
+  const modelRange: [number, number] | null =
+    rangeFromScore &&
+    rangeFromScore.length === 2 &&
+    Number.isFinite(rangeFromScore[0]) &&
+    Number.isFinite(rangeFromScore[1])
+      ? [rangeFromScore[0], rangeFromScore[1]]
+      : null;
+  const refFromScore = whatIf.score?.reference_temperature_c;
+  const refTemp = Number.isFinite(refFromScore) ? (refFromScore as number) : null;
 
-  const sliderMin = modelRange?.[0] ?? FALLBACK_MIN_TEMP;
+  // Below the model's reference temperature the exposure-response is
+  // outside the paper's interpreted scope, so the slider is clamped to
+  // start at the reference. Falls back to the raw model support when the
+  // reference has not arrived yet.
+  const sliderMin = Math.max(
+    refTemp ?? -Infinity,
+    modelRange?.[0] ?? FALLBACK_MIN_TEMP,
+  );
   const sliderMax = modelRange?.[1] ?? FALLBACK_MAX_TEMP;
   useEffect(() => {
     setTemperature((prev) => Math.min(sliderMax, Math.max(sliderMin, prev)));
@@ -124,10 +124,10 @@ export function HeatLbwLinkPanel({
       setLatest(null);
       return;
     }
-    if (!effectiveGeographyId || !accessToken) return;
+    if (!geographyId || !accessToken) return;
     let cancelled = false;
     setLatest(null);
-    listPredictionRequests(effectiveGeographyId, accessToken)
+    listPredictionRequests(geographyId, accessToken)
       .then(async (items) => {
         const done = items.find((item) => item.status === "completed");
         if (!done) return;
@@ -141,10 +141,14 @@ export function HeatLbwLinkPanel({
     return () => {
       cancelled = true;
     };
-  }, [accessToken, batchEnabled, effectiveGeographyId, refreshKey]);
+  }, [accessToken, batchEnabled, geographyId, refreshKey]);
 
   const activePrediction: {
     percent: number;
+    /** AF (individual-level attributable fraction among the exposed) —
+     * shown as a small optional line beneath the main odds sentence when
+     * OR > 1. `null` if no OR is available (preview cards). */
+    afPercent: number | null;
     oddsRatio: number | null;
     referenceTemperatureC: number | null;
     ci95Low: number | null;
@@ -154,6 +158,9 @@ export function HeatLbwLinkPanel({
         percent:
           whatIf.score.relative_odds_change_percent ??
           relativeOddsChangePercent(whatIf.score.odds_ratio),
+        afPercent:
+          whatIf.score.attributable_fraction_percent ??
+          affectedPercentFromOddsRatio(whatIf.score.odds_ratio),
         oddsRatio: whatIf.score.odds_ratio,
         referenceTemperatureC: whatIf.score.reference_temperature_c,
         ci95Low: whatIf.score.ci95_low,
@@ -162,6 +169,7 @@ export function HeatLbwLinkPanel({
     : latest && batchEnabled
       ? {
           percent: relativeOddsChangePercent(latest.oddsRatio),
+          afPercent: affectedPercentFromOddsRatio(latest.oddsRatio),
           oddsRatio: latest.oddsRatio,
           referenceTemperatureC: latest.referenceTemperatureC,
           ci95Low: latest.ci95Low,
@@ -169,9 +177,15 @@ export function HeatLbwLinkPanel({
         }
       : previewPrediction
         ? {
-            ...previewPrediction,
-            oddsRatio: null,
-            referenceTemperatureC: null,
+            percent: previewPrediction.percent,
+            afPercent:
+              typeof previewPrediction.oddsRatio === "number"
+                ? affectedPercentFromOddsRatio(previewPrediction.oddsRatio)
+                : null,
+            ci95Low: previewPrediction.ci95Low,
+            ci95High: previewPrediction.ci95High,
+            oddsRatio: previewPrediction.oddsRatio ?? null,
+            referenceTemperatureC: previewPrediction.referenceTemperatureC ?? null,
           }
         : null;
   const showingRealResult = activePrediction !== null;
@@ -183,9 +197,12 @@ export function HeatLbwLinkPanel({
       ? precisionFromCi(activePrediction.ci95Low, activePrediction.ci95High)
       : null;
 
-  const showOutcomeSelect = Boolean(outcomes && outcomes.length > 1 && onOutcomeChange);
-  const showPlaceSelect = parentSelectable || districts.length > 0;
-  const placeValue = activeAdminUnitCode ?? STATE_ROOT_VALUE;
+  // Outcome + place switchers moved to DashboardContextBar — the panel
+  // now reads as a static sentence anchored to the top bar's context.
+  // Outcome + place switchers live in DashboardContextBar — the panel
+  // reads as a static sentence anchored to whatever the top bar has
+  // selected. `placeLabel` is passed from the dashboard page as the
+  // resolved leaf name (division, county, state).
 
   return (
     <section className={styles.panel} aria-labelledby="heat-lbw-heading">
@@ -195,63 +212,11 @@ export function HeatLbwLinkPanel({
         How do the modelled odds{" "}
         <span className={styles.phrase}>
           of{" "}
-          {showOutcomeSelect ? (
-            <InlineSelect
-              aria-label="Health outcome"
-              value={outcome}
-              onChange={(value) => onOutcomeChange?.(value)}
-              options={outcomes!.map((o) => ({ value: o.code, label: o.label }))}
-            />
-          ) : (
-            <span className={styles.inlineStatic}>{outcomeLabel.toLowerCase()}</span>
-          )}
+          <span className={styles.inlineStatic}>{outcomeLabel.toLowerCase()}</span>
         </span>{" "}
         <span className={styles.phrase}>
           in{" "}
-          {showPlaceSelect ? (
-            <InlineSelect
-              aria-label="Place"
-              value={placeValue}
-              onChange={(value) => {
-                const next = value === STATE_ROOT_VALUE ? null : value;
-                recordAuditEvent({
-                  event_type: "district_switch",
-                  geography_id: next ?? geographyId ?? null,
-                  payload: {
-                    from: activeAdminUnitCode,
-                    to: next,
-                    parent_geography_id: geographyId ?? null,
-                  },
-                });
-                onAdminUnitChange?.(next);
-              }}
-              groups={[
-                {
-                  label: "Whole area",
-                  options: [
-                    {
-                      value: STATE_ROOT_VALUE,
-                      label: stateLabel,
-                      disabled: !parentSelectable,
-                    },
-                  ],
-                },
-                districts.length > 0
-                  ? {
-                      label: districts[0].levelLabel
-                        ? `${districts[0].levelLabel}s`
-                        : "Districts",
-                      options: districts.map((d) => ({
-                        value: d.code,
-                        label: d.levelLabel ? `${d.name} (${d.levelLabel})` : d.name,
-                      })),
-                    }
-                  : null,
-              ]}
-            />
-          ) : (
-            <span className={styles.inlineStatic}>{stateLabel}</span>
-          )}
+          <span className={styles.inlineStatic}>{placeLabel}</span>
         </span>{" "}
         compare with the fitted reference temperature?
       </h2>
@@ -265,6 +230,12 @@ export function HeatLbwLinkPanel({
 
       {showingRealResult ? (
         <div className={styles.iconArrayWrap}>
+          {/* Icon array fills on |relative odds change|. That matches the
+              stat sentence below one-for-one so the visual and the number
+              tell the same story; AF was tried here but clamping to 0
+              whenever OR<=1 made several divisions render as empty grids
+              (e.g. Bhopal at 38.5°C, Sagar at 40°C) which the reader
+              interpreted as "no signal" rather than "unusual fit". */}
           <IconArray value={Math.abs(activePrediction.percent)} figure={figure} />
         </div>
       ) : (
@@ -277,26 +248,55 @@ export function HeatLbwLinkPanel({
       )}
 
       {showingRealResult ? (
-        <p className={styles.stat}>
-          {activePrediction.oddsRatio === null ? (
-            <>
-              <strong>{Math.round(activePrediction.percent)}%</strong> modelled
-              difference from the reference
-            </>
-          ) : activePrediction.percent === 0 ? (
-            <>
-              Modelled odds are <strong>the same</strong> as at the{" "}
-              {activePrediction.referenceTemperatureC?.toFixed(1)}°C reference
-            </>
-          ) : (
-            <>
-              Modelled odds are{" "}
-              <strong>{Math.abs(activePrediction.percent).toFixed(1)}%</strong>{" "}
-              {activePrediction.percent < 0 ? "lower" : "higher"} than at the{" "}
-              {activePrediction.referenceTemperatureC?.toFixed(1)}°C reference
-            </>
-          )}
-        </p>
+        <>
+          <p className={styles.stat}>
+            {activePrediction.oddsRatio === null ? (
+              <>
+                <strong>{Math.round(activePrediction.percent)}%</strong> modelled
+                difference from the reference
+              </>
+            ) : activePrediction.referenceTemperatureC !== null &&
+              temperature < activePrediction.referenceTemperatureC &&
+              activePrediction.percent === 0 ? (
+              <>
+                At or below the {activePrediction.referenceTemperatureC.toFixed(1)}°C
+                reference — no heat-attributable excess
+              </>
+            ) : activePrediction.percent === 0 ? (
+              <>
+                <strong>The same</strong> as the modelled odds at the{" "}
+                {activePrediction.referenceTemperatureC?.toFixed(1)}°C reference
+              </>
+            ) : (
+              <>
+                <strong
+                  className={
+                    activePrediction.percent < 0
+                      ? styles.statValueDown
+                      : styles.statValueUp
+                  }
+                >
+                  {Math.abs(activePrediction.percent).toFixed(1)}%{" "}
+                  {activePrediction.percent < 0 ? "lower" : "higher"}
+                </strong>{" "}
+                than the modelled odds at the{" "}
+                {activePrediction.referenceTemperatureC?.toFixed(1)}°C reference
+              </>
+            )}
+          </p>
+
+          {/* Optional context — only surfaces when AF is a positive integer
+              percent that's not already implied by the main line (i.e. OR>1
+              above reference). This is the "of every 100 exposed cases here,
+              N are attributable to the heat" framing; kept small so the
+              headline stays the odds sentence the user asked for. */}
+          {activePrediction.afPercent !== null && activePrediction.afPercent >= 1 ? (
+            <p className={styles.afHint}>
+              {Math.round(activePrediction.afPercent)}% of {outcomeLabel.toLowerCase()}{" "}
+              cases at this temperature are attributable to the heat exposure
+            </p>
+          ) : null}
+        </>
       ) : (
         <p className={styles.stat} data-loading>
           Preparing prediction…
@@ -350,49 +350,6 @@ export function HeatLbwLinkPanel({
         activeLevel={precisionLevel ?? undefined}
       />
     </section>
-  );
-}
-
-type InlineSelectOption = { value: string; label: string; disabled?: boolean };
-type InlineSelectGroup = { label: string; options: readonly InlineSelectOption[] };
-
-function InlineSelect({
-  value,
-  onChange,
-  options,
-  groups,
-  "aria-label": ariaLabel,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options?: readonly InlineSelectOption[];
-  groups?: readonly (InlineSelectGroup | null)[];
-  "aria-label": string;
-}) {
-  const renderOption = (option: InlineSelectOption) => (
-    <option key={option.value} value={option.value} disabled={option.disabled}>
-      {option.label}
-    </option>
-  );
-  return (
-    <span className={styles.inlineSelect}>
-      <select
-        aria-label={ariaLabel}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {groups
-          ? groups
-              .filter((group): group is InlineSelectGroup => group !== null)
-              .map((group) => (
-                <optgroup key={group.label} label={group.label}>
-                  {group.options.map(renderOption)}
-                </optgroup>
-              ))
-          : options?.map(renderOption)}
-      </select>
-      <Icon name="chevron-down" size={12} className={styles.inlineSelectChevron} />
-    </span>
   );
 }
 

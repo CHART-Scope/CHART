@@ -71,8 +71,13 @@ def score_association(
     outcome: str,
     exposure_values_c: tuple[float, ...],
     service_url: str | None = None,
+    reference_temperature_c: float | None = None,
 ) -> AssociationScore:
-    """Score a compact non-pregnancy temperature association model."""
+    """Score a compact non-pregnancy temperature association model.
+
+    ``reference_temperature_c`` re-anchors the DLNM crosspred at the
+    supplied value when the manifest carries an editorial reference.
+    """
 
     url = resolve_lbw_service_url(service_url)
     if not url:
@@ -87,6 +92,7 @@ def score_association(
             model_area=model_area,
             outcome=outcome,
             exposure_values_c=exposure_values_c,
+            reference_temperature_c=reference_temperature_c,
         )
     except LbwProviderError as error:
         raise InferenceError(error.code, error.detail) from error
@@ -163,8 +169,15 @@ def score_lbw(
     pregnancy_window: PregnancyWindow,
     temperatures_c: tuple[float, float, float],
     service_url: str | None = None,
+    reference_temperature_c: float | None = None,
 ) -> LbwScore:
-    """Run the deterministic LBW scorer; explanations are a separate concern."""
+    """Run the deterministic LBW scorer; explanations are a separate concern.
+
+    ``reference_temperature_c`` overrides the block's bundled MMT when the
+    manifest declares an editorial anchor (e.g. the MP LBW release pins to
+    27 °C to match the source paper). Leave as ``None`` to keep whatever
+    the compact ``.rds`` was fit against.
+    """
 
     provider = os.getenv("INFERENCE_STATISTICAL_PROVIDER", "lbw_r")
     if provider != "lbw_r":
@@ -182,6 +195,7 @@ def score_lbw(
             model_area=model_area,
             pregnancy_window=pregnancy_window,
             temperatures_c=temperatures_c,
+            reference_temperature_c=reference_temperature_c,
         )
     except LbwProviderError as error:
         raise InferenceError(error.code, error.detail) from error

@@ -14,6 +14,7 @@ import {
   RiskProtectionPanel,
   RunsStrip,
 } from "@/features/dashboard";
+import { DashboardContextBar } from "@/features/dashboard";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
 import {
@@ -238,6 +239,24 @@ function AuthorizedDashboard({
         userLabel={session.user.username}
       >
         <main className={styles.page}>
+          <DashboardContextBar
+            geographyScopes={session.user.geographyScopes}
+            geographyId={geographyId}
+            adminUnit={adminUnit ?? null}
+            outcome={outcome}
+            catalog={catalog}
+            onNavigate={({
+              geographyId: nextGeo,
+              adminUnit: nextAdmin,
+              outcome: nextOutcome,
+            }) => {
+              const params = new URLSearchParams();
+              if (nextAdmin) params.set("admin_unit", nextAdmin);
+              if (nextOutcome) params.set("outcome", nextOutcome);
+              const query = params.toString() ? `?${params.toString()}` : "";
+              router.push(`/dashboard/${encodeURIComponent(nextGeo)}${query}`);
+            }}
+          />
           <DashboardHeader
             country={country}
             areaName={areaName}
@@ -256,30 +275,16 @@ function AuthorizedDashboard({
                 description={selectedCatalog?.risk_description}
               />
               <HeatLbwLinkPanel
-                stateLabel={stateLabel}
+                placeLabel={effectiveGeography?.name ?? stateLabel}
                 modelAreaName={selectedModel?.modelAreaName ?? null}
                 outcome={outcome}
                 outcomeLabel={outcomeLabel}
-                outcomes={catalog.map((entry) => ({
-                  code: entry.outcome,
-                  label: entry.outcome_label,
-                }))}
-                onOutcomeChange={handleOutcomeChange}
                 figure="newborn"
                 batchEnabled={
                   selectedCatalog?.batch_status !==
                   "blocked_pending_modeller_confirmation"
                 }
-                parentSelectable={
-                  currentGeography
-                    ? canUseArea(currentGeography, session.user.geographyScopes) &&
-                      Boolean(selectedModel)
-                    : false
-                }
-                districts={districts}
-                activeAdminUnitCode={effectiveAdminUnit}
-                onAdminUnitChange={handleAdminUnitChange}
-                geographyId={geographyId}
+                geographyId={effectiveAdminUnit ?? geographyId}
                 accessToken={selectedModel ? session.accessToken : undefined}
               />
               {/* Predictions card temporarily hidden while the pipeline stabilises.

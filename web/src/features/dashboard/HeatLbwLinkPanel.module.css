@@ -44,52 +44,6 @@
   color: var(--color-nexus);
 }
 
-.inlineSelect {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  /* Sit the pill nicely on the text baseline. */
-  vertical-align: baseline;
-  margin: 0 2px;
-}
-
-.inlineSelect select {
-  appearance: none;
-  -webkit-appearance: none;
-  padding: 4px 24px 4px 12px;
-  border: 1px solid var(--color-nexus-tint, rgba(56, 62, 233, 0.2));
-  border-radius: var(--radius-pill, 999px);
-  background: var(--color-nexus-tint, rgba(56, 62, 233, 0.08));
-  color: var(--color-nexus);
-  font-family: var(--font-body);
-  font-size: inherit;
-  font-weight: 500;
-  line-height: 1.4;
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    border-color 120ms ease;
-}
-
-.inlineSelect select:hover {
-  background: rgba(56, 62, 233, 0.14);
-  border-color: rgba(56, 62, 233, 0.35);
-}
-
-.inlineSelect select:focus-visible {
-  outline: 2px solid var(--color-nexus);
-  outline-offset: 2px;
-}
-
-.inlineSelectChevron {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: var(--color-nexus);
-}
-
 .modelScopeNote {
   margin: 0;
   padding: var(--space-1) var(--space-2);
@@ -154,6 +108,29 @@
 .stat[data-loading] {
   color: var(--color-text-muted);
   font-style: italic;
+}
+
+/* Direction-aware colour on the % value in the odds sentence so the
+ * reader clocks direction at a glance without parsing the word.
+ * Up (heat elevates odds — the expected heat-hazard signal) uses a
+ * warm burnt-orange; down (heat lowers odds — often a small-sample
+ * spline dip at high temperatures in a division fit) uses a cool
+ * teal. Both are distinct from the panel's default maroon so the two
+ * cases are visually unmistakable. */
+.statValueUp {
+  color: var(--color-burnt-orange, #b64d1a);
+}
+
+.statValueDown {
+  color: var(--color-teal, #276674);
+}
+
+.afHint {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-body);
+  text-align: center;
 }
 
 .precisionRow {

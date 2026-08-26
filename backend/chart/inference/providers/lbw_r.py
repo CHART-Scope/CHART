@@ -31,18 +31,25 @@ def call_lbw_r(
     model_area: str,
     pregnancy_window: int,
     temperatures_c: tuple[float, float, float],
+    reference_temperature_c: float | None = None,
 ) -> dict:
+    body: dict[str, object] = {
+        "release_id": model_release_id,
+        "model_file": model_file,
+        "model_version": model_version,
+        "model_sha256": model_sha256,
+        "area": model_area,
+        "trimester": pregnancy_window,
+        "tmax_lag": list(temperatures_c),
+    }
+    if reference_temperature_c is not None:
+        # api_registry.R:150 honours "ref" as the DLNM crosspred anchor;
+        # every scored block re-anchors at this temperature instead of
+        # using the bundled per-block MMT.
+        body["ref"] = float(reference_temperature_c)
     return call_compact_r(
         base_url,
-        body={
-            "release_id": model_release_id,
-            "model_file": model_file,
-            "model_version": model_version,
-            "model_sha256": model_sha256,
-            "area": model_area,
-            "trimester": pregnancy_window,
-            "tmax_lag": list(temperatures_c),
-        },
+        body=body,
         required={
             "area",
             "geography_level",
@@ -69,18 +76,22 @@ def call_association_r(
     model_area: str,
     outcome: str,
     exposure_values_c: tuple[float, ...],
+    reference_temperature_c: float | None = None,
 ) -> dict:
+    body: dict[str, object] = {
+        "release_id": model_release_id,
+        "model_file": model_file,
+        "model_version": model_version,
+        "model_sha256": model_sha256,
+        "area": model_area,
+        "outcome": outcome,
+        "exposure_values_c": list(exposure_values_c),
+    }
+    if reference_temperature_c is not None:
+        body["ref"] = float(reference_temperature_c)
     return call_compact_r(
         base_url,
-        body={
-            "release_id": model_release_id,
-            "model_file": model_file,
-            "model_version": model_version,
-            "model_sha256": model_sha256,
-            "area": model_area,
-            "outcome": outcome,
-            "exposure_values_c": list(exposure_values_c),
-        },
+        body=body,
         required={
             "area",
             "geography_level",

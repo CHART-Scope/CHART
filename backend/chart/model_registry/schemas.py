@@ -166,6 +166,14 @@ class ModelPresentationSpec(BaseModel):
     model_scope_label: str = Field(default="model", min_length=1)
     visualization: ModelVisualizationSpec | None = None
     risk_description: str | None = Field(default=None, min_length=1)
+    # Overrides the anchor the runtime uses when computing odds ratios.
+    # When set, the backend passes ``ref`` to the R adapter so every block
+    # re-anchors at this temperature via ``dlnm::crosspred`` — the point
+    # estimate and CI are genuinely relative to it rather than to the
+    # per-block MMT baked into the compact artifact. Leave unset to keep
+    # the modeller's bundled reference (e.g. climate-zone models where a
+    # single fixed anchor across zones is not defensible).
+    editorial_reference_temperature_c: float | None = Field(default=None, ge=-50, le=60)
 
 
 class ModelAreaSpec(BaseModel):

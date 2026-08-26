@@ -208,24 +208,46 @@
           "geographies"
         ],
         "summary": "List application geographies available for planning",
+        "description": "Returns database-backed countries and administrative areas known to CHART, including hierarchy and prediction-support metadata. This public catalog drives place selection; protected analytical routes apply user scope separately.",
         "operationId": "list_geographies_geographies_get",
+        "parameters": [
+          {
+            "name": "include_unsupported",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Unsupported"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "The ordered application-geography catalog and hierarchy metadata.",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/GeographyResponse"
                   },
-                  "type": "array",
                   "title": "Response List Geographies Geographies Get"
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "description": "Returns database-backed countries and administrative areas known to CHART, including hierarchy and prediction-support metadata. This public catalog drives place selection; protected analytical routes apply user scope separately."
+        }
       }
     },
     "/climate/locations": {
@@ -6002,9 +6024,9 @@
           },
           "relative_odds_change_percent": {
             "type": "number",
-            "exclusiveMinimum": -100.0,
+            "minimum": -100.0,
             "title": "Relative Odds Change Percent",
-            "description": "Signed change in modelled odds relative to the fitted reference."
+            "description": "Signed change in modelled odds relative to the fitted reference. Collapses to 0.0 only when the query temperature is *below* the reference AND the release's output_contract.attributable_fraction is 'positive_excess_only'. Above-reference readings are reported at full precision, including OR<1 outputs from unstable small-sample division fits \u2014 they represent what the runtime actually computed, not a policy suppression. The floor is -100 (inclusive) \u2014 reachable when a fit returns OR=0 (numerical underflow); strict gt=-100 would 500 the endpoint at that edge."
           },
           "on_training_support": {
             "type": "boolean",

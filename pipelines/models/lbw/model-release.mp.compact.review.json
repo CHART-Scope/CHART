@@ -38,12 +38,13 @@
       "figure": "mother-baby",
       "context_figure": "pregnant-woman"
     },
-    "risk_description": "Exposure to extreme heat during pregnancy is associated with increased low-birth-weight risk, while cooler environments can reduce exposure."
+    "risk_description": "Exposure to extreme heat during pregnancy is associated with increased low-birth-weight risk, while cooler environments can reduce exposure.",
+    "editorial_reference_temperature_c": 27.0
   },
   "base_uri": "s3://chart-predictive-models/india/mp/lbw/1.0.1-compact-review",
   "temperature_input": "Three monthly means of daily maximum 2m air temperature, newest first, Celsius",
   "months_required": 3,
-  "release_notes": "Modeller-only compact parity-review release: one supplied MP-wide window-1 fit and ten supplied division fits for windows 1-3 (31 blocks). CHART-derived state fits are excluded. Not approved for activation.",
+  "release_notes": "Modeller-only compact parity-review release: one supplied MP-wide window-1 fit and ten supplied division fits for windows 1-3 (31 blocks). CHART-derived state fits are excluded. Not approved for activation. Presentation now sets editorial_reference_temperature_c=27.0 (matches Zhu et al. 2024) — odds ratios and CIs re-anchor at 27 °C via the R runtime rather than the per-block MMT baked into the compact artifact. Fitted parameters and artifact bytes unchanged.",
   "source_git_ref": "modeller-review-required",
   "geography": {
     "country_code": "IN",

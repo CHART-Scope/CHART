@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
@@ -17,6 +17,11 @@ type Props = {
   error: string | null;
   onChange: (selection: PlanningSelection) => void;
   onStart: () => void;
+  /** Optional inline element rendered above the "What would you like to
+   * plan for" heading — the planning page passes an
+   * `<InlineContextSwitcher />` so the family flip is one control, no
+   * separate context card taking up space. */
+  contextSwitcher?: ReactNode;
 };
 
 export function PlanningSetup({
@@ -28,6 +33,7 @@ export function PlanningSetup({
   error,
   onChange,
   onStart,
+  contextSwitcher,
 }: Props) {
   const activeArea = useMemo(
     () => areas.find((area) => area.id === selection.area) ?? null,
@@ -124,6 +130,9 @@ export function PlanningSetup({
 
   return (
     <div className={styles.wrap}>
+      {contextSwitcher ? (
+        <div className={styles.contextRow}>{contextSwitcher}</div>
+      ) : null}
       <header className={styles.header}>
         <h1>What would you like to plan for, together?</h1>
         <p>

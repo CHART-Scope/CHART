@@ -64,6 +64,50 @@ def test_parent_catalog_can_include_descendant_model_outcomes(monkeypatch) -> No
     assert items["lbw"]["visualization_figure"] == "mother-baby"
 
 
+def test_manifest_can_revise_presentation_values_on_re_register() -> None:
+    """Presentation is UI metadata — the manifest is source of truth, so a
+    figure swap or editorial-reference addition should overlay onto the
+    stored row without tripping MODEL_RELEASE_IMMUTABLE. Runtime and I/O
+    contracts stay strictly immutable (tested elsewhere)."""
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    manifest = Path("pipelines/models/lbw/model-release.mp.compact.review.json")
+
+    with factory() as session:
+        bootstrap_place_from_release(
+            session, model_release_path=manifest, activate=True
+        )
+        release = session.get(ModelRelease, "lbw-mp-1.0.1-compact-review")
+        assert release is not None
+        stale_spec = dict(release.input_spec)
+        stale_presentation = dict(stale_spec["presentation"])
+        stale_presentation["visualization"] = {
+            "kind": "odds_ratio_icon_array",
+            "figure": "newborn",
+            "context_figure": "pregnant-woman",
+        }
+        stale_presentation.pop("editorial_reference_temperature_c", None)
+        stale_spec["presentation"] = stale_presentation
+        release.input_spec = stale_spec
+        session.commit()
+
+    with factory() as session:
+        bootstrap_place_from_release(
+            session, model_release_path=manifest, activate=True
+        )
+        release = session.get(ModelRelease, "lbw-mp-1.0.1-compact-review")
+        assert release is not None
+        presentation = release.input_spec["presentation"]
+        assert presentation["visualization"]["figure"] == "mother-baby"
+        assert presentation["editorial_reference_temperature_c"] == 27.0
+
+
 def test_manifest_can_add_presentation_fields_without_changing_model_contract() -> None:
     engine = create_engine(
         "sqlite://",

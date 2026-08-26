@@ -70,7 +70,10 @@ function AuthorizedSettings({ session }: { session: AuthSession }) {
         onSignOut={signOutOfKeycloak}
         userLabel={session.user.username}
       >
-        <GeographyContextCard session={session} />
+        <GeographyContextCard
+          geographyScopes={session.user.geographyScopes}
+          activeGeographyId={session.user.activeGeographyId}
+        />
         <ModelHubCard />
         <UserManagement
           accessToken={session.accessToken}

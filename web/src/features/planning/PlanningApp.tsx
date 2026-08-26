@@ -14,6 +14,7 @@ import {
 } from "@/lib/planningClient";
 import { rememberActiveGeography } from "@/lib/authClient";
 import { isInScope } from "@/lib/geographyScope";
+import { InlineContextSwitcher } from "./InlineContextSwitcher";
 import { PlanningSetup } from "./PlanningSetup";
 import { defaultPlanningSelection, type PlanningSelection } from "./planningWireframe";
 
@@ -141,6 +142,21 @@ export function PlanningApp({
           error={error}
           onChange={changeSelection}
           onStart={openDashboard}
+          contextSwitcher={
+            <InlineContextSwitcher
+              geographyScopes={geographyScopes}
+              activeGeographyId={activeGeographyId ?? selection.area}
+              onFamilyChange={(_family, defaultArea) => {
+                // Instant switch — reset the sentence back to defaults for
+                // the new family so hazard / outcome / period are picked
+                // from that family's catalog rather than the previous one.
+                changeSelection({
+                  ...defaultPlanningSelection(),
+                  area: defaultArea.id,
+                });
+              }}
+            />
+          }
         />
       </AppShell>
     </>

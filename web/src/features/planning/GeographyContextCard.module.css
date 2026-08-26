@@ -9,6 +9,28 @@
   margin-bottom: var(--space-4);
 }
 
+.card[data-compact] {
+  padding: var(--space-2) var(--space-3);
+  gap: var(--space-2);
+}
+
+.card[data-compact] .row {
+  gap: var(--space-2);
+}
+
+.card[data-compact] .title {
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.card[data-compact] .select {
+  min-width: 240px;
+  padding: 4px 10px;
+  font-size: var(--fs-body);
+}
+
 .header {
   display: flex;
   flex-direction: column;

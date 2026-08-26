@@ -11,6 +11,7 @@ not.
 from __future__ import annotations
 
 import logging
+import math
 
 from chart.inference import InferenceError
 from chart.shared.db.session import get_session_factory
@@ -104,7 +105,12 @@ def score_what_if(
         ci95_low=score.ci95_low,
         ci95_high=score.ci95_high,
         attributable_fraction_percent=_odds_ratio_to_percent(score.odds_ratio),
-        relative_odds_change_percent=_relative_odds_change_percent(score.odds_ratio),
+        relative_odds_change_percent=_relative_odds_change_percent(
+            score.odds_ratio,
+            place.model.input_spec,
+            temperature_c=temperature,
+            reference_temperature_c=score.reference_temperature_c,
+        ),
         on_training_support=score.on_training_support,
         warning=score.warning,
         n_training=score.n_training,
@@ -183,7 +189,12 @@ def _score_association_what_if(
         ci95_low=score.ci95_low,
         ci95_high=score.ci95_high,
         attributable_fraction_percent=_odds_ratio_to_percent(score.estimate),
-        relative_odds_change_percent=_relative_odds_change_percent(score.estimate),
+        relative_odds_change_percent=_relative_odds_change_percent(
+            score.estimate,
+            model.input_spec,
+            temperature_c=temperature,
+            reference_temperature_c=score.reference_temperature_c,
+        ),
         on_training_support=score.on_training_support,
         warning=score.warning,
         n_model_rows=score.n_model_rows,
@@ -220,7 +231,48 @@ def _odds_ratio_to_percent(odds_ratio: float) -> float:
     return round(max(0.0, min(1.0, fraction)) * 1000) / 10
 
 
-def _relative_odds_change_percent(odds_ratio: float) -> float:
-    """Signed percentage change in modelled odds relative to the reference."""
+def _relative_odds_change_percent(
+    odds_ratio: float,
+    input_spec: dict | None = None,
+    *,
+    temperature_c: float | None = None,
+    reference_temperature_c: float | None = None,
+) -> float:
+    """Signed percentage change in modelled odds relative to the reference.
 
+    When the release's ``output_contract.attributable_fraction`` is set to
+    ``"positive_excess_only"`` the *below-reference* tail is outside the
+    interpreted scope of the fit — the paper only claims heat-attributable
+    excess above the reference, so we collapse the below-reference reading
+    to 0.0.
+
+    Above-reference readings are always reported at full precision, even
+    when the block's own spline returns OR<1. That's the model's own
+    prediction (often a small-sample instability in a division fit) and
+    hiding it would misrepresent what the runtime actually computed.
+    """
+
+    if (
+        _is_positive_excess_only(input_spec)
+        and temperature_c is not None
+        and reference_temperature_c is not None
+        and math.isfinite(temperature_c)
+        and math.isfinite(reference_temperature_c)
+        and temperature_c < reference_temperature_c
+    ):
+        return 0.0
     return round((odds_ratio - 1) * 1000) / 10
+
+
+def _is_positive_excess_only(input_spec: dict | None) -> bool:
+    """Whether the release explicitly opts into positive-excess-only.
+
+    Missing or ``None`` input_spec means we don't know the policy — the
+    conservative choice is to report the raw signed change (do not
+    clamp), so callers can still see what the model returned. Releases
+    that want the below-reference tail suppressed must declare
+    ``output_contract.attributable_fraction = "positive_excess_only"``.
+    """
+
+    output_contract = (input_spec or {}).get("output_contract") or {}
+    return output_contract.get("attributable_fraction") == "positive_excess_only"

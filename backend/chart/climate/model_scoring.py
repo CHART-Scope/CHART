@@ -26,6 +26,7 @@ def score_lbw_model(
     temperatures_c: tuple[float, float, float],
     service_url: str | None = None,
 ) -> LbwScore:
+    editorial_ref = _editorial_reference_temperature_c(model.input_spec)
     return _score_with_runtime_recovery(
         model,
         lambda: score_lbw(
@@ -37,6 +38,7 @@ def score_lbw_model(
             pregnancy_window=cast(Literal[1, 2, 3], pregnancy_window),
             temperatures_c=temperatures_c,
             service_url=service_url,
+            reference_temperature_c=editorial_ref,
         ),
         service_url=service_url,
     )
@@ -49,6 +51,7 @@ def score_association_model(
     exposure_values_c: tuple[float, ...],
     service_url: str | None = None,
 ) -> AssociationScore:
+    editorial_ref = _editorial_reference_temperature_c(model.input_spec)
     return _score_with_runtime_recovery(
         model,
         lambda: score_association(
@@ -60,9 +63,25 @@ def score_association_model(
             outcome=outcome,
             exposure_values_c=exposure_values_c,
             service_url=service_url,
+            reference_temperature_c=editorial_ref,
         ),
         service_url=service_url,
     )
+
+
+def _editorial_reference_temperature_c(input_spec: dict | None) -> float | None:
+    """Return the manifest's editorial anchor if declared.
+
+    Presentation-level override that re-anchors the DLNM crosspred in the
+    R adapter so odds ratios and CIs match the paper's editorial reference
+    instead of the per-block MMT baked into the ``.rds``.
+    """
+
+    presentation = (input_spec or {}).get("presentation") or {}
+    value = presentation.get("editorial_reference_temperature_c")
+    if value is None:
+        return None
+    return float(value)
 
 
 def _score_with_runtime_recovery(

@@ -446,6 +446,9 @@ def test_kenya_onboarding_warms_and_activates_kajiado(monkeypatch) -> None:
         mapping = get_active_model_mapping(session, admin_unit_id=admin_unit.id)
         assert mapping is not None
         assert mapping.model_area_name == "South-eastern"
+    # The service default preserves every place (Turkana included, marked
+    # unsupported) — that path is used by internal analytics that need the
+    # full picture.
     locations = list_locations(session_factory=factory)
     assert len(locations.items) == 58
     assert sum(item.supports_prediction for item in locations.items) == 57
@@ -458,6 +461,15 @@ def test_kenya_onboarding_warms_and_activates_kajiado(monkeypatch) -> None:
     )
     assert turkana.supports_prediction is False
     assert turkana.model_area_name is None
+
+    # The frontend route calls with include_unsupported=False so the picker
+    # never has to render "no prediction here" leaves — Turkana disappears
+    # entirely rather than showing an empty state on direct navigation.
+    ui_locations = list_locations(session_factory=factory, include_unsupported=False)
+    ui_ids = {item.geography_id for item in ui_locations.items}
+    assert "geo-ke-kajiado" in ui_ids
+    assert "geo-ke-turkana" not in ui_ids
+    assert len(ui_locations.items) == 57  # dropped Turkana (1 uncovered county)
     with factory() as session:
         children = list(
             session.scalars(select(AdminUnit).where(AdminUnit.level == "sub-county"))

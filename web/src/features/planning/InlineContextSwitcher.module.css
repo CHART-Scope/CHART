@@ -1,0 +1,28 @@
+/* Static-single-family variant used when the user only has one
+ * installed context in scope. Matches the InlineSelect .field /
+ * .fieldLabel column so nothing shifts when the family list is
+ * expanded (multiple families → InlineSelect renders instead). */
+.staticField {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.staticLabel {
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.staticValue {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  color: var(--color-charcoal);
+  font-family: var(--font-body);
+  font-weight: 500;
+  line-height: 1.4;
+}

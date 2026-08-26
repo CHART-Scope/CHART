@@ -64,7 +64,7 @@ prediction_roles = frozenset(
     summary="List model-ready places",
 )
 def get_locations() -> PlaceListResponse:
-    return list_locations()
+    return list_locations(include_unsupported=False)
 
 
 @router.get(
