@@ -5,7 +5,7 @@ export PATH := $(dir $(NPM)):$(PATH)
 CHART_REPOSITORY_DIR := chart-repository
 CHART_REPOSITORY_COMPOSE := $(DOCKER) compose -f $(CHART_REPOSITORY_DIR)/docker-compose.yml
 
-.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run bootstrap-token install-hooks
+.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run wait-for-lbw bootstrap-token install-hooks
 
 help:
 	@printf "\nQuick start (climate pipeline)\n"
@@ -49,12 +49,12 @@ run: local-setup climate-install lbw-check
 	$(MAKE) -j4 lbw-run climate-api-run dagster-run web
 
 verify: climate-install identity-test python-check web-typecheck web-build format-check
-	$(VENV_PYTHON) -m pytest backend/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/models/lbw/tests -q
+	$(VENV_PYTHON) -m pytest backend/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests -q
 
 python-check:
-	$(VENV_PYTHON) -m ruff check backend orchestration pipelines/boundaries pipelines/era5_heat/src pipelines/era5_heat/tests pipelines/seasonal_c3s pipelines/isimip_projection pipelines/models/lbw/model_release.py pipelines/models/lbw/tests
-	$(VENV_PYTHON) -m black --check backend orchestration pipelines/boundaries pipelines/seasonal_c3s pipelines/isimip_projection pipelines/era5_heat/src/era5_heat/__init__.py pipelines/era5_heat/src/era5_heat/aggregate.py pipelines/era5_heat/tests/test_aggregate.py pipelines/models/lbw/model_release.py pipelines/models/lbw/tests
-	$(VENV_PYTHON) -m mypy backend/chart orchestration/src pipelines/boundaries/src pipelines/era5_heat/src pipelines/seasonal_c3s/src pipelines/isimip_projection/src pipelines/models/lbw/model_release.py --ignore-missing-imports --no-error-summary
+	$(VENV_PYTHON) -m ruff check backend orchestration pipelines/boundaries pipelines/era5_heat/src pipelines/era5_heat/tests pipelines/seasonal_c3s pipelines/isimip_projection
+	$(VENV_PYTHON) -m black --check backend orchestration pipelines/boundaries pipelines/seasonal_c3s pipelines/isimip_projection pipelines/era5_heat/src/era5_heat/__init__.py pipelines/era5_heat/src/era5_heat/aggregate.py pipelines/era5_heat/tests/test_aggregate.py
+	$(VENV_PYTHON) -m mypy backend/chart orchestration/src pipelines/boundaries/src pipelines/era5_heat/src pipelines/seasonal_c3s/src pipelines/isimip_projection/src --ignore-missing-imports --no-error-summary
 
 local-setup: services postgres-wait identity-wait climate-migrate identity-sync
 
@@ -254,7 +254,7 @@ ERA5_DIR := pipelines/era5_heat
 SEASONAL_DIR := pipelines/seasonal_c3s
 PROJECTION_DIR := pipelines/isimip_projection
 BOUNDARY_DIR := pipelines/boundaries
-LBW_DIR := pipelines/models/lbw
+MODEL_DIR := pipelines/models
 ORCH_DIR := orchestration
 BACKEND_DIR := backend
 CLIMATE_OUT := data/climate
@@ -264,9 +264,8 @@ VENV_DIR ?= .venv
 VENV_PYTHON := $(abspath $(VENV_DIR))/bin/python
 DOCS_PORT ?= 8001
 LBW_PORT ?= 8000
-LBW_MODEL_RELEASE_MANIFEST ?= $(abspath $(LBW_DIR)/model-release.example.json)
-LBW_MODEL_DIVISION ?= $(abspath $(LBW_DIR)/model/MP_division_LBW_tmax_DHS2015-21_v1.0.0.rds)
-LBW_MODEL_STATE ?= $(abspath $(LBW_DIR)/model/MP_state_LBW_tmax_DHS2015-21_v1.0.0.rds)
+CHART_MODEL_CACHE_DIR ?= $(abspath $(MODEL_DIR))
+LBW_MODEL_CONTROL_TOKEN ?= chart-local-model-control
 DAGSTER_PORT ?= 3002
 CHART_DATABASE_URL ?= postgresql+psycopg://chart:chart@127.0.0.1:5434/chart
 migrate: climate-migrate
@@ -276,45 +275,40 @@ dev: climate-migrate
 
 lbw-check:
 	@if ! command -v Rscript >/dev/null 2>&1; then \
-		printf "Rscript is required for the LBW prediction model.\n"; \
+		printf "Rscript is required for the model registry runtime.\n"; \
 		exit 1; \
 	fi
-	@$(PYTHON) $(LBW_DIR)/model_release.py \
-		--manifest "$(LBW_MODEL_RELEASE_MANIFEST)" \
-		--division "$(LBW_MODEL_DIVISION)" \
-		--state "$(LBW_MODEL_STATE)"
-	@Rscript $(LBW_DIR)/tests/test_serialization.R
+	@Rscript $(MODEL_DIR)/inference/tests/test_serialization.R
+	@Rscript $(MODEL_DIR)/inference/tests/test_compact_score.R
 
 lbw-run: lbw-check
 	@health=$$(curl -fsS "http://127.0.0.1:$(LBW_PORT)/health" 2>/dev/null || true); \
-	if printf "%s" "$$health" | grep -q '"region"[[:space:]]*:[[:space:]]*"MP"'; then \
-		printf "LBW prediction model is already ready on http://127.0.0.1:$(LBW_PORT)\n"; \
-		exit 0; \
-	fi; \
-	if lsof -ti :"$(LBW_PORT)" >/dev/null 2>&1; then \
-		printf "Port %s is in use by something other than the LBW prediction model.\n" "$(LBW_PORT)"; \
+	if printf "%s" "$$health" | grep -q '"runtime"[[:space:]]*:[[:space:]]*"registry"' \
+	   && printf "%s" "$$health" | grep -Fq '"model_cache_dir":"$(CHART_MODEL_CACHE_DIR)"'; then \
+		printf "Model registry is already ready on http://127.0.0.1:$(LBW_PORT)\n"; \
+	elif lsof -ti :"$(LBW_PORT)" -sTCP:LISTEN >/dev/null 2>&1; then \
+		printf "Port %s is in use by something other than the configured model registry.\n" "$(LBW_PORT)"; \
 		exit 1; \
-	fi
-	@printf "LBW prediction model: http://127.0.0.1:$(LBW_PORT)\n"
-	cd $(LBW_DIR) && \
+	else \
+		printf "Model registry: http://127.0.0.1:$(LBW_PORT)\n"; \
+		cd $(MODEL_DIR) && \
 		PORT="$(LBW_PORT)" \
-		PYTHON="$(PYTHON)" \
-		LBW_MODEL_RELEASE_MANIFEST="$(LBW_MODEL_RELEASE_MANIFEST)" \
-		LBW_MODEL_DIVISION="$(LBW_MODEL_DIVISION)" \
-		LBW_MODEL_STATE="$(LBW_MODEL_STATE)" \
-		bash run_api.sh
+		MODEL_CACHE_DIR="$(CHART_MODEL_CACHE_DIR)" \
+		MODEL_CONTROL_TOKEN="$(LBW_MODEL_CONTROL_TOKEN)" \
+		bash run_registry_api.sh; \
+	fi
 
 dagster-run:
 	@mkdir -p $(ORCH_DIR)/.dagster_home
 	cd $(ORCH_DIR) && DATABASE_URL="$(CHART_DATABASE_URL)" \
-	  LBW_SERVICE_URL="$${LBW_SERVICE_URL:-http://127.0.0.1:8000}" \
+	  INFERENCE_LBW_BASE_URL="$${INFERENCE_LBW_BASE_URL:-http://127.0.0.1:8000}" \
 	  DAGSTER_HOME=$(CURDIR)/$(ORCH_DIR) \
 	  $(VENV_PYTHON) -m dagster dev -p "$(DAGSTER_PORT)" -m chart_pipeline.definitions
 
 dagster-run-fixture:
 	@mkdir -p $(ORCH_DIR)/.dagster_home
 	cd $(ORCH_DIR) && CLIMATE_USE_FIXTURE=1 DATABASE_URL="$(CHART_DATABASE_URL)" \
-	  LBW_SERVICE_URL="$${LBW_SERVICE_URL:-http://127.0.0.1:8000}" \
+	  INFERENCE_LBW_BASE_URL="$${INFERENCE_LBW_BASE_URL:-http://127.0.0.1:8000}" \
 	  DAGSTER_HOME=$(CURDIR)/$(ORCH_DIR) \
 	  $(VENV_PYTHON) -m dagster dev -p "$(DAGSTER_PORT)" -m chart_pipeline.definitions
 
@@ -352,10 +346,23 @@ climate-install: climate-venv
 climate-api: climate-migrate
 	$(MAKE) climate-api-run
 
-climate-api-run: bootstrap-token
+wait-for-lbw:
+	@printf "Waiting for model registry on http://127.0.0.1:$(LBW_PORT) "; \
+	deadline=$$(($$(date +%s) + 60)); \
+	while [ $$(date +%s) -lt $$deadline ]; do \
+		if curl -fsS "http://127.0.0.1:$(LBW_PORT)/health" >/dev/null 2>&1; then \
+			printf " ready\n"; exit 0; \
+		fi; \
+		printf "."; sleep 1; \
+	done; \
+	printf " NOT ready after 60s (starting anyway; prediction endpoints will 503 until it comes up)\n"
+
+climate-api-run: bootstrap-token wait-for-lbw
 	@token=$$(sed -n 's/^CHART_BOOTSTRAP_TOKEN=//p' "$(WEB_ENV_LOCAL)" | head -1); \
 	DATABASE_URL="$(CHART_DATABASE_URL)" \
-	  LBW_SERVICE_URL="$${LBW_SERVICE_URL:-http://127.0.0.1:8000}" \
+	  INFERENCE_LBW_BASE_URL="$${INFERENCE_LBW_BASE_URL:-http://127.0.0.1:8000}" \
+	  MODEL_CACHE_DIR="$(CHART_MODEL_CACHE_DIR)" \
+	  MODEL_CONTROL_TOKEN="$(LBW_MODEL_CONTROL_TOKEN)" \
 	  CHART_BOOTSTRAP_TOKEN="$$token" \
 	  $(VENV_PYTHON) -m chart
 

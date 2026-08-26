@@ -4,6 +4,13 @@ export type GeographyRecord = {
   path: string;
   levelLabel: string;
   supportsPrediction?: boolean;
+  parentId?: string | null;
+  modelAreaName?: string | null;
+  models?: {
+    outcome: string;
+    modelAreaName: string;
+    releaseId: string;
+  }[];
 };
 
 export type PlanningTarget =
@@ -145,12 +152,28 @@ export type ModelCatalogEntry = {
   health_domain_label: string;
   outcome: string;
   outcome_label: string;
+  dashboard_title: string | null;
+  population_label: string | null;
+  model_scope_label: string | null;
+  effect_measure: string | null;
+  batch_status: string | null;
+  visualization_type: string | null;
+  visualization_figure: "newborn" | "baby" | "mother-baby" | null;
+  visualization_context_figure: "pregnant-woman" | "baby" | null;
+  risk_description: string | null;
   release_ids: string[];
 };
 
-export async function listModelCatalog() {
+export async function listModelCatalog(
+  geographyId?: string,
+  options: { includeDescendants?: boolean } = {},
+) {
+  const params = new URLSearchParams();
+  if (geographyId) params.set("geography_id", geographyId);
+  if (options.includeDescendants) params.set("include_descendants", "true");
+  const query = params.size > 0 ? `?${params}` : "";
   const response = await request<{ items: ModelCatalogEntry[] }>(
-    "/api/chart/model-catalog",
+    `/api/chart/model-catalog${query}`,
   );
   return response.items;
 }
@@ -295,25 +318,36 @@ function hostnameOf(url: string): string {
 export type WhatIfScore = {
   geography_id: string;
   temperature_c: number;
+  outcome: string;
   area: string;
   geography_level: string;
-  pregnancy_window: 1 | 2 | 3;
+  pregnancy_window: 1 | 2 | 3 | null;
+  exposure_values_c: number[];
   tmax_lag: number[];
   reference_temperature_c: number;
   odds_ratio: number;
   ci95_low: number;
   ci95_high: number;
   attributable_fraction_percent: number;
+  relative_odds_change_percent: number;
   on_training_support: boolean;
   warning: string | null;
+  n_model_rows: number | null;
   n_training: number | null;
+  n_events: number | null;
+  n_subjects: number | null;
   modelled_temperature_range_c: number[] | null;
   model_version: string;
+  climate_hazard_label: string | null;
+  health_domain_label: string | null;
+  outcome_label: string | null;
+  dashboard_title: string | null;
+  population_label: string | null;
 };
 
 export async function submitWhatIfScore(
   accessToken: string,
-  input: { geographyId: string; temperatureC: number },
+  input: { geographyId: string; temperatureC: number; outcome?: string },
   init: { signal?: AbortSignal } = {},
 ) {
   return request<WhatIfScore>("/api/chart/climate/what-if", accessToken, {
@@ -322,6 +356,7 @@ export async function submitWhatIfScore(
     body: JSON.stringify({
       geography_id: input.geographyId,
       temperature_c: input.temperatureC,
+      outcome: input.outcome ?? "lbw",
     }),
     signal: init.signal,
   });
@@ -386,8 +421,16 @@ async function request<T>(url: string, accessToken?: string, init: RequestInit =
   const headers = new Headers(init.headers);
   if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
   const response = await fetch(url, {
-    ...init,
+    // ``cache: "no-store"`` is the safe default for this client — most
+    // endpoints (prediction status polling, what-if scoring, live
+    // catalogs after a manifest change) must never come from a stale
+    // browser cache. Callers that hit near-static reference endpoints
+    // can override ``init.cache`` explicitly to opt into normal HTTP
+    // caching. Note: process-level caches (see ``useGeographies``)
+    // already dedupe within a session, so browser caching is mainly
+    // useful across hard refreshes.
     cache: "no-store",
+    ...init,
     headers,
     signal: init.signal ?? AbortSignal.timeout(30_000),
   });

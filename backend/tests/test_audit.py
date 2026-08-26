@@ -110,6 +110,26 @@ def test_insert_events_is_idempotent_on_replay(session_factory) -> None:
     assert inserted == 1
 
 
+def test_insert_events_discards_a_batch_for_a_reset_user(session_factory) -> None:
+    with session_factory() as session:
+        user = session.get(AppUser, "user-a")
+        assert user is not None
+        session.delete(user)
+        session.commit()
+
+    inserted = insert_events(
+        user_id="user-a",
+        batch=AuditBatchIn(
+            session_id="stale", flush_id="after-reset", events=[_event(0)]
+        ),
+        session_factory=session_factory,
+    )
+
+    assert inserted == 0
+    with session_factory() as session:
+        assert list(session.scalars(select(AuditEventRecord))) == []
+
+
 def test_list_events_is_user_scoped_and_newest_first(session_factory) -> None:
     now = datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc)
     insert_events(

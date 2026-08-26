@@ -1,12 +1,14 @@
 import type { ReactNode } from "react";
 
+import type { IconName } from "@/components/Icon";
+
 import styles from "./FillFigure.module.css";
 
-export type FillFigureShape = "mother-baby" | "baby";
-
 type Props = {
-  /** Which silhouette to render as the fill target. */
-  figure: FillFigureShape;
+  /** Which silhouette to render as the fill target. Defaults to the
+   * ``mother-baby`` pictogram — the maternal-heat visual language used by
+   * the dashboard and matched by ``IconArray`` and ``RiskProtectionPanel``. */
+  figure?: IconName;
   /** 0–100. Percentage of the silhouette filled bottom-up. */
   value: number;
   /** Fill color for the filled portion. Defaults to var(--color-maroon). */
@@ -19,18 +21,13 @@ type Props = {
   label?: ReactNode;
   /** Caption below (e.g. "72%" or freeform ReactNode). */
   caption?: ReactNode;
-  /** Renders a small standalone baby silhouette below the main figure. */
-  subFigure?: "baby" | null;
+  /** Small standalone silhouette rendered below the main figure. */
+  subFigure?: IconName | null;
   className?: string;
 };
 
-const SHAPE_HREF: Record<FillFigureShape, string> = {
-  "mother-baby": "#ic-mother-baby",
-  baby: "#ic-baby",
-};
-
 export function FillFigure({
-  figure,
+  figure = "mother-baby",
   value,
   color = "var(--color-maroon)",
   unfilledColor = "var(--color-grey-mid)",
@@ -60,7 +57,7 @@ export function FillFigure({
           <mask id={maskId}>
             {/* white = show, black = hide */}
             <rect width="24" height="24" fill="black" />
-            <use href={SHAPE_HREF[figure]} fill="white" />
+            <use href={`#ic-${figure}`} fill="white" />
           </mask>
         </defs>
         <g mask={`url(#${maskId})`}>
@@ -82,7 +79,7 @@ export function FillFigure({
           className={styles.sub}
           aria-hidden
         >
-          <use href={SHAPE_HREF[subFigure]} fill={color} />
+          <use href={`#ic-${subFigure}`} fill={color} />
         </svg>
       )}
       {caption && <div className={styles.caption}>{caption}</div>}

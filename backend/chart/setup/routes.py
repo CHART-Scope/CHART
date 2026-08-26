@@ -13,10 +13,19 @@ from .schemas import (
     BootstrapSetupInput,
     BootstrapSetupResponse,
     CompleteSetupInput,
+    ModelSyncResponse,
     SetupOptions,
     SetupStatus,
 )
-from .service import SetupError, bootstrap, complete, get_options, get_status, reset
+from .service import (
+    SetupError,
+    bootstrap,
+    complete,
+    get_options,
+    get_status,
+    reset,
+    sync_deployed_models,
+)
 
 router = APIRouter(prefix="/setup", tags=["setup"])
 
@@ -68,5 +77,15 @@ def reset_route(
 ) -> SetupStatus:
     try:
         return reset(user)
+    except SetupError as error:
+        raise HTTPException(error.status_code, detail=error.code) from error
+
+
+@router.post("/models/sync", response_model=ModelSyncResponse)
+def sync_models_route(
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+) -> ModelSyncResponse:
+    try:
+        return sync_deployed_models(user)
     except SetupError as error:
         raise HTTPException(error.status_code, detail=error.code) from error

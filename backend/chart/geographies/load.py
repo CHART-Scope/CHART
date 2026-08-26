@@ -4,6 +4,7 @@ import json
 import math
 import re
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
@@ -19,6 +20,194 @@ from .catalog import MP_LBW_MODEL_AREAS
 from .schemas import BoundaryRegistryError
 
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+
+
+def load_release_geography_geojson(
+    session: Session,
+    geojson_path: Path,
+    release_spec: Any,
+    release_geography: Any | None = None,
+) -> dict[str, AdminUnit]:
+    """Load an installation geography declared entirely by a release manifest."""
+
+    release_geography = release_geography or release_spec.geography
+    if release_geography is None:
+        raise BoundaryRegistryError(
+            "BOUNDARY_RELEASE_GEOGRAPHY_REQUIRED", release_spec.id
+        )
+
+    document = json.loads(geojson_path.read_text(encoding="utf-8"))
+    features = document.get("features")
+    if document.get("type") != "FeatureCollection" or not isinstance(features, list):
+        raise BoundaryRegistryError(
+            "BOUNDARY_GEOJSON_INVALID", "expected a GeoJSON FeatureCollection"
+        )
+    indexed = {
+        feature.get("properties", {}).get("admin_unit_code"): feature
+        for feature in features
+    }
+    places_by_code = {place.place_code: place for place in release_geography.places}
+    expected_boundary_keys = {place.boundary_key for place in release_geography.places}
+    missing_boundary_keys = expected_boundary_keys - set(indexed)
+    if missing_boundary_keys:
+        raise BoundaryRegistryError(
+            "BOUNDARY_MODEL_AREA_SET_MISMATCH",
+            f"missing={sorted(missing_boundary_keys)}; actual={sorted(indexed)}",
+        )
+
+    geography_slug = release_geography.analytics_slug
+    geography = session.scalar(
+        select(Geography).where(Geography.slug == geography_slug)
+    )
+    if geography is None:
+        geography = Geography(
+            slug=geography_slug,
+            country=release_geography.country_name,
+            name=release_geography.country_name,
+        )
+        session.add(geography)
+        session.flush()
+    app_places = _ensure_release_app_places(session, release_geography)
+
+    loaded: dict[str, AdminUnit] = {}
+    for place_code, area in places_by_code.items():
+        feature = indexed[area.boundary_key]
+        properties = feature.get("properties", {})
+        geometry = feature.get("geometry")
+        if properties.get("geography_level") != area.level:
+            raise BoundaryRegistryError(
+                "BOUNDARY_MODEL_AREA_LEVEL_MISMATCH", place_code
+            )
+        if not isinstance(geometry, dict) or geometry.get("type") not in {
+            "Polygon",
+            "MultiPolygon",
+        }:
+            raise BoundaryRegistryError("BOUNDARY_GEOMETRY_TYPE_INVALID", place_code)
+        source_hash = properties.get("source_artifact_sha256", "")
+        if not _SHA256_PATTERN.fullmatch(source_hash):
+            raise BoundaryRegistryError("BOUNDARY_CHECKSUM_INVALID", place_code)
+
+        admin_unit = session.scalar(
+            select(AdminUnit).where(
+                AdminUnit.geography_id == geography.id,
+                AdminUnit.code == place_code,
+            )
+        )
+        if admin_unit is None:
+            admin_unit = AdminUnit(
+                geography_id=geography.id,
+                code=place_code,
+                name=area.display_name,
+                level=area.level,
+            )
+            session.add(admin_unit)
+        west, south, east, north = _geometry_bounds(geometry)
+        admin_unit.name = area.display_name
+        admin_unit.level = area.level
+        admin_unit.bbox_north = north
+        admin_unit.bbox_west = west
+        admin_unit.bbox_south = south
+        admin_unit.bbox_east = east
+        admin_unit.boundary_provenance = {
+            "source_dataset": properties.get("source_dataset"),
+            "source_artifact_sha256": source_hash,
+            "transform_id": properties.get("transform_id"),
+        }
+        admin_unit.boundary_version = f"{properties.get('transform_id')}:{source_hash}"
+        admin_unit.app_geography_id = app_places[place_code].id
+        model_mapping = next(
+            (
+                mapping
+                for mapping in release_spec.areas
+                if mapping.place_code == place_code
+            ),
+            None,
+        )
+        admin_unit.note = (
+            f"Administrative climate-extraction boundary mapped to the "
+            f"{model_mapping.model_area_name} model area by release {release_spec.id}."
+            if model_mapping is not None
+            else f"Navigation geography declared by release {release_spec.id}; "
+            "no fitted model block is assigned."
+        )
+        session.flush()
+        geometry_json = json.dumps(geometry, sort_keys=True, separators=(",", ":"))
+        if session.get_bind().dialect.name == "postgresql":
+            session.execute(
+                update(AdminUnit)
+                .where(AdminUnit.id == admin_unit.id)
+                .values(
+                    boundary=func.ST_Multi(
+                        func.ST_SetSRID(func.ST_GeomFromGeoJSON(geometry_json), 4326)
+                    )
+                )
+            )
+            session.expire(admin_unit, ["boundary"])
+        else:
+            admin_unit.boundary = geometry_json
+        loaded[place_code] = admin_unit
+    session.flush()
+    return loaded
+
+
+def _ensure_release_app_places(
+    session: Session, geography: Any
+) -> dict[str, AppGeography]:
+    for level in geography.levels:
+        config = session.get(CountryGeoConfig, (geography.country_code, level.key))
+        if config is None:
+            session.add(
+                CountryGeoConfig(
+                    country_code=geography.country_code,
+                    level_key=level.key,
+                    level_label=level.label,
+                    enabled=True,
+                    sort_order=level.sort_order,
+                )
+            )
+    session.flush()
+    country = _upsert_app_place(
+        session,
+        place_id=geography.root_id,
+        country_code=geography.country_code,
+        level="country",
+        level_label="Country",
+        name=geography.country_name,
+        parent_id=None,
+        path=geography.root_path,
+        sort_order=0,
+    )
+    places: dict[str, AppGeography] = {}
+    pending = list(geography.places)
+    while pending:
+        progressed = False
+        for area in pending[:]:
+            parent = (
+                places.get(area.parent_place_code)
+                if area.parent_place_code
+                else country
+            )
+            if parent is None:
+                continue
+            places[area.place_code] = _upsert_app_place(
+                session,
+                place_id=area.geography_id,
+                country_code=geography.country_code,
+                level=area.app_level,
+                level_label=area.level_label,
+                name=area.display_name,
+                parent_id=parent.id,
+                path=area.path,
+                sort_order=area.sort_order,
+            )
+            pending.remove(area)
+            progressed = True
+        if not progressed:
+            raise BoundaryRegistryError(
+                "BOUNDARY_RELEASE_GEOGRAPHY_PARENT_CYCLE", geography.root_id
+            )
+    session.flush()
+    return places
 
 
 def load_mp_model_area_geojson(

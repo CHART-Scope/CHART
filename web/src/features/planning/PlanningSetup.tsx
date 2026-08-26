@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
@@ -17,6 +17,11 @@ type Props = {
   error: string | null;
   onChange: (selection: PlanningSelection) => void;
   onStart: () => void;
+  /** Optional inline element rendered above the "What would you like to
+   * plan for" heading — the planning page passes an
+   * `<InlineContextSwitcher />` so the family flip is one control, no
+   * separate context card taking up space. */
+  contextSwitcher?: ReactNode;
 };
 
 export function PlanningSetup({
@@ -28,13 +33,12 @@ export function PlanningSetup({
   error,
   onChange,
   onStart,
+  contextSwitcher,
 }: Props) {
   const activeArea = useMemo(
     () => areas.find((area) => area.id === selection.area) ?? null,
     [areas, selection.area],
   );
-  const switcherGroups = useMemo(() => groupAreasByCountry(areas), [areas]);
-  const hasSwitcher = areas.length > 0;
 
   const hazards = useMemo(
     () =>
@@ -47,42 +51,88 @@ export function PlanningSetup({
       ),
     [catalog],
   );
+  const selectedHazard = selection.hazard || hazards[0]?.code || "";
   const domains = useMemo(
     () =>
       dedupeBy(
-        catalog.map((entry) => ({
-          code: entry.health_domain,
-          label: entry.health_domain_label,
-        })),
+        catalog
+          .filter((entry) => entry.climate_hazard === selectedHazard)
+          .map((entry) => ({
+            code: entry.health_domain,
+            label: entry.health_domain_label,
+          })),
         (item) => item.code,
       ),
-    [catalog],
+    [catalog, selectedHazard],
   );
-  const [hazardCode, setHazardCode] = useState<string>("");
-  const [domainCode, setDomainCode] = useState<string>("");
+  const selectedDomain = selection.healthDomain || domains[0]?.code || "";
+  const outcomes = useMemo(
+    () =>
+      dedupeBy(
+        catalog
+          .filter(
+            (entry) =>
+              entry.climate_hazard === selectedHazard &&
+              entry.health_domain === selectedDomain,
+          )
+          .map((entry) => ({ code: entry.outcome, label: entry.outcome_label })),
+        (item) => item.code,
+      ),
+    [catalog, selectedDomain, selectedHazard],
+  );
+  const selectedOutcome = selection.outcome || outcomes[0]?.code || "";
+  const selectedAreaSupportsOutcome = Boolean(
+    activeArea && supportsOutcome(activeArea, selectedOutcome),
+  );
+  const descendantModelAreas = useMemo(
+    () =>
+      activeArea
+        ? areas.filter(
+            (area) =>
+              area.path.startsWith(`${activeArea.path.replace(/\/+$/, "")}/`) &&
+              supportsOutcome(area, selectedOutcome),
+          )
+        : [],
+    [activeArea, areas, selectedOutcome],
+  );
+  const selectedScopeSupportsOutcome =
+    selectedAreaSupportsOutcome || descendantModelAreas.length > 0;
   useEffect(() => {
-    if (!hazardCode && hazards[0]) setHazardCode(hazards[0].code);
-  }, [hazards, hazardCode]);
-  useEffect(() => {
-    if (!domainCode && domains[0]) setDomainCode(domains[0].code);
-  }, [domains, domainCode]);
-  const hazardLabel = hazards.find((item) => item.code === hazardCode)?.label ?? "…";
-  const domainLabel = domains.find((item) => item.code === domainCode)?.label ?? "…";
+    if (
+      selectedHazard &&
+      selectedDomain &&
+      selectedOutcome &&
+      (selection.hazard !== selectedHazard ||
+        selection.healthDomain !== selectedDomain ||
+        selection.outcome !== selectedOutcome)
+    ) {
+      onChange({
+        ...selection,
+        hazard: selectedHazard,
+        healthDomain: selectedDomain,
+        outcome: selectedOutcome,
+      });
+    }
+  }, [onChange, selectedDomain, selectedHazard, selectedOutcome, selection]);
+  const hazardLabel =
+    hazards.find((item) => item.code === selectedHazard)?.label ?? "…";
+  const domainLabel =
+    domains.find((item) => item.code === selectedDomain)?.label ?? "…";
+  const outcomeLabel =
+    outcomes.find((item) => item.code === selectedOutcome)?.label ?? "…";
 
-  const canStart = Boolean(activeArea) && !isLoading && !isSubmitting;
-  const country = activeArea ? countryFromPath(activeArea.path) : null;
+  const canStart =
+    Boolean(activeArea && selectedOutcome && selectedScopeSupportsOutcome) &&
+    !isLoading &&
+    !isSubmitting;
+  const modelUnavailable = Boolean(activeArea) && !isLoading && catalog.length === 0;
   const areaName = activeArea?.name ?? "your area";
 
   return (
     <div className={styles.wrap}>
-      {country ? (
-        <div className={styles.breadcrumb} aria-label="Current geography">
-          <span>{country}</span>
-          <Icon name="arrow-right" size={11} />
-          <strong>{areaName}</strong>
-        </div>
+      {contextSwitcher ? (
+        <div className={styles.contextRow}>{contextSwitcher}</div>
       ) : null}
-
       <header className={styles.header}>
         <h1>What would you like to plan for, together?</h1>
         <p>
@@ -112,49 +162,71 @@ export function PlanningSetup({
           <span>We&apos;re planning together for the impacts of </span>
           <PillSelect
             label={hazardLabel}
-            value={hazardCode}
+            value={selectedHazard}
             options={hazards}
-            onChange={setHazardCode}
+            onChange={(hazard) =>
+              onChange({
+                ...selection,
+                hazard,
+                healthDomain: "",
+                outcome: "",
+              })
+            }
             ariaLabel="Choose the climate hazard"
             hint="Hazard covered by the deployed model."
           />
           <span> on </span>
           <PillSelect
             label={domainLabel}
-            value={domainCode}
+            value={selectedDomain}
             options={domains}
-            onChange={setDomainCode}
+            onChange={(healthDomain) =>
+              onChange({ ...selection, healthDomain, outcome: "" })
+            }
             ariaLabel="Choose the health domain"
             hint="Health domain the deployed model estimates."
+          />
+          <span>, focusing on </span>
+          <PillSelect
+            label={outcomeLabel}
+            value={selectedOutcome}
+            options={outcomes}
+            onChange={(outcome) => onChange({ ...selection, outcome })}
+            ariaLabel="Choose the health outcome"
+            hint="Specific outcome estimated by the deployed model."
           />
           <span> in {areaName}.</span>
         </p>
 
-        {hasSwitcher ? (
-          <label className={styles.areaSwitcher}>
-            <span>Switch area</span>
-            <select
-              value={selection.area}
-              onChange={(event) =>
-                onChange({ ...selection, area: event.currentTarget.value })
-              }
-            >
-              {switcherGroups.map((group) => (
-                <optgroup key={group.country} label={group.country}>
-                  {group.areas.map((area) => (
-                    <option key={area.id} value={area.id}>
-                      {optionLabel(area)}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-        ) : null}
-
         {error ? (
           <div className={styles.error} role="alert">
             {error}
+          </div>
+        ) : null}
+        {activeArea &&
+        selectedOutcome &&
+        !selectedAreaSupportsOutcome &&
+        descendantModelAreas.length > 0 ? (
+          <div className={styles.notice} role="status">
+            {outcomeLabel} is available for {descendantModelAreas.length}{" "}
+            {pluralizeLevel(
+              descendantModelAreas[0]?.levelLabel,
+              descendantModelAreas.length,
+            )}{" "}
+            within {areaName}. The dashboard will open at a supported area, and you can
+            switch between the other model-backed areas there.
+          </div>
+        ) : null}
+        {activeArea && selectedOutcome && !selectedScopeSupportsOutcome ? (
+          <div className={styles.error} role="status">
+            {outcomeLabel} is not fitted for {areaName} or any available area below it.
+          </div>
+        ) : null}
+        {modelUnavailable ? (
+          <div className={styles.error} role="status">
+            No fitted model is available for {areaName}. You can keep this county in
+            your workspace, but predictions and model-based planning remain disabled
+            until a compatible model mapping is released.
           </div>
         ) : null}
 
@@ -180,6 +252,15 @@ export function PlanningSetup({
       </section>
     </div>
   );
+}
+
+function supportsOutcome(area: GeographyRecord, outcome: string) {
+  return Boolean(outcome && area.models?.some((model) => model.outcome === outcome));
+}
+
+function pluralizeLevel(levelLabel: string | undefined, count: number) {
+  const label = levelLabel?.toLowerCase() || "sub-area";
+  return count === 1 ? label : `${label}s`;
 }
 
 function PillSelect({
@@ -229,50 +310,4 @@ function dedupeBy<T>(items: T[], key: (item: T) => string) {
     result.push(item);
   }
   return result;
-}
-
-function countryFromPath(path: string): string | null {
-  const parts = path.split("/").filter(Boolean);
-  if (parts.length === 0) return null;
-  return parts[0]
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-type SwitcherGroup = { country: string; areas: GeographyRecord[] };
-
-/**
- * Group areas by country so the switcher scales as new countries are added.
- * Within each country top-level units (state/region) sort before their
- * divisions; native <select> can only nest one level, so divisions live in
- * the same country group but are prefixed to signal the hierarchy visually.
- */
-function groupAreasByCountry(areas: GeographyRecord[]): SwitcherGroup[] {
-  const byCountry = new Map<string, GeographyRecord[]>();
-  for (const area of areas) {
-    const country = countryFromPath(area.path) ?? "Other";
-    const bucket = byCountry.get(country) ?? [];
-    bucket.push(area);
-    byCountry.set(country, bucket);
-  }
-  const groups: SwitcherGroup[] = [];
-  for (const [country, items] of byCountry) {
-    const sorted = [...items].sort(
-      (a, b) => pathDepth(a.path) - pathDepth(b.path) || a.name.localeCompare(b.name),
-    );
-    groups.push({ country, areas: sorted });
-  }
-  return groups;
-}
-
-function pathDepth(path: string): number {
-  return path.split("/").filter(Boolean).length;
-}
-
-function optionLabel(area: GeographyRecord): string {
-  const suffix = ` (${area.levelLabel.toLowerCase()})`;
-  return pathDepth(area.path) > 2
-    ? `    ${area.name}${suffix}`
-    : `${area.name}${suffix}`;
 }

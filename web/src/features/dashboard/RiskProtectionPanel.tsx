@@ -1,6 +1,6 @@
 "use client";
 
-import { Icon } from "@/components/Icon";
+import { Icon, type IconName } from "@/components/Icon";
 
 import styles from "./RiskProtectionPanel.module.css";
 
@@ -9,8 +9,9 @@ type Column = {
   toneClass: string;
   eyebrowIcon: string;
   eyebrowLabel: string;
-  caption: string;
 };
+
+type RenderedColumn = Column & { caption: string };
 
 const COLUMNS: readonly Column[] = [
   {
@@ -18,28 +19,40 @@ const COLUMNS: readonly Column[] = [
     toneClass: "heat",
     eyebrowIcon: "☼",
     eyebrowLabel: "Heat exposed",
-    caption: "Low birth weight",
   },
   {
     key: "cool",
     toneClass: "cool",
     eyebrowIcon: "☂",
     eyebrowLabel: "Shaded / cool",
-    caption: "Typical birth weight",
   },
 ];
 
-export function RiskProtectionPanel() {
+export function RiskProtectionPanel({
+  outcomeLabel = "Health outcome",
+  figure = "newborn",
+  contextFigure = "pregnant-woman",
+  description,
+}: {
+  outcomeLabel?: string;
+  figure?: IconName;
+  contextFigure?: IconName;
+  description?: string | null;
+}) {
+  const columns: readonly RenderedColumn[] = [
+    { ...COLUMNS[0], caption: `Higher ${outcomeLabel.toLowerCase()} risk` },
+    { ...COLUMNS[1], caption: `Lower ${outcomeLabel.toLowerCase()} risk` },
+  ];
   return (
     <section className={styles.panel} aria-labelledby="risk-protection-heading">
       <header>
         <p className={styles.eyebrow}>Risk vs Protection</p>
       </header>
       <h2 id="risk-protection-heading" className={styles.visuallyHidden}>
-        How heat exposure and shade affect birth weight
+        How heat exposure and protection affect {outcomeLabel.toLowerCase()}
       </h2>
       <div className={styles.figures}>
-        {COLUMNS.map((column) => (
+        {columns.map((column) => (
           <div
             key={column.key}
             className={`${styles.column} ${styles[column.toneClass]}`}
@@ -50,19 +63,18 @@ export function RiskProtectionPanel() {
               </span>
               {column.eyebrowLabel}
             </span>
-            <Icon name="pregnant-woman" size={72} className={styles.pregnantIcon} />
+            <Icon name={contextFigure} size={72} className={styles.pregnantIcon} />
             <span className={styles.arrow} aria-hidden>
               ↓
             </span>
-            <Icon name="newborn" size={44} className={styles.newbornIcon} />
+            <Icon name={figure} size={44} className={styles.newbornIcon} />
             <p className={styles.figureCaption}>{column.caption}</p>
           </div>
         ))}
       </div>
       <p className={styles.body}>
-        Exposure to extreme heat during pregnancy directly increases the risk of a baby
-        being born with low birth weight (LBW), while maintaining a cooler environment
-        significantly reduces this risk.
+        {description ??
+          `The fitted model estimates how climate exposure is associated with ${outcomeLabel.toLowerCase()}. It does not by itself establish causality.`}
       </p>
     </section>
   );

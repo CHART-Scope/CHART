@@ -23,6 +23,24 @@
   max-width: 600px;
 }
 
+.size_sm {
+  max-width: 340px;
+}
+.size_md {
+  max-width: 520px;
+}
+.size_lg {
+  max-width: 600px;
+}
+
+.bare {
+  padding: 0;
+  overflow: hidden;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+}
+
 .close {
   position: absolute;
   top: 16px;

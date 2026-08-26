@@ -35,7 +35,7 @@ function AuthorizedLearning({ session }: { session: AuthSession }) {
         onSignOut={signOutOfKeycloak}
         userLabel={session.user.username}
       >
-        <main style={{ padding: "2rem", maxWidth: "48rem", margin: "0 auto" }}>
+        <main style={{ maxWidth: "48rem" }}>
           <p
             style={{
               fontSize: "0.7rem",

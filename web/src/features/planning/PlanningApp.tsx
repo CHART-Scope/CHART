@@ -12,6 +12,9 @@ import {
   type GeographyRecord,
   type ModelCatalogEntry,
 } from "@/lib/planningClient";
+import { rememberActiveGeography } from "@/lib/authClient";
+import { isInScope } from "@/lib/geographyScope";
+import { InlineContextSwitcher } from "./InlineContextSwitcher";
 import { PlanningSetup } from "./PlanningSetup";
 import { defaultPlanningSelection, type PlanningSelection } from "./planningWireframe";
 
@@ -43,27 +46,20 @@ export function PlanningApp({
 
   useEffect(() => {
     let cancelled = false;
-    listModelCatalog()
-      .then((items) => {
-        if (!cancelled) setCatalog(items);
-      })
-      .catch(() => {
-        // Catalog is best-effort — planning still works if it can't be
-        // loaded; the pill selects just render an empty list.
-        if (!cancelled) setCatalog([]);
-      });
     listGeographies()
       .then((records) => {
         if (cancelled) return;
-        // Don't filter by supportsPrediction: the dashboard renders an
-        // empty-state skeleton when nothing has been materialized yet,
-        // and the onboarded location may not yet have a registered
-        // model release. Geography scope from Keycloak still applies.
-        const inScope = records.filter((area) => isInScope(area, geographyScopes));
+        const inScope = records.filter(
+          (area) => area.supportsPrediction && isInScope(area, geographyScopes),
+        );
         const active =
           inScope.find(
             (area) => area.id === activeGeographyId || area.path === activeGeographyId,
           ) ??
+          // The Settings context picker stores the family root path (e.g. /kenya
+          // or /india/madhya-pradesh). When the root itself has no direct model,
+          // land on the first prediction-supporting descendant of that family.
+          descendantOf(activeGeographyId, inScope) ??
           inScope.find((area) => area.id === "geo-in-madhya-pradesh") ??
           inScope[0];
         setAreas(inScope);
@@ -88,13 +84,38 @@ export function PlanningApp({
     };
   }, [activeGeographyId, geographyScopes]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!selection.area) {
+      setCatalog([]);
+      return;
+    }
+    listModelCatalog(selection.area, { includeDescendants: true })
+      .then((items) => {
+        if (!cancelled) setCatalog(items);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalog([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selection.area]);
+
   const openDashboard = useCallback(() => {
     if (!selection.area) return;
     setIsSubmitting(true);
-    router.push(`/dashboard/${encodeURIComponent(selection.area)}`);
+    const query = selection.outcome
+      ? `?outcome=${encodeURIComponent(selection.outcome)}`
+      : "";
+    router.push(`/dashboard/${encodeURIComponent(selection.area)}${query}`);
   }, [router, selection.area]);
 
   function changeSelection(next: PlanningSelection) {
+    if (next.area !== selection.area) {
+      const nextArea = areas.find((area) => area.id === next.area);
+      if (nextArea) rememberActiveGeography(nextArea.path);
+    }
     setSelection(next);
     setError(null);
   }
@@ -121,26 +142,33 @@ export function PlanningApp({
           error={error}
           onChange={changeSelection}
           onStart={openDashboard}
+          contextSwitcher={
+            <InlineContextSwitcher
+              geographyScopes={geographyScopes}
+              activeGeographyId={activeGeographyId ?? selection.area}
+              onFamilyChange={(_family, defaultArea) => {
+                // Instant switch — reset the sentence back to defaults for
+                // the new family so hazard / outcome / period are picked
+                // from that family's catalog rather than the previous one.
+                changeSelection({
+                  ...defaultPlanningSelection(),
+                  area: defaultArea.id,
+                });
+              }}
+            />
+          }
         />
       </AppShell>
     </>
   );
 }
 
-function isInScope(area: GeographyRecord, scopes: string[]) {
-  if (scopes.length === 0) return false;
-  const areaPath = normalizeScope(area.path);
-  return scopes.some((raw) => {
-    const scope = normalizeScope(raw);
-    if (!scope) return false;
-    if (scope === area.id) return true;
-    if (scope === areaPath) return true;
-    return areaPath.startsWith(`${scope}/`);
-  });
-}
-
-function normalizeScope(value: string) {
-  const trimmed = value.trim().replace(/\/+$/, "");
-  if (!trimmed) return "";
-  return trimmed.startsWith("/") || !trimmed.includes("/") ? trimmed : `/${trimmed}`;
+function descendantOf(
+  rootPath: string | undefined,
+  areas: GeographyRecord[],
+): GeographyRecord | undefined {
+  if (!rootPath) return undefined;
+  const root = rootPath.replace(/\/+$/, "");
+  if (!root) return undefined;
+  return areas.find((area) => area.path.startsWith(`${root}/`));
 }

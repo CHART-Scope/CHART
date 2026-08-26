@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { Icon } from "@/components/Icon";
 
 import styles from "./DashboardHeader.module.css";
@@ -9,7 +11,13 @@ type Props = {
   areaName: string;
   hazardLabel: string;
   healthDomainLabel: string;
+  title?: string;
   onPlayVideo?: () => void;
+  /** Optional inline element rendered in place of the country name — the
+   * dashboard passes an `<InlineContextSwitcher />` here so users can
+   * flip between installed families straight from the breadcrumb without
+   * a separate settings-style card taking up vertical space. */
+  countrySlot?: ReactNode;
 };
 
 /**
@@ -26,13 +34,15 @@ export function DashboardHeader({
   areaName,
   hazardLabel,
   healthDomainLabel,
+  title = "Understand the climate-health risk and the actions that can save lives",
   onPlayVideo,
+  countrySlot,
 }: Props) {
   const pill = `${hazardLabel} + ${healthDomainLabel}`;
   return (
     <header className={styles.wrap}>
       <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
-        <span>{country}</span>
+        <span>{countrySlot ?? country}</span>
         <span className={styles.separator} aria-hidden>
           ›
         </span>
@@ -56,10 +66,7 @@ export function DashboardHeader({
         </button>
         <div className={styles.cardBody}>
           <p className={styles.eyebrow}>Understand the climate-health risk</p>
-          <h1 className={styles.title}>
-            Protecting mothers and babies from extreme heat: The science and actions
-            that can save lives
-          </h1>
+          <h1 className={styles.title}>{title}</h1>
         </div>
       </article>
     </header>

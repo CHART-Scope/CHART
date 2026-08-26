@@ -1,0 +1,281 @@
+{
+  "id": "under5-mortality-mp-0.1.0-review",
+  "module": "prediction",
+  "outcome": "under_5_mortality",
+  "climate_hazard": "extreme_heat",
+  "health_domain": "child_health",
+  "version": "0.1.0-review",
+  "runtime": {
+    "adapter": "compact_r_registry",
+    "artifact_type": "rds"
+  },
+  "input_contract": {
+    "variables": [
+      {
+        "name": "daily_tmax_lag",
+        "description": "Daily maximum 2m air temperature at lag 0 through lag 3",
+        "unit": "Celsius",
+        "interval": "day",
+        "order": "newest_first",
+        "length": 4
+      }
+    ],
+    "interactive_profile": "repeat_selected_temperature_across_all_lags",
+    "batch_status": "blocked_pending_modeller_confirmation"
+  },
+  "output_contract": {
+    "effect_measure": "odds_ratio",
+    "confidence_level": 0.95,
+    "attributable_fraction": "positive_excess_only"
+  },
+  "presentation": {
+    "climate_hazard_label": "Extreme heat",
+    "health_domain_label": "Child health",
+    "outcome_label": "Under-five mortality",
+    "dashboard_title": "Protecting children under five from extreme heat",
+    "population_label": "case-control rows",
+    "model_scope_label": "division model",
+    "visualization": {
+      "kind": "odds_ratio_icon_array",
+      "figure": "baby",
+      "context_figure": "baby"
+    },
+    "risk_description": "The review model estimates how short-term maximum-temperature exposure is associated with under-five mortality. It does not by itself establish causality."
+  },
+  "base_uri": "s3://chart-predictive-models/india/mp/under-five-mortality/0.1.0-review",
+  "release_notes": "Direct division-specific conditional-logistic DLNM review artifact. Interactive flat four-day profiles only. No state model and no approved batch projection path.",
+  "source_git_ref": "modeller-review-required",
+  "geography": {
+    "country_code": "IN",
+    "country_name": "India",
+    "root_id": "geo-in",
+    "root_path": "/india",
+    "analytics_slug": "madhya-pradesh",
+    "levels": [
+      { "key": "geo_level_1", "label": "State", "sort_order": 10 },
+      { "key": "geo_level_2", "label": "Division", "sort_order": 20 }
+    ],
+    "places": [
+      {
+        "place_code": "madhya-pradesh",
+        "country_code": "IN",
+        "level": "state",
+        "display_name": "Madhya Pradesh",
+        "geography_id": "geo-in-madhya-pradesh",
+        "app_level": "geo_level_1",
+        "level_label": "State",
+        "path": "/india/madhya-pradesh",
+        "sort_order": 10,
+        "boundary_key": "madhya-pradesh"
+      },
+      {
+        "place_code": "bhopal",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Bhopal Division",
+        "geography_id": "geo-in-madhya-pradesh-division-bhopal",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/bhopal",
+        "sort_order": 10,
+        "boundary_key": "bhopal"
+      },
+      {
+        "place_code": "chambal",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Chambal Division",
+        "geography_id": "geo-in-madhya-pradesh-division-chambal",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/chambal",
+        "sort_order": 20,
+        "boundary_key": "chambal"
+      },
+      {
+        "place_code": "gwalior",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Gwalior Division",
+        "geography_id": "geo-in-madhya-pradesh-division-gwalior",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/gwalior",
+        "sort_order": 30,
+        "boundary_key": "gwalior"
+      },
+      {
+        "place_code": "indore",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Indore Division",
+        "geography_id": "geo-in-madhya-pradesh-division-indore",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/indore",
+        "sort_order": 40,
+        "boundary_key": "indore"
+      },
+      {
+        "place_code": "jabalpur",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Jabalpur Division",
+        "geography_id": "geo-in-madhya-pradesh-division-jabalpur",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/jabalpur",
+        "sort_order": 50,
+        "boundary_key": "jabalpur"
+      },
+      {
+        "place_code": "narmadapuram",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Narmadapuram Division",
+        "geography_id": "geo-in-madhya-pradesh-division-narmadapuram",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/narmadapuram",
+        "sort_order": 60,
+        "boundary_key": "narmadapuram"
+      },
+      {
+        "place_code": "rewa",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Rewa Division",
+        "geography_id": "geo-in-madhya-pradesh-division-rewa",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/rewa",
+        "sort_order": 70,
+        "boundary_key": "rewa"
+      },
+      {
+        "place_code": "sagar",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Sagar Division",
+        "geography_id": "geo-in-madhya-pradesh-division-sagar",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/sagar",
+        "sort_order": 80,
+        "boundary_key": "sagar"
+      },
+      {
+        "place_code": "shahdol",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Shahdol Division",
+        "geography_id": "geo-in-madhya-pradesh-division-shahdol",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/shahdol",
+        "sort_order": 90,
+        "boundary_key": "shahdol"
+      },
+      {
+        "place_code": "ujjain",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Ujjain Division",
+        "geography_id": "geo-in-madhya-pradesh-division-ujjain",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/ujjain",
+        "sort_order": 100,
+        "boundary_key": "ujjain"
+      }
+    ]
+  },
+  "model_files": [
+    {
+      "filename": "IN_MP_under5_mortality_tmax_v0.1.0-review.rds",
+      "sha256": "8a9766a2a16ff6ec1263b896106bc8d2a38bd0d07328be6943e1f5d87d3aaf87"
+    }
+  ],
+  "areas": [
+    {
+      "place_code": "bhopal",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Bhopal"
+    },
+    {
+      "place_code": "chambal",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Chambal"
+    },
+    {
+      "place_code": "gwalior",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Gwalior"
+    },
+    {
+      "place_code": "indore",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Indore"
+    },
+    {
+      "place_code": "jabalpur",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Jabalpur"
+    },
+    {
+      "place_code": "narmadapuram",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Narmadapuram"
+    },
+    {
+      "place_code": "rewa",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Rewa"
+    },
+    {
+      "place_code": "sagar",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Sagar"
+    },
+    {
+      "place_code": "shahdol",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Shahdol"
+    },
+    {
+      "place_code": "ujjain",
+      "country_code": "IN",
+      "level": "division",
+      "model_file": "IN_MP_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Ujjain"
+    }
+  ]
+}

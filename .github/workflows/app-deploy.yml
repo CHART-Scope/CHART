@@ -132,7 +132,7 @@ jobs:
         run: python -m alembic check
 
       - name: Test Python API and data flow
-        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests pipelines/models/lbw/tests -q
+        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests -q
 
       - name: Typecheck current frontend
         run: npm run typecheck:web
@@ -164,8 +164,8 @@ jobs:
             -e DAGSTER_POSTGRES_DB=chart_dagster \
             chart-python:ci dagster instance info
 
-      - name: Validate LBW prediction image
-        run: docker build --target test -f pipelines/models/lbw/Dockerfile -t chart-lbw:ci pipelines/models/lbw
+      - name: Validate model registry image
+        run: docker build --target test -f pipelines/models/Dockerfile -t chart-lbw:ci pipelines/models
 
       - name: Build current frontend image
         run: docker build --build-arg "CHART_BUILD_ID=$GITHUB_SHA" -f web/Dockerfile -t chart-web:ci .

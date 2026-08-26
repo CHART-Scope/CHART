@@ -95,6 +95,99 @@ def test_auth_me_applies_an_allowed_active_geography(
     assert response.json()["geographyLevel"] == "geo_level_2"
 
 
+def test_admin_can_switch_within_assigned_country_but_not_to_another_country(
+    client: TestClient, signed_token
+) -> None:
+    token = signed_token(resource_access={"chart-api": {"roles": ["chart_admin"]}})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    profile = client.get("/auth/me", headers=headers)
+    sibling = client.get(
+        "/auth/geography-access?geography=/country-b/region-c", headers=headers
+    )
+    other_country = client.get(
+        "/auth/geography-access?geography=/country-a/region-a", headers=headers
+    )
+
+    assert profile.status_code == 200
+    assert profile.json()["geographyScopes"] == ["/country-b"]
+    assert profile.json()["activeGeographyId"] == "/country-b/region-b"
+    assert sibling.status_code == 200
+    assert other_country.status_code == 403
+
+
+def test_auth_me_unions_model_family_roots_into_admin_scopes_when_opted_in(
+    client: TestClient, signed_token, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES", "true")
+    monkeypatch.setattr(service, "_active_model_family_roots", lambda: ["/kenya"])
+    token = signed_token(resource_access={"chart-api": {"roles": ["chart_admin"]}})
+
+    response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert response.json()["geographyScopes"] == ["/country-b", "/kenya"]
+
+
+def test_auth_me_does_not_union_model_roots_for_non_admin(
+    client: TestClient, signed_token, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES", "true")
+    monkeypatch.setattr(service, "_active_model_family_roots", lambda: ["/kenya"])
+
+    response = client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {signed_token()}"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["geographyScopes"] == ["/country-b/region-b"]
+
+
+def test_admin_union_is_off_by_default(
+    client: TestClient, signed_token, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES", raising=False)
+    monkeypatch.setattr(service, "_active_model_family_roots", lambda: ["/kenya"])
+    token = signed_token(resource_access={"chart-api": {"roles": ["chart_admin"]}})
+
+    response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    # Default is opt-in — no union, admin stays on their Keycloak country.
+    assert response.json()["geographyScopes"] == ["/country-b"]
+
+
+def test_admin_union_requires_exact_true(
+    client: TestClient, signed_token, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Only the literal string "true" enables the union — "1", "yes", "True"
+    # are all treated as false so a typo can't silently open scope up.
+    monkeypatch.setenv("CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES", "yes")
+    monkeypatch.setattr(service, "_active_model_family_roots", lambda: ["/kenya"])
+    token = signed_token(resource_access={"chart-api": {"roles": ["chart_admin"]}})
+
+    response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert response.json()["geographyScopes"] == ["/country-b"]
+
+
+def test_auth_me_snaps_back_when_active_geography_falls_out_of_scope(
+    client: TestClient, signed_token
+) -> None:
+    # sessionStorage remembered /out-of-scope from before the admin flag was
+    # flipped off. The stale header should be silently dropped, not 403 — the
+    # user lands on their default Keycloak-derived area instead of being
+    # locked out.
+    response = client.get(
+        "/auth/me?activeGeography=/country-a/region-a",
+        headers={"Authorization": f"Bearer {signed_token()}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["activeGeographyId"] == "/country-b/region-b"
+
+
 def test_auth_me_rejects_invalid_issuer(client: TestClient, signed_token) -> None:
     response = client.get(
         "/auth/me",

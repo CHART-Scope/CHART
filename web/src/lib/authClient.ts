@@ -18,9 +18,29 @@ type TokenResponse = {
 };
 
 let currentSession: AuthSession | null = null;
+const activeGeographyStorageKey = "chart.activeGeography";
 
 export function getStoredAuthSession() {
   return currentSession;
+}
+
+export function clearStoredAuthSession() {
+  currentSession = null;
+  if (typeof window !== "undefined") {
+    window.sessionStorage.removeItem(activeGeographyStorageKey);
+  }
+}
+
+export function rememberActiveGeography(path: string) {
+  if (typeof window !== "undefined") {
+    window.sessionStorage.setItem(activeGeographyStorageKey, path);
+  }
+  if (currentSession) {
+    currentSession = {
+      ...currentSession,
+      user: { ...currentSession.user, activeGeographyId: path },
+    };
+  }
 }
 
 export async function restoreAuthSession() {
@@ -54,7 +74,7 @@ export function startKeycloakSignIn() {
 
 export function signOutOfKeycloak() {
   recordAuditEvent({ event_type: "signout" });
-  currentSession = null;
+  clearStoredAuthSession();
   window.location.assign("/auth/signout?returnTo=/plan");
 }
 
@@ -88,7 +108,18 @@ async function refreshAuthSession() {
 
 async function storeTokenSession(tokens: TokenResponse) {
   if (!tokens.access_token) throw new Error("The access token is missing.");
-  const user = await fetchCurrentUser(tokens.access_token);
+  const activeGeography =
+    typeof window === "undefined"
+      ? null
+      : window.sessionStorage.getItem(activeGeographyStorageKey);
+  let user: CurrentUser;
+  try {
+    user = await fetchCurrentUser(tokens.access_token, activeGeography);
+  } catch (error) {
+    if (!activeGeography) throw error;
+    window.sessionStorage.removeItem(activeGeographyStorageKey);
+    user = await fetchCurrentUser(tokens.access_token);
+  }
   const previous = currentSession;
   const session: AuthSession = {
     user,
@@ -106,10 +137,13 @@ async function storeTokenSession(tokens: TokenResponse) {
   return session;
 }
 
-async function fetchCurrentUser(accessToken: string) {
+async function fetchCurrentUser(accessToken: string, activeGeography?: string | null) {
   const response = await fetch("/api/chart/auth/me", {
     cache: "no-store",
-    headers: { authorization: `Bearer ${accessToken}` },
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      ...(activeGeography ? { "x-chart-active-geography": activeGeography } : {}),
+    },
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) throw new Error("The signed-in CHART user could not be loaded.");

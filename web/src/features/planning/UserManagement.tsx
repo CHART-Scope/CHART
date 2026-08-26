@@ -9,7 +9,9 @@ import { Modal } from "@/components/Modal";
 import { Panel } from "@/components/Panel";
 import { Select } from "@/components/Select";
 import { TextInput } from "@/components/TextInput";
-import { resetInstallation } from "@/lib/setupClient";
+import { resetAuditSession, stopAuditFlush } from "@/lib/audit";
+import { clearStoredAuthSession } from "@/lib/authClient";
+import { resetInstallation, syncInstalledModels } from "@/lib/setupClient";
 import {
   inviteUser,
   listAdminGeographies,
@@ -54,7 +56,12 @@ const initialForm: FormState = {
 
 const RESET_CONFIRM_PHRASE = "RESET";
 
-export function UserManagement({ accessToken }: { accessToken: string }) {
+type Props = {
+  accessToken: string;
+  geographyScopes: string[];
+};
+
+export function UserManagement({ accessToken, geographyScopes }: Props) {
   const router = useRouter();
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [geographies, setGeographies] = useState<AdminGeography[]>([]);
@@ -67,12 +74,30 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [isResetting, setIsResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  const [isSyncingModels, setIsSyncingModels] = useState(false);
+  const [modelSyncMessage, setModelSyncMessage] = useState<string | null>(null);
+
+  const availableGeographies = geographies.filter(
+    (geography) =>
+      geography.supportsPrediction &&
+      isGeographyInScope(geography.path, geographyScopes),
+  );
+
+  function updateFormField<Key extends keyof FormState>(
+    field: Key,
+    value: FormState[Key],
+  ) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
 
   async function performReset() {
     setIsResetting(true);
     setResetError(null);
     try {
       await resetInstallation(accessToken);
+      stopAuditFlush();
+      resetAuditSession();
+      clearStoredAuthSession();
       router.replace("/onboarding");
     } catch (thrown) {
       setResetError(
@@ -85,6 +110,26 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
     }
   }
 
+  async function syncModels() {
+    setIsSyncingModels(true);
+    setModelSyncMessage(null);
+    try {
+      const result = await syncInstalledModels(accessToken);
+      setModelSyncMessage(
+        `${result.activeReleaseIds.length} model releases are ready across ${result.assignmentCount} planning-area assignments.`,
+      );
+      router.refresh();
+    } catch (thrown) {
+      setModelSyncMessage(
+        thrown instanceof Error
+          ? thrown.message
+          : "CHART could not check for model updates.",
+      );
+    } finally {
+      setIsSyncingModels(false);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
     Promise.all([listManagedUsers(accessToken), listAdminGeographies(accessToken)])
@@ -94,7 +139,14 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
         setGeographies(nextGeographies);
         setForm((current) => ({
           ...current,
-          geographyId: current.geographyId || nextGeographies[0]?.id || "",
+          geographyId:
+            current.geographyId ||
+            nextGeographies.find(
+              (geography) =>
+                geography.supportsPrediction &&
+                isGeographyInScope(geography.path, geographyScopes),
+            )?.id ||
+            "",
         }));
       })
       .catch((loadError) => {
@@ -112,7 +164,7 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, geographyScopes]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -163,6 +215,28 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
         </div>
       </header>
 
+      <section className={styles.modelUpdates} aria-labelledby="model-updates-title">
+        <div>
+          <strong id="model-updates-title">Installed models</strong>
+          <p>
+            Check deployed manifests for new or updated model releases. This preserves
+            people, workspaces, and saved planning data.
+          </p>
+          {modelSyncMessage ? (
+            <p className={styles.modelSyncMessage} role="status">
+              {modelSyncMessage}
+            </p>
+          ) : null}
+        </div>
+        <Button
+          variant="secondary"
+          disabled={isSyncingModels}
+          onClick={() => void syncModels()}
+        >
+          {isSyncingModels ? "Checking…" : "Check for model updates"}
+        </Button>
+      </section>
+
       <div className={styles.grid}>
         <Panel pad="lg" eyebrow="Invite a person" title="Create their CHART account">
           <form className={styles.form} onSubmit={(event) => void submit(event)}>
@@ -170,12 +244,7 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
               id="invite-name"
               label="Full name"
               value={form.name}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  name: event.currentTarget.value,
-                }))
-              }
+              onChange={(event) => updateFormField("name", event.currentTarget.value)}
               autoComplete="name"
             />
             <TextInput
@@ -183,12 +252,7 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
               label="Email address"
               type="email"
               value={form.email}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  email: event.currentTarget.value,
-                }))
-              }
+              onChange={(event) => updateFormField("email", event.currentTarget.value)}
               autoComplete="email"
             />
             <Select
@@ -198,10 +262,7 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
               value={form.role}
               options={roles}
               onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  role: event.currentTarget.value as ChartRole,
-                }))
+                updateFormField("role", event.currentTarget.value as ChartRole)
               }
             />
             <Select
@@ -210,15 +271,12 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
               fullWidth
               value={form.geographyId}
               placeholder="— Choose a planning area —"
-              options={geographies.map((geography) => ({
+              options={availableGeographies.map((geography) => ({
                 value: geography.id,
                 label: `${geography.name} · ${geography.levelLabel}`,
               }))}
               onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  geographyId: event.currentTarget.value,
-                }))
+                updateFormField("geographyId", event.currentTarget.value)
               }
             />
             <TextInput
@@ -228,10 +286,7 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
               minLength={8}
               value={form.password}
               onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  password: event.currentTarget.value,
-                }))
+                updateFormField("password", event.currentTarget.value)
               }
               autoComplete="new-password"
             />
@@ -308,6 +363,7 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
       </div>
 
       <Modal
+        size="lg"
         open={showResetDialog}
         onClose={() => {
           if (!isResetting) setShowResetDialog(false);
@@ -359,4 +415,20 @@ export function UserManagement({ accessToken }: { accessToken: string }) {
 
 function roleLabel(role?: ChartRole) {
   return roles.find((option) => option.value === role)?.label ?? "No role";
+}
+
+function isGeographyInScope(path: string, scopes: string[]) {
+  const normalizedPath = normalizePath(path);
+  return scopes.some((scope) => {
+    const normalizedScope = normalizePath(scope);
+    return (
+      normalizedPath === normalizedScope ||
+      normalizedPath.startsWith(`${normalizedScope}/`)
+    );
+  });
+}
+
+function normalizePath(path: string) {
+  const value = path.trim().replace(/\/+$/, "");
+  return value.startsWith("/") ? value : `/${value}`;
 }

@@ -24,7 +24,8 @@ data/
 docs/
 pipelines/era5_heat/README.md
 pipelines/LBW_demo/README.md
-pipelines/LBW_demo/web/index.html
+pipelines/models/lbw/web/index.html
+pipelines/places/**/shapes.geojson
 web/payload-types.ts
 web/src/app/(payload)/admin/importMap.ts
 chart-repository/payload-types.ts

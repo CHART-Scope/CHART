@@ -15,6 +15,7 @@ export type AdminGeography = {
   name: string;
   parentId: string | null;
   path: string;
+  supportsPrediction: boolean;
 };
 
 export type ManagedUser = {

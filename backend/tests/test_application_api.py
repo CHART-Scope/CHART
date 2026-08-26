@@ -12,6 +12,7 @@ from chart.auth.service import require_current_user
 from chart.setup.schemas import (
     BootstrapAdminResponse,
     BootstrapSetupResponse,
+    ModelSyncResponse,
     SetupCounts,
     SetupStatus,
 )
@@ -64,7 +65,10 @@ def test_setup_status_remains_public(client: TestClient) -> None:
     assert response.json()["requiresOnboarding"] is True
 
 
-def test_setup_options_return_installation_sectors(client: TestClient) -> None:
+def test_setup_options_return_manifest_geographies(
+    client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setenv("CHART_ENABLE_REVIEW_MODELS", "true")
     response = client.get("/setup/options")
 
     assert response.status_code == 200
@@ -72,6 +76,37 @@ def test_setup_options_return_installation_sectors(client: TestClient) -> None:
         {"id": "health", "label": "Health"},
         {"id": "environment", "label": "Environment & climate change"},
     ]
+    countries = {item["countryCode"]: item for item in response.json()["geographies"]}
+    assert set(countries) == {"IN", "KE"}
+    kenya = countries["KE"]
+    assert kenya["countryName"] == "Kenya"
+    assert kenya["levels"] == [
+        {"key": "geo_level_1", "label": "County", "sortOrder": 10}
+    ]
+    assert len(kenya["places"]) == 46
+    assert {place["name"] for place in kenya["places"]} >= {
+        "Kajiado",
+        "West Pokot",
+    }
+    assert "Turkana" not in {place["name"] for place in kenya["places"]}
+    assert all(place["predictionSupported"] for place in kenya["places"])
+    assert {place["levelLabel"] for place in kenya["places"]} == {"County"}
+    kajiado = next(place for place in kenya["places"] if place["name"] == "Kajiado")
+    assert kajiado["modelMappings"] == [
+        {
+            "releaseId": "lbw-ke-climate-zone-0.2.1-review",
+            "outcome": "lbw",
+            "outcomeLabel": "Low birth weight",
+            "modelAreaName": "South-eastern",
+            "modelScopeLabel": "climate-zone model",
+        }
+    ]
+
+    india = countries["IN"]
+    assert [
+        place["name"] for place in india["places"] if place["level"] == "geo_level_1"
+    ] == ["Madhya Pradesh"]
+    assert all(place["predictionSupported"] for place in india["places"])
 
 
 def test_readiness_rejects_a_database_behind_the_code(
@@ -222,6 +257,32 @@ def test_users_deny_non_admin(planning_user_client: TestClient) -> None:
     response = planning_user_client.get("/users")
     assert response.status_code == 403
     assert response.json() == {"error": "USER_FORBIDDEN"}
+
+
+def test_model_sync_requires_authentication(client: TestClient) -> None:
+    response = client.post("/setup/models/sync")
+    assert response.status_code == 401
+    assert response.json() == {"error": "AUTH_TOKEN_REQUIRED"}
+
+
+def test_model_sync_denies_non_admin(planning_user_client: TestClient) -> None:
+    response = planning_user_client.post("/setup/models/sync")
+    assert response.status_code == 403
+    assert response.json() == {"error": "SETUP_FORBIDDEN"}
+
+
+def test_model_sync_returns_active_releases(admin_client: TestClient) -> None:
+    result = ModelSyncResponse(
+        activeReleaseIds=["lbw-mp-review", "under5-mp-review"],
+        assignmentCount=21,
+    )
+    with patch("chart.setup.routes.sync_deployed_models", return_value=result):
+        response = admin_client.post("/setup/models/sync")
+    assert response.status_code == 200
+    assert response.json() == {
+        "activeReleaseIds": ["lbw-mp-review", "under5-mp-review"],
+        "assignmentCount": 21,
+    }
 
 
 def _bootstrap_request() -> dict:

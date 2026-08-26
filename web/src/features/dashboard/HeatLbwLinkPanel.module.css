@@ -2,17 +2,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-5);
+  padding: var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-card);
   min-height: 22rem;
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
 }
 
 .eyebrow {
@@ -24,35 +18,40 @@
   color: var(--color-text-muted);
 }
 
-.viewingFor {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.viewingLabel {
+.question {
+  margin: 0;
   font-family: var(--font-body);
-  font-size: var(--fs-caption);
+  font-size: var(--fs-body-lg);
+  font-weight: 400;
+  color: var(--color-charcoal);
+  /* Extra line-height so the pill dropdowns get vertical breathing room
+   * as the question wraps across lines. */
+  line-height: 1.7;
+  /* Prevent English-language leading-space collapse — the JSX inserts
+   * a real space around each inline select and we want it preserved. */
+  word-spacing: 0.05em;
+}
+
+/* Keep each "…of [dropdown]" / "in [dropdown]" chunk together so the
+ * sentence only wraps at phrase boundaries, never mid-clause or right
+ * before the closing text. */
+.phrase {
+  white-space: nowrap;
+}
+
+.inlineStatic {
+  font-weight: 500;
+  color: var(--color-nexus);
+}
+
+.modelScopeNote {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-left: 3px solid var(--color-accent, #2f6f62);
+  background: var(--surface-muted, #f5f4ef);
   color: var(--color-text-muted);
-  flex-shrink: 0;
-}
-
-.viewingFor > *:last-child {
-  flex: 1;
-  min-width: 0;
-}
-
-.visuallyHidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
+  font-size: var(--fs-caption);
+  line-height: 1.45;
 }
 
 .iconArrayWrap {
@@ -61,17 +60,10 @@
   margin: var(--space-1) 0;
 }
 
-.skeleton {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4) 0;
-}
-
 .skeletonGrid {
+  align-self: center;
   width: 220px;
-  height: 128px;
+  height: 200px;
   border-radius: var(--radius-md);
   background: linear-gradient(
     100deg,
@@ -81,24 +73,6 @@
   );
   background-size: 200% 100%;
   animation: skeletonShimmer 1.4s ease-in-out infinite;
-}
-
-.skeletonLine {
-  width: 78%;
-  height: 12px;
-  border-radius: 6px;
-  background: linear-gradient(
-    100deg,
-    var(--surface-muted, #f0efe9) 30%,
-    rgba(255, 255, 255, 0.6) 50%,
-    var(--surface-muted, #f0efe9) 70%
-  );
-  background-size: 200% 100%;
-  animation: skeletonShimmer 1.4s ease-in-out infinite;
-}
-
-.skeletonLineShort {
-  width: 45%;
 }
 
 @keyframes skeletonShimmer {
@@ -111,8 +85,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeletonGrid,
-  .skeletonLine {
+  .skeletonGrid {
     animation: none;
   }
 }
@@ -132,15 +105,32 @@
   font-weight: 500;
 }
 
-.stat[data-loading="true"] strong {
-  opacity: 0.7;
+.stat[data-loading] {
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
-.stat[data-loading="true"]::after {
-  content: " (preparing…)";
+/* Direction-aware colour on the % value in the odds sentence so the
+ * reader clocks direction at a glance without parsing the word.
+ * Up (heat elevates odds — the expected heat-hazard signal) uses a
+ * warm burnt-orange; down (heat lowers odds — often a small-sample
+ * spline dip at high temperatures in a division fit) uses a cool
+ * teal. Both are distinct from the panel's default maroon so the two
+ * cases are visually unmistakable. */
+.statValueUp {
+  color: var(--color-burnt-orange, #b64d1a);
+}
+
+.statValueDown {
+  color: var(--color-teal, #276674);
+}
+
+.afHint {
+  margin: calc(-1 * var(--space-2)) 0 0;
   color: var(--color-text-muted);
   font-size: var(--fs-caption);
-  font-weight: 400;
+  line-height: var(--lh-body);
+  text-align: center;
 }
 
 .precisionRow {
@@ -158,7 +148,7 @@
 .tempReadout {
   margin: 0;
   text-align: center;
-  color: var(--color-maroon);
+  color: var(--color-blue, #1c4e9a);
   font-family: var(--font-display);
   font-size: var(--fs-h3);
   font-weight: 500;
@@ -177,88 +167,12 @@
   color: var(--color-text-muted);
 }
 
-.sliderNote {
-  margin: var(--space-1) 0 0;
-  font-size: var(--fs-caption);
-  color: var(--color-text-muted);
-  text-align: center;
-}
-
-.estimateTag {
-  margin-left: 0.4rem;
-  padding: 1px 6px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-body);
-  font-size: 0.65rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  background: var(--surface-muted);
-  vertical-align: middle;
-}
-
 .footnote {
   margin: var(--space-2) 0 0;
-  font-size: var(--fs-caption);
-  color: var(--color-text-muted);
-  text-align: center;
-  line-height: var(--lh-body);
-}
-
-.tempPills {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  justify-content: center;
-}
-
-.tempPill {
-  display: inline-flex;
-  gap: var(--space-1);
-  padding: 4px var(--space-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-  background: var(--surface-muted);
-  font-size: var(--fs-caption);
-  color: var(--color-charcoal);
-}
-
-.tempPill strong {
-  color: var(--color-text-muted);
-  font-weight: 500;
-  font-family: var(--font-display);
-}
-
-.modelReadout {
-  margin: 0;
-  text-align: center;
-  font-size: var(--fs-body-sm);
-  color: var(--color-text-muted);
-}
-
-.modelReadout strong {
-  color: var(--color-maroon);
-  font-family: var(--font-display);
-}
-
-.explorerHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
   padding-top: var(--space-3);
-  border-top: 1px dashed var(--border-subtle);
-}
-
-.explorerLabel {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-eyebrow);
-  letter-spacing: var(--ls-eyebrow);
-  text-transform: uppercase;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--fs-caption);
   color: var(--color-text-muted);
+  text-align: left;
+  line-height: var(--lh-body);
 }

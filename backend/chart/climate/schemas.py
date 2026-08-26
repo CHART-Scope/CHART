@@ -86,6 +86,7 @@ class PlaceResponse(BaseModel):
     path: str
     supports_prediction: bool
     model_version: str | None = None
+    model_area_name: str | None = None
 
 
 class ClimateMonthResponse(BaseModel):
@@ -273,34 +274,69 @@ class HealthResponse(BaseModel):
 class WhatIfRequest(BaseModel):
     geography_id: str = Field(min_length=1)
     temperature_c: float = Field(ge=-30, le=60)
+    outcome: str = Field(default="lbw", min_length=1)
 
 
 class WhatIfResponse(BaseModel):
-    """Mirrors the R service /predict response so the dashboard has the same
-    shape as the reference `pipelines/models/lbw/web/index.html` demo. Fields
-    the UI does not render today are still returned so the visuals can pull
-    them in without another round-trip."""
+    """Mirrors the R service /predict response. Fields the UI does not render
+    today are still returned so the visuals can pull them in without another
+    round-trip."""
 
     model_config = ConfigDict(allow_inf_nan=False)
 
     geography_id: str
     temperature_c: float
+    outcome: str = "lbw"
     area: str
     geography_level: str
-    pregnancy_window: PregnancyWindow
-    tmax_lag: list[float] = Field(min_length=3, max_length=3)
+    pregnancy_window: PregnancyWindow | None = None
+    exposure_values_c: list[float] = Field(default_factory=list, min_length=1)
+    tmax_lag: list[float] = Field(default_factory=list)
     reference_temperature_c: float
+    effect_measure: str = "odds_ratio"
     odds_ratio: float = Field(gt=0)
     ci95_low: float = Field(gt=0)
     ci95_high: float = Field(gt=0)
-    attributable_fraction_percent: float = Field(ge=0, le=100)
+    attributable_fraction_percent: float = Field(
+        ge=0,
+        le=100,
+        description="Positive-excess attributable fraction; zero when odds ratio <= 1.",
+    )
+    relative_odds_change_percent: float = Field(
+        ge=-100,
+        description=(
+            "Signed change in modelled odds relative to the fitted reference. "
+            "Collapses to 0.0 only when the query temperature is *below* the "
+            "reference AND the release's output_contract.attributable_fraction "
+            "is 'positive_excess_only'. Above-reference readings are reported "
+            "at full precision, including OR<1 outputs from unstable "
+            "small-sample division fits — they represent what the runtime "
+            "actually computed, not a policy suppression. The floor is -100 "
+            "(inclusive) — reachable when a fit returns OR=0 (numerical "
+            "underflow); strict gt=-100 would 500 the endpoint at that edge."
+        ),
+    )
     on_training_support: bool
     warning: str | None = None
+    n_model_rows: int | None = None
     n_training: int | None = None
+    n_events: int | None = None
+    n_subjects: int | None = None
     modelled_temperature_range_c: list[float] | None = Field(
-        default=None, min_length=2, max_length=2
+        default=None,
+        min_length=2,
+        max_length=2,
+        description=(
+            "Location- and model-window-specific fitted basis support copied from "
+            "the modeller artifact Boundary.knots."
+        ),
     )
     model_version: str = Field(min_length=1)
+    climate_hazard_label: str | None = None
+    health_domain_label: str | None = None
+    outcome_label: str | None = None
+    dashboard_title: str | None = None
+    population_label: str | None = None
 
     @model_validator(mode="after")
     def validate_confidence_interval(self):

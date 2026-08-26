@@ -269,19 +269,26 @@ def load_era5_monthly_frame(
     *,
     preset_slug: str,
     admin_unit_code: str | None = None,
+    admin_unit_id: int | None = None,
     df: pd.DataFrame,
     meta: dict,
     csv_path: str,
     allow_sample: bool = False,
 ) -> ClimateRun:
     """Upsert one observed ERA5 run and monthly district_climate rows."""
-    geographies = ensure_mvp_geographies(session)
-    if preset_slug not in geographies:
-        raise KeyError(f"unknown preset slug: {preset_slug}")
-
-    geography, default_admin_unit = geographies[preset_slug]
-    admin_unit = default_admin_unit
-    if admin_unit_code is not None:
+    if admin_unit_id is not None:
+        admin_unit = session.get(AdminUnit, admin_unit_id)
+        if admin_unit is None:
+            raise KeyError(f"unknown admin unit id: {admin_unit_id}")
+        geography = session.get(Geography, admin_unit.geography_id)
+        if geography is None:
+            raise KeyError(f"unknown geography for admin unit: {admin_unit_id}")
+    else:
+        geographies = ensure_mvp_geographies(session)
+        if preset_slug not in geographies:
+            raise KeyError(f"unknown preset slug: {preset_slug}")
+        geography, admin_unit = geographies[preset_slug]
+    if admin_unit_code is not None and admin_unit_id is None:
         selected_admin_unit = session.scalar(
             select(AdminUnit).where(
                 AdminUnit.geography_id == geography.id,

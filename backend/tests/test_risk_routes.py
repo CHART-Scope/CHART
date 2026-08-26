@@ -15,7 +15,7 @@ from chart.api.app import app
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import require_current_user
 from chart.risk import routes as risk_routes
-from chart.risk import service as risk_service
+from chart.risk.precision import precision_for_ci
 from chart.shared.db.base import Base
 from chart.shared.db.models import (
     AdminUnit,
@@ -139,8 +139,9 @@ def _seed_dashboard_fixture(session: Session) -> None:
                 "m6",
                 date(2027, 1, 1),
                 rr=1180,
-                low=1120,
-                high=1240,
+                # CI ratio 3000/1000 = 3.0 falls in the MODERATE band.
+                low=1000,
+                high=3000,
                 af=153,
                 an=230,
             ),
@@ -342,6 +343,13 @@ def test_short_term_rejects_unauthenticated_client() -> None:
 
 
 def test_precision_thresholds_match_intent() -> None:
-    assert risk_service._precision_for_ci(1150, 1200) == "high"
-    assert risk_service._precision_for_ci(1130, 1330) == "moderate"
-    assert risk_service._precision_for_ci(1100, 1500) == "low"
+    # CI ratio ≤ 2.5 -> high (no indication of substantial imprecision)
+    assert precision_for_ci(1000, 2500) == "high"
+    assert precision_for_ci(1.15, 1.30) == "high"
+    # 2.5 < CI ratio ≤ 5 -> moderate (potential imprecision)
+    assert precision_for_ci(1000, 3000) == "moderate"
+    assert precision_for_ci(1000, 5000) == "moderate"
+    # CI ratio > 5 -> low (imprecise / wide confidence interval)
+    assert precision_for_ci(1000, 6000) == "low"
+    # Non-positive lower bound falls into the LOW bucket without dividing by zero.
+    assert precision_for_ci(0, 1000) == "low"

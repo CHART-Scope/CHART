@@ -2,6 +2,7 @@ import type {
   OnboardingState,
   SetupSector,
 } from "@/features/onboarding/OnboardingWizard";
+import type { SetupCountryOption } from "@/features/onboarding/data/geo";
 
 export type { SetupSector };
 
@@ -22,6 +23,7 @@ export type SetupStatus = {
 
 export type SetupOptions = {
   sectors?: SetupSector[];
+  geographies?: SetupCountryOption[];
 };
 
 export type ActionRepositoryStatus = {
@@ -73,11 +75,14 @@ export async function loadActionRepository() {
   return (await response.json()) as ActionRepositoryStatus;
 }
 
-export async function bootstrapChartSetup(state: OnboardingState) {
+export async function bootstrapChartSetup(
+  state: OnboardingState,
+  geographyCatalog: SetupCountryOption[],
+) {
   const response = await fetch("/api/setup/bootstrap", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(toBootstrapInput(state)),
+    body: JSON.stringify(toBootstrapInput(state, geographyCatalog)),
     signal: AbortSignal.timeout(30_000),
   });
 
@@ -91,7 +96,10 @@ export async function bootstrapChartSetup(state: OnboardingState) {
   return (await response.json()) as BootstrapSetupResult;
 }
 
-function toBootstrapInput(state: OnboardingState) {
+function toBootstrapInput(
+  state: OnboardingState,
+  geographyCatalog: SetupCountryOption[],
+) {
   if (
     !state.country ||
     !state.level ||
@@ -104,44 +112,42 @@ function toBootstrapInput(state: OnboardingState) {
     throw new Error("Complete every setup step before launching CHART.");
   }
 
-  const countryCode = state.country === "India" ? "IN" : "KE";
-  const countrySlug = slugify(state.country);
-  const rootId = `geo-${countryCode.toLowerCase()}`;
-  const geographyLevelLabel = state.country === "India" ? "State" : "County";
-  const hasFirstLevel = state.level !== "National";
-  const firstId = `geo-${countryCode.toLowerCase()}-${slugify(state.geo)}`;
-  const firstPath = `/${countrySlug}/${slugify(state.geo)}`;
-  const geographies = hasFirstLevel
-    ? [
-        {
-          id: firstId,
-          level: "geo_level_1",
-          levelLabel: geographyLevelLabel,
-          name: state.geo,
-          parentId: rootId,
-          path: firstPath,
-          sortOrder: 10,
-        },
-      ]
-    : [];
-
-  if (state.subgeo) {
-    geographies.push({
-      id: `${firstId}-${slugify(state.subgeo)}`,
-      level: "geo_level_2",
-      levelLabel: state.country === "India" ? "District" : "Sub-county",
-      name: state.subgeo,
-      parentId: firstId,
-      path: `${firstPath}/${slugify(state.subgeo)}`,
-      sortOrder: 20,
-    });
+  const country = geographyCatalog.find(
+    (option) => option.countryName === state.country,
+  );
+  if (!country) throw new Error("The selected country is no longer configured.");
+  const selectedName = state.subgeo ?? state.geo;
+  const selected = country.places.find(
+    (place) => place.name === selectedName && place.levelLabel === state.level,
+  );
+  if (!selected) throw new Error("The selected geography is no longer configured.");
+  const byCode = new Map(country.places.map((place) => [place.placeCode, place]));
+  const chain = [selected];
+  let parentCode = selected.parentPlaceCode;
+  while (parentCode) {
+    const parent = byCode.get(parentCode);
+    if (!parent) throw new Error("The selected geography hierarchy is incomplete.");
+    chain.unshift(parent);
+    parentCode = parent.parentPlaceCode;
   }
+  const geographies = chain.map((place) => ({
+    id: place.id,
+    level: place.level,
+    levelLabel: place.levelLabel,
+    name: place.name,
+    parentId:
+      place.parentPlaceCode === null
+        ? country.rootId
+        : byCode.get(place.parentPlaceCode)?.id,
+    path: place.path,
+    sortOrder: place.sortOrder,
+  }));
 
   const adminEmail = state.adminEmail.trim().toLowerCase();
   return {
-    countryCode,
-    countryName: state.country,
-    geographyLevelLabel,
+    countryCode: country.countryCode,
+    countryName: country.countryName,
+    geographyLevelLabel: chain[0].levelLabel,
     geographies,
     primarySectorId: state.primarySectorId,
     collaboratingSectorIds: [...state.collaboratingSectorIds],
@@ -170,6 +176,29 @@ export async function resetInstallation(accessToken: string) {
   return (await response.json()) as SetupStatus;
 }
 
+export async function syncInstalledModels(accessToken: string) {
+  const response = await fetch("/api/setup/models/sync", {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+    signal: AbortSignal.timeout(45_000),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+    throw new Error(
+      body?.error === "SETUP_MODEL_PREPARATION_FAILED"
+        ? "A model artifact could not be verified and prepared."
+        : "CHART could not check for model updates.",
+    );
+  }
+  return (await response.json()) as {
+    activeReleaseIds: string[];
+    assignmentCount: number;
+  };
+}
+
 function resetErrorMessage(code?: string) {
   switch (code) {
     case "SETUP_FORBIDDEN":
@@ -183,15 +212,6 @@ function resetErrorMessage(code?: string) {
   }
 }
 
-function slugify(value: string) {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
 function setupErrorMessage(code?: string) {
   switch (code) {
     case "SETUP_BOOTSTRAP_LOCKED":
@@ -199,9 +219,9 @@ function setupErrorMessage(code?: string) {
     case "SETUP_BOOTSTRAP_IN_PROGRESS":
       return "A CHART setup attempt is already running. Wait a few minutes and retry.";
     case "SETUP_BOOTSTRAP_REQUEST_MISMATCH":
-      return "A previous setup attempt is stuck with a different payload. Reset the installation in the database and try again.";
+      return "Another setup request is still running with different details. Wait a moment, then try again.";
     case "SETUP_PROVISIONING_LOST":
-      return "The CHART setup session was interrupted. Reset the installation and try again.";
+      return "The CHART setup session was interrupted. Try launching setup again.";
     case "SETUP_ADMIN_PASSWORD_REQUIRED":
     case "SETUP_IDENTITY_PASSWORD_REJECTED":
       return "Use an administrator password with at least eight characters.";
@@ -211,6 +231,8 @@ function setupErrorMessage(code?: string) {
       return "Choose the primary sector for this CHART installation.";
     case "SETUP_SECTOR_INVALID":
       return "One of the selected sectors is no longer available. Reload and choose again.";
+    case "SETUP_GEOGRAPHY_MODEL_UNAVAILABLE":
+      return "The selected geography does not have an installed model. Reload and choose an available area.";
     case "SETUP_IDENTITY_ADMIN_AUTH_FAILED":
     case "SETUP_IDENTITY_CONFIG_INVALID":
     case "SETUP_IDENTITY_CLIENT_MISSING":
@@ -220,6 +242,8 @@ function setupErrorMessage(code?: string) {
     case "SETUP_IDENTITY_UNAVAILABLE":
     case "SETUP_IDENTITY_USER_CREATE_FAILED":
       return "CHART could not create the first administrator in Keycloak. Try again.";
+    case "SETUP_MODEL_PREPARATION_FAILED":
+      return "One or more installed models could not be verified and started. Check the model service and artifacts, then retry setup.";
     case "SETUP_SERVICE_UNAVAILABLE":
       return "The CHART setup service is unavailable. Check that the application API is running.";
     default:

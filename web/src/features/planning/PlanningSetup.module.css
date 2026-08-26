@@ -1,29 +1,6 @@
 .wrap {
   max-width: 780px;
-  margin: 0 auto;
   padding-top: var(--space-4);
-}
-
-.breadcrumb {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.35rem 0.75rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  background: var(--surface-card);
-  color: var(--color-text-muted);
-  font-size: var(--fs-caption);
-  margin-bottom: var(--space-5);
-}
-
-.breadcrumb strong {
-  color: var(--color-charcoal);
-  font-weight: 500;
-}
-
-.breadcrumb :global(svg) {
-  color: var(--color-text-muted);
 }
 
 .header {
@@ -37,6 +14,14 @@
   font-size: 24px;
   font-weight: 500;
   letter-spacing: -0.02em;
+}
+
+.contextRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) 0 var(--space-4);
 }
 
 .header p {
@@ -132,27 +117,19 @@
   outline-offset: 2px;
 }
 
-.areaSwitcher {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  font-size: var(--fs-caption);
-  color: var(--color-text-muted);
-}
-
-.areaSwitcher select {
-  padding: 6px 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--color-white);
-  font: inherit;
-  color: var(--color-charcoal);
-}
-
 .error {
   padding: var(--space-3) var(--space-4);
   border-left: 3px solid var(--color-amber);
   background: rgba(201, 102, 47, 0.08);
+  color: var(--color-charcoal);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-body);
+}
+
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--color-nexus);
+  background: var(--color-nexus-tint);
   color: var(--color-charcoal);
   font-size: var(--fs-caption);
   line-height: var(--lh-body);

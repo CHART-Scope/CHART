@@ -21,6 +21,7 @@ type Actions = {
   record: (event: AuditEventInput) => void;
   takeBatch: (limit: number) => AuditEvent[];
   ackFlush: (uptoClientSeq: number) => void;
+  resetSession: () => void;
 };
 
 export const useAuditStore = createPersistedStore<State & Actions, State>(
@@ -53,6 +54,12 @@ export const useAuditStore = createPersistedStore<State & Actions, State>(
       set((state) => ({
         pending: state.pending.filter((event) => event.client_seq > uptoClientSeq),
       })),
+    resetSession: () =>
+      set({
+        sessionId: newId(),
+        nextSeq: 0,
+        pending: [],
+      }),
   }),
   {
     name: "chart:audit",
@@ -68,4 +75,8 @@ export const useAuditStore = createPersistedStore<State & Actions, State>(
 
 export function recordAuditEvent(event: AuditEventInput): void {
   useAuditStore.getState().record(event);
+}
+
+export function resetAuditSession(): void {
+  useAuditStore.getState().resetSession();
 }

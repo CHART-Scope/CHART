@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import os
 from contextlib import asynccontextmanager
+from contextlib import suppress
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -20,7 +23,10 @@ from chart.climate.schemas import ErrorResponse, HealthResponse
 from chart.erf_registry.routes import router as erf_registry_router
 from chart.setup.bootstrap_routes import router as bootstrap_router
 from chart.geographies.routes import router as geographies_router
-from chart.model_registry.routes import router as model_catalog_router
+from chart.model_registry.routes import (
+    releases_router as model_releases_router,
+    router as model_catalog_router,
+)
 from chart.risk.routes import router as risk_router
 from chart.setup.routes import router as setup_router
 from chart.solution_repository.hazards import router as hazards_router
@@ -40,11 +46,55 @@ available, while HTTP 202 means Dagster has queued background work. Swagger is
 available at `/docs` and ReDoc at `/redoc`.
 """
 
+logger = logging.getLogger(__name__)
+
+
+async def _restore_models_after_startup() -> None:
+    """Retry until the database and model runtime are both ready."""
+
+    delay_seconds = 1
+    while True:
+        try:
+            from chart.setup.service import restore_deployed_models
+
+            await asyncio.to_thread(restore_deployed_models)
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 - retry handles service start order
+            logger.exception(
+                "Model release restoration failed; retrying in %s seconds",
+                delay_seconds,
+            )
+            await asyncio.sleep(delay_seconds)
+            delay_seconds = min(30, delay_seconds * 2)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    yield
-    dispose_engines()
+    # The R runtime intentionally starts with an empty in-memory cache. On API
+    # startup, reconcile immutable manifests and warm every installed artifact
+    # so a service restart does not leave active DB assignments unscoreable.
+    restore_task: asyncio.Task[None] | None = None
+    try:
+        from chart.setup.service import restore_deployed_models
+
+        # When the runtime is already available, complete reconciliation before
+        # accepting traffic so the first slider request cannot observe a stale
+        # assignment. If service start order prevents that, accept non-model
+        # traffic and keep retrying in the background.
+        await asyncio.to_thread(restore_deployed_models)
+    except Exception:  # noqa: BLE001 - background retry handles start order
+        logger.exception("Initial model release restoration failed")
+        restore_task = asyncio.create_task(_restore_models_after_startup())
+    try:
+        yield
+    finally:
+        if restore_task is not None:
+            restore_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await restore_task
+        dispose_engines()
 
 
 class ChartFastAPI(FastAPI):
@@ -73,6 +123,7 @@ app.include_router(workspaces_router)
 app.include_router(risk_router)
 app.include_router(erf_registry_router)
 app.include_router(model_catalog_router)
+app.include_router(model_releases_router)
 app.include_router(bootstrap_router)
 app.include_router(audit_router)
 
@@ -97,6 +148,7 @@ def _expected_alembic_head() -> str:
 
     ini_path = Path(__file__).resolve().parents[2] / "alembic.ini"
     config = Config(str(ini_path))
+    config.set_main_option("script_location", str(ini_path.parent / "alembic"))
     script_dir = ScriptDirectory.from_config(config)
     head = script_dir.get_current_head()
     if head is None:
@@ -117,9 +169,11 @@ def ready() -> HealthResponse:
                 raise RuntimeError(
                     f"database revision is {revision!r}; expected {expected_head!r}"
                 )
+            from chart.inference.env import resolve_lbw_service_url
+
             if (
                 os.getenv("CHART_REQUIRE_ACTIVE_MODEL", "0") == "1"
-                or os.getenv("INFERENCE_LBW_BASE_URL", "").strip()
+                or resolve_lbw_service_url().strip()
             ):
                 assignments = session.scalar(
                     text("SELECT count(*) FROM active_model_assignment")
@@ -127,6 +181,7 @@ def ready() -> HealthResponse:
                 if not assignments:
                     raise RuntimeError("no active model assignment")
     except Exception as error:
+        logger.warning("readiness_check_failed: %r", error)
         raise HTTPException(status_code=503, detail="SERVICE_NOT_READY") from error
     return HealthResponse(status="ok")
 
@@ -166,6 +221,13 @@ def export_openapi(output_path: Path) -> Path:
 
 def main() -> None:
     import uvicorn
+    from dotenv import load_dotenv
+
+    # backend/.env is where operators are expected to keep local overrides
+    # (feature flags, model catalog toggles). Load it before reading any env
+    # so edits to that file actually reach the process without also touching
+    # the Makefile launcher.
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "3210"))

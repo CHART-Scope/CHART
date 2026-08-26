@@ -172,6 +172,133 @@
   letter-spacing: 0.05em;
 }
 
+.modelMapping {
+  max-width: 620px;
+  margin-top: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--color-nexus);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--color-white);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.modelMapping > strong,
+.modelMapping > span {
+  display: block;
+}
+
+.modelMapping > strong {
+  color: var(--color-charcoal);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.modelMapping > span {
+  margin-top: 2px;
+}
+
+.modelMapping ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.modelMapping b {
+  color: var(--color-charcoal);
+  font-weight: 500;
+}
+
+.mappingDirectory,
+.mappingUnavailable {
+  max-width: 620px;
+  margin: 4px 0 20px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mappingDirectory {
+  border: 1px solid var(--border-subtle);
+  background: var(--color-white);
+}
+
+.mappingDirectory > strong,
+.mappingUnavailable > strong {
+  display: block;
+  color: var(--color-charcoal);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mappingDirectory > p {
+  margin: 3px 0 10px;
+  color: var(--color-text-muted);
+}
+
+.mappingAreas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.mappingAreas span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--color-nexus-tint);
+  color: var(--color-nexus);
+  font-size: 11px;
+}
+
+.mappingDirectory details {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 9px;
+}
+
+.mappingDirectory summary {
+  color: var(--color-charcoal);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.mappingDirectory ul {
+  max-height: 190px;
+  margin: 9px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.mappingDirectory li {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.7fr) minmax(220px, 1.3fr);
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.mappingDirectory li b {
+  color: var(--color-charcoal);
+  font-weight: 500;
+}
+
+.mappingDirectory li span {
+  color: var(--color-text-muted);
+}
+
+.mappingUnavailable {
+  border-left: 3px solid var(--color-amber);
+  background: rgba(201, 102, 47, 0.08);
+  color: var(--color-text-muted);
+}
+
 .whyBox {
   border-left: 3px solid var(--color-maroon);
   padding: 12px 16px;

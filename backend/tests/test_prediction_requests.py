@@ -259,7 +259,7 @@ def _claim(session_factory, request_id: int, run_id: str) -> str:
 
 
 def test_submit_creates_one_durable_request_without_scoring(session_factory) -> None:
-    with patch("chart.climate.service.score_lbw") as score:
+    with patch("chart.climate.service.score_lbw_model") as score:
         first = submit_prediction(
             _request(), session_factory=session_factory, now=TEST_NOW
         )
@@ -386,7 +386,7 @@ def test_model_cannot_run_before_three_climate_rows_are_saved(session_factory) -
     accepted = submit_prediction(_request(), session_factory=session_factory)
 
     with (
-        patch("chart.climate.service.score_lbw") as score,
+        patch("chart.climate.service.score_lbw_model") as score,
         pytest.raises(ClimateServiceError, match="CLIMATE_DATA_NOT_READY"),
     ):
         complete_prediction_request(
@@ -408,20 +408,24 @@ def test_saved_climate_window_is_the_only_input_sent_to_model(session_factory) -
         session_factory=session_factory,
         now=TEST_NOW,
     )
-    with patch("chart.climate.service.score_lbw", return_value=_score()) as score:
+    with patch("chart.climate.service.score_lbw_model", return_value=_score()) as score:
         result = complete_prediction_request(
             accepted.request_id,
             lease_token=lease_token,
             session_factory=session_factory,
         )
 
-    score.assert_called_once_with(
-        model_area="Madhya Pradesh",
+    score.assert_called_once()
+    scored_model = score.call_args.args[0]
+    assert scored_model.release_id == "lbw-demo-v1"
+    assert scored_model.model_file == "state.rds"
+    assert scored_model.version == "1.0.0"
+    assert scored_model.artifact_sha256 == "a" * 64
+    assert scored_model.model_area_name == "Madhya Pradesh"
+    assert score.call_args.kwargs == dict(
         pregnancy_window=1,
         temperatures_c=(29.1, 30.4, 31.2),
         service_url=None,
-        expected_model_version="1.0.0",
-        expected_model_sha256="a" * 64,
     )
     assert result.request_status == "completed"
     assert result.availability.input_window_id == window_id
@@ -471,7 +475,9 @@ def test_one_planning_request_scores_all_three_pregnancy_stages(
             }
         )
 
-    with patch("chart.climate.service.score_lbw", side_effect=score_for_stage) as score:
+    with patch(
+        "chart.climate.service.score_lbw_model", side_effect=score_for_stage
+    ) as score:
         result = complete_prediction_request(
             accepted.request_id,
             lease_token=lease_token,
@@ -687,7 +693,7 @@ def test_numeric_result_is_saved_before_optional_explanation(session_factory) ->
         return "Saved result explained in plain language."
 
     with (
-        patch("chart.climate.service.score_lbw", return_value=_score()),
+        patch("chart.climate.service.score_lbw_model", return_value=_score()),
         patch(
             "chart.climate.requests.explain_if_configured",
             side_effect=explain_after_commit,

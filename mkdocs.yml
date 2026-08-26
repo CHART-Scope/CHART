@@ -69,6 +69,8 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Installation setup: installation-setup.md
+  - Architecture:
+      - System requirements and capacity: system-architecture-and-requirements.md
   - Infrastructure:
       - AWS sandbox deployment: aws-sandbox.md
   - Python backend:
@@ -78,6 +80,7 @@ nav:
       - API explorer: api-reference.md
   - Modeling:
       - Overview: modeling.md
+      - Model releases: model-updates.md
       - Health input contract: health-input-contract.md
       - Survey exploration guide: health-survey-exploration-guide.md
   - Data pipeline: data-pipeline.md

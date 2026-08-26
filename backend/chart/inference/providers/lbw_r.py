@@ -24,23 +24,100 @@ class LbwProviderError(RuntimeError):
 def call_lbw_r(
     base_url: str,
     *,
+    model_release_id: str,
+    model_file: str,
+    model_version: str,
+    model_sha256: str,
     model_area: str,
     pregnancy_window: int,
     temperatures_c: tuple[float, float, float],
+    reference_temperature_c: float | None = None,
 ) -> dict:
+    body: dict[str, object] = {
+        "release_id": model_release_id,
+        "model_file": model_file,
+        "model_version": model_version,
+        "model_sha256": model_sha256,
+        "area": model_area,
+        "trimester": pregnancy_window,
+        "tmax_lag": list(temperatures_c),
+    }
+    if reference_temperature_c is not None:
+        # api_registry.R:150 honours "ref" as the DLNM crosspred anchor;
+        # every scored block re-anchors at this temperature instead of
+        # using the bundled per-block MMT.
+        body["ref"] = float(reference_temperature_c)
+    return call_compact_r(
+        base_url,
+        body=body,
+        required={
+            "area",
+            "geography_level",
+            "tmax_lag",
+            "ref_temp",
+            "odds_ratio",
+            "ci95_low",
+            "ci95_high",
+            "on_training_support",
+            "model_file",
+            "model_version",
+            "model_sha256",
+        },
+    )
+
+
+def call_association_r(
+    base_url: str,
+    *,
+    model_release_id: str,
+    model_file: str,
+    model_version: str,
+    model_sha256: str,
+    model_area: str,
+    outcome: str,
+    exposure_values_c: tuple[float, ...],
+    reference_temperature_c: float | None = None,
+) -> dict:
+    body: dict[str, object] = {
+        "release_id": model_release_id,
+        "model_file": model_file,
+        "model_version": model_version,
+        "model_sha256": model_sha256,
+        "area": model_area,
+        "outcome": outcome,
+        "exposure_values_c": list(exposure_values_c),
+    }
+    if reference_temperature_c is not None:
+        body["ref"] = float(reference_temperature_c)
+    return call_compact_r(
+        base_url,
+        body=body,
+        required={
+            "area",
+            "geography_level",
+            "outcome",
+            "exposure_values_c",
+            "ref_temp",
+            "effect_measure",
+            "odds_ratio",
+            "ci95_low",
+            "ci95_high",
+            "on_training_support",
+            "model_file",
+            "model_version",
+            "model_sha256",
+        },
+    )
+
+
+def call_compact_r(base_url: str, *, body: dict, required: set[str]) -> dict:
     global _circuit_failures, _circuit_open_until
 
-    body = json.dumps(
-        {
-            "area": model_area,
-            "trimester": pregnancy_window,
-            "tmax_lag": list(temperatures_c),
-        }
-    ).encode("utf-8")
-    idempotency_key = hashlib.sha256(body).hexdigest()
+    encoded_body = json.dumps(body).encode("utf-8")
+    idempotency_key = hashlib.sha256(encoded_body).hexdigest()
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/predict",
-        data=body,
+        data=encoded_body,
         method="POST",
         headers={
             "Content-Type": "application/json",
@@ -86,19 +163,6 @@ def call_lbw_r(
     else:
         raise LbwProviderError("LBW_SERVICE_UNAVAILABLE")
 
-    required = {
-        "area",
-        "geography_level",
-        "tmax_lag",
-        "ref_temp",
-        "odds_ratio",
-        "ci95_low",
-        "ci95_high",
-        "on_training_support",
-        "model_file",
-        "model_version",
-        "model_sha256",
-    }
     missing = sorted(required - set(payload))
     if missing:
         raise LbwProviderError("LBW_RESPONSE_INVALID", ", ".join(missing))

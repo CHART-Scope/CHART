@@ -44,9 +44,31 @@ CHART_ADMIN_RECOVERY_PASSWORD='<new-password>' chart-admin-recover \
 
 ## Add a place or model
 
-Follow [Add a geography and model](../docs/add-geography-and-model.md). The
-model handoff file is
-[`pipelines/models/lbw/model-release.example.json`](../pipelines/models/lbw/model-release.example.json).
+Follow [Add a geography and model](../docs/add-geography-and-model.md). A
+worked example lives at
+[`pipelines/models/lbw/model-release.kenya.review.json`](../pipelines/models/lbw/model-release.kenya.review.json).
+
+### Test the Kenya onboarding path locally
+
+Build the ignored Kenya compact artifact as documented in
+[`pipelines/models/lbw/README.md`](../pipelines/models/lbw/README.md),
+then run the normal stack:
+
+```bash
+make run
+```
+
+After an installation reset, choose **Kenya → County → Kajiado** or **Kenya →
+Sub-county** and one of Kajiado Central, East, North, South, or West. Local setup
+loads the tracked administrative boundaries, registers the review manifest,
+verifies the cached artifact, warms it in the internal Plumber registry runtime,
+and activates each place's explicit South-eastern mapping. Climate ingestion
+uses the selected administrative polygon; inference uses the shared
+climate-zone response curve. The planning web does not read the RDS or call the
+model-control endpoint directly.
+
+This path is enabled locally with `CHART_ENABLE_REVIEW_MODELS=true`. Do not set
+that flag in production; the Kenya release still requires modeller approval.
 
 ## Invitation emails
 
