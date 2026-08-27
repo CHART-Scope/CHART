@@ -354,3 +354,153 @@ def test_lbw_provider_reports_an_unavailable_service_clearly() -> None:
         )
 
     assert caught.value.code == "LBW_SERVICE_UNAVAILABLE"
+
+
+def test_circuit_reopens_but_half_open_probe_can_close_it(monkeypatch) -> None:
+    """After the wait window expires the next call runs as a probe. A
+    successful probe closes the circuit end-to-end (counter resets); a
+    failing probe re-opens the circuit for the same wait without
+    carrying a stale counter that would immediately re-trip on the
+    request after that."""
+
+    from chart.inference.providers import lbw_r
+
+    lbw_r.reset_circuit()
+    monkeypatch.setenv("INFERENCE_LBW_CIRCUIT_FAILURES", "2")
+    monkeypatch.setenv("INFERENCE_LBW_CIRCUIT_SECONDS", "1")
+    monkeypatch.setenv("INFERENCE_LBW_ATTEMPTS", "1")
+
+    # Two failures trip the breaker (threshold=2).
+    with patch(
+        "chart.inference.providers.lbw_r.urllib.request.urlopen",
+        side_effect=urllib.error.URLError("down"),
+    ):
+        for _ in range(2):
+            with pytest.raises(LbwProviderError):
+                call_lbw_r(
+                    "http://lbw.test",
+                    model_release_id=MODEL_RELEASE_ID,
+                    model_file=MODEL_FILE,
+                    model_version=MODEL_VERSION,
+                    model_sha256=MODEL_SHA256,
+                    model_area="Madhya Pradesh",
+                    pregnancy_window=1,
+                    temperatures_c=(31.0, 30.0, 29.0),
+                )
+    # Circuit now open. Any call fails fast with LBW_CIRCUIT_OPEN.
+    with pytest.raises(LbwProviderError) as fast_fail:
+        call_lbw_r(
+            "http://lbw.test",
+            model_release_id=MODEL_RELEASE_ID,
+            model_file=MODEL_FILE,
+            model_version=MODEL_VERSION,
+            model_sha256=MODEL_SHA256,
+            model_area="Madhya Pradesh",
+            pregnancy_window=1,
+            temperatures_c=(31.0, 30.0, 29.0),
+        )
+    assert fast_fail.value.code == "LBW_CIRCUIT_OPEN"
+
+    # Sleep past the 1 s wait, then land a probe. A successful probe
+    # should close the circuit.
+    import time as _time
+
+    _time.sleep(1.1)
+    response = {
+        "area": "Madhya Pradesh",
+        "geography_level": "state",
+        "trimester": 1,
+        "tmax_lag": [31.0, 30.0, 29.0],
+        "ref_temp": 27.0,
+        "odds_ratio": 1.12,
+        "ci95_low": 1.02,
+        "ci95_high": 1.22,
+        "on_training_support": True,
+        "model_file": "state.rds",
+        "model_version": "1.0.0",
+        "model_sha256": "a" * 64,
+    }
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return json.dumps(response).encode("utf-8")
+
+    with patch(
+        "chart.inference.providers.lbw_r.urllib.request.urlopen",
+        return_value=FakeResponse(),
+    ):
+        result = call_lbw_r(
+            "http://lbw.test",
+            model_release_id=MODEL_RELEASE_ID,
+            model_file=MODEL_FILE,
+            model_version=MODEL_VERSION,
+            model_sha256=MODEL_SHA256,
+            model_area="Madhya Pradesh",
+            pregnancy_window=1,
+            temperatures_c=(31.0, 30.0, 29.0),
+        )
+    assert result["odds_ratio"] == 1.12
+    # Cleanup — release module state for adjacent tests.
+    lbw_r.reset_circuit()
+
+
+def test_reset_circuit_clears_state(monkeypatch) -> None:
+    from chart.inference.providers import lbw_r
+
+    monkeypatch.setenv("INFERENCE_LBW_CIRCUIT_FAILURES", "1")
+    monkeypatch.setenv("INFERENCE_LBW_ATTEMPTS", "1")
+    lbw_r.reset_circuit()
+    with patch(
+        "chart.inference.providers.lbw_r.urllib.request.urlopen",
+        side_effect=urllib.error.URLError("down"),
+    ):
+        with pytest.raises(LbwProviderError):
+            call_lbw_r(
+                "http://lbw.test",
+                model_release_id=MODEL_RELEASE_ID,
+                model_file=MODEL_FILE,
+                model_version=MODEL_VERSION,
+                model_sha256=MODEL_SHA256,
+                model_area="Madhya Pradesh",
+                pregnancy_window=1,
+                temperatures_c=(31.0, 30.0, 29.0),
+            )
+    # Circuit is now open — confirm the fast-fail path.
+    with pytest.raises(LbwProviderError) as blocked:
+        call_lbw_r(
+            "http://lbw.test",
+            model_release_id=MODEL_RELEASE_ID,
+            model_file=MODEL_FILE,
+            model_version=MODEL_VERSION,
+            model_sha256=MODEL_SHA256,
+            model_area="Madhya Pradesh",
+            pregnancy_window=1,
+            temperatures_c=(31.0, 30.0, 29.0),
+        )
+    assert blocked.value.code == "LBW_CIRCUIT_OPEN"
+    # Explicit reset — next call should attempt R again (and fail
+    # because R is still mocked-down, but with a different error code).
+    lbw_r.reset_circuit()
+    with patch(
+        "chart.inference.providers.lbw_r.urllib.request.urlopen",
+        side_effect=urllib.error.URLError("still down"),
+    ):
+        with pytest.raises(LbwProviderError) as after_reset:
+            call_lbw_r(
+                "http://lbw.test",
+                model_release_id=MODEL_RELEASE_ID,
+                model_file=MODEL_FILE,
+                model_version=MODEL_VERSION,
+                model_sha256=MODEL_SHA256,
+                model_area="Madhya Pradesh",
+                pregnancy_window=1,
+                temperatures_c=(31.0, 30.0, 29.0),
+            )
+    assert after_reset.value.code == "LBW_SERVICE_UNAVAILABLE"
+    lbw_r.reset_circuit()
