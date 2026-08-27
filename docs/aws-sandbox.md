@@ -161,9 +161,26 @@ files whose local copy already matches — so redeploys are cheap.
 
 The sync runs inside a throwaway `public.ecr.aws/aws-cli/aws-cli`
 container that mounts the volume at `/models`. This avoids host-side
-`chmod`/`sudo` on the Docker volume directory (owned by root) and
-inherits credentials from the EC2 instance profile via IMDS. The
-instance role therefore needs read access to the model bucket.
+`chmod`/`sudo` on the Docker volume directory (owned by root). The
+container runs with `--network host` so it can reach IMDS
+(169.254.169.254) through the host's network stack and pick up the EC2
+instance profile automatically — the default docker bridge blocks IMDS
+with `HttpPutResponseHopLimit=1`, so bridged containers hit "Unable to
+locate credentials". `AWS_ACCESS_KEY_ID` env vars (workstation runs) or
+a mounted `~/.aws` are used as fallbacks.
+
+The instance role therefore needs read access to the model bucket:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": ["s3:GetObject", "s3:ListBucket"],
+  "Resource": [
+    "arn:aws:s3:::chart-predictive-models",
+    "arn:aws:s3:::chart-predictive-models/*"
+  ]
+}
+```
 
 If the sync is skipped or the file names diverge, the app fails cleanly
 at startup with `MODEL_RELEASE_FILE_MISSING` (name not found under
