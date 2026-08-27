@@ -153,11 +153,17 @@ and are excluded from the deploy sync.
 
 `infra/aws/deploy-app.sh` walks every `pipelines/models/**/model-release.*.json`
 manifest at deploy time, extracts each `(base_uri, filename)` pair, and
-runs one scoped `aws s3 sync` into the host volume backing
-`chart-lbw-model:/models`. Only files the manifests actually reference
-are pulled; unrelated bucket objects (WIP releases, `archive/`) are
-ignored. The sync is idempotent — `aws s3 sync` skips files whose local
-copy already matches — so redeploys are cheap.
+runs a scoped `aws s3 sync` into the shared `chart-lbw-model` Docker
+volume before the R container starts. Only files the manifests actually
+reference are pulled; unrelated bucket objects (WIP releases,
+`archive/`) are ignored. The sync is idempotent — `aws s3 sync` skips
+files whose local copy already matches — so redeploys are cheap.
+
+The sync runs inside a throwaway `public.ecr.aws/aws-cli/aws-cli`
+container that mounts the volume at `/models`. This avoids host-side
+`chmod`/`sudo` on the Docker volume directory (owned by root) and
+inherits credentials from the EC2 instance profile via IMDS. The
+instance role therefore needs read access to the model bucket.
 
 If the sync is skipped or the file names diverge, the app fails cleanly
 at startup with `MODEL_RELEASE_FILE_MISSING` (name not found under

@@ -1812,6 +1812,28 @@
         }
       }
     },
+    "/model-releases/circuit/reset": {
+      "post": {
+        "tags": [
+          "model-releases"
+        ],
+        "summary": "Clear the LBW inference circuit breaker in this API process",
+        "description": "The R adapter's circuit breaker opens after INFERENCE_LBW_CIRCUIT_FAILURES consecutive failures (default 5) and stays open for INFERENCE_LBW_CIRCUIT_SECONDS (default 30). The half-open probe closes it automatically once R recovers, but an operator investigating after an outage can call this endpoint to skip the wait instead of restarting the API container. Only clears state in the calling process; other API replicas keep their own counter until reset individually or until their next half-open probe succeeds.",
+        "operationId": "reset_inference_circuit_model_releases_circuit_reset_post",
+        "responses": {
+          "200": {
+            "description": "Circuit state cleared for this process; the next inference call will attempt R directly. Status is 'cleared'.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CircuitResetResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/bootstrap-place": {
       "post": {
         "tags": [
@@ -2753,6 +2775,19 @@
           "items"
         ],
         "title": "CatalogResponse"
+      },
+      "CircuitResetResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "CircuitResetResponse"
       },
       "ClimateMonthResponse": {
         "properties": {

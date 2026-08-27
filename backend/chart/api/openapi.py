@@ -493,6 +493,26 @@ OPERATION_DOCUMENTATION: dict[
             )
         },
     ),
+    ("post", "/model-releases/circuit/reset"): OperationDocumentation(
+        summary="Clear the LBW inference circuit breaker in this API process",
+        description=(
+            "The R adapter's circuit breaker opens after "
+            "INFERENCE_LBW_CIRCUIT_FAILURES consecutive failures (default 5) "
+            "and stays open for INFERENCE_LBW_CIRCUIT_SECONDS (default 30). "
+            "The half-open probe closes it automatically once R recovers, but "
+            "an operator investigating after an outage can call this endpoint "
+            "to skip the wait instead of restarting the API container. Only "
+            "clears state in the calling process; other API replicas keep "
+            "their own counter until reset individually or until their next "
+            "half-open probe succeeds."
+        ),
+        success_responses={
+            "200": (
+                "Circuit state cleared for this process; the next inference "
+                "call will attempt R directly. Status is 'cleared'."
+            )
+        },
+    ),
     ("post", "/audit/events"): OperationDocumentation(
         summary="Batch-insert one user's client-buffered activity events",
         description=(

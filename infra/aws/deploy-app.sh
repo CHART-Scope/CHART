@@ -632,9 +632,11 @@ if [ -n "$LBW_ENABLED" ]; then
   # host. New releases only need: (1) manifest committed to the repo,
   # (2) rds uploaded to base_uri, (3) redeploy — no infra edit.
   MODEL_BUCKET="${MODEL_BUCKET:-chart-predictive-models}"
-  MODEL_VOLUME_DIR="/var/lib/docker/volumes/chart-lbw-model/_data"
-  mkdir -p "$MODEL_VOLUME_DIR"
-  echo "Syncing model artifacts from s3://$MODEL_BUCKET → $MODEL_VOLUME_DIR ..."
+  MODEL_REGION="${AWS_REGION:-eu-west-2}"
+  # Ensure the named volume exists so the sync + downstream containers
+  # can both mount it. `docker volume create` is idempotent.
+  docker volume create chart-lbw-model >/dev/null
+  echo "Syncing model artifacts from s3://$MODEL_BUCKET → chart-lbw-model:/models ..."
   # Read every manifest and construct include filters for each declared
   # (base_uri, filename) pair. This scopes the sync to files the app
   # actually loads, so stray bucket objects (archive, WIP releases) are
@@ -659,8 +661,16 @@ PY
   done < <(find "$APP_DIR/pipelines/models" -name "model-release*.json" -type f)
 
   if [ ${#include_flags[@]} -gt 0 ]; then
-    aws s3 sync \
-      "s3://$MODEL_BUCKET/" "$MODEL_VOLUME_DIR/" \
+    # Run the sync from inside a throwaway container that mounts the
+    # named volume — no host-side chmod/sudo required, and the AWS CLI
+    # image already ships with everything we need. Credentials come
+    # from the EC2 instance profile via IMDS (169.254.169.254), which
+    # the container inherits automatically.
+    docker run --rm \
+      -v chart-lbw-model:/models \
+      -e AWS_DEFAULT_REGION="$MODEL_REGION" \
+      public.ecr.aws/aws-cli/aws-cli:latest \
+      s3 sync "s3://$MODEL_BUCKET/" /models/ \
       --exclude "*" \
       "${include_flags[@]}"
   else

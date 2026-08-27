@@ -12,6 +12,13 @@ import urllib.request
 _circuit_lock = threading.Lock()
 _circuit_failures = 0
 _circuit_open_until = 0.0
+# Half-open probe token — while the circuit is in the half-open state,
+# exactly one request is allowed through as a probe. Its outcome flips
+# the circuit back to closed (success) or re-opens it (failure). Without
+# this, a stuck-down R runtime keeps the circuit permanently open even
+# after operators fix the underlying issue, because the counter carries
+# over between windows and one failure past the wait immediately re-opens.
+_circuit_probe_in_flight = False
 
 
 class LbwProviderError(RuntimeError):
@@ -19,6 +26,17 @@ class LbwProviderError(RuntimeError):
         super().__init__(f"{code}: {detail}" if detail else code)
         self.code = code
         self.detail = detail
+
+
+def reset_circuit() -> None:
+    """Clear the circuit breaker — reachable via an admin endpoint so
+    operators can unblock a sandbox without restarting the API process."""
+
+    global _circuit_failures, _circuit_open_until, _circuit_probe_in_flight
+    with _circuit_lock:
+        _circuit_failures = 0
+        _circuit_open_until = 0.0
+        _circuit_probe_in_flight = False
 
 
 def call_lbw_r(
@@ -111,7 +129,7 @@ def call_association_r(
 
 
 def call_compact_r(base_url: str, *, body: dict, required: set[str]) -> dict:
-    global _circuit_failures, _circuit_open_until
+    global _circuit_failures, _circuit_open_until, _circuit_probe_in_flight
 
     encoded_body = json.dumps(body).encode("utf-8")
     idempotency_key = hashlib.sha256(encoded_body).hexdigest()
@@ -124,44 +142,68 @@ def call_compact_r(base_url: str, *, body: dict, required: set[str]) -> dict:
             "Idempotency-Key": idempotency_key,
         },
     )
-    now = time.monotonic()
+    # Closed → open → half-open → closed. Half-open transitions the
+    # counter to 0 so a real success clears the breaker end-to-end and a
+    # failure re-opens it without carrying over stale failure count.
+    is_probe = False
     with _circuit_lock:
-        if now < _circuit_open_until:
-            raise LbwProviderError("LBW_CIRCUIT_OPEN")
+        now = time.monotonic()
+        if _circuit_open_until > 0 and now < _circuit_open_until:
+            wait_ms = int((_circuit_open_until - now) * 1000)
+            raise LbwProviderError("LBW_CIRCUIT_OPEN", f"retry in ~{wait_ms}ms")
+        if _circuit_open_until > 0:
+            # Wait window just elapsed. Enter half-open: allow one probe
+            # through, block concurrent siblings so they don't all fire
+            # at a possibly-still-down runtime.
+            if _circuit_probe_in_flight:
+                raise LbwProviderError("LBW_CIRCUIT_OPEN", "half-open probe in flight")
+            _circuit_probe_in_flight = True
+            _circuit_failures = 0
+            is_probe = True
 
     attempts = int(os.getenv("INFERENCE_LBW_ATTEMPTS", "2"))
-    for attempt in range(attempts):
-        try:
-            with urllib.request.urlopen(
-                request,
-                timeout=float(os.getenv("INFERENCE_LBW_TIMEOUT_SECONDS", "30")),
-            ) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+    try:
+        for attempt in range(attempts):
+            try:
+                with urllib.request.urlopen(
+                    request,
+                    timeout=float(os.getenv("INFERENCE_LBW_TIMEOUT_SECONDS", "30")),
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                with _circuit_lock:
+                    _circuit_failures = 0
+                    _circuit_open_until = 0.0
+                break
+            except urllib.error.HTTPError as error:
+                detail = error.read().decode("utf-8", errors="replace")
+                if error.code < 500 or attempt + 1 >= attempts:
+                    _record_failure()
+                    raise LbwProviderError("LBW_PREDICT_FAILED", detail) from error
+                _backoff(attempt)
+            except urllib.error.URLError as error:
+                if attempt + 1 >= attempts:
+                    _record_failure()
+                    raise LbwProviderError(
+                        "LBW_SERVICE_UNAVAILABLE", str(error)
+                    ) from error
+                _backoff(attempt)
+            except TimeoutError as error:
+                if attempt + 1 >= attempts:
+                    _record_failure()
+                    raise LbwProviderError("LBW_SERVICE_TIMEOUT", str(error)) from error
+                _backoff(attempt)
+            except json.JSONDecodeError as error:
+                _record_failure()
+                raise LbwProviderError("LBW_RESPONSE_INVALID", str(error)) from error
+        else:
+            raise LbwProviderError("LBW_SERVICE_UNAVAILABLE")
+    finally:
+        # Always clear the half-open probe slot so the next caller can
+        # try again (either as a fresh probe if we re-opened, or as a
+        # normal request if we closed).
+        if is_probe:
             with _circuit_lock:
-                _circuit_failures = 0
-                _circuit_open_until = 0.0
-            break
-        except urllib.error.HTTPError as error:
-            detail = error.read().decode("utf-8", errors="replace")
-            if error.code < 500 or attempt + 1 >= attempts:
-                _record_failure()
-                raise LbwProviderError("LBW_PREDICT_FAILED", detail) from error
-            _backoff(attempt)
-        except urllib.error.URLError as error:
-            if attempt + 1 >= attempts:
-                _record_failure()
-                raise LbwProviderError("LBW_SERVICE_UNAVAILABLE", str(error)) from error
-            _backoff(attempt)
-        except TimeoutError as error:
-            if attempt + 1 >= attempts:
-                _record_failure()
-                raise LbwProviderError("LBW_SERVICE_TIMEOUT", str(error)) from error
-            _backoff(attempt)
-        except json.JSONDecodeError as error:
-            _record_failure()
-            raise LbwProviderError("LBW_RESPONSE_INVALID", str(error)) from error
-    else:
-        raise LbwProviderError("LBW_SERVICE_UNAVAILABLE")
+                _circuit_probe_in_flight = False
 
     missing = sorted(required - set(payload))
     if missing:

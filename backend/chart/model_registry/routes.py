@@ -257,6 +257,10 @@ class ReloadResponse(BaseModel):
     status: str
 
 
+class CircuitResetResponse(BaseModel):
+    status: str
+
+
 @releases_router.get("", response_model=ReleasesResponse)
 def list_releases() -> ReleasesResponse:
     """Every registered model release, active-first."""
@@ -375,3 +379,23 @@ def reload_release(release_id: str) -> ReloadResponse:
     except ModelRegistryError as error:
         raise HTTPException(status_code=503, detail=error.args[0]) from error
     return ReloadResponse(release_id=release_id, status="loaded")
+
+
+@releases_router.post("/circuit/reset", response_model=CircuitResetResponse)
+def reset_inference_circuit() -> CircuitResetResponse:
+    """Clear the LBW inference circuit breaker in this API process.
+
+    The R adapter's circuit breaker opens after ``INFERENCE_LBW_CIRCUIT_FAILURES``
+    consecutive failures (default 5) and stays open for
+    ``INFERENCE_LBW_CIRCUIT_SECONDS`` (default 30). The half-open probe
+    lets recovery happen automatically once R is back, but a sandbox
+    operator investigating after an outage can call this endpoint to
+    skip the wait entirely instead of restarting the API container.
+    Only clears state in this process; other API replicas would need
+    their own reset.
+    """
+
+    from chart.inference.providers.lbw_r import reset_circuit
+
+    reset_circuit()
+    return CircuitResetResponse(status="cleared")
