@@ -618,15 +618,55 @@ docker run -d \
   "$WEB_IMAGE" >/dev/null
 
 if [ -n "$LBW_ENABLED" ]; then
-  # NOTE: the shared model volume `chart-lbw-model:/models` is mounted on
-  # both the Python API and the LBW container so that Python's
+  # The shared model volume `chart-lbw-model:/models` is mounted on both
+  # the Python API and the LBW container so that Python's
   # warm_model_release can hash the RDS files locally and then POST a
-  # local_path to R that both processes can resolve. The volume must be
-  # populated with the artifacts referenced in
-  # `pipelines/models/*/model-release.*.json` before setup can activate a
-  # release — either bake them into an init step here (aws s3 cp using the
-  # base_uri + filename fields from the manifest) or pre-seed the EBS
-  # volume out of band. Nothing in this script populates it yet.
+  # local_path to R that both processes can resolve. Sync every artifact
+  # every manifest under pipelines/models/**/model-release.*.json
+  # references from S3 into the volume before the R container starts —
+  # otherwise the first `/models/load` call fires MODEL_RELEASE_FILE_MISSING.
+  #
+  # The sync is idempotent (aws s3 sync only copies changed files by
+  # SHA/mtime), and we scope it via --exclude/--include so unrelated
+  # bucket objects (archive/, old rewrites) don't get pulled onto the
+  # host. New releases only need: (1) manifest committed to the repo,
+  # (2) rds uploaded to base_uri, (3) redeploy — no infra edit.
+  MODEL_BUCKET="${MODEL_BUCKET:-chart-predictive-models}"
+  MODEL_VOLUME_DIR="/var/lib/docker/volumes/chart-lbw-model/_data"
+  mkdir -p "$MODEL_VOLUME_DIR"
+  echo "Syncing model artifacts from s3://$MODEL_BUCKET → $MODEL_VOLUME_DIR ..."
+  # Read every manifest and construct include filters for each declared
+  # (base_uri, filename) pair. This scopes the sync to files the app
+  # actually loads, so stray bucket objects (archive, WIP releases) are
+  # ignored.
+  include_flags=()
+  while IFS= read -r manifest; do
+    while IFS=$'\t' read -r base_uri filename; do
+      [ -z "$filename" ] && continue
+      # Strip the s3://<bucket>/ prefix so --include is a plain key
+      # pattern rooted at the bucket. Example base_uri:
+      #   s3://chart-predictive-models/india/mp/lbw/1.0.1-compact-review
+      key="${base_uri#s3://$MODEL_BUCKET/}/$filename"
+      include_flags+=("--include" "$key")
+    done < <(python3 - "$manifest" <<'PY'
+import json, sys
+manifest = json.load(open(sys.argv[1]))
+base = manifest["base_uri"].rstrip("/")
+for entry in manifest.get("model_files", []):
+    print(f"{base}\t{entry['filename']}")
+PY
+)
+  done < <(find "$APP_DIR/pipelines/models" -name "model-release*.json" -type f)
+
+  if [ ${#include_flags[@]} -gt 0 ]; then
+    aws s3 sync \
+      "s3://$MODEL_BUCKET/" "$MODEL_VOLUME_DIR/" \
+      --exclude "*" \
+      "${include_flags[@]}"
+  else
+    echo "WARN: no model-release manifests found under pipelines/models — skipping S3 sync"
+  fi
+
   docker run -d \
     --name "$LBW_CONTAINER" \
     --network "$NETWORK" \

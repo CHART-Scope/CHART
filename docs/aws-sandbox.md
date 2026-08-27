@@ -111,6 +111,81 @@ paths. Optional climate, model, Google, and explanation settings use the same
 names documented in the operational runbook. GitHub is only one way to pass
 those inputs; it is not required by the script.
 
+## Model artifacts on S3
+
+Every model release ships as two things:
+
+1. **A manifest** in the repo at `pipelines/models/<family>/model-release.*.json`.
+   The manifest carries the release id, version, expected SHA256, and the
+   S3 `base_uri` for that release's artifacts.
+2. **One or more `.rds` files** stored on S3 under the manifest's `base_uri`.
+   The runtime never fetches them — the app expects them on disk in
+   `MODEL_CACHE_DIR`, so the deploy pipeline pulls them from S3 into the
+   shared `chart-lbw-model` volume before the R container starts.
+
+### Bucket layout
+
+Files live at `{base_uri}/{filename}`, keyed by country → outcome →
+version so a bucket listing is self-describing:
+
+```text
+s3://chart-predictive-models/
+├── india/
+│   └── mp/
+│       ├── lbw/
+│       │   └── 1.0.1-compact-review/
+│       │       └── IN_MP_LBW_tmax_v1.0.1-compact.rds
+│       └── under-five-mortality/
+│           └── 0.1.0-review/
+│               └── IN_MP_under5_mortality_tmax_v0.1.0-review.rds
+├── kenya/
+│   └── lbw/
+│       └── 0.2.1-review/
+│           └── KE_climate_zone_LBW_tmax_v0.2.1-review.rds
+└── archive/                   # retired artifacts kept for provenance
+```
+
+Bucket versioning is enabled so an accidental overwrite is recoverable.
+Retired artifacts (pre-compact-registry rewrites) live under `archive/`
+and are excluded from the deploy sync.
+
+### Deploy-time sync
+
+`infra/aws/deploy-app.sh` walks every `pipelines/models/**/model-release.*.json`
+manifest at deploy time, extracts each `(base_uri, filename)` pair, and
+runs one scoped `aws s3 sync` into the host volume backing
+`chart-lbw-model:/models`. Only files the manifests actually reference
+are pulled; unrelated bucket objects (WIP releases, `archive/`) are
+ignored. The sync is idempotent — `aws s3 sync` skips files whose local
+copy already matches — so redeploys are cheap.
+
+If the sync is skipped or the file names diverge, the app fails cleanly
+at startup with `MODEL_RELEASE_FILE_MISSING` (name not found under
+`MODEL_CACHE_DIR`) or `MODEL_RELEASE_CHECKSUM_MISMATCH` (name matches
+but SHA256 differs from the manifest).
+
+### Environment variables
+
+| Variable | Where | Default | Purpose |
+| --- | --- | --- | --- |
+| `MODEL_BUCKET` | `deploy-app.sh` shell env | `chart-predictive-models` | Bucket the deploy sync pulls from. |
+| `MODEL_CACHE_DIR` | Python API + R container | `/models` | Where the app expects the artifacts on disk (deploy binds the host volume here). |
+| `MODEL_CONTROL_TOKEN` | Python API + R container | generated | Shared secret gating `/models/load` on the R runtime. |
+
+The Python side's `warm_model_artifact` searches `MODEL_CACHE_DIR`
+recursively (`rglob(filename)`) — the on-disk directory layout can
+mirror the S3 tree (recommended, matches the deploy sync) or be flat;
+what matters is that the filename in the manifest exists somewhere
+under the cache root.
+
+### Adding a new release
+
+1. Upload the new `.rds` to `s3://<MODEL_BUCKET>/<base_uri path>/<filename>`.
+2. Commit a manifest under `pipelines/models/<family>/` pointing at that
+   `base_uri` + `filename` with the file's SHA256.
+3. Merge to `dev` — the next deploy syncs the file and activates the
+   release automatically. No infra edit required.
+
 ## Deployment and verification
 
 A pull request validates the deployment candidate but does not change the EC2
