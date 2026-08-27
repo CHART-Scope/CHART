@@ -190,6 +190,30 @@ onboarding or geography loading.
 An unsupported adapter fails preparation explicitly; CHART does not activate a
 release it cannot verify and load.
 
+## Where the artifact lives at runtime
+
+The manifest's `base_uri` is metadata — the app never fetches from S3
+directly. The runtime opens the file from disk under `MODEL_CACHE_DIR`
+(default `/models` in containers, `pipelines/models/` in local dev) and
+verifies the SHA256 before POSTing the local path to the R scorer's
+`/models/load`. Two failure modes:
+
+- `MODEL_RELEASE_FILE_MISSING` — no file with the manifest's `filename`
+  exists anywhere under `MODEL_CACHE_DIR`. Populate the cache directory.
+- `MODEL_RELEASE_CHECKSUM_MISMATCH` — a file with the right name exists
+  but its SHA256 doesn't match. The wrong file was uploaded, or the
+  manifest's hash is stale.
+
+On AWS the deploy pipeline pulls artifacts from S3 into a shared
+`chart-lbw-model` Docker volume before the R container starts. It walks
+every `pipelines/models/**/model-release.*.json`, extracts
+`(base_uri, filename)` pairs, and runs one scoped `aws s3 sync` per
+release. Locally, the `.rds` files live under
+`pipelines/models/<family>/model/` and the same discovery logic finds
+them via `rglob(filename)`. See
+[AWS sandbox → Model artifacts on S3](aws-sandbox.md#model-artifacts-on-s3)
+for the bucket layout, versioning policy, and how to add a new release.
+
 ## Updating an existing deployment
 
 Never edit the identity or model mapping of a registered release. Publish a new
