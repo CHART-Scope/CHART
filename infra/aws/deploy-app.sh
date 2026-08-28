@@ -661,12 +661,32 @@ PY
   done < <(find "$APP_DIR/pipelines/models" -name "model-release*.json" -type f)
 
   if [ ${#include_flags[@]} -gt 0 ]; then
-    # Run the sync from inside a throwaway container that mounts the
-    # named volume — no host-side chmod/sudo required, and the AWS CLI
-    # image already ships with everything we need. Credentials come
-    # from the EC2 instance profile via IMDS (169.254.169.254), which
-    # the container inherits automatically.
+    # Run the sync from inside a throwaway aws-cli container that
+    # mounts the named volume — no host-side chmod/sudo required. Two
+    # credential paths supported:
+    #
+    #   1. EC2 instance profile via IMDS: reached with --network host so
+    #      the container talks to 169.254.169.254 through the host's
+    #      network stack. The default docker bridge doesn't forward IMDS
+    #      (IMDSv2's HttpPutResponseHopLimit=1 blocks it), so bridged
+    #      containers hit "Unable to locate credentials"; --network host
+    #      sidesteps the whole hop-limit question.
+    #
+    #   2. Explicit env / mounted creds: on a workstation without IMDS,
+    #      set AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / optionally
+    #      AWS_SESSION_TOKEN and they flow through; or mount ~/.aws.
+    #
+    docker_cred_args=(--network host)
+    if [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
+      docker_cred_args+=(-e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID")
+      docker_cred_args+=(-e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}")
+      [ -n "${AWS_SESSION_TOKEN:-}" ] && \
+        docker_cred_args+=(-e AWS_SESSION_TOKEN="$AWS_SESSION_TOKEN")
+    elif [ -d "$HOME/.aws" ]; then
+      docker_cred_args+=(-v "$HOME/.aws:/root/.aws:ro")
+    fi
     docker run --rm \
+      "${docker_cred_args[@]}" \
       -v chart-lbw-model:/models \
       -e AWS_DEFAULT_REGION="$MODEL_REGION" \
       public.ecr.aws/aws-cli/aws-cli:latest \
