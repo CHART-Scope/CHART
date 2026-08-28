@@ -151,25 +151,63 @@ and are excluded from the deploy sync.
 
 ### Deploy-time sync
 
-`infra/aws/deploy-app.sh` walks every `pipelines/models/**/model-release.*.json`
-manifest at deploy time, extracts each `(base_uri, filename)` pair, and
-runs a scoped `aws s3 sync` into the shared `chart-lbw-model` Docker
-volume before the R container starts. Only files the manifests actually
-reference are pulled; unrelated bucket objects (WIP releases,
-`archive/`) are ignored. The sync is idempotent — `aws s3 sync` skips
-files whose local copy already matches — so redeploys are cheap.
+`infra/aws/deploy-app.sh` mirrors the whole bucket into the shared
+`chart-lbw-model` Docker volume before the R container starts, using
+one `aws s3 sync` with `--exclude "archive/*"` so retired artifacts
+(and any future non-model prefix like `raw/` or `docs/`) never land on
+the runtime host. **S3 is the source of truth** — a new release goes
+live by uploading it to the bucket at the `base_uri` the manifest
+declares; no deploy code edit needed.
 
 The sync runs inside a throwaway `public.ecr.aws/aws-cli/aws-cli`
 container that mounts the volume at `/models`. This avoids host-side
-`chmod`/`sudo` on the Docker volume directory (owned by root). The
-container runs with `--network host` so it can reach IMDS
-(169.254.169.254) through the host's network stack and pick up the EC2
-instance profile automatically — the default docker bridge blocks IMDS
-with `HttpPutResponseHopLimit=1`, so bridged containers hit "Unable to
-locate credentials". `AWS_ACCESS_KEY_ID` env vars (workstation runs) or
-a mounted `~/.aws` are used as fallbacks.
+`chmod`/`sudo` on the root-owned Docker volume directory. The sync is
+idempotent — `aws s3 sync` skips files whose local copy already
+matches — so redeploys are cheap.
 
-The instance role therefore needs read access to the model bucket:
+### Bucket policy
+
+The bucket needs a policy allowing anonymous read + list so the sync
+works from any host without credentials:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicList",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::chart-predictive-models"
+    },
+    {
+      "Sid": "PublicRead",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::chart-predictive-models/*"
+    }
+  ]
+}
+```
+
+The compact `.rds` artifacts are respondent-free by design (basis
+settings, coefficients, covariance matrices — no microdata), so
+public read is acceptable. If policy changes require the bucket to go
+private, see the "credential flows" section below.
+
+### Bucket access modes
+
+Controlled by `MODEL_BUCKET_PUBLIC` (default `1`):
+
+| Mode | When | How credentials flow |
+| --- | --- | --- |
+| **Public** (`MODEL_BUCKET_PUBLIC=1`) | Default. Bucket has the anonymous list + read policy above. | `--no-sign-request` on the sync; no IAM, no keys, no IMDS. Works from any host. |
+| **Private** (`MODEL_BUCKET_PUBLIC=0`) | If the bucket ever flips to authenticated-only. | Tried in order: `--network host` to reach IMDS 169.254.169.254 and pick up the EC2 instance profile; `AWS_ACCESS_KEY_ID` env vars; mounted `~/.aws`. |
+
+If you flip the bucket to private, the instance role needs both
+actions (list + get) because `aws s3 sync` needs to enumerate first:
 
 ```json
 {
