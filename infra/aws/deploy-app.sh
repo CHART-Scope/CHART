@@ -637,65 +637,39 @@ if [ -n "$LBW_ENABLED" ]; then
   # can both mount it. `docker volume create` is idempotent.
   docker volume create chart-lbw-model >/dev/null
   echo "Syncing model artifacts from s3://$MODEL_BUCKET → chart-lbw-model:/models ..."
-  # Read every manifest and construct include filters for each declared
-  # (base_uri, filename) pair. This scopes the sync to files the app
-  # actually loads, so stray bucket objects (archive, WIP releases) are
-  # ignored.
-  include_flags=()
-  while IFS= read -r manifest; do
-    while IFS=$'\t' read -r base_uri filename; do
-      [ -z "$filename" ] && continue
-      # Strip the s3://<bucket>/ prefix so --include is a plain key
-      # pattern rooted at the bucket. Example base_uri:
-      #   s3://chart-predictive-models/india/mp/lbw/1.0.1-compact-review
-      key="${base_uri#s3://$MODEL_BUCKET/}/$filename"
-      include_flags+=("--include" "$key")
-    done < <(python3 - "$manifest" <<'PY'
-import json, sys
-manifest = json.load(open(sys.argv[1]))
-base = manifest["base_uri"].rstrip("/")
-for entry in manifest.get("model_files", []):
-    print(f"{base}\t{entry['filename']}")
-PY
-)
-  done < <(find "$APP_DIR/pipelines/models" -name "model-release*.json" -type f)
-
-  if [ ${#include_flags[@]} -gt 0 ]; then
-    # Run the sync from inside a throwaway aws-cli container that
-    # mounts the named volume — no host-side chmod/sudo required. Two
-    # credential paths supported:
-    #
-    #   1. EC2 instance profile via IMDS: reached with --network host so
-    #      the container talks to 169.254.169.254 through the host's
-    #      network stack. The default docker bridge doesn't forward IMDS
-    #      (IMDSv2's HttpPutResponseHopLimit=1 blocks it), so bridged
-    #      containers hit "Unable to locate credentials"; --network host
-    #      sidesteps the whole hop-limit question.
-    #
-    #   2. Explicit env / mounted creds: on a workstation without IMDS,
-    #      set AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / optionally
-    #      AWS_SESSION_TOKEN and they flow through; or mount ~/.aws.
-    #
-    docker_cred_args=(--network host)
-    if [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
-      docker_cred_args+=(-e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID")
-      docker_cred_args+=(-e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}")
-      [ -n "${AWS_SESSION_TOKEN:-}" ] && \
-        docker_cred_args+=(-e AWS_SESSION_TOKEN="$AWS_SESSION_TOKEN")
-    elif [ -d "$HOME/.aws" ]; then
-      docker_cred_args+=(-v "$HOME/.aws:/root/.aws:ro")
-    fi
-    docker run --rm \
-      "${docker_cred_args[@]}" \
-      -v chart-lbw-model:/models \
-      -e AWS_DEFAULT_REGION="$MODEL_REGION" \
-      public.ecr.aws/aws-cli/aws-cli:latest \
-      s3 sync "s3://$MODEL_BUCKET/" /models/ \
-      --exclude "*" \
-      "${include_flags[@]}"
-  else
-    echo "WARN: no model-release manifests found under pipelines/models — skipping S3 sync"
+  # S3 is the source of truth. `aws s3 sync` mirrors the whole bucket
+  # into the volume, honouring `--exclude` so retired artifacts under
+  # `archive/` (and any future non-model prefix like `raw/` or `docs/`)
+  # never land on the runtime host. New releases go live by uploading
+  # to the bucket at the base_uri the manifest declares — no deploy
+  # code edit needed.
+  #
+  # Credentials:
+  #   - MODEL_BUCKET_PUBLIC=1 (default) uses --no-sign-request. The
+  #     bucket needs a policy allowing anonymous s3:ListBucket and
+  #     s3:GetObject — see docs/aws-sandbox.md for the JSON.
+  #   - MODEL_BUCKET_PUBLIC=0 falls back to (in order): IMDS via
+  #     --network host, explicit AWS_ACCESS_KEY_ID env vars, or a
+  #     mounted ~/.aws.
+  docker_cred_args=(--network host)
+  sync_extra_args=(--exclude "archive/*")
+  if [ "${MODEL_BUCKET_PUBLIC:-1}" = "1" ]; then
+    sync_extra_args+=(--no-sign-request)
+  elif [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
+    docker_cred_args+=(-e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID")
+    docker_cred_args+=(-e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}")
+    [ -n "${AWS_SESSION_TOKEN:-}" ] && \
+      docker_cred_args+=(-e AWS_SESSION_TOKEN="$AWS_SESSION_TOKEN")
+  elif [ -d "$HOME/.aws" ]; then
+    docker_cred_args+=(-v "$HOME/.aws:/root/.aws:ro")
   fi
+  docker run --rm \
+    "${docker_cred_args[@]}" \
+    -v chart-lbw-model:/models \
+    -e AWS_DEFAULT_REGION="$MODEL_REGION" \
+    public.ecr.aws/aws-cli/aws-cli:latest \
+    s3 sync "s3://$MODEL_BUCKET/" /models/ \
+    "${sync_extra_args[@]}"
 
   docker run -d \
     --name "$LBW_CONTAINER" \
