@@ -33,3 +33,8 @@ out
 .env.*
 api/openapi.yaml
 web/chart-cms.db
+
+# Model artifacts are pulled from S3 into the chart-lbw-model volume at
+# deploy time; keep them out of the backend + LBW image build contexts
+# so a local build doesn't bloat with the modeller's dev-tree RDS files.
+**/*.rds
