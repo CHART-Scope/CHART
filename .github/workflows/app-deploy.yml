@@ -14,7 +14,7 @@ on:
       - "pipelines/seasonal_c3s/**"
       - "pipelines/isimip_projection/**"
       - "pipelines/boundaries/**"
-      - "pipelines/models/lbw/**"
+      - "pipelines/models/**"
       - "web/**"
   push:
     branches:
@@ -33,7 +33,7 @@ on:
       - "pipelines/seasonal_c3s/**"
       - "pipelines/isimip_projection/**"
       - "pipelines/boundaries/**"
-      - "pipelines/models/lbw/**"
+      - "pipelines/models/**"
       - "web/**"
   workflow_dispatch:
     inputs:
@@ -56,6 +56,10 @@ on:
 
 env:
   DEPLOY_BRANCH: dev
+  # Every model currently deployed to the dev sandbox is review-gated. Keep
+  # the opt-in explicit here rather than enabling review releases by default
+  # in the reusable host deployment script.
+  CHART_ENABLE_REVIEW_MODELS: "true"
 
 concurrency:
   group: chart-app-deploy-${{ github.ref }}
@@ -226,7 +230,7 @@ jobs:
           username: ${{ env.AWS_APP_USER }}
           key: ${{ env.AWS_APP_SSH_KEY }}
           command_timeout: 90m
-          envs: CDSAPI_KEY,CDSAPI_URL,KEYCLOAK_GOOGLE_CLIENT_ID,KEYCLOAK_GOOGLE_CLIENT_SECRET,KEYCLOAK_GOOGLE_HOSTED_DOMAIN,INFERENCE_LLM_ENABLED,INFERENCE_LLM_BASE_URL,INFERENCE_LLM_MODEL,INFERENCE_LLM_API_KEY,PUBLIC_SCHEME,TLS_TERMINATED_UPSTREAM,TLS_CERT_FILE,TLS_KEY_FILE,ALLOW_INSECURE_HTTP,CHART_BOOTSTRAP_TOKEN
+          envs: CDSAPI_KEY,CDSAPI_URL,KEYCLOAK_GOOGLE_CLIENT_ID,KEYCLOAK_GOOGLE_CLIENT_SECRET,KEYCLOAK_GOOGLE_HOSTED_DOMAIN,INFERENCE_LLM_ENABLED,INFERENCE_LLM_BASE_URL,INFERENCE_LLM_MODEL,INFERENCE_LLM_API_KEY,PUBLIC_SCHEME,TLS_TERMINATED_UPSTREAM,TLS_CERT_FILE,TLS_KEY_FILE,ALLOW_INSECURE_HTTP,CHART_BOOTSTRAP_TOKEN,CHART_ENABLE_REVIEW_MODELS
           script: |
             set -euo pipefail
 
@@ -262,12 +266,13 @@ jobs:
             web_status="$(curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/" || true)"
             build_id="$(curl -fsS --connect-timeout 5 --max-time 15 "$base_url/api/build" | jq -r .buildId || true)"
             api_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$base_url/chart-api/ready" || true)"
+            setup_country_count="$(curl -fsS --connect-timeout 5 --max-time 15 "$base_url/chart-api/setup/options" | jq -r '.geographies | length' || true)"
             auth_status="$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/chart-api/auth/me" || true)"
             keycloak_status="$(curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/identity/realms/chart" || true)"
             keycloak_auth_status="$(curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/identity/realms/chart/protocol/openid-connect/auth?client_id=chart-web&redirect_uri=$callback_uri&response_type=code&scope=openid&state=deploy-check&code_challenge=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&code_challenge_method=S256" || true)"
 
-            if [ "$web_status" != "200" ] || [ "$build_id" != "$GITHUB_SHA" ] || [ "$api_body" != '{"status":"ok"}' ] || [ "$auth_status" != "401" ] || [ "$keycloak_status" != "200" ] || [ "$keycloak_auth_status" != "200" ]; then
-              echo "::error title=Public smoke check failed::attempt ${attempt}: web=${web_status:-000} build=${build_id:-empty} api=${api_body:-empty} auth=${auth_status:-000} keycloak=${keycloak_status:-000} keycloak_auth=${keycloak_auth_status:-000}"
+            if [ "$web_status" != "200" ] || [ "$build_id" != "$GITHUB_SHA" ] || [ "$api_body" != '{"status":"ok"}' ] || [ "${setup_country_count:-0}" -lt 1 ] || [ "$auth_status" != "401" ] || [ "$keycloak_status" != "200" ] || [ "$keycloak_auth_status" != "200" ]; then
+              echo "::error title=Public smoke check failed::attempt ${attempt}: web=${web_status:-000} build=${build_id:-empty} api=${api_body:-empty} setup_countries=${setup_country_count:-0} auth=${auth_status:-000} keycloak=${keycloak_status:-000} keycloak_auth=${keycloak_auth_status:-000}"
               if [ "$attempt" -eq 12 ]; then
                 exit 1
               fi
