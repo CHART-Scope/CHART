@@ -97,6 +97,271 @@ that packages or scores approved fitted artifacts.
 See the [health input contract](health-input-contract.md) for the proposed
 source fields, data rights, and unresolved extraction decisions.
 
+## Model-release manifest structure
+
+Each fitted model is installed from a `model-release*.json` manifest below
+`pipelines/models/`. The manifest is the contract between setup, geography
+navigation, the model registry, the artifact cache, the scorer, and the
+dashboard. The `.rds` contains fitted parameters; the manifest explains what
+the artifact is, where it applies, how to call it, and how to present its
+result.
+
+```mermaid
+flowchart LR
+    Identity["Release identity<br/>id + version + taxonomy"] --> Release["Model-release manifest"]
+    Contract["Runtime contract<br/>inputs + outputs + presentation"] --> Release
+    Geography["Navigation geography<br/>country + levels + places"] --> Release
+    Coverage["Model coverage<br/>place → artifact → fitted block"] --> Release
+    Files["Artifact records<br/>S3 URI + filename + SHA-256"] --> Release
+
+    Release --> Setup["Setup and model registry"]
+    Release --> Runtime["Artifact verification and scorer"]
+    Release --> UI["Geography picker and dashboard"]
+```
+
+### Shortened version 1 example
+
+The example below shows one model-supported place. Real manifests repeat
+`geography.places[]` and `areas[]` for every place they install or cover.
+
+```json
+{
+  "schema_version": 1,
+  "id": "lbw-mp-1.0.1-compact-review",
+  "module": "prediction",
+  "outcome": "lbw",
+  "climate_hazard": "extreme_heat",
+  "health_domain": "maternal_newborn_child_health",
+  "version": "1.0.1-compact-review",
+  "runtime": {
+    "adapter": "compact_r_registry",
+    "artifact_type": "rds"
+  },
+  "input_contract": {
+    "variables": [
+      {
+        "name": "tmax_lag",
+        "unit": "Celsius",
+        "order": "newest_first",
+        "length": 3
+      }
+    ]
+  },
+  "output_contract": {
+    "effect_measure": "odds_ratio",
+    "confidence_level": 0.95,
+    "attributable_fraction": "positive_excess_only"
+  },
+  "presentation": {
+    "climate_hazard_label": "Extreme heat",
+    "health_domain_label": "Maternal, newborn and child health",
+    "outcome_label": "Low birth weight",
+    "dashboard_title": "Protecting mothers and babies from extreme heat",
+    "population_label": "pregnancies",
+    "model_scope_label": "administrative model",
+    "visualization": {
+      "kind": "odds_ratio_icon_array",
+      "figure": "mother-baby",
+      "context_figure": "pregnant-woman"
+    },
+    "editorial_reference_temperature_c": 27.0
+  },
+  "base_uri": "s3://chart-predictive-models/india/mp/lbw/1.0.1-compact-review",
+  "source_git_ref": "modeller-review-required",
+  "model_files": [
+    {
+      "filename": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
+      "sha256": "b7460b4772eb006fd01ffc997deb1fe26e8a9e2b651d6c387553dd6befb98069"
+    }
+  ],
+  "geography": {
+    "country_code": "IN",
+    "country_name": "India",
+    "root_id": "geo-in",
+    "root_path": "/india",
+    "analytics_slug": "madhya-pradesh",
+    "levels": [
+      { "key": "geo_level_1", "label": "State", "sort_order": 10 }
+    ],
+    "places": [
+      {
+        "place_code": "madhya-pradesh",
+        "country_code": "IN",
+        "level": "state",
+        "display_name": "Madhya Pradesh",
+        "geography_id": "geo-in-madhya-pradesh",
+        "app_level": "geo_level_1",
+        "level_label": "State",
+        "path": "/india/madhya-pradesh",
+        "sort_order": 10,
+        "boundary_key": "madhya-pradesh"
+      }
+    ]
+  },
+  "areas": [
+    {
+      "place_code": "madhya-pradesh",
+      "country_code": "IN",
+      "level": "state",
+      "model_file": "IN_MP_LBW_tmax_v1.0.1-compact.rds",
+      "model_area_name": "Madhya Pradesh",
+      "validated_pregnancy_windows": [1]
+    }
+  ]
+}
+```
+
+### Identity and scientific classification
+
+| Field | Meaning and expected value |
+|---|---|
+| `schema_version` | Manifest layout. Omitted means `1`. Version 1 uses `geography` and `areas`; version 2 uses `place_set` and `coverage`. |
+| `id` | Immutable release identifier stored in prediction history, for example `lbw-mp-1.0.1-compact-review`. Never reuse it for different fitted parameters or coverage. |
+| `version` | Human-readable release version. A value containing `review` is hidden unless `CHART_ENABLE_REVIEW_MODELS=true`. |
+| `module` | CHART analytical module. Current releases use `prediction`. |
+| `outcome` | Stable machine code such as `lbw` or `under_5_mortality`; it is not display copy. |
+| `climate_hazard` | Stable hazard code such as `extreme_heat`. |
+| `health_domain` | Stable grouping code such as `maternal_newborn_child_health` or `child_health`. |
+| `source_git_ref` | Source-model revision, tag, or approval reference used for provenance. |
+| `release_notes` | Scientific scope, caveats, approval status, and important differences from earlier releases. |
+
+`id`, `outcome`, `climate_hazard`, and `health_domain` are machine-facing
+identifiers. Keep them stable and lowercase with underscores or hyphens as
+already established by the model family. User-facing capitalization and prose
+belong under `presentation`.
+
+### Runtime, input, output, and presentation
+
+| Field | Meaning and expected value |
+|---|---|
+| `runtime.adapter` | Code adapter that understands the artifact. Current R releases use `compact_r_registry`. A new artifact format needs a tested adapter. |
+| `runtime.artifact_type` | File/runtime type, currently `rds`. |
+| `input_contract.variables[]` | Inputs expected by the fitted model. Record the machine name, description, unit, interval where relevant, ordering, and exact length. |
+| `input_contract.supersedes_release_ids[]` | Older release IDs replaced by this release. It cannot contain the current `id`, empty values, or duplicates. |
+| `input_contract.batch_status` | Optional operational statement such as `blocked_pending_modeller_confirmation`; the model catalog uses it to prevent an unsupported batch path. |
+| `output_contract.effect_measure` | Statistical quantity returned by the scorer, currently `odds_ratio`. |
+| `output_contract.confidence_level` | Confidence interval level as a proportion, currently `0.95`. |
+| `output_contract.attributable_fraction` | Interpretation policy. `positive_excess_only` reports no heat-attributable excess when the odds ratio is at or below one. |
+| `presentation.*_label` | Reviewed display text for the dashboard and model catalog. Do not derive these labels from machine codes. |
+| `presentation.model_scope_label` | Honest fitted granularity, such as `division model` or `climate-zone model`. It describes the fitted block, not necessarily the selected administrative boundary. |
+| `presentation.visualization.kind` | Registered renderer. The current accepted value is `odds_ratio_icon_array`. |
+| `presentation.visualization.figure` | Main pictogram: `newborn`, `baby`, or `mother-baby`. |
+| `presentation.visualization.context_figure` | Context pictogram: `pregnant-woman` or `baby`. |
+| `presentation.editorial_reference_temperature_c` | Optional fixed Celsius anchor, allowed from -50 to 60. Omit it to retain each fitted block's bundled reference. |
+
+`input_contract` and `output_contract` are intentionally model-specific. Do
+not copy the LBW three-month contract into a daily-lag mortality model merely
+because both return odds ratios.
+
+### Artifact location and integrity
+
+| Field | Meaning and expected value |
+|---|---|
+| `base_uri` | Versioned artifact prefix, normally `s3://<bucket>/<country>/<model>/<version>`. |
+| `model_files[].filename` | Plain filename only: no directory components. Every filename must be unique in the release. |
+| `model_files[].sha256` | Exactly 64 lowercase hexadecimal characters calculated from the artifact bytes. |
+
+Every `areas[].model_file` must match one entry in `model_files[]`. During
+activation, CHART finds that filename below `MODEL_CACHE_DIR`, calculates its
+SHA-256, and refuses to load missing or altered bytes. The filename, checksum,
+and versioned S3 location should therefore change together for a new artifact.
+
+### Geography describes navigation
+
+The version 1 `geography` object tells setup which country, hierarchy, labels,
+paths, and boundary keys exist. It does not by itself claim that every listed
+place has a fitted model.
+
+| Field | Meaning and expected value |
+|---|---|
+| `country_code` | Uppercase ISO 3166-1 alpha-2 code such as `IN` or `KE`. Place records must use the same code. |
+| `country_name` | User-facing country name. |
+| `root_id` | Stable application ID for the country root, for example `geo-ke`. |
+| `root_path` | One-segment URL path such as `/kenya`. |
+| `analytics_slug` | Stable slug used by analytical adapters and stored data. |
+| `boundary_artifact` | Optional repository-relative boundary file used by this release. |
+| `levels[]` | Ordered application levels. Each `key` is stable; `label` is country-specific display text such as `State`, `Division`, or `County`. |
+| `places[]` | All navigation places, including parents or locations with no fitted model. |
+
+For each place:
+
+- `place_code` is the stable code stored on `admin_unit` and referenced by
+  `areas[]`;
+- `geography_id` is the stable ID sent by the browser and prediction API;
+- `app_level` must match a `geography.levels[].key`, and `level_label` must
+  exactly match that level's label;
+- `parent_place_code` builds the hierarchy and must name another declared
+  place; parent cycles are rejected;
+- `path` must begin below `root_path`;
+- `boundary_key` must uniquely match the place identifier in the boundary
+  data; and
+- `sort_order` controls deterministic display order.
+
+Within one geography, `place_code`, `geography_id`, `path`, and `boundary_key`
+must each be unique.
+
+### Areas describe model coverage
+
+`areas[]` is the bridge from a navigable place to a fitted block:
+
+| Field | Meaning and expected value |
+|---|---|
+| `place_code` | Must identify a place declared by `geography.places[]`. It is unique within the release. |
+| `model_file` | Selects one checksummed artifact from `model_files[]`. |
+| `model_area_name` | Exact fitted-block key expected by the scorer. This may differ from the administrative display name. |
+| `validated_pregnancy_windows` | Optional unique subset of `[1, 2, 3]` proven valid for that fitted block. Omit it for models without pregnancy-window semantics. |
+| `country_code` and `level` | When supplied, they must agree with the matching geography place. |
+
+A place present only in `geography.places[]` can appear in navigation and
+supply a climate boundary, but it cannot be scored. A place becomes
+model-supported only when `areas[]` maps its `place_code` to both a model file
+and a fitted `model_area_name`. This distinction is why Turkana can remain
+visible while prediction is unavailable, and why a Kenya county can use its
+own polygon but score against a shared climate-zone block.
+
+### Version 2 manifests and shared place sets
+
+Version 2 avoids repeating a large geography tree across several model
+releases. It replaces `geography` and `areas` with:
+
+```json
+{
+  "schema_version": 2,
+  "place_set": {
+    "id": "in-mp-state-divisions",
+    "version": "1",
+    "path": "pipelines/places/in-mp-v1/place-set.json",
+    "sha256": "<64 lowercase hexadecimal characters>"
+  },
+  "coverage": [
+    {
+      "place_code": "bhopal",
+      "model_file": "example.rds",
+      "model_area_name": "Bhopal"
+    }
+  ]
+}
+```
+
+The referenced place-set file owns the `geography`, optional boundary shape,
+and source/licence provenance. Its repository-relative path may not be
+absolute or contain `..`, and its checksum is verified before setup uses it.
+A version 2 release must not also declare `geography` or `areas`. The resolved
+place codes and the same model-file and fitted-block rules still apply to
+`coverage[]`.
+
+!!! warning "Review releases are opt-in"
+    Discovery treats any manifest whose `version` contains `review` as
+    review-only. Set `CHART_ENABLE_REVIEW_MODELS=true` only in an environment
+    approved to expose those releases. Without that flag, setup correctly
+    reports zero configured model countries when every installed manifest is
+    a review release.
+
+The authoritative validation rules live in
+[`backend/chart/model_registry/schemas.py`](https://github.com/CHART-Scope/CHART/blob/dev/backend/chart/model_registry/schemas.py).
+For the installation workflow and pre-activation checks, see
+[Add a geography and model](add-geography-and-model.md).
+
 ## Model artifacts
 
 The release-aware runtime uses respondent-free compact R artifacts:
