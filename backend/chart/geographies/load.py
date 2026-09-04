@@ -153,6 +153,17 @@ def load_release_geography_geojson(
 def _ensure_release_app_places(
     session: Session, geography: Any
 ) -> dict[str, AppGeography]:
+    country_config = session.get(CountryGeoConfig, (geography.country_code, "country"))
+    if country_config is None:
+        session.add(
+            CountryGeoConfig(
+                country_code=geography.country_code,
+                level_key="country",
+                level_label="Country",
+                enabled=True,
+                sort_order=0,
+            )
+        )
     for level in geography.levels:
         config = session.get(CountryGeoConfig, (geography.country_code, level.key))
         if config is None:
