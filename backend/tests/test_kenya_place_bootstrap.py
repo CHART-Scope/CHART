@@ -32,6 +32,7 @@ from chart.shared.db.models import (
     ActiveModelAssignment,
     AdminUnit,
     AppGeography,
+    CountryGeoConfig,
     ModelAreaMapping,
     ModelRelease,
     SetupStateRecord,
@@ -232,34 +233,11 @@ def test_kenya_release_links_kajiado_and_activates() -> None:
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    with engine.connect() as connection:
+        connection.exec_driver_sql("PRAGMA foreign_keys=ON")
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     with factory() as session:
-        session.add_all(
-            [
-                AppGeography(
-                    id="geo-ke",
-                    country_code="KE",
-                    level="country",
-                    level_label="Country",
-                    name="Kenya",
-                    path="/kenya",
-                    sort_order=0,
-                ),
-                AppGeography(
-                    id="geo-ke-kajiado",
-                    country_code="KE",
-                    level="geo_level_1",
-                    level_label="County",
-                    name="Kajiado",
-                    parent_id="geo-ke",
-                    path="/kenya/kajiado",
-                    sort_order=10,
-                ),
-            ]
-        )
-        session.flush()
-
         result = bootstrap_place_from_release(
             session,
             model_release_path=Path(
@@ -268,6 +246,10 @@ def test_kenya_release_links_kajiado_and_activates() -> None:
             activate=True,
         )
         session.flush()
+        country_config = session.get(CountryGeoConfig, ("KE", "country"))
+        assert country_config is not None
+        assert country_config.level_label == "Country"
+        assert session.get(AppGeography, "geo-ke") is not None
         admin_unit = session.scalar(
             select(AdminUnit).where(AdminUnit.code == "kajiado")
         )
