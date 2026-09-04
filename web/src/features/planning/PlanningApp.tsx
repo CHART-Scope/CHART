@@ -145,7 +145,7 @@ export function PlanningApp({
           contextSwitcher={
             <InlineContextSwitcher
               geographyScopes={geographyScopes}
-              activeGeographyId={activeGeographyId ?? selection.area}
+              activeGeographyId={selection.area || activeGeographyId}
               onFamilyChange={(_family, defaultArea) => {
                 // Instant switch — reset the sentence back to defaults for
                 // the new family so hazard / outcome / period are picked
