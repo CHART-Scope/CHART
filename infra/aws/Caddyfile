@@ -1,0 +1,33 @@
+{$PUBLIC_ORIGIN} {
+	encode zstd gzip
+
+	route {
+		@identity path /identity /identity/*
+		handle @identity {
+			reverse_proxy chart-keycloak:8080
+		}
+
+		@api_docs path /chart-api /chart-api/
+		handle @api_docs {
+			rewrite * /docs
+			reverse_proxy chart-api:3210
+		}
+
+		handle_path /chart-api/* {
+			reverse_proxy chart-api:3210
+		}
+
+		handle /climate/* {
+			reverse_proxy chart-api:3210
+		}
+
+		handle /climate-api/health {
+			rewrite * /health
+			reverse_proxy chart-api:3210
+		}
+
+		handle {
+			reverse_proxy chart-web:3100
+		}
+	}
+}

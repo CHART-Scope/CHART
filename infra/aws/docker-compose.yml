@@ -1,0 +1,386 @@
+name: chart
+
+x-python-environment: &python-environment
+  DATABASE_URL: postgresql+psycopg://chart:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in CHART_RUNTIME_ENV}@chart-postgres:5432/chart
+  PYTHON_DATABASE_URL: postgresql+psycopg://chart:${POSTGRES_PASSWORD}@chart-postgres:5432/chart
+  KEYCLOAK_ISSUER_URL: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in CHART_RUNTIME_ENV}/identity/realms/chart
+  KEYCLOAK_CLIENT_ID: chart-api
+  KEYCLOAK_JWKS_URL: http://chart-keycloak:8080/identity/realms/chart/protocol/openid-connect/certs
+  KEYCLOAK_SERVER_URL: http://chart-keycloak:8080/identity
+  KEYCLOAK_ADMIN_URL: http://chart-keycloak:8080/identity
+  KEYCLOAK_ADMIN_USERNAME: admin
+  KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in CHART_RUNTIME_ENV}
+  KEYCLOAK_REALM: chart
+  CHART_WEB_ORIGIN: ${PUBLIC_ORIGIN}
+  CHART_CORS_ORIGINS: ${PUBLIC_ORIGIN}
+  CHART_BOOTSTRAP_TOKEN: ${CHART_BOOTSTRAP_TOKEN:?set CHART_BOOTSTRAP_TOKEN in CHART_RUNTIME_ENV}
+  CHART_REQUIRE_ACTIVE_MODEL: "1"
+  CHART_ENABLE_REVIEW_MODELS: ${CHART_ENABLE_REVIEW_MODELS:-true}
+  CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES: ${CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES:-true}
+  INFERENCE_LBW_BASE_URL: http://chart-lbw:8000
+  MODEL_CONTROL_TOKEN: ${MODEL_CONTROL_TOKEN:?set MODEL_CONTROL_TOKEN in CHART_RUNTIME_ENV}
+  MODEL_CACHE_DIR: /models
+
+x-dagster-environment: &dagster-environment
+  <<: *python-environment
+  DAGSTER_HOME: /opt/dagster/dagster_home
+  DAGSTER_POSTGRES_HOST: chart-postgres
+  DAGSTER_POSTGRES_PORT: "5432"
+  DAGSTER_POSTGRES_USER: chart
+  DAGSTER_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  DAGSTER_POSTGRES_DB: chart_dagster
+  CLIMATE_OUTPUT_DIR: /opt/chart/data/climate
+  ERA5_USE_FIXTURE: "0"
+  CDSAPI_URL: ${CDSAPI_URL:-https://cds.climate.copernicus.eu/api}
+  CDSAPI_KEY: ${CDSAPI_KEY:-}
+  INFERENCE_STATISTICAL_PROVIDER: lbw_r
+  INFERENCE_LLM_ENABLED: ${INFERENCE_LLM_ENABLED:-false}
+  INFERENCE_LLM_BASE_URL: ${INFERENCE_LLM_BASE_URL:-}
+  INFERENCE_LLM_MODEL: ${INFERENCE_LLM_MODEL:-}
+  INFERENCE_LLM_API_KEY: ${INFERENCE_LLM_API_KEY:-}
+  INFERENCE_LLM_TIMEOUT_SECONDS: "10"
+
+services:
+  chart-postgres:
+    image: postgis/postgis:16-3.5
+    container_name: chart-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chart
+      POSTGRES_USER: chart
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - chart-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chart -d chart"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  chart-db-prepare:
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
+    restart: "no"
+    labels:
+      chart.release: ${IMAGE_TAG:-dev}
+    depends_on:
+      chart-postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: chart-postgres
+      POSTGRES_USER: chart
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command: ["python", "/app/backend/scripts/prepare_databases.py"]
+
+  chart-backup:
+    image: postgis/postgis:16-3.5
+    restart: "no"
+    labels:
+      chart.release: ${IMAGE_TAG:-dev}
+    depends_on:
+      chart-db-prepare:
+        condition: service_completed_successfully
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - /opt/chart-backups:/backups
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >-
+        backup=/backups/chart-$$(date -u +%Y%m%dT%H%M%SZ).dump;
+        pg_dump -h chart-postgres -U chart -d chart --format=custom --file="$$backup";
+        chmod 600 "$$backup";
+        find /backups -type f -name 'chart-*.dump' -mtime +14 -delete
+
+  chart-migrate:
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
+    restart: "no"
+    labels:
+      chart.release: ${IMAGE_TAG:-dev}
+    depends_on:
+      chart-backup:
+        condition: service_completed_successfully
+    environment:
+      <<: *python-environment
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+
+  chart-model-sync:
+    image: public.ecr.aws/aws-cli/aws-cli:2.27.49
+    restart: "no"
+    network_mode: host
+    labels:
+      chart.release: ${IMAGE_TAG:-dev}
+    environment:
+      AWS_DEFAULT_REGION: ${AWS_REGION:-eu-west-2}
+      MODEL_BUCKET: ${MODEL_BUCKET:-chart-predictive-models}
+      MODEL_BUCKET_PUBLIC: ${MODEL_BUCKET_PUBLIC:-1}
+    volumes:
+      - chart-lbw-model:/models
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >-
+        if [ "$$MODEL_BUCKET_PUBLIC" = "1" ]; then
+          public_flag="--no-sign-request";
+        else
+          public_flag="";
+        fi;
+        aws s3 sync "s3://$$MODEL_BUCKET/" /models/ --exclude "archive/*" $$public_flag
+
+  chart-lbw:
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-lbw:${IMAGE_TAG:-dev}
+    container_name: chart-lbw
+    restart: unless-stopped
+    depends_on:
+      chart-model-sync:
+        condition: service_completed_successfully
+    environment:
+      MODEL_CONTROL_TOKEN: ${MODEL_CONTROL_TOKEN}
+      MODEL_CACHE_DIR: /models
+    volumes:
+      - chart-lbw-model:/models
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  chart-bootstrap:
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
+    restart: "no"
+    labels:
+      chart.release: ${IMAGE_TAG:-dev}
+    depends_on:
+      chart-migrate:
+        condition: service_completed_successfully
+      chart-lbw:
+        condition: service_healthy
+    environment:
+      <<: *python-environment
+    command:
+      - chart-bootstrap-mp
+      - --source-manifest
+      - /app/pipelines/boundaries/manifests/mp_model_areas_v1.json
+      - --crosswalk
+      - /app/pipelines/boundaries/data/mp_district_division_crosswalk.csv
+      - --model-release
+      - /app/pipelines/models/lbw/model-release.mp.compact.review.json
+      - --activate-model
+
+  chart-keycloak:
+    image: quay.io/keycloak/keycloak:26.6.1
+    container_name: chart-keycloak
+    restart: unless-stopped
+    depends_on:
+      chart-db-prepare:
+        condition: service_completed_successfully
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://chart-postgres:5432/chart_keycloak
+      KC_DB_USERNAME: chart_keycloak
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_RELATIVE_PATH: /identity
+      KC_HOSTNAME: ${PUBLIC_ORIGIN}/identity
+      KC_HOSTNAME_STRICT: "true"
+      KC_PROXY_HEADERS: xforwarded
+    volumes:
+      - ../keycloak/chart-realm.json:/opt/keycloak/data/import/chart-realm.json:ro
+      - ../keycloak/themes/chart:/opt/keycloak/themes/chart:ro
+    command: ["start", "--import-realm"]
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  chart-keycloak-config:
+    image: node:22-alpine
+    restart: "no"
+    labels:
+      chart.release: ${IMAGE_TAG:-dev}
+    depends_on:
+      chart-keycloak:
+        condition: service_healthy
+    environment:
+      KEYCLOAK_ADMIN_URL: http://chart-keycloak:8080/identity
+      KEYCLOAK_ADMIN_USERNAME: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KEYCLOAK_REALM: chart
+      KEYCLOAK_REALM_FILE: /keycloak/chart-realm.json
+      CHART_WEB_ORIGIN: ${PUBLIC_ORIGIN}
+      KEYCLOAK_GOOGLE_CLIENT_ID: ${KEYCLOAK_GOOGLE_CLIENT_ID:-}
+      KEYCLOAK_GOOGLE_CLIENT_SECRET: ${KEYCLOAK_GOOGLE_CLIENT_SECRET:-}
+      KEYCLOAK_GOOGLE_HOSTED_DOMAIN: ${KEYCLOAK_GOOGLE_HOSTED_DOMAIN:-}
+    volumes:
+      - ../keycloak:/keycloak:ro
+    command: ["node", "/keycloak/sync-realm.js"]
+
+  chart-api:
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
+    container_name: chart-api
+    restart: unless-stopped
+    depends_on:
+      chart-bootstrap:
+        condition: service_completed_successfully
+      chart-keycloak-config:
+        condition: service_completed_successfully
+    environment:
+      <<: *python-environment
+      HOST: 0.0.0.0
+      PORT: "3210"
+    volumes:
+      - chart-lbw-model:/models
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3210/ready')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  chart-web:
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-web:${IMAGE_TAG:-dev}
+    container_name: chart-web
+    restart: unless-stopped
+    depends_on:
+      chart-api:
+        condition: service_healthy
+    environment:
+      CHART_API_INTERNAL_URL: http://chart-api:3210
+      CHART_PYTHON_API_INTERNAL_URL: http://chart-api:3210
+      CHART_WEB_ORIGIN: ${PUBLIC_ORIGIN}
+      CHART_BOOTSTRAP_TOKEN: ${CHART_BOOTSTRAP_TOKEN}
+      KEYCLOAK_BROWSER_URL: ${PUBLIC_ORIGIN}/identity
+      KEYCLOAK_SERVER_URL: http://chart-keycloak:8080/identity
+      KEYCLOAK_REALM: chart
+      KEYCLOAK_WEB_CLIENT_ID: chart-web
+      HOSTNAME: 0.0.0.0
+      PORT: "3100"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3100/api/build').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  chart-dagster-migrate:
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
+    restart: "no"
+    labels:
+      chart.release: ${IMAGE_TAG:-dev}
+    depends_on:
+      chart-db-prepare:
+        condition: service_completed_successfully
+    environment:
+      <<: *dagster-environment
+    command: ["dagster", "instance", "migrate"]
+
+  chart-dagster-webserver:
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
+    container_name: chart-dagster-webserver
+    restart: unless-stopped
+    depends_on:
+      chart-dagster-migrate:
+        condition: service_completed_successfully
+      chart-migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *dagster-environment
+    volumes:
+      - chart-dagster-storage:/opt/dagster/storage
+      - chart-climate-data:/opt/chart/data/climate
+    ports:
+      - 127.0.0.1:3000:3000
+    command:
+      [
+        "dagster-webserver",
+        "-h",
+        "0.0.0.0",
+        "-p",
+        "3000",
+        "-m",
+        "chart_pipeline.definitions",
+      ]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/server_info')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  chart-dagster-daemon:
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
+    container_name: chart-dagster-daemon
+    restart: unless-stopped
+    depends_on:
+      chart-dagster-migrate:
+        condition: service_completed_successfully
+      chart-migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *dagster-environment
+    volumes:
+      - chart-dagster-storage:/opt/dagster/storage
+      - chart-climate-data:/opt/chart/data/climate
+    command: ["dagster-daemon", "run", "-m", "chart_pipeline.definitions"]
+    healthcheck:
+      test: ["CMD", "dagster-daemon", "liveness-check"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  chart-caddy:
+    image: caddy:2.10-alpine
+    container_name: chart-caddy
+    restart: unless-stopped
+    depends_on:
+      chart-api:
+        condition: service_healthy
+      chart-web:
+        condition: service_healthy
+      chart-keycloak:
+        condition: service_healthy
+    environment:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - chart-caddy-data:/data
+      - chart-caddy-config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2019/config/"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  chart-postgres-data:
+    name: chart-postgres-data
+  chart-lbw-model:
+    name: chart-lbw-model
+  chart-dagster-storage:
+    name: chart-dagster-storage
+  chart-climate-data:
+    name: chart-climate-data
+  chart-caddy-data:
+    name: chart-caddy-data
+  chart-caddy-config:
+    name: chart-caddy-config

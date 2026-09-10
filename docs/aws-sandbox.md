@@ -1,267 +1,110 @@
 # AWS sandbox deployment
 
-The `App Deploy` workflow provisions one EC2 host with the web app, Python API,
-Dagster, Postgres, Keycloak, nginx, and the optional LBW scorer. HTTP and HTTPS
-use the same deployment path; the canonical browser origin determines the
-Keycloak SSL policy, callbacks, cookies, CORS origin, and proxy headers.
+The `App Deploy` workflow validates CHART, publishes commit-tagged images to
+GitHub Container Registry, and deploys those images to one EC2 host with Docker
+Compose. EC2 receives the small `infra/aws` and `infra/keycloak` deployment
+bundle; it does not clone or build the repository.
 
-The detailed operational runbook is
+The operational setup is documented in
 [`infra/aws/README.md`](https://github.com/CHART-Scope/CHART/blob/dev/infra/aws/README.md).
 
 ## GitHub configuration
 
-The automated `dev` deployment reads these GitHub Actions secrets:
+Create a GitHub environment named `dev` with these secrets:
 
 | Secret | Purpose |
 | --- | --- |
-| `AWS_APP_PUBLIC_ORIGIN` | Preferred complete browser origin, including `http://` or `https://`. |
-| `AWS_APP_PUBLIC_HOST` | Host or IP fallback when a complete origin is not configured. |
-| `CHART_PUBLIC_SCHEME` | Scheme fallback; defaults to `https`. |
-| `CHART_ALLOW_INSECURE_HTTP` | Required safety gate for an HTTP deployment. |
-| `CHART_TLS_TERMINATED_UPSTREAM` | Set to `1` when a trusted load balancer terminates HTTPS. |
-| `CHART_TLS_CERT_FILE` | Certificate path when nginx terminates HTTPS on the host. |
-| `CHART_TLS_KEY_FILE` | Private-key path when nginx terminates HTTPS on the host. |
+| `AWS_APP_HOST` | EC2 hostname or IP used by SSH. |
+| `AWS_APP_USER` | EC2 deployment user. |
+| `AWS_APP_SSH_KEY` | Private SSH key for that user. |
+| `CHART_RUNTIME_ENV` | One multiline dotenv value containing every Compose setting. |
 
-Prefer `AWS_APP_PUBLIC_ORIGIN`; it removes ambiguity by carrying the scheme,
-host, and optional port together. When it is set, the deploy derives the scheme
-and host from it rather than the fallback settings.
+The runtime secret must contain:
 
-Do not remove the existing `CDSAPI_*`, `INFERENCE_LLM_*`, Google
-identity-provider, or bootstrap-token secrets while simplifying the public
-origin. They configure independent services. Model S3 URIs are not
-deployment secrets — each model's `model-release.json` manifest carries its
-own `base_uri` (currently `s3://chart-predictive-models` for LBW) and the
-deploy derives the concrete URIs from it.
+```dotenv
+PUBLIC_ORIGIN=https://chart.example.org
+POSTGRES_PASSWORD=replace-me
+KEYCLOAK_ADMIN_PASSWORD=replace-me
+CHART_BOOTSTRAP_TOKEN=replace-me
+MODEL_CONTROL_TOKEN=replace-me
+AWS_REGION=eu-west-2
+MODEL_BUCKET=chart-predictive-models
+MODEL_BUCKET_PUBLIC=1
+CHART_ENABLE_REVIEW_MODELS=true
+CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES=true
+```
 
-## Files on the host
+Optional `CDSAPI_*`, `INFERENCE_LLM_*`, and `KEYCLOAK_GOOGLE_*` settings go in
+the same secret. Adding one does not require a workflow change. Keep
+`POSTGRES_PASSWORD` URL-safe because it is embedded in the application database
+URL.
 
-The deploy script generates these protected files under `/opt/chart-env`:
+The workflow encodes the secret before sending it over SSH. EC2 decodes it into
+a mode-600 file in `/dev/shm`, passes that file to Compose, and deletes it when
+the deployment command ends. Container environments retain only the settings
+assigned to each service.
 
-- `chart.env` for the Python API and shared application settings;
-- `web.env` for the web application;
-- `dagster.env` for Dagster storage;
-- `prediction-worker.env` for climate, model, and optional explanation inputs;
-- `nginx.conf` for the public proxy;
-- `backups/` for pre-migration database backups.
+## Host setup
 
-These are deployment outputs, not independent configuration sources. Do not
-delete, combine, or manually edit them; the next deployment recreates them.
-Inspect only the keys needed for diagnosis because the files contain secrets:
+Install Docker with the Compose plugin and create the two host directories:
 
 ```bash
-sudo grep -E '^(CHART_WEB_ORIGIN|KEYCLOAK_BROWSER_URL|KEYCLOAK_ISSUER_URL)=' \
-  /opt/chart-env/chart.env /opt/chart-env/web.env
+sudo install -d -o "$USER" -g "$USER" /opt/chart-deploy
+sudo install -d -m 700 -o "$USER" -g "$USER" /opt/chart-backups
 ```
 
-## HTTP domain or IP
+Allow inbound ports 80 and 443 and point the public domain at the instance.
+Caddy obtains and renews certificates for an HTTPS `PUBLIC_ORIGIN`. An HTTP
+origin is suitable only for an isolated sandbox; Google sign-in requires HTTPS
+for a non-local callback.
 
-For an isolated HTTP sandbox, configure:
-
-```text
-AWS_APP_PUBLIC_ORIGIN=http://sandbox.example.org
-CHART_ALLOW_INSECURE_HTTP=1
-```
-
-An IPv4 address or explicit port can be used instead, provided the browser uses
-that same canonical origin. The deploy sets the Keycloak realm to
-`sslRequired=none`, aligns its client redirects and web origins, and configures
-nginx to redirect alternate hosts to the canonical origin.
-
-Keycloak-managed username and password accounts work in this mode. Google
-Workspace login is automatically disabled for a non-local HTTP origin because
-Google OAuth requires HTTPS for that callback. Localhost HTTP remains eligible
-for local development.
-
-!!! warning
-
-    Use cleartext HTTP only for an isolated sandbox. Passwords, session cookies,
-    and access tokens otherwise cross the network without transport encryption.
-
-## HTTPS
-
-Set `AWS_APP_PUBLIC_ORIGIN=https://<domain>` and use one TLS setup:
-
-- **nginx terminates TLS.** Stage the certificate and private key on the host,
-  set `CHART_TLS_CERT_FILE` and `CHART_TLS_KEY_FILE` to their paths, and open
-  port 443.
-- **A trusted load balancer terminates TLS.** Forward to host port 80 and set
-  `CHART_TLS_TERMINATED_UPSTREAM=1`.
-
-The deploy sets the Keycloak realm to `sslRequired=external`. Google Workspace
-login can be enabled when its client credentials and hosted domain are also
-configured. Switching between HTTP and HTTPS requires changing the canonical
-origin and deploying again; do not update Keycloak manually.
-
-## Run without GitHub Actions
-
-The deployment script can run directly from a clone on a Linux/Docker host.
-Pass the same settings as ordinary process environment variables:
-
-```bash
-sudo env \
-  APP_DIR="$PWD" \
-  PUBLIC_ORIGIN="http://sandbox.example.org" \
-  ALLOW_INSECURE_HTTP=1 \
-  bash infra/aws/deploy-app.sh
-```
-
-For HTTPS, use an `https://` origin and provide either
-`TLS_TERMINATED_UPSTREAM=1` or readable `TLS_CERT_FILE` and `TLS_KEY_FILE`
-paths. Optional climate, model, Google, and explanation settings use the same
-names documented in the operational runbook. GitHub is only one way to pass
-those inputs; it is not required by the script.
+Before the first Compose release, copy the values from the existing
+`/opt/chart-env/chart.env` and `/opt/chart-env/prediction-worker.env` files into
+`CHART_RUNTIME_ENV`. Preserve the existing `POSTGRES_PASSWORD` so the retained
+database volume remains accessible.
 
 ## Model artifacts on S3
 
-Every model release ships as two things:
+Each model release consists of a checked-in manifest under
+`pipelines/models/<family>/` and its `.rds` files under the manifest's S3
+`base_uri`. Before starting the scorer, Compose syncs the configured bucket into
+the shared `chart-lbw-model` volume and excludes `archive/*`.
 
-1. **A manifest** in the repo at `pipelines/models/<family>/model-release.*.json`.
-   The manifest carries the release id, version, expected SHA256, and the
-   S3 `base_uri` for that release's artifacts.
-2. **One or more `.rds` files** stored on S3 under the manifest's `base_uri`.
-   The runtime never fetches them — the app expects them on disk in
-   `MODEL_CACHE_DIR`, so the deploy pipeline pulls them from S3 into the
-   shared `chart-lbw-model` volume before the R container starts.
+Set `MODEL_BUCKET_PUBLIC=1` for the current anonymous list/read bucket policy.
+For a private bucket, set it to `0` and grant the EC2 instance role
+`s3:ListBucket` and `s3:GetObject` on the bucket. No AWS access keys are stored
+in GitHub.
 
-### Bucket layout
+The sync is idempotent. A release fails during startup if a manifest artifact is
+missing or its SHA-256 does not match.
 
-Files live at `{base_uri}/{filename}`, keyed by country → outcome →
-version so a bucket listing is self-describing:
+To add a model release:
 
-```text
-s3://chart-predictive-models/
-├── india/
-│   └── mp/
-│       ├── lbw/
-│       │   └── 1.0.1-compact-review/
-│       │       └── IN_MP_LBW_tmax_v1.0.1-compact.rds
-│       └── under-five-mortality/
-│           └── 0.1.0-review/
-│               └── IN_MP_under5_mortality_tmax_v0.1.0-review.rds
-├── kenya/
-│   └── lbw/
-│       └── 0.2.1-review/
-│           └── KE_climate_zone_LBW_tmax_v0.2.1-review.rds
-└── archive/                   # retired artifacts kept for provenance
-```
-
-Bucket versioning is enabled so an accidental overwrite is recoverable.
-Retired artifacts (pre-compact-registry rewrites) live under `archive/`
-and are excluded from the deploy sync.
-
-### Deploy-time sync
-
-`infra/aws/deploy-app.sh` mirrors the whole bucket into the shared
-`chart-lbw-model` Docker volume before the R container starts, using
-one `aws s3 sync` with `--exclude "archive/*"` so retired artifacts
-(and any future non-model prefix like `raw/` or `docs/`) never land on
-the runtime host. **S3 is the source of truth** — a new release goes
-live by uploading it to the bucket at the `base_uri` the manifest
-declares; no deploy code edit needed.
-
-The sync runs inside a throwaway `public.ecr.aws/aws-cli/aws-cli`
-container that mounts the volume at `/models`. This avoids host-side
-`chmod`/`sudo` on the root-owned Docker volume directory. The sync is
-idempotent — `aws s3 sync` skips files whose local copy already
-matches — so redeploys are cheap.
-
-### Bucket policy
-
-The bucket needs a policy allowing anonymous read + list so the sync
-works from any host without credentials:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "PublicList",
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "s3:ListBucket",
-      "Resource": "arn:aws:s3:::chart-predictive-models"
-    },
-    {
-      "Sid": "PublicRead",
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::chart-predictive-models/*"
-    }
-  ]
-}
-```
-
-The compact `.rds` artifacts are respondent-free by design (basis
-settings, coefficients, covariance matrices — no microdata), so
-public read is acceptable. If policy changes require the bucket to go
-private, see the "credential flows" section below.
-
-### Bucket access modes
-
-Controlled by `MODEL_BUCKET_PUBLIC` (default `1`):
-
-| Mode | When | How credentials flow |
-| --- | --- | --- |
-| **Public** (`MODEL_BUCKET_PUBLIC=1`) | Default. Bucket has the anonymous list + read policy above. | `--no-sign-request` on the sync; no IAM, no keys, no IMDS. Works from any host. |
-| **Private** (`MODEL_BUCKET_PUBLIC=0`) | If the bucket ever flips to authenticated-only. | Tried in order: `--network host` to reach IMDS 169.254.169.254 and pick up the EC2 instance profile; `AWS_ACCESS_KEY_ID` env vars; mounted `~/.aws`. |
-
-If you flip the bucket to private, the instance role needs both
-actions (list + get) because `aws s3 sync` needs to enumerate first:
-
-```json
-{
-  "Effect": "Allow",
-  "Action": ["s3:GetObject", "s3:ListBucket"],
-  "Resource": [
-    "arn:aws:s3:::chart-predictive-models",
-    "arn:aws:s3:::chart-predictive-models/*"
-  ]
-}
-```
-
-If the sync is skipped or the file names diverge, the app fails cleanly
-at startup with `MODEL_RELEASE_FILE_MISSING` (name not found under
-`MODEL_CACHE_DIR`) or `MODEL_RELEASE_CHECKSUM_MISMATCH` (name matches
-but SHA256 differs from the manifest).
-
-### Environment variables
-
-| Variable | Where | Default | Purpose |
-| --- | --- | --- | --- |
-| `MODEL_BUCKET` | `deploy-app.sh` shell env | `chart-predictive-models` | Bucket the deploy sync pulls from. |
-| `MODEL_CACHE_DIR` | Python API + R container | `/models` | Where the app expects the artifacts on disk (deploy binds the host volume here). |
-| `MODEL_CONTROL_TOKEN` | Python API + R container | generated | Shared secret gating `/models/load` on the R runtime. |
-
-The Python side's `warm_model_artifact` searches `MODEL_CACHE_DIR`
-recursively (`rglob(filename)`) — the on-disk directory layout can
-mirror the S3 tree (recommended, matches the deploy sync) or be flat;
-what matters is that the filename in the manifest exists somewhere
-under the cache root.
-
-### Adding a new release
-
-1. Upload the new `.rds` to `s3://<MODEL_BUCKET>/<base_uri path>/<filename>`.
-2. Commit a manifest under `pipelines/models/<family>/` pointing at that
-   `base_uri` + `filename` with the file's SHA256.
-3. Merge to `dev` — the next deploy syncs the file and activates the
-   release automatically. No infra edit required.
+1. Upload the `.rds` file beneath the manifest's S3 `base_uri`.
+2. Commit the manifest under `pipelines/models/<family>/`.
+3. Merge to `dev`; the next deployment syncs and activates it.
 
 ## Deployment and verification
 
-A pull request validates the deployment candidate but does not change the EC2
-host. Merging or pushing to `dev` runs the deployment. The final checks verify:
+Pull requests run validation and build all deploy images without changing EC2.
+A push to `dev`, or a manually dispatched workflow, publishes and deploys the
+exact commit SHA. The workflow then checks that the public web build reports
+that SHA and that the API readiness endpoint succeeds.
 
-- web build identity and public reachability;
-- Python API readiness and unauthenticated auth behavior;
-- the Keycloak realm endpoint; and
-- a complete OIDC authorization request for the configured callback.
+On failure, the workflow reports Compose status and recent logs. On the host,
+the current containers can be inspected with:
+
+```bash
+docker ps --filter label=com.docker.compose.project=chart
+docker logs --tail 100 chart-api
+```
+
+Database backups are created in `/opt/chart-backups` before migrations and kept
+for 14 days. Postgres, models, climate outputs, Dagster state, and Caddy
+certificates use named Docker volumes.
 
 ## Related
 
 - [`infra/aws/README.md`](https://github.com/CHART-Scope/CHART/blob/dev/infra/aws/README.md)
-  — complete secret inventory, host requirements, and operational checks.
+- [`infra/aws/docker-compose.yml`](https://github.com/CHART-Scope/CHART/blob/dev/infra/aws/docker-compose.yml)
 - [`infra/keycloak/README.md`](https://github.com/CHART-Scope/CHART/blob/dev/infra/keycloak/README.md)
-  — identity-provider configuration and callback rules.
-- [`infra/aws/deploy-app.sh`](https://github.com/CHART-Scope/CHART/blob/dev/infra/aws/deploy-app.sh)
-  — the unchanged deployment implementation described by this page.

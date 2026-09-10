@@ -5,61 +5,38 @@ on:
     paths:
       - ".github/workflows/app-deploy.yml"
       - ".dockerignore"
+      - ".prettierignore"
+      - ".prettierrc.json"
       - "backend/**"
+      - "docs/climate-api.md"
+      - "docs/data-pipeline.md"
+      - "docs/openapi/climate.json"
       - "infra/**"
+      - "Makefile"
       - "orchestration/**"
       - "package.json"
       - "package-lock.json"
-      - "pipelines/era5_heat/**"
-      - "pipelines/seasonal_c3s/**"
-      - "pipelines/isimip_projection/**"
-      - "pipelines/boundaries/**"
-      - "pipelines/models/**"
+      - "pipelines/**"
       - "web/**"
   push:
-    branches:
-      - dev
+    branches: [main, dev]
     paths:
       - ".github/workflows/app-deploy.yml"
       - ".dockerignore"
-      - "backend/**"
       - ".prettierignore"
       - ".prettierrc.json"
+      - "backend/**"
+      - "docs/climate-api.md"
+      - "docs/data-pipeline.md"
+      - "docs/openapi/climate.json"
       - "infra/**"
+      - "Makefile"
       - "orchestration/**"
       - "package.json"
       - "package-lock.json"
-      - "pipelines/era5_heat/**"
-      - "pipelines/seasonal_c3s/**"
-      - "pipelines/isimip_projection/**"
-      - "pipelines/boundaries/**"
-      - "pipelines/models/**"
+      - "pipelines/**"
       - "web/**"
   workflow_dispatch:
-    inputs:
-      public_origin:
-        description: "Preferred browser origin, such as https://chart.example.org."
-        required: false
-        type: string
-      public_host:
-        description: "Optional public hostname for browser URLs, such as dev.example.org. Defaults to AWS_APP_PUBLIC_HOST or AWS_APP_HOST."
-        required: false
-        type: string
-      public_scheme:
-        description: "Public browser scheme. Production defaults to https."
-        required: false
-        default: "https"
-        type: choice
-        options:
-          - https
-          - http
-
-env:
-  DEPLOY_BRANCH: dev
-  # Every model currently deployed to the dev sandbox is review-gated. Keep
-  # the opt-in explicit here rather than enabling review releases by default
-  # in the reusable host deployment script.
-  CHART_ENABLE_REVIEW_MODELS: "true"
 
 concurrency:
   group: chart-app-deploy-${{ github.ref }}
@@ -70,7 +47,7 @@ permissions:
 
 jobs:
   validate:
-    name: Validate deploy candidate
+    name: Validate
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -89,217 +66,231 @@ jobs:
     env:
       DATABASE_URL: postgres://chart:chart@127.0.0.1:5432/chart
     steps:
-      - name: Check out deploy branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || env.DEPLOY_BRANCH }}
+      - uses: actions/checkout@v4
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
+      - run: npx prettier --check .github README.md infra web/src web/.storybook web/*.json web/*.mjs web/*.ts package.json
+      - run: npm run identity:test
 
-      - name: Check formatting
-        run: npx prettier --check .github README.md infra web/src web/.storybook web/*.json web/*.mjs web/*.ts package.json
-
-      - name: Check deploy script syntax
-        run: bash -n infra/aws/deploy-app.sh
-
-      - name: Test Keycloak SSO configuration
-        run: npm run identity:test
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install Python application
+      - name: Install Python packages
         run: >-
           python -m pip install -e 'backend[dev]' -e 'pipelines/era5_heat[dev]'
           -e 'pipelines/seasonal_c3s[dev]' -e 'pipelines/boundaries[dev]'
-          -e 'pipelines/isimip_projection[dev]'
-          -e orchestration
+          -e 'pipelines/isimip_projection[dev]' -e orchestration
 
-      - name: Apply Alembic migrations
-        env:
-          DATABASE_URL: postgresql+psycopg://chart:chart@127.0.0.1:5432/chart
-        run: backend/scripts/migrate.sh
+      - name: Check Python formatting, lint, and types
+        run: make python-check VENV_PYTHON=python
 
-      - name: Verify SQLAlchemy metadata matches Alembic
+      - name: Validate database migrations
         working-directory: backend
         env:
           DATABASE_URL: postgresql+psycopg://chart:chart@127.0.0.1:5432/chart
-        run: python -m alembic check
+        run: |
+          python -m alembic upgrade head
+          python -m alembic check
 
-      - name: Test Python API and data flow
+      - name: Test Python application and pipelines
         run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests -q
 
-      - name: Typecheck current frontend
-        run: npm run typecheck:web
-
-      - name: Build current frontend
-        run: npm run build:web
-
-      - name: Build CHART API and data image
-        run: docker build -f backend/Dockerfile -t chart-python:ci .
-
-      - name: Create Dagster database
+      - name: Validate Dagster and OpenAPI contracts
         run: |
-          docker run --rm --network host \
-            -e PGPASSWORD=chart \
-            postgres:16-alpine \
-            createdb -h 127.0.0.1 -U chart chart_dagster
+          python -c 'import dagster as dg; from chart_pipeline.definitions import defs; dg.Definitions.validate_loadable(defs)'
+          python -m chart.api.export_openapi --output docs/openapi/climate.json
+          git diff --exit-code docs/openapi/climate.json
 
-      - name: Validate Python prediction image
+      - run: npm run typecheck:web
+      - run: npm run build:web
+
+      - name: Validate deployment configuration
+        env:
+          PUBLIC_ORIGIN: http://example.test
+          POSTGRES_PASSWORD: test-password
+          KEYCLOAK_ADMIN_PASSWORD: test-password
+          CHART_BOOTSTRAP_TOKEN: test-token
+          MODEL_CONTROL_TOKEN: test-token
         run: |
-          docker run --rm chart-python:ci test -x /app/backend/scripts/migrate.sh
-          docker run --rm chart-python:ci chart-admin-recover --help
-          docker run --rm chart-python:ci python -c 'from chart.api.app import app; paths=app.openapi()["paths"]; assert all(path in paths for path in ["/auth/me", "/setup", "/users", "/geographies", "/climate/predict"])'
-          docker run --rm chart-python:ci python -c 'import dagster as dg; from chart_pipeline.definitions import defs; dg.Definitions.validate_loadable(defs)'
-          docker run --rm --network host \
-            -e DAGSTER_POSTGRES_HOST=127.0.0.1 \
-            -e DAGSTER_POSTGRES_PORT=5432 \
-            -e DAGSTER_POSTGRES_USER=chart \
-            -e DAGSTER_POSTGRES_PASSWORD=chart \
-            -e DAGSTER_POSTGRES_DB=chart_dagster \
-            chart-python:ci dagster instance info
+          IMAGE_PREFIX=ghcr.io/chart-scope/chart IMAGE_TAG=test docker compose -f infra/aws/docker-compose.yml config -q
+          docker run --rm -e PUBLIC_ORIGIN -v "$PWD/infra/aws/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10-alpine caddy validate --config /etc/caddy/Caddyfile
 
-      - name: Validate model registry image
-        run: docker build --target test -f pipelines/models/Dockerfile -t chart-lbw:ci pipelines/models
+      - name: Validate deploy images on pull requests
+        if: github.event_name == 'pull_request'
+        run: |
+          docker build -f backend/Dockerfile -t chart-python:ci .
+          docker build --build-arg "CHART_BUILD_ID=$GITHUB_SHA" -f web/Dockerfile -t chart-web:ci .
+          docker build --target test -f pipelines/models/Dockerfile -t chart-lbw:ci pipelines/models
+          docker run --rm chart-python:ci python -c 'from chart.api.app import app; assert "/climate/predict" in app.openapi()["paths"]'
 
-      - name: Build current frontend image
-        run: docker build --build-arg "CHART_BUILD_ID=$GITHUB_SHA" -f web/Dockerfile -t chart-web:ci .
+  publish:
+    name: Build and publish images
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_prefix: ${{ steps.image.outputs.prefix }}
+      image_tag: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image names
+        id: image
+        run: echo "prefix=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Python image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.image.outputs.prefix }}-python:${{ github.sha }}
+            ${{ steps.image.outputs.prefix }}-python:dev
+          cache-from: type=gha,scope=python
+          cache-to: type=gha,mode=max,scope=python
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: web/Dockerfile
+          push: true
+          build-args: CHART_BUILD_ID=${{ github.sha }}
+          tags: |
+            ${{ steps.image.outputs.prefix }}-web:${{ github.sha }}
+            ${{ steps.image.outputs.prefix }}-web:dev
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Build and push model image
+        uses: docker/build-push-action@v6
+        with:
+          context: pipelines/models
+          target: final
+          push: true
+          tags: |
+            ${{ steps.image.outputs.prefix }}-lbw:${{ github.sha }}
+            ${{ steps.image.outputs.prefix }}-lbw:dev
+          cache-from: type=gha,scope=lbw
+          cache-to: type=gha,mode=max,scope=lbw
 
   deploy:
-    name: Deploy app
-    needs: validate
-    if: github.event_name != 'pull_request'
+    name: Deploy to EC2
+    needs: publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     environment: dev
-    env:
-      AWS_APP_HOST: ${{ secrets.AWS_APP_HOST }}
-      AWS_APP_PUBLIC_ORIGIN: ${{ secrets.AWS_APP_PUBLIC_ORIGIN }}
-      AWS_APP_PUBLIC_HOST: ${{ secrets.AWS_APP_PUBLIC_HOST }}
-      AWS_APP_SSH_KEY: ${{ secrets.AWS_APP_SSH_KEY }}
-      AWS_APP_USER: ${{ secrets.AWS_APP_USER }}
-      CDSAPI_KEY: ${{ secrets.CDSAPI_KEY }}
-      CDSAPI_URL: ${{ secrets.CDSAPI_URL }}
-      KEYCLOAK_GOOGLE_CLIENT_ID: ${{ secrets.KEYCLOAK_GOOGLE_CLIENT_ID }}
-      KEYCLOAK_GOOGLE_CLIENT_SECRET: ${{ secrets.KEYCLOAK_GOOGLE_CLIENT_SECRET }}
-      KEYCLOAK_GOOGLE_HOSTED_DOMAIN: ${{ secrets.KEYCLOAK_GOOGLE_HOSTED_DOMAIN }}
-      INFERENCE_LLM_ENABLED: ${{ secrets.INFERENCE_LLM_ENABLED }}
-      INFERENCE_LLM_BASE_URL: ${{ secrets.INFERENCE_LLM_BASE_URL }}
-      INFERENCE_LLM_MODEL: ${{ secrets.INFERENCE_LLM_MODEL }}
-      INFERENCE_LLM_API_KEY: ${{ secrets.INFERENCE_LLM_API_KEY }}
-      PUBLIC_SCHEME: ${{ inputs.public_scheme || secrets.CHART_PUBLIC_SCHEME || 'https' }}
-      TLS_TERMINATED_UPSTREAM: ${{ secrets.CHART_TLS_TERMINATED_UPSTREAM }}
-      TLS_CERT_FILE: ${{ secrets.CHART_TLS_CERT_FILE }}
-      TLS_KEY_FILE: ${{ secrets.CHART_TLS_KEY_FILE }}
-      ALLOW_INSECURE_HTTP: ${{ secrets.CHART_ALLOW_INSECURE_HTTP }}
-      CHART_BOOTSTRAP_TOKEN: ${{ secrets.CHART_BOOTSTRAP_TOKEN }}
     steps:
-      - name: Validate deploy secrets
-        run: |
-          missing=0
-          for name in AWS_APP_HOST AWS_APP_SSH_KEY AWS_APP_USER; do
-            if [ -z "${!name}" ]; then
-              echo "::error title=Missing deploy secret::$name is required for EC2 deploy"
-              missing=1
-            fi
-          done
-          if [ -n "$KEYCLOAK_GOOGLE_CLIENT_ID" ] || [ -n "$KEYCLOAK_GOOGLE_CLIENT_SECRET" ]; then
-            if [ -z "$KEYCLOAK_GOOGLE_CLIENT_ID" ] || [ -z "$KEYCLOAK_GOOGLE_CLIENT_SECRET" ]; then
-              echo "::error title=Incomplete Google SSO configuration::Set both KEYCLOAK_GOOGLE_CLIENT_ID and KEYCLOAK_GOOGLE_CLIENT_SECRET"
-              missing=1
-            fi
-            if [ -z "${{ inputs.public_origin || env.AWS_APP_PUBLIC_ORIGIN }}" ]; then
-              echo "::error title=Missing public origin::Google SSO requires AWS_APP_PUBLIC_ORIGIN, for example https://chart.example.org"
-              missing=1
-            fi
-          fi
-          exit "$missing"
+      - uses: actions/checkout@v4
 
-      - name: Deploy app on EC2
-        uses: appleboy/ssh-action@v1.2.0
+      - name: Copy Compose configuration
+        uses: appleboy/scp-action@v1
         with:
-          host: ${{ env.AWS_APP_HOST }}
-          username: ${{ env.AWS_APP_USER }}
-          key: ${{ env.AWS_APP_SSH_KEY }}
-          command_timeout: 90m
-          envs: CDSAPI_KEY,CDSAPI_URL,KEYCLOAK_GOOGLE_CLIENT_ID,KEYCLOAK_GOOGLE_CLIENT_SECRET,KEYCLOAK_GOOGLE_HOSTED_DOMAIN,INFERENCE_LLM_ENABLED,INFERENCE_LLM_BASE_URL,INFERENCE_LLM_MODEL,INFERENCE_LLM_API_KEY,PUBLIC_SCHEME,TLS_TERMINATED_UPSTREAM,TLS_CERT_FILE,TLS_KEY_FILE,ALLOW_INSECURE_HTTP,CHART_BOOTSTRAP_TOKEN,CHART_ENABLE_REVIEW_MODELS
+          host: ${{ secrets.AWS_APP_HOST }}
+          username: ${{ secrets.AWS_APP_USER }}
+          key: ${{ secrets.AWS_APP_SSH_KEY }}
+          source: "infra/aws,infra/keycloak"
+          target: /opt/chart-deploy
+          strip_components: 1
+          overwrite: true
+
+      - name: Prepare runtime environment
+        env:
+          CHART_RUNTIME_ENV: ${{ secrets.CHART_RUNTIME_ENV }}
+        run: |
+          if [ -z "$CHART_RUNTIME_ENV" ]; then
+            echo "::error title=Missing deployment configuration::CHART_RUNTIME_ENV is required"
+            exit 1
+          fi
+          runtime_env="$(mktemp)"
+          trap 'rm -f "$runtime_env"' EXIT
+          printf '%s' "$CHART_RUNTIME_ENV" > "$runtime_env"
+          public_origin="$(docker compose --env-file "$runtime_env" -f infra/aws/docker-compose.yml config --format json | jq -r '.services["chart-caddy"].environment.PUBLIC_ORIGIN // empty')"
+          if [[ ! "$public_origin" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]]; then
+            echo "::error title=Invalid runtime setting::PUBLIC_ORIGIN must be an HTTP(S) origin without a path"
+            exit 1
+          fi
+          runtime_env_b64="$(printf '%s' "$CHART_RUNTIME_ENV" | base64 -w 0)"
+          echo "::add-mask::$runtime_env_b64"
+          echo "AWS_APP_PUBLIC_ORIGIN=$public_origin" >> "$GITHUB_ENV"
+          echo "CHART_RUNTIME_ENV_B64=$runtime_env_b64" >> "$GITHUB_ENV"
+
+      - name: Pull and start release
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USER: ${{ github.actor }}
+        with:
+          host: ${{ secrets.AWS_APP_HOST }}
+          username: ${{ secrets.AWS_APP_USER }}
+          key: ${{ secrets.AWS_APP_SSH_KEY }}
+          command_timeout: 30m
+          envs: GHCR_TOKEN,GHCR_USER,CHART_RUNTIME_ENV_B64
           script: |
             set -euo pipefail
-
-            APP_DIR="${APP_DIR:-/opt/chart}"
-            BRANCH="${{ env.DEPLOY_BRANCH }}"
-
-            if [ -d "$APP_DIR/.git" ]; then
-              git -C "$APP_DIR" reset --hard
-              git -C "$APP_DIR" clean -fd
-              git -C "$APP_DIR" fetch origin "$BRANCH"
-              git -C "$APP_DIR" checkout -B "$BRANCH" "origin/$BRANCH"
-              git -C "$APP_DIR" reset --hard "origin/$BRANCH"
-              git -C "$APP_DIR" clean -fd
-            else
-              mkdir -p "$(dirname "$APP_DIR")"
-              git clone --branch "$BRANCH" https://github.com/CHART-Scope/CHART.git "$APP_DIR"
-            fi
-
-            PUBLIC_ORIGIN="${{ inputs.public_origin || env.AWS_APP_PUBLIC_ORIGIN }}"
-            PUBLIC_HOST="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
-            PUBLIC_ORIGIN="$PUBLIC_ORIGIN" PUBLIC_HOST="$PUBLIC_HOST" bash "$APP_DIR/infra/aws/deploy-app.sh"
-
-      - name: Verify public app remains reachable
-        run: |
-          base_url="${{ inputs.public_origin || env.AWS_APP_PUBLIC_ORIGIN }}"
-          if [ -z "$base_url" ]; then
-            public_host="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
-            base_url="${PUBLIC_SCHEME}://${public_host}"
-          fi
-          callback_uri="$(jq -rn --arg value "$base_url/auth/callback" '$value | @uri')"
-
-          for attempt in $(seq 1 12); do
-            web_status="$(curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/" || true)"
-            build_id="$(curl -fsS --connect-timeout 5 --max-time 15 "$base_url/api/build" | jq -r .buildId || true)"
-            api_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$base_url/chart-api/ready" || true)"
-            setup_country_count="$(curl -fsS --connect-timeout 5 --max-time 15 "$base_url/chart-api/setup/options" | jq -r '.geographies | length' || true)"
-            auth_status="$(curl -sS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/chart-api/auth/me" || true)"
-            keycloak_status="$(curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/identity/realms/chart" || true)"
-            keycloak_auth_status="$(curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" "$base_url/identity/realms/chart/protocol/openid-connect/auth?client_id=chart-web&redirect_uri=$callback_uri&response_type=code&scope=openid&state=deploy-check&code_challenge=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&code_challenge_method=S256" || true)"
-
-            if [ "$web_status" != "200" ] || [ "$build_id" != "$GITHUB_SHA" ] || [ "$api_body" != '{"status":"ok"}' ] || [ "${setup_country_count:-0}" -lt 1 ] || [ "$auth_status" != "401" ] || [ "$keycloak_status" != "200" ] || [ "$keycloak_auth_status" != "200" ]; then
-              echo "::error title=Public smoke check failed::attempt ${attempt}: web=${web_status:-000} build=${build_id:-empty} api=${api_body:-empty} setup_countries=${setup_country_count:-0} auth=${auth_status:-000} keycloak=${keycloak_status:-000} keycloak_auth=${keycloak_auth_status:-000}"
-              if [ "$attempt" -eq 12 ]; then
-                exit 1
+            cd /opt/chart-deploy/aws
+            runtime_env="$(mktemp /dev/shm/chart-env.XXXXXX)"
+            docker_config="$(mktemp -d /dev/shm/chart-docker.XXXXXX)"
+            trap 'rm -rf "$runtime_env" "$docker_config"' EXIT
+            printf '%s' "$CHART_RUNTIME_ENV_B64" | base64 -d > "$runtime_env"
+            chmod 600 "$runtime_env"
+            printf '%s' "$GHCR_TOKEN" | DOCKER_CONFIG="$docker_config" docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}" IMAGE_TAG="${{ needs.publish.outputs.image_tag }}" DOCKER_CONFIG="$docker_config" docker compose --env-file "$runtime_env" pull
+            if docker inspect chart-postgres >/dev/null 2>&1; then
+              compose_owner="$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' chart-postgres 2>/dev/null || true)"
+              if [ "$compose_owner" != "chart" ]; then
+                docker rm -f chart-proxy chart-web chart-api chart-climate-api chart-new-design chart-dagster-webserver chart-dagster-daemon chart-lbw chart-keycloak chart-keycloak-postgres chart-postgres 2>/dev/null || true
               fi
-              sleep 10
-              continue
             fi
+            IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}" IMAGE_TAG="${{ needs.publish.outputs.image_tag }}" DOCKER_CONFIG="$docker_config" docker compose --env-file "$runtime_env" up -d --wait --remove-orphans
 
-            echo "Public smoke check ${attempt}/12 passed."
+      - name: Verify public release
+        if: env.AWS_APP_PUBLIC_ORIGIN != ''
+        run: |
+          for attempt in $(seq 1 12); do
+            build_id="$(curl -fsS --connect-timeout 5 --max-time 15 "$AWS_APP_PUBLIC_ORIGIN/api/build" | jq -r .buildId || true)"
+            api_status="$(curl -fsS --connect-timeout 5 --max-time 15 "$AWS_APP_PUBLIC_ORIGIN/chart-api/ready" | jq -r .status || true)"
+            if [ "$build_id" = "$GITHUB_SHA" ] && [ "$api_status" = "ok" ]; then
+              exit 0
+            fi
             sleep 10
           done
+          exit 1
 
-      - name: Dump EC2 diagnostics on failure
-        if: failure()
+      - name: Show deployment diagnostics
+        if: failure() && env.CHART_RUNTIME_ENV_B64 != ''
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ env.AWS_APP_HOST }}
-          username: ${{ env.AWS_APP_USER }}
-          key: ${{ env.AWS_APP_SSH_KEY }}
+          host: ${{ secrets.AWS_APP_HOST }}
+          username: ${{ secrets.AWS_APP_USER }}
+          key: ${{ secrets.AWS_APP_SSH_KEY }}
+          envs: CHART_RUNTIME_ENV_B64
           script: |
-            set -uo pipefail
-
-            docker ps -a --filter "name=chart-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-            ss -ltnp || true
-
-            for container in chart-proxy chart-web chart-api chart-dagster-webserver chart-dagster-daemon chart-lbw chart-keycloak chart-postgres; do
-              if docker ps -a --format "{{.Names}}" | grep -qx "$container"; then
-                echo "===== $container logs ====="
-                docker logs --tail 120 "$container" || true
-              fi
-            done
+            set -u
+            cd /opt/chart-deploy/aws
+            runtime_env="$(mktemp /dev/shm/chart-env.XXXXXX)"
+            trap 'rm -f "$runtime_env"' EXIT
+            printf '%s' "$CHART_RUNTIME_ENV_B64" | base64 -d > "$runtime_env"
+            chmod 600 "$runtime_env"
+            IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}" IMAGE_TAG="${{ needs.publish.outputs.image_tag }}" docker compose --env-file "$runtime_env" ps -a
+            IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}" IMAGE_TAG="${{ needs.publish.outputs.image_tag }}" docker compose --env-file "$runtime_env" logs --tail 100

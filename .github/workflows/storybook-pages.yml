@@ -62,12 +62,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check Storybook formatting
-        run: npx prettier --check web/.storybook web/src package.json
-
-      - name: Typecheck web
-        run: npm run typecheck:web
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

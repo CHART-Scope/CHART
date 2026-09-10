@@ -38,4 +38,4 @@ FROM runtime AS test
 RUN Rscript inference/tests/test_serialization.R
 RUN Rscript inference/tests/test_compact_score.R
 
-FROM runtime AS final
+FROM test AS final
