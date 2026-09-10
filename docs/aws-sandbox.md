@@ -46,12 +46,9 @@ assigned to each service.
 
 ## Host setup
 
-Install Docker with the Compose plugin and create the two host directories:
-
-```bash
-sudo install -d -o "$USER" -g "$USER" /opt/chart-deploy
-sudo install -d -m 700 -o "$USER" -g "$USER" /opt/chart-backups
-```
+Install Docker with the Compose plugin and allow the deployment SSH user to run
+Docker. The workflow creates `~/chart-deploy` and its backup directory without
+requiring access to `/opt`.
 
 Allow inbound ports 80 and 443 and point the public domain at the instance.
 Caddy obtains and renews certificates for an HTTPS `PUBLIC_ORIGIN`. An HTTP
@@ -99,9 +96,9 @@ docker ps --filter label=com.docker.compose.project=chart
 docker logs --tail 100 chart-api
 ```
 
-Database backups are created in `/opt/chart-backups` before migrations and kept
-for 14 days. Postgres, models, climate outputs, Dagster state, and Caddy
-certificates use named Docker volumes.
+Database backups are created in `~/chart-deploy/aws/backups` before migrations
+and kept for 14 days. Postgres, models, climate outputs, Dagster state, and
+Caddy certificates use named Docker volumes.
 
 ## Related
 
