@@ -84,10 +84,9 @@ Two categories of setting live in different places:
   `CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES`, `EMAIL_*`) live in `backend/.env`
   because they don't need to match anything outside the API process.
 
-In production, put these settings in the multiline GitHub environment secret
-`CHART_RUNTIME_ENV`. The deployment passes that bundle to Docker Compose at
-runtime, which assigns each service only the values declared in
-`infra/aws/docker-compose.yml`.
+In production, put these settings in the gitignored
+`~/chart-deploy/aws/.env.prod` file on EC2. Docker Compose assigns each service
+only the values declared in `infra/aws/docker-compose.yml`.
 
 ## Admin geography scope
 
