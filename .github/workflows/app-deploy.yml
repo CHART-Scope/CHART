@@ -210,7 +210,7 @@ jobs:
           username: ${{ secrets.AWS_APP_USER }}
           key: ${{ secrets.AWS_APP_SSH_KEY }}
           source: "infra/aws,infra/keycloak"
-          target: /opt/chart-deploy
+          target: chart-deploy
           strip_components: 1
           overwrite: true
 
@@ -248,7 +248,9 @@ jobs:
           envs: GHCR_TOKEN,GHCR_USER,CHART_RUNTIME_ENV_B64
           script: |
             set -euo pipefail
-            cd /opt/chart-deploy/aws
+            cd "$HOME/chart-deploy/aws"
+            mkdir -p backups
+            chmod 700 backups
             runtime_env="$(mktemp /dev/shm/chart-env.XXXXXX)"
             docker_config="$(mktemp -d /dev/shm/chart-docker.XXXXXX)"
             trap 'rm -rf "$runtime_env" "$docker_config"' EXIT
@@ -287,7 +289,7 @@ jobs:
           envs: CHART_RUNTIME_ENV_B64
           script: |
             set -u
-            cd /opt/chart-deploy/aws
+            cd "$HOME/chart-deploy/aws"
             runtime_env="$(mktemp /dev/shm/chart-env.XXXXXX)"
             trap 'rm -f "$runtime_env"' EXIT
             printf '%s' "$CHART_RUNTIME_ENV_B64" | base64 -d > "$runtime_env"

@@ -10,7 +10,7 @@ runs Docker Compose.
 1. Pull requests run tests and validate all three deploy images.
 2. A push to `dev` runs the same validation, builds the Python, web, and LBW
    images, and pushes both the commit SHA and `dev` tags to GHCR.
-3. CI copies `infra/aws` and `infra/keycloak` to `/opt/chart-deploy` on EC2 and
+3. CI copies `infra/aws` and `infra/keycloak` to `~/chart-deploy` on EC2 and
    passes one encoded runtime-environment secret to the deployment command.
 4. EC2 logs in to GHCR and runs `docker compose pull` followed by
    `docker compose up -d --wait --remove-orphans`. Compose reads the settings
@@ -39,13 +39,9 @@ else goes to the web app. Dagster remains bound to `127.0.0.1:3000`.
 
 ## One-time EC2 setup
 
-Install Docker with the Compose plugin and create directories writable by the
-deployment SSH user:
-
-```bash
-sudo install -d -o "$USER" -g "$USER" /opt/chart-deploy
-sudo install -d -m 700 -o "$USER" -g "$USER" /opt/chart-backups
-```
+Install Docker with the Compose plugin and allow the deployment SSH user to run
+Docker. The workflow creates its deployment and backup directories under that
+user's home directory.
 
 Set `MODEL_BUCKET_PUBLIC=0` and grant the EC2 instance role read access when the
 model S3 bucket is private. The default `MODEL_BUCKET_PUBLIC=1` uses anonymous
@@ -104,6 +100,6 @@ Open the private Dagster UI through an SSH tunnel:
 ssh -L 3000:127.0.0.1:3000 <user>@<host>
 ```
 
-Database backups are written to `/opt/chart-backups` before migrations and
-retained for 14 days. Application data, model files, climate outputs, Dagster
-state, and Caddy certificates use named Docker volumes.
+Database backups are written to `~/chart-deploy/aws/backups` before migrations
+and retained for 14 days. Application data, model files, climate outputs,
+Dagster state, and Caddy certificates use named Docker volumes.

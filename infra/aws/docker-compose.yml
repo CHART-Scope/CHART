@@ -82,7 +82,7 @@ services:
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - /opt/chart-backups:/backups
+      - ./backups:/backups
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - >-
