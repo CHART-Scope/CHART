@@ -342,17 +342,18 @@ stays disabled until its method is approved.
 
 ## 10. Deployment
 
-One Python image is used by the API and Dagster. EC2 deployment:
+One Python image is used by the API and Dagster. CI publishes that image with
+the web and R scorer images, then EC2 uses Docker Compose to:
 
 1. starts Postgres/PostGIS;
 2. runs Alembic;
 3. loads versioned MP boundaries and place mappings;
 4. registers and activates the model for each explicit analytical area only
    when both files and expected SHA-256 values are configured;
-5. starts the Python API, Dagster, `web`, Keycloak, and optional R scorer;
+5. starts the Python API, Dagster, `web`, Keycloak, and R scorer;
 6. waits for `/ready` and verifies that `/api/build` reports the deployed commit;
-7. exposes the web and `/chart-api` through nginx over HTTPS, unless TLS is
-   explicitly declared to terminate at an upstream load balancer.
+7. exposes the web, `/chart-api`, and `/identity` through Caddy, which manages
+   HTTPS certificates for the configured public domain.
 
 `CDSAPI_KEY` is a deployment secret. Users do not enter Copernicus credentials
 in the UI. Refresh and ID tokens remain in secure HttpOnly cookies; only the

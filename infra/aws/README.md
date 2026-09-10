@@ -1,157 +1,109 @@
-# AWS deploy
+# AWS deployment
 
-`App Deploy` validates the requested commit and runs
-`infra/aws/deploy-app.sh` on one EC2 host.
+GitHub Actions builds CHART once and publishes commit-tagged images to GitHub
+Container Registry. The EC2 host does not clone the repository or build images.
+It receives this small deployment bundle, pulls the requested image tag, and
+runs Docker Compose.
 
-## What runs
+## Release flow
 
-- the canonical `web` Next app;
-- one Python/FastAPI application API;
-- Dagster webserver and daemon;
-- Postgres/PostGIS;
-- Keycloak;
-- nginx;
-- the LBW R scorer when both model files are configured.
+1. Pull requests run tests and validate all three deploy images.
+2. A push to `dev` runs the same validation, builds the Python, web, and LBW
+   images, and pushes both the commit SHA and `dev` tags to GHCR.
+3. CI copies `infra/aws` and `infra/keycloak` to `/opt/chart-deploy` on EC2 and
+   passes one encoded runtime-environment secret to the deployment command.
+4. EC2 logs in to GHCR and runs `docker compose pull` followed by
+   `docker compose up -d --wait --remove-orphans`. Compose reads the settings
+   from a temporary file in `/dev/shm`, which is deleted when the command ends.
 
-Fastify and Drizzle are not installed or deployed. Alembic is the only CHART
-database migration path.
+On the first release after this migration, CI removes the old manually managed
+containers after the new images have been pulled. Named volumes are retained.
+Later releases are managed entirely by Compose.
 
-The deploy creates a timestamped PostgreSQL backup, runs the checked Alembic
-migration script, loads the versioned Madhya Pradesh boundaries and place
-mappings, verifies both expected model SHA-256 values, registers scoped model
-assignments, then migrates Dagster storage. Backups are stored under
-`/opt/chart-env/backups` for 14 days.
+The SHA tag is used for the deployment, so a release always identifies the
+exact images it runs. The moving `dev` tag is available for inspection only.
 
-## Public paths
+## Services
 
-- `/`: Next web
-- `/chart-api/*`: Python application API
-- `/climate/*`: the same Python API, kept as a planning shortcut
-- `/chart-api/live`: process liveness
-- `/chart-api/ready`: database, migration, and model readiness
-- `/identity/*`: Keycloak
+Compose runs the Next web app, FastAPI, Dagster webserver and daemon,
+Postgres/PostGIS, Keycloak, the LBW scorer, and Caddy. It also runs short-lived
+containers for the database backup, database migrations, geography/model
+bootstrap, model download, Dagster migration, and Keycloak configuration.
+Those jobs are dependencies of the long-running services, so the single
+`compose up` command stops if preparation fails.
 
-Dagster and the LBW scorer bind only to localhost on the host.
+Caddy is the public entrypoint. It obtains and renews HTTPS certificates when
+`PUBLIC_ORIGIN` is an HTTPS domain, stores them in a persistent volume, and
+routes `/chart-api`, `/climate`, and `/identity` to their services. Everything
+else goes to the web app. Dagster remains bound to `127.0.0.1:3000`.
 
-## GitHub secrets
+## One-time EC2 setup
 
-Required:
+Install Docker with the Compose plugin and create directories writable by the
+deployment SSH user:
+
+```bash
+sudo install -d -o "$USER" -g "$USER" /opt/chart-deploy
+sudo install -d -m 700 -o "$USER" -g "$USER" /opt/chart-backups
+```
+
+Set `MODEL_BUCKET_PUBLIC=0` and grant the EC2 instance role read access when the
+model S3 bucket is private. The default `MODEL_BUCKET_PUBLIC=1` uses anonymous
+read access. Ports 80 and 443 must be open, and the public domain must point to
+the instance. Caddy uses port 80 for certificate issuance and HTTP-to-HTTPS
+redirects.
+
+Required GitHub `dev` environment secrets are:
 
 - `AWS_APP_HOST`
 - `AWS_APP_USER`
 - `AWS_APP_SSH_KEY`
+- `CHART_RUNTIME_ENV`
 
-Optional:
+Store every Compose setting in the single multiline `CHART_RUNTIME_ENV` secret:
 
-- `AWS_APP_PUBLIC_HOST`
-- `AWS_APP_PUBLIC_ORIGIN`
-- `CHART_PUBLIC_SCHEME`
-- `CHART_ALLOW_INSECURE_HTTP`
-- `CHART_BOOTSTRAP_TOKEN` (generated and persisted when omitted)
-- `KEYCLOAK_GOOGLE_CLIENT_ID`
-- `KEYCLOAK_GOOGLE_CLIENT_SECRET`
-- `KEYCLOAK_GOOGLE_HOSTED_DOMAIN`
-- `CHART_TLS_TERMINATED_UPSTREAM`
-- `CHART_TLS_CERT_FILE`
-- `CHART_TLS_KEY_FILE`
-- `CDSAPI_URL`
-- `CDSAPI_KEY`
-- `INFERENCE_LLM_ENABLED`
-- `INFERENCE_LLM_BASE_URL`
-- `INFERENCE_LLM_MODEL`
-- `INFERENCE_LLM_API_KEY`
-
-Model S3 URIs are no longer deployment secrets. Each model's
-`model-release.json` manifest carries the `base_uri` (e.g.
-`s3://chart-predictive-models`) and per-file names + SHA256 hashes; the
-deploy derives the concrete URIs from it. Adding a new model means shipping
-its manifest, not adding new secrets.
-
-Copernicus and optional explanation credentials are stored in
-`/opt/chart-env/prediction-worker.env` with mode `600` and passed only to
-Dagster workers. Users never enter them. The release ID, version, and
-expected artifact hashes also come from the checked-in model-release
-manifest rather than independent mutable deployment variables.
-
-Without those optional integrations, the main app still starts and existing
-climate data remains readable. A prediction reports a clear unavailable error
-until its climate source and scorer are configured.
-
-## HTTP vs HTTPS
-
-Authentication can use a domain or IP over explicitly enabled HTTP. Set the
-canonical browser origin, including its scheme, and allow insecure HTTP:
-
-```txt
-AWS_APP_PUBLIC_ORIGIN=http://sandbox.example.org
-CHART_ALLOW_INSECURE_HTTP=1
+```dotenv
+PUBLIC_ORIGIN=https://chart.example.org
+POSTGRES_PASSWORD=replace-me
+KEYCLOAK_ADMIN_PASSWORD=replace-me
+CHART_BOOTSTRAP_TOKEN=replace-me
+MODEL_CONTROL_TOKEN=replace-me
+AWS_REGION=eu-west-2
+MODEL_BUCKET=chart-predictive-models
+MODEL_BUCKET_PUBLIC=1
+CHART_ENABLE_REVIEW_MODELS=true
+CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES=true
 ```
 
-The deploy derives Keycloak's hostname, realm SSL mode, callbacks, cookies,
-issuer, CORS origin, and proxy headers from that one origin. Requests made with
-another host are redirected to the canonical origin before authentication
-starts. Switch `AWS_APP_PUBLIC_ORIGIN` to `https://...` when TLS is available;
-the deploy then restores Keycloak's external HTTPS requirement automatically.
+Optional settings such as `CDSAPI_KEY`, the explanation service, and the Google
+identity provider can be added to this same secret. Adding a setting does not
+require a workflow change. Keep `POSTGRES_PASSWORD` URL-safe because it is
+embedded in the application database URL.
 
-Plain HTTP exposes credentials and tokens in transit, so use it only for an
-isolated sandbox. Google Workspace sign-in cannot use an HTTP domain because
-Google requires HTTPS for non-local OAuth callbacks; Keycloak-managed accounts
-continue to work in this mode.
+Before the first release, copy the existing values from
+`/opt/chart-env/chart.env` and `/opt/chart-env/prediction-worker.env` into
+`CHART_RUNTIME_ENV`. Keep the existing `POSTGRES_PASSWORD`: changing it does not
+update the password inside an existing Postgres data volume. After a successful
+release, the old environment files can be removed from EC2.
 
-## EC2 requirements
+## Operations
 
-- Docker running;
-- port 80 open for an HTTP sandbox, or port 443 with a TLS certificate/key, or
-  a trusted upstream load balancer that terminates TLS;
-- deploy SSH key installed;
-- an instance role that can read both LBW model objects;
-- 4 vCPU and 16 GiB RAM when all services share the host.
-
-## Checks
+Inspect the deployment on EC2:
 
 ```bash
-docker ps -a --filter "name=chart-"
-docker logs chart-api --tail 50
-docker logs chart-web --tail 50
-docker logs chart-dagster-daemon --tail 50
-docker logs chart-dagster-webserver --tail 50
-docker logs chart-proxy --tail 50
+docker ps --filter label=com.docker.compose.project=chart
+docker logs --tail 100 chart-api
 ```
 
-Open the private Dagster UI through a tunnel:
+The deployment workflow automatically includes full Compose status and recent
+logs when a release fails.
+
+Open the private Dagster UI through an SSH tunnel:
 
 ```bash
 ssh -L 3000:127.0.0.1:3000 <user>@<host>
 ```
 
-Then open `http://127.0.0.1:3000`.
-
-Test one deployed prediction with an authorised token:
-
-```bash
-curl -s https://<host>/chart-api/climate/predict \
-  -H 'authorization: Bearer <keycloak-access-token>' \
-  -H 'content-type: application/json' \
-  -d '{"geography_id":"geo-in-madhya-pradesh","planning_date":"2026-10-01","outcome":"lbw","pregnancy_window":1}'
-```
-
-Poll the returned `status_url` through `/chart-api` until it completes. Record
-the request ID, Dagster run ID, climate-source hash, input hash, model version,
-and dashboard evidence for release sign-off.
-
-Find the Keycloak admin password with:
-
-```bash
-grep KEYCLOAK_ADMIN_PASSWORD /opt/chart-env/chart.env
-```
-
-Recover an existing CHART administrator without deleting application data:
-
-```bash
-docker exec \
-  -e CHART_ADMIN_RECOVERY_PASSWORD='<new-password>' \
-  chart-api chart-admin-recover \
-  --username chart-admin \
-  --email chart-admin@example.org \
-  --confirm chart-admin
-```
+Database backups are written to `/opt/chart-backups` before migrations and
+retained for 14 days. Application data, model files, climate outputs, Dagster
+state, and Caddy certificates use named Docker volumes.
