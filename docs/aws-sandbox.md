@@ -10,39 +10,18 @@ The operational setup is documented in
 
 ## GitHub configuration
 
-Create a GitHub environment named `dev` with these secrets:
+Create a GitHub environment named `dev` with these connection secrets:
 
 | Secret | Purpose |
 | --- | --- |
 | `AWS_APP_HOST` | EC2 hostname or IP used by SSH. |
 | `AWS_APP_USER` | EC2 deployment user. |
 | `AWS_APP_SSH_KEY` | Private SSH key for that user. |
-| `CHART_RUNTIME_ENV` | One multiline dotenv value containing every Compose setting. |
 
-The runtime secret must contain:
-
-```dotenv
-PUBLIC_ORIGIN=https://chart.example.org
-POSTGRES_PASSWORD=replace-me
-KEYCLOAK_ADMIN_PASSWORD=replace-me
-CHART_BOOTSTRAP_TOKEN=replace-me
-MODEL_CONTROL_TOKEN=replace-me
-AWS_REGION=eu-west-2
-MODEL_BUCKET=chart-predictive-models
-MODEL_BUCKET_PUBLIC=1
-CHART_ENABLE_REVIEW_MODELS=true
-CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES=true
-```
-
-Optional `CDSAPI_*`, `INFERENCE_LLM_*`, and `KEYCLOAK_GOOGLE_*` settings go in
-the same secret. Adding one does not require a workflow change. Keep
-`POSTGRES_PASSWORD` URL-safe because it is embedded in the application database
-URL.
-
-The workflow encodes the secret before sending it over SSH. EC2 decodes it into
-a mode-600 file in `/dev/shm`, passes that file to Compose, and deletes it when
-the deployment command ends. Container environments retain only the settings
-assigned to each service.
+Application settings live in `~/chart-deploy/aws/.env.prod` on EC2. Start from
+`infra/aws/env.prod.example`; `.env.prod` is gitignored. Optional `CDSAPI_*`,
+`INFERENCE_LLM_*`, and `KEYCLOAK_GOOGLE_*` settings go in the same file, so
+adding one does not require a workflow change.
 
 ## Host setup
 
@@ -55,10 +34,11 @@ Caddy obtains and renews certificates for an HTTPS `PUBLIC_ORIGIN`. An HTTP
 origin is suitable only for an isolated sandbox; Google sign-in requires HTTPS
 for a non-local callback.
 
-Before the first Compose release, copy the values from the existing
-`/opt/chart-env/chart.env` and `/opt/chart-env/prediction-worker.env` files into
-`CHART_RUNTIME_ENV`. Preserve the existing `POSTGRES_PASSWORD` so the retained
-database volume remains accessible.
+When `.env.prod` is absent, the first Compose release migrates the existing
+`/opt/chart-env/chart.env` and `/opt/chart-env/prediction-worker.env` files
+automatically. Preserve the existing `POSTGRES_PASSWORD` so the retained
+database volume remains accessible. Add Google identity-provider settings
+manually because the old deployment did not store them on EC2.
 
 ## Model artifacts on S3
 

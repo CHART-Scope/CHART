@@ -214,27 +214,6 @@ jobs:
           strip_components: 1
           overwrite: true
 
-      - name: Prepare runtime environment
-        env:
-          CHART_RUNTIME_ENV: ${{ secrets.CHART_RUNTIME_ENV }}
-        run: |
-          if [ -z "$CHART_RUNTIME_ENV" ]; then
-            echo "::error title=Missing deployment configuration::CHART_RUNTIME_ENV is required"
-            exit 1
-          fi
-          runtime_env="$(mktemp)"
-          trap 'rm -f "$runtime_env"' EXIT
-          printf '%s' "$CHART_RUNTIME_ENV" > "$runtime_env"
-          public_origin="$(docker compose --env-file "$runtime_env" -f infra/aws/docker-compose.yml config --format json | jq -r '.services["chart-caddy"].environment.PUBLIC_ORIGIN // empty')"
-          if [[ ! "$public_origin" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]]; then
-            echo "::error title=Invalid runtime setting::PUBLIC_ORIGIN must be an HTTP(S) origin without a path"
-            exit 1
-          fi
-          runtime_env_b64="$(printf '%s' "$CHART_RUNTIME_ENV" | base64 -w 0)"
-          echo "::add-mask::$runtime_env_b64"
-          echo "AWS_APP_PUBLIC_ORIGIN=$public_origin" >> "$GITHUB_ENV"
-          echo "CHART_RUNTIME_ENV_B64=$runtime_env_b64" >> "$GITHUB_ENV"
-
       - name: Pull and start release
         uses: appleboy/ssh-action@v1.2.0
         env:
@@ -245,54 +224,74 @@ jobs:
           username: ${{ secrets.AWS_APP_USER }}
           key: ${{ secrets.AWS_APP_SSH_KEY }}
           command_timeout: 30m
-          envs: GHCR_TOKEN,GHCR_USER,CHART_RUNTIME_ENV_B64
+          envs: GHCR_TOKEN,GHCR_USER
           script: |
             set -euo pipefail
             cd "$HOME/chart-deploy/aws"
             mkdir -p backups
             chmod 700 backups
-            runtime_env="$(mktemp /dev/shm/chart-env.XXXXXX)"
-            docker_config="$(mktemp -d /dev/shm/chart-docker.XXXXXX)"
-            trap 'rm -rf "$runtime_env" "$docker_config"' EXIT
-            printf '%s' "$CHART_RUNTIME_ENV_B64" | base64 -d > "$runtime_env"
+            runtime_env="$PWD/.env.prod"
+            if [ ! -r "$runtime_env" ]; then
+              legacy_env=/opt/chart-env/chart.env
+              if [ ! -r "$legacy_env" ]; then
+                echo "Create $runtime_env from infra/aws/env.prod.example before deploying." >&2
+                exit 1
+              fi
+              public_origin="$(sed -n 's/^CHART_WEB_ORIGIN=//p' "$legacy_env" | tail -n 1)"
+              if [ -z "$public_origin" ]; then
+                echo "Could not migrate PUBLIC_ORIGIN from $legacy_env." >&2
+                exit 1
+              fi
+              umask 077
+              {
+                printf 'PUBLIC_ORIGIN=%s\n' "$public_origin"
+                cat "$legacy_env"
+                [ ! -r /opt/chart-env/prediction-worker.env ] || cat /opt/chart-env/prediction-worker.env
+              } > "$runtime_env"
+              echo "Migrated the existing EC2 settings to $runtime_env."
+            fi
             chmod 600 "$runtime_env"
+            public_origin="$(sed -n 's/^PUBLIC_ORIGIN=//p' "$runtime_env" | tail -n 1)"
+            if [[ ! "$public_origin" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]]; then
+              echo "PUBLIC_ORIGIN in $runtime_env must be an HTTP(S) origin without a path." >&2
+              exit 1
+            fi
+            export IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}"
+            export IMAGE_TAG="${{ needs.publish.outputs.image_tag }}"
+            docker compose --env-file "$runtime_env" config -q
+            docker_config="$(mktemp -d /dev/shm/chart-docker.XXXXXX)"
+            trap 'rm -rf "$docker_config"' EXIT
             printf '%s' "$GHCR_TOKEN" | DOCKER_CONFIG="$docker_config" docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}" IMAGE_TAG="${{ needs.publish.outputs.image_tag }}" DOCKER_CONFIG="$docker_config" docker compose --env-file "$runtime_env" pull
+            DOCKER_CONFIG="$docker_config" docker compose --env-file "$runtime_env" pull
             if docker inspect chart-postgres >/dev/null 2>&1; then
               compose_owner="$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' chart-postgres 2>/dev/null || true)"
               if [ "$compose_owner" != "chart" ]; then
                 docker rm -f chart-proxy chart-web chart-api chart-climate-api chart-new-design chart-dagster-webserver chart-dagster-daemon chart-lbw chart-keycloak chart-keycloak-postgres chart-postgres 2>/dev/null || true
               fi
             fi
-            IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}" IMAGE_TAG="${{ needs.publish.outputs.image_tag }}" DOCKER_CONFIG="$docker_config" docker compose --env-file "$runtime_env" up -d --wait --remove-orphans
-
-      - name: Verify public release
-        if: env.AWS_APP_PUBLIC_ORIGIN != ''
-        run: |
-          for attempt in $(seq 1 12); do
-            build_id="$(curl -fsS --connect-timeout 5 --max-time 15 "$AWS_APP_PUBLIC_ORIGIN/api/build" | jq -r .buildId || true)"
-            api_status="$(curl -fsS --connect-timeout 5 --max-time 15 "$AWS_APP_PUBLIC_ORIGIN/chart-api/ready" | jq -r .status || true)"
-            if [ "$build_id" = "$GITHUB_SHA" ] && [ "$api_status" = "ok" ]; then
-              exit 0
-            fi
-            sleep 10
-          done
-          exit 1
+            DOCKER_CONFIG="$docker_config" docker compose --env-file "$runtime_env" up -d --wait --remove-orphans
+            for attempt in $(seq 1 12); do
+              build_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$public_origin/api/build" || true)"
+              api_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$public_origin/chart-api/ready" || true)"
+              if printf '%s' "$build_body" | grep -Eq '"buildId"[[:space:]]*:[[:space:]]*"'"$IMAGE_TAG"'"' \
+                && printf '%s' "$api_body" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"'; then
+                exit 0
+              fi
+              sleep 10
+            done
+            echo "Public release verification failed for $public_origin." >&2
+            exit 1
 
       - name: Show deployment diagnostics
-        if: failure() && env.CHART_RUNTIME_ENV_B64 != ''
+        if: failure()
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.AWS_APP_HOST }}
           username: ${{ secrets.AWS_APP_USER }}
           key: ${{ secrets.AWS_APP_SSH_KEY }}
-          envs: CHART_RUNTIME_ENV_B64
           script: |
             set -u
             cd "$HOME/chart-deploy/aws"
-            runtime_env="$(mktemp /dev/shm/chart-env.XXXXXX)"
-            trap 'rm -f "$runtime_env"' EXIT
-            printf '%s' "$CHART_RUNTIME_ENV_B64" | base64 -d > "$runtime_env"
-            chmod 600 "$runtime_env"
-            IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}" IMAGE_TAG="${{ needs.publish.outputs.image_tag }}" docker compose --env-file "$runtime_env" ps -a
-            IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}" IMAGE_TAG="${{ needs.publish.outputs.image_tag }}" docker compose --env-file "$runtime_env" logs --tail 100
+            runtime_env="$PWD/.env.prod"
+            [ ! -r "$runtime_env" ] || IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}" IMAGE_TAG="${{ needs.publish.outputs.image_tag }}" docker compose --env-file "$runtime_env" ps -a
+            [ ! -r "$runtime_env" ] || IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}" IMAGE_TAG="${{ needs.publish.outputs.image_tag }}" docker compose --env-file "$runtime_env" logs --tail 100

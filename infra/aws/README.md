@@ -10,11 +10,10 @@ runs Docker Compose.
 1. Pull requests run tests and validate all three deploy images.
 2. A push to `dev` runs the same validation, builds the Python, web, and LBW
    images, and pushes both the commit SHA and `dev` tags to GHCR.
-3. CI copies `infra/aws` and `infra/keycloak` to `~/chart-deploy` on EC2 and
-   passes one encoded runtime-environment secret to the deployment command.
+3. CI copies `infra/aws` and `infra/keycloak` to `~/chart-deploy` on EC2.
 4. EC2 logs in to GHCR and runs `docker compose pull` followed by
-   `docker compose up -d --wait --remove-orphans`. Compose reads the settings
-   from a temporary file in `/dev/shm`, which is deleted when the command ends.
+   `docker compose up -d --wait --remove-orphans` using the host's
+   `~/chart-deploy/aws/.env.prod` file.
 
 On the first release after this migration, CI removes the old manually managed
 containers after the new images have been pulled. Named volumes are retained.
@@ -54,33 +53,28 @@ Required GitHub `dev` environment secrets are:
 - `AWS_APP_HOST`
 - `AWS_APP_USER`
 - `AWS_APP_SSH_KEY`
-- `CHART_RUNTIME_ENV`
 
-Store every Compose setting in the single multiline `CHART_RUNTIME_ENV` secret:
+Create the production environment locally from the tracked example:
 
-```dotenv
-PUBLIC_ORIGIN=https://chart.example.org
-POSTGRES_PASSWORD=replace-me
-KEYCLOAK_ADMIN_PASSWORD=replace-me
-CHART_BOOTSTRAP_TOKEN=replace-me
-MODEL_CONTROL_TOKEN=replace-me
-AWS_REGION=eu-west-2
-MODEL_BUCKET=chart-predictive-models
-MODEL_BUCKET_PUBLIC=1
-CHART_ENABLE_REVIEW_MODELS=true
-CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES=true
+```bash
+cp infra/aws/env.prod.example infra/aws/.env.prod
 ```
 
-Optional settings such as `CDSAPI_KEY`, the explanation service, and the Google
-identity provider can be added to this same secret. Adding a setting does not
-require a workflow change. Keep `POSTGRES_PASSWORD` URL-safe because it is
-embedded in the application database URL.
+The repository's `.gitignore` excludes `.env.prod`. Fill in the existing
+passwords and optional integrations, then copy it to EC2 once:
 
-Before the first release, copy the existing values from
-`/opt/chart-env/chart.env` and `/opt/chart-env/prediction-worker.env` into
-`CHART_RUNTIME_ENV`. Keep the existing `POSTGRES_PASSWORD`: changing it does not
-update the password inside an existing Postgres data volume. After a successful
-release, the old environment files can be removed from EC2.
+```bash
+ssh <user>@<host> 'mkdir -p ~/chart-deploy/aws'
+scp infra/aws/.env.prod <user>@<host>:chart-deploy/aws/.env.prod
+ssh <user>@<host> 'chmod 600 ~/chart-deploy/aws/.env.prod'
+```
+
+Keep `POSTGRES_PASSWORD` URL-safe and preserve its existing value because it is
+embedded in application URLs and changing it does not update an existing
+Postgres data volume. When `.env.prod` is absent, the first release automatically
+migrates the existing `/opt/chart-env/chart.env` and
+`/opt/chart-env/prediction-worker.env` values. Add any Google identity-provider
+settings manually because the old deployment did not store those on EC2.
 
 ## Operations
 
