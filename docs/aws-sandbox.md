@@ -18,10 +18,10 @@ Create a GitHub environment named `dev` with these connection secrets:
 | `AWS_APP_USER` | EC2 deployment user. |
 | `AWS_APP_SSH_KEY` | Private SSH key for that user. |
 
-Application settings live in `~/chart-deploy/aws/.env.prod` on EC2. Start from
-`infra/aws/env.prod.example`; `.env.prod` is gitignored. Optional `CDSAPI_*`,
-`INFERENCE_LLM_*`, and `KEYCLOAK_GOOGLE_*` settings go in the same file, so
-adding one does not require a workflow change.
+Application settings are written once in the gitignored
+`infra/aws/.env.prod`, then copied unchanged to
+`~/chart-deploy/aws/.env.prod` on EC2. The exact seven-line configuration and
+`vim` setup are documented once in `infra/aws/README.md`.
 
 ## Host setup
 
@@ -34,11 +34,8 @@ Caddy obtains and renews certificates for an HTTPS `PUBLIC_ORIGIN`. An HTTP
 origin is suitable only for an isolated sandbox; Google sign-in requires HTTPS
 for a non-local callback.
 
-When `.env.prod` is absent, the first Compose release migrates the existing
-`/opt/chart-env/chart.env` and `/opt/chart-env/prediction-worker.env` files
-automatically. Preserve the existing `POSTGRES_PASSWORD` so the retained
-database volume remains accessible. Add Google identity-provider settings
-manually because the old deployment did not store them on EC2.
+Create `~/chart-deploy/aws/.env.prod` before the first deployment. Preserve the
+existing `POSTGRES_PASSWORD` when retaining an existing database volume.
 
 ## Model artifacts on S3
 

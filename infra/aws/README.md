@@ -12,12 +12,8 @@ runs Docker Compose.
    images, and pushes both the commit SHA and `dev` tags to GHCR.
 3. CI copies `infra/aws` and `infra/keycloak` to `~/chart-deploy` on EC2.
 4. EC2 logs in to GHCR and runs `docker compose pull` followed by
-   `docker compose up -d --wait --remove-orphans` using the host's
-   `~/chart-deploy/aws/.env.prod` file.
-
-On the first release after this migration, CI removes the old manually managed
-containers after the new images have been pulled. Named volumes are retained.
-Later releases are managed entirely by Compose.
+   `docker compose up -d --remove-orphans` using the host's single runtime file,
+   `~/chart-deploy/aws/.env.prod`.
 
 The SHA tag is used for the deployment, so a release always identifies the
 exact images it runs. The moving `dev` tag is available for inspection only.
@@ -54,27 +50,36 @@ Required GitHub `dev` environment secrets are:
 - `AWS_APP_USER`
 - `AWS_APP_SSH_KEY`
 
-Create the production environment locally from the tracked example:
+Create the single local runtime file:
 
 ```bash
-cp infra/aws/env.prod.example infra/aws/.env.prod
+vim infra/aws/.env.prod
 ```
 
-The repository's `.gitignore` excludes `.env.prod`. Fill in the existing
-passwords and optional integrations, then copy it to EC2 once:
+Paste these seven settings with their real values:
+
+```dotenv
+PUBLIC_ORIGIN=https://your-domain
+POSTGRES_PASSWORD=your-existing-postgres-password
+KEYCLOAK_ADMIN_PASSWORD=your-keycloak-admin-password
+CHART_BOOTSTRAP_TOKEN=your-bootstrap-token
+MODEL_CONTROL_TOKEN=your-model-control-token
+CDSAPI_URL=https://cds.climate.copernicus.eu/api
+CDSAPI_KEY=your-copernicus-key
+```
+
+Save it, then copy that same file to the sandbox:
 
 ```bash
-ssh <user>@<host> 'mkdir -p ~/chart-deploy/aws'
+chmod 600 infra/aws/.env.prod
+ssh <user>@<host> 'mkdir -p ~/chart-deploy/aws && chmod 700 ~/chart-deploy ~/chart-deploy/aws'
 scp infra/aws/.env.prod <user>@<host>:chart-deploy/aws/.env.prod
 ssh <user>@<host> 'chmod 600 ~/chart-deploy/aws/.env.prod'
 ```
 
-Keep `POSTGRES_PASSWORD` URL-safe and preserve its existing value because it is
-embedded in application URLs and changing it does not update an existing
-Postgres data volume. When `.env.prod` is absent, the first release automatically
-migrates the existing `/opt/chart-env/chart.env` and
-`/opt/chart-env/prediction-worker.env` values. Add any Google identity-provider
-settings manually because the old deployment did not store those on EC2.
+The local file is gitignored, and the deployment does not read any other
+environment file. Keep `POSTGRES_PASSWORD` URL-safe and preserve its existing
+value because changing it does not update an existing Postgres data volume.
 
 ## Operations
 
