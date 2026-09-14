@@ -1,6 +1,7 @@
 # CHART
 
-CHART is a climate-health planning platform.
+CHART is the Climate x Health Adaptation and Resilience Tool, a climate-health
+planning platform.
 
 Documentation: [https://chart-scope.github.io/CHART/docs/](https://chart-scope.github.io/CHART/docs/)
 
