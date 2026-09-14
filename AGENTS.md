@@ -15,34 +15,36 @@ Generated code should be:
 
 CHART is a monorepo. Do not treat the root as a Next app.
 
-- `web`: CHART Next web app.
-- `api`: Fastify backend API.
+- `web`: CHART Next web app and current product UI.
+- `backend`: Python/FastAPI application API and analytical engine; owner of auth, workspaces, users, geographies, predictions, and analytical reads.
+- `orchestration`: Dagster data plane importing the Python `chart` package.
+- `api`: legacy Fastify/Drizzle API being retired module-by-module after Python parity.
 - `chart-repository`: separate Payload CMS service for maintaining published chart repository data. It is not required to run CHART core.
+- `infra`: local services, CHART workload manifests, and AWS deployment handoff.
 - `data/`: local generated seed/import outputs, ignored by git.
 - `docs/`: local planning notes, ignored by git.
 
-Future Python or data-processing services should be added as separate apps or services, not inside `web`.
+Python or data-processing code belongs in `backend`, `orchestration`, or a focused `pipelines` package, never inside `web`.
+
+Next route handlers may be thin browser/session proxies during migration. They must not own business workflows, Keycloak authorization policy, or CHART database tables. Do not add a Next.js BFF.
 
 ## Directory Boundaries
 
-Use this structure:
+Use this target structure while preserving current top-level names:
 
 ```txt
-api/
-  src/services/chart-repository/
-    service.ts
-    types.ts
-    seed-data/
-  src/modules/hazards/
-    routes.ts
-    routes.test.ts
-  src/modules/solutions/
-    routes.ts
-    routes.test.ts
+backend/
+  chart/api/
+  chart/auth/
+  chart/climate/
+  chart/shared/db/
+
+orchestration/
+  src/chart_pipeline/
 
 web/
-  src/modules/solutions/
-  src/lib/solutionRepositoryClient.ts
+  src/features/
+  src/lib/
 
 chart-repository/
   payload.config.ts
@@ -53,10 +55,9 @@ chart-repository/
   infra/docker-compose.yml
 ```
 
-The chart repository directories mean different things:
+The chart repository and CHART core mean different things:
 
-- `api/src/services/chart-repository`: CHART adapter for reading a public repository snapshot/API. It must not define repository-owned Drizzle tables.
-- `api/src/modules/hazards` and `api/src/modules/solutions`: thin Fastify route modules that call the adapter.
+- `backend/chart/solution_repository`: CHART adapter for reading a public repository snapshot/API. It must not define repository-owned Payload tables.
 - `chart-repository`: standalone Payload CMS service that owns editing, media, publishing workflow, and repository auth.
 
 Dependency direction:
@@ -64,18 +65,19 @@ Dependency direction:
 ```txt
 chart-repository publishes data
         ↓
-api reads public snapshot/API responses
+Python backend reads public snapshot/API responses
         ↓
-web reads from api
+web reads from Python backend
 ```
 
-Never import from `chart-repository/` into `api/` or `web/`. Use an HTTP API or public JSON snapshot instead.
+Never import from `chart-repository/` into `backend/` or `web/`. Use an HTTP API or public JSON snapshot instead.
 
 ## Current Stack
 
 - Web: Next, React.
-- API: Fastify, TypeScript.
-- Database: Postgres.
+- API + engine: Python, FastAPI, SQLAlchemy, Alembic.
+- Data plane: Dagster with Postgres-backed durable requests.
+- Database: PostgreSQL + PostGIS.
 - Formatting: Prettier.
 
 ## Project Priorities
@@ -100,21 +102,23 @@ Build in this order:
 - Do not invent new folder patterns unless needed.
 - Refactor only when there is actual code pressure.
 
-## Backend Module Shape
+## Python Backend Module Shape
 
-Start simple:
+Start simple and keep routes thin:
 
 ```txt
 module/
-  types.ts
-  service.ts
-  routes.ts
-  routes.test.ts
+  schemas.py
+  service.py
+  routes.py
+
+backend/tests/
+  test_<module>_api.py
 ```
 
-Use `routes.ts` for HTTP endpoints and `service.ts` for behavior. If a module grows, split it later into clearer subfolders.
+Use `routes.py` for HTTP endpoints and `service.py` for behavior. Engine compute must not import FastAPI or Dagster. Dagster definitions call backend services through thin wrappers.
 
-Every new API route should have a route-level test using `Fastify.inject()`.
+Every new Python API route should have a route-level test using FastAPI `TestClient`. Every protected route must test both authentication and role/geography denial.
 
 ## Backend Route Rules
 
@@ -122,20 +126,22 @@ Every new API route should have a route-level test using `Fastify.inject()`.
 - Route handlers should read params/body, call service functions, and map results to HTTP responses.
 - Route handlers should not contain business workflows.
 - Keep error responses explicit and stable.
+- Prediction submission and status lookup must enforce geography scope, not merely bearer-token presence.
+- Postgres is the durable request/state store and Dagster executes background pipeline work; do not add Redis or another queue without demonstrated pressure.
 
 ## Frontend Module Shape
 
-Keep feature UI under `web/src/modules/`.
+Keep current feature UI under `web/src/features/`.
 
 - Use `PascalCase.tsx` for React components.
-- Keep shared shell/layout code under `web/src/app/`.
+- Keep routes and shared layout code under `web/src/app/`.
 - Keep static copy and seed-like UI data close to the module using it.
 - Use simple props/state first; avoid state libraries until shared state is actually needed.
 
 ## Naming
 
 - Folders: `kebab-case`.
-- Backend files: `types.ts`, `service.ts`, `routes.ts`, `routes.test.ts`.
+- Python backend files: `schemas.py`, `service.py`, `routes.py`; route tests live under `backend/tests/`.
 - React components: `PascalCase.tsx`.
 - Functions: `camelCase` with clear verbs, such as `getCurrentUser` or `listSources`.
 - Types: `PascalCase`.
@@ -148,15 +154,17 @@ Keep feature UI under `web/src/modules/`.
 - Build for the health planning lead and cross-sector planning lead flow first.
 - Prefer simple seeded data before adding real integrations.
 - Keep the first user flow understandable before making it comprehensive.
-- Do not make CHART core depend on Payload CMS. CHART should consume the published solution repository through the Fastify adapter and public snapshots or a remote API, not CHART Drizzle tables.
+- Do not make CHART core depend on Payload CMS. Python should consume the published solution repository through an adapter and public snapshots or a remote API, not repository-owned tables.
+- Deterministic prediction results must succeed without the optional Qwen explanation service.
+- Production infrastructure reuses the generic OpenTofu/k3s/RDS/Flux pattern from `halla-health-infra`, but CHART owns separate state, stores, compute, namespaces, images, and manifests.
 
 ## Validation
 
-Before finishing backend work:
+Before finishing Python backend work:
 
 ```bash
-make api-test
-make api-build
+python -m pytest backend/tests -q
+python -m pytest orchestration/tests -q
 ```
 
 Before finishing frontend work:

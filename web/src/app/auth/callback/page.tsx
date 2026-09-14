@@ -1,4 +1,4 @@
-import { AuthCallbackPage } from "../../../modules/auth/AuthCallbackPage";
+import { AuthCallbackPage } from "@/features/auth/AuthCallbackPage";
 
 export default function Page() {
   return <AuthCallbackPage />;

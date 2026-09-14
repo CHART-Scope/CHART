@@ -1,0 +1,36 @@
+.page {
+  display: grid;
+  min-height: 100vh;
+  padding: var(--space-6);
+  place-items: center;
+  background: var(--surface-app);
+}
+
+.card {
+  width: min(440px, 100%);
+  padding: var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-card);
+}
+
+.card span {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+}
+
+.card h1 {
+  margin: var(--space-3) 0 var(--space-2);
+  color: var(--color-charcoal);
+  font-family: var(--font-mono);
+  font-size: var(--fs-h1);
+  font-weight: 500;
+}
+
+.card p {
+  color: var(--color-text-muted);
+  line-height: var(--lh-body);
+}

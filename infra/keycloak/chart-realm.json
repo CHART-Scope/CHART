@@ -2,7 +2,7 @@
   "realm": "chart",
   "enabled": true,
   "displayName": "CHART",
-  "sslRequired": "none",
+  "sslRequired": "external",
   "loginTheme": "chart",
   "roles": {
     "realm": [
@@ -46,62 +46,7 @@
       ]
     }
   },
-  "groups": [
-    {
-      "name": "country-a",
-      "attributes": {
-        "country_code": ["CTA"],
-        "geo_level": ["country"]
-      },
-      "subGroups": [
-        {
-          "name": "region-a",
-          "attributes": {
-            "country_code": ["CTA"],
-            "geo_level": ["geo_level_1"],
-            "level_label": ["region"]
-          },
-          "subGroups": [
-            {
-              "name": "district-a",
-              "attributes": {
-                "country_code": ["CTA"],
-                "geo_level": ["geo_level_2"],
-                "level_label": ["district"]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "country-b",
-      "attributes": {
-        "country_code": ["CTB"],
-        "geo_level": ["country"]
-      },
-      "subGroups": [
-        {
-          "name": "region-b",
-          "attributes": {
-            "country_code": ["CTB"],
-            "geo_level": ["geo_level_1"],
-            "level_label": ["region"]
-          },
-          "subGroups": [
-            {
-              "name": "district-c",
-              "attributes": {
-                "country_code": ["CTB"],
-                "geo_level": ["geo_level_2"],
-                "level_label": ["district"]
-              }
-            }
-          ]
-        }
-      ]
-    }
-  ],
+  "groups": [],
   "clients": [
     {
       "clientId": "chart-web",
@@ -113,7 +58,7 @@
       "directAccessGrantsEnabled": true,
       "fullScopeAllowed": true,
       "redirectUris": ["http://localhost:3100/*", "http://127.0.0.1:3100/*"],
-      "webOrigins": ["+"],
+      "webOrigins": ["http://localhost:3100", "http://127.0.0.1:3100"],
       "attributes": {
         "post.logout.redirect.uris": "http://localhost:3100##http://localhost:3100/*##http://127.0.0.1:3100##http://127.0.0.1:3100/*"
       },
@@ -130,6 +75,18 @@
             "access.token.claim": "true",
             "userinfo.token.claim": "true"
           }
+        },
+        {
+          "name": "chart-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "chart-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
         }
       ]
     },
@@ -145,96 +102,5 @@
       "fullScopeAllowed": true
     }
   ],
-  "users": [
-    {
-      "username": "chart-admin",
-      "enabled": true,
-      "email": "chart-admin@example.org",
-      "firstName": "CHART",
-      "lastName": "Admin",
-      "groups": ["/country-a"],
-      "clientRoles": {
-        "chart-api": ["chart_admin", "content_editor"]
-      },
-      "credentials": [
-        {
-          "type": "password",
-          "value": "password",
-          "temporary": false
-        }
-      ]
-    },
-    {
-      "username": "u1-health-region",
-      "enabled": true,
-      "email": "u1-health-region@example.org",
-      "firstName": "U1",
-      "lastName": "Health Region",
-      "groups": ["/country-a/region-a"],
-      "clientRoles": {
-        "chart-api": ["health_planning_lead"]
-      },
-      "credentials": [
-        {
-          "type": "password",
-          "value": "password",
-          "temporary": false
-        }
-      ]
-    },
-    {
-      "username": "u2-sector-region",
-      "enabled": true,
-      "email": "u2-sector-region@example.org",
-      "firstName": "U2",
-      "lastName": "Sector Region",
-      "groups": ["/country-b/region-b"],
-      "clientRoles": {
-        "chart-api": ["cross_sector_planning_lead"]
-      },
-      "credentials": [
-        {
-          "type": "password",
-          "value": "password",
-          "temporary": false
-        }
-      ]
-    },
-    {
-      "username": "u3-health-district",
-      "enabled": true,
-      "email": "u3-health-district@example.org",
-      "firstName": "U3",
-      "lastName": "Health District",
-      "groups": ["/country-a/region-a/district-a"],
-      "clientRoles": {
-        "chart-api": ["health_implementation_officer"]
-      },
-      "credentials": [
-        {
-          "type": "password",
-          "value": "password",
-          "temporary": false
-        }
-      ]
-    },
-    {
-      "username": "u4-sector-district",
-      "enabled": true,
-      "email": "u4-sector-district@example.org",
-      "firstName": "U4",
-      "lastName": "Sector District",
-      "groups": ["/country-b/region-b/district-c"],
-      "clientRoles": {
-        "chart-api": ["cross_sector_implementation_officer"]
-      },
-      "credentials": [
-        {
-          "type": "password",
-          "value": "password",
-          "temporary": false
-        }
-      ]
-    }
-  ]
+  "users": []
 }

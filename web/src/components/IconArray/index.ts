@@ -1,0 +1,1 @@
+export { IconArray } from "./IconArray";

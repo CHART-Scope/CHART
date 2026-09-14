@@ -1,30 +1,45 @@
 name: App Deploy
 
 on:
-  push:
-    branches:
-      - dev
+  pull_request:
     paths:
       - ".github/workflows/app-deploy.yml"
-      - "api/**"
+      - ".dockerignore"
       - ".prettierignore"
       - ".prettierrc.json"
+      - "backend/**"
+      - "docs/climate-api.md"
+      - "docs/data-pipeline.md"
+      - "docs/openapi/climate.json"
       - "infra/**"
+      - "Makefile"
+      - "orchestration/**"
       - "package.json"
       - "package-lock.json"
+      - "pipelines/**"
+      - "web/**"
+  push:
+    branches: [main, dev]
+    paths:
+      - ".github/workflows/app-deploy.yml"
+      - ".dockerignore"
+      - ".prettierignore"
+      - ".prettierrc.json"
+      - "backend/**"
+      - "docs/climate-api.md"
+      - "docs/data-pipeline.md"
+      - "docs/openapi/climate.json"
+      - "infra/**"
+      - "Makefile"
+      - "orchestration/**"
+      - "package.json"
+      - "package-lock.json"
+      - "pipelines/**"
       - "web/**"
   workflow_dispatch:
-    inputs:
-      public_host:
-        description: "Optional public hostname for browser URLs, such as dev.example.org. Defaults to AWS_APP_PUBLIC_HOST or AWS_APP_HOST."
-        required: false
-        type: string
-
-env:
-  DEPLOY_BRANCH: dev
 
 concurrency:
-  group: chart-app-deploy-dev
+  group: chart-app-deploy-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -32,11 +47,11 @@ permissions:
 
 jobs:
   validate:
-    name: Validate deploy candidate
+    name: Validate
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgis/postgis:16-3.5
         env:
           POSTGRES_DB: chart
           POSTGRES_USER: chart
@@ -51,131 +66,238 @@ jobs:
     env:
       DATABASE_URL: postgres://chart:chart@127.0.0.1:5432/chart
     steps:
-      - name: Check out deploy branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.DEPLOY_BRANCH }}
+      - uses: actions/checkout@v6
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
+      - run: npx prettier --check .github README.md infra web/src web/.storybook web/*.json web/*.mjs web/*.ts package.json
+      - run: npm run identity:test
 
-      - name: Check formatting
-        run: npx prettier --check .github README.md api infra web/src web/.storybook web/*.json web/*.mjs web/*.ts package.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
 
-      - name: Check API migrations
-        run: npm run db:check:api
+      - name: Install Python packages
+        run: >-
+          python -m pip install -e 'backend[dev]' -e 'pipelines/era5_heat[dev]'
+          -e 'pipelines/seasonal_c3s[dev]' -e 'pipelines/boundaries[dev]'
+          -e 'pipelines/isimip_projection[dev]' -e orchestration
 
-      - name: Typecheck API
-        run: npm run typecheck:api
+      - name: Check Python formatting, lint, and types
+        run: make python-check VENV_PYTHON=python
 
-      - name: Test API
-        run: npm run test:api
+      - name: Validate database migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://chart:chart@127.0.0.1:5432/chart
+        run: |
+          python -m alembic upgrade head
+          python -m alembic check
 
-      - name: Build API
-        run: npm run build:api
+      - name: Test Python application and pipelines
+        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests -q
 
-      - name: Typecheck web
-        run: npm run typecheck:web
+      - name: Validate Dagster and OpenAPI contracts
+        run: |
+          python -c 'import dagster as dg; from chart_pipeline.definitions import defs; dg.Definitions.validate_loadable(defs)'
+          python -m chart.api.export_openapi --output docs/openapi/climate.json
+          git diff --exit-code docs/openapi/climate.json
 
-      - name: Build web
-        run: npm run build:web
+      - run: npm run typecheck:web
+      - run: npm run build:web
 
-      - name: Build API image
-        run: docker build -f api/Dockerfile -t chart-api:ci .
+      - name: Validate deployment configuration
+        env:
+          PUBLIC_ORIGIN: http://example.test
+          POSTGRES_PASSWORD: test-password
+          KEYCLOAK_ADMIN_PASSWORD: test-password
+          CHART_BOOTSTRAP_TOKEN: test-token
+          MODEL_CONTROL_TOKEN: test-token
+        run: |
+          IMAGE_PREFIX=ghcr.io/chart-scope/chart IMAGE_TAG=test docker compose -f infra/aws/docker-compose.yml config -q
+          docker run --rm -e PUBLIC_ORIGIN -v "$PWD/infra/aws/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10-alpine caddy validate --config /etc/caddy/Caddyfile
 
-      - name: Build web image
-        run: docker build -f web/Dockerfile -t chart-web:ci .
+      - name: Validate deploy images on pull requests
+        if: github.event_name == 'pull_request'
+        run: |
+          docker build -f backend/Dockerfile -t chart-python:ci .
+          docker build --build-arg "CHART_BUILD_ID=$GITHUB_SHA" -f web/Dockerfile -t chart-web:ci .
+          docker build --target test -f pipelines/models/Dockerfile -t chart-lbw:ci pipelines/models
+          docker run --rm chart-python:ci python -c 'from chart.api.app import app; assert "/climate/predict" in app.openapi()["paths"]'
 
-  deploy:
-    name: Deploy app
+  publish:
+    name: Build and publish images
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/dev')
     needs: validate
     runs-on: ubuntu-latest
-    environment: dev
-    env:
-      AWS_APP_HOST: ${{ secrets.AWS_APP_HOST }}
-      AWS_APP_PUBLIC_HOST: ${{ secrets.AWS_APP_PUBLIC_HOST }}
-      AWS_APP_SSH_KEY: ${{ secrets.AWS_APP_SSH_KEY }}
-      AWS_APP_USER: ${{ secrets.AWS_APP_USER }}
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_prefix: ${{ steps.image.outputs.prefix }}
+      image_tag: ${{ github.sha }}
     steps:
-      - name: Validate deploy secrets
-        run: |
-          missing=0
-          for name in AWS_APP_HOST AWS_APP_SSH_KEY AWS_APP_USER; do
-            if [ -z "${!name}" ]; then
-              echo "::error title=Missing deploy secret::$name is required for EC2 deploy"
-              missing=1
-            fi
-          done
-          exit "$missing"
+      - uses: actions/checkout@v6
 
-      - name: Deploy app on EC2
-        uses: appleboy/ssh-action@v1.2.0
+      - name: Set image names
+        id: image
+        run: echo "prefix=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v4
         with:
-          host: ${{ env.AWS_APP_HOST }}
-          username: ${{ env.AWS_APP_USER }}
-          key: ${{ env.AWS_APP_SSH_KEY }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build and push Python image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.image.outputs.prefix }}-python:${{ github.sha }}
+            ${{ steps.image.outputs.prefix }}-python:dev
+          cache-from: type=gha,scope=python
+          cache-to: type=gha,mode=max,scope=python
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: web/Dockerfile
+          push: true
+          build-args: CHART_BUILD_ID=${{ github.sha }}
+          tags: |
+            ${{ steps.image.outputs.prefix }}-web:${{ github.sha }}
+            ${{ steps.image.outputs.prefix }}-web:dev
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Build and push model image
+        uses: docker/build-push-action@v7
+        with:
+          context: pipelines/models
+          target: final
+          push: true
+          tags: |
+            ${{ steps.image.outputs.prefix }}-lbw:${{ github.sha }}
+            ${{ steps.image.outputs.prefix }}-lbw:dev
+          cache-from: type=gha,scope=lbw
+          cache-to: type=gha,mode=max,scope=lbw
+
+  deploy:
+    name: Deploy to EC2
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    environment: dev
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Copy Compose configuration
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.AWS_APP_HOST }}
+          username: ${{ secrets.AWS_APP_USER }}
+          key: ${{ secrets.AWS_APP_SSH_KEY }}
+          source: "infra/aws,infra/keycloak"
+          target: chart-deploy
+          strip_components: 1
+          overwrite: true
+
+      - name: Pull and start release
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USER: ${{ github.actor }}
+        with:
+          host: ${{ secrets.AWS_APP_HOST }}
+          username: ${{ secrets.AWS_APP_USER }}
+          key: ${{ secrets.AWS_APP_SSH_KEY }}
+          command_timeout: 30m
+          envs: GHCR_TOKEN,GHCR_USER
           script: |
             set -euo pipefail
-
-            APP_DIR="${APP_DIR:-/opt/chart}"
-            BRANCH="${{ env.DEPLOY_BRANCH }}"
-
-            if [ -d "$APP_DIR/.git" ]; then
-              git -C "$APP_DIR" reset --hard
-              git -C "$APP_DIR" clean -fd
-              git -C "$APP_DIR" fetch origin "$BRANCH"
-              git -C "$APP_DIR" checkout -B "$BRANCH" "origin/$BRANCH"
-              git -C "$APP_DIR" reset --hard "origin/$BRANCH"
-              git -C "$APP_DIR" clean -fd
-            else
-              mkdir -p "$(dirname "$APP_DIR")"
-              git clone --branch "$BRANCH" https://github.com/CHART-Scope/CHART.git "$APP_DIR"
-            fi
-
-            PUBLIC_HOST="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
-            PUBLIC_HOST="$PUBLIC_HOST" bash "$APP_DIR/infra/aws/deploy-app.sh"
-
-      - name: Verify public app remains reachable
-        run: |
-          public_host="${{ inputs.public_host || env.AWS_APP_PUBLIC_HOST || env.AWS_APP_HOST }}"
-          base_url="http://${public_host}"
-
-          for attempt in $(seq 1 12); do
-            web_status="$(curl -fsS -o /dev/null -w "%{http_code}" "$base_url/" || true)"
-            api_body="$(curl -fsS "$base_url/chart-api/health" || true)"
-            keycloak_status="$(curl -fsS -o /dev/null -w "%{http_code}" "$base_url/identity/realms/chart" || true)"
-
-            if [ "$web_status" != "200" ] || [ "$api_body" != '{"status":"ok"}' ] || [ "$keycloak_status" != "200" ]; then
-              echo "::error title=Public smoke check failed::attempt ${attempt}: web=${web_status:-000} api=${api_body:-empty} keycloak=${keycloak_status:-000}"
+            cd "$HOME/chart-deploy/aws"
+            mkdir -p backups
+            chmod 700 backups
+            runtime_env="$PWD/.env.prod"
+            if [ ! -r "$runtime_env" ]; then
+              echo "Create $runtime_env before deploying; see infra/aws/README.md." >&2
               exit 1
             fi
+            chmod 600 "$runtime_env"
+            if grep -Eq '=(replace-me|changeme)($|[[:space:]])|example\.(org|com)($|[/:])' "$runtime_env"; then
+              echo "$runtime_env still contains example values." >&2
+              exit 1
+            fi
+            set -a
+            . "$runtime_env"
+            set +a
+            public_origin="${PUBLIC_ORIGIN:-}"
+            if [[ ! "$public_origin" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]]; then
+              echo "PUBLIC_ORIGIN in $runtime_env must be an HTTP(S) origin without a path." >&2
+              exit 1
+            fi
+            if docker compose version >/dev/null 2>&1; then
+              compose=(docker compose)
+            elif command -v docker-compose >/dev/null 2>&1; then
+              compose=(docker-compose)
+            else
+              echo "Install Docker Compose on the EC2 host before deploying." >&2
+              exit 1
+            fi
+            export IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}"
+            export IMAGE_TAG="${{ needs.publish.outputs.image_tag }}"
+            "${compose[@]}" config -q
+            docker_config="$(mktemp -d /dev/shm/chart-docker.XXXXXX)"
+            trap 'rm -rf "$docker_config"' EXIT
+            printf '%s' "$GHCR_TOKEN" | DOCKER_CONFIG="$docker_config" docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            DOCKER_CONFIG="$docker_config" "${compose[@]}" pull
+            DOCKER_CONFIG="$docker_config" "${compose[@]}" up -d --remove-orphans
+            for attempt in $(seq 1 60); do
+              build_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$public_origin/api/build" || true)"
+              api_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$public_origin/chart-api/ready" || true)"
+              if printf '%s' "$build_body" | grep -Eq '"buildId"[[:space:]]*:[[:space:]]*"'"$IMAGE_TAG"'"' \
+                && printf '%s' "$api_body" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"'; then
+                exit 0
+              fi
+              sleep 10
+            done
+            echo "Public release verification failed for $public_origin." >&2
+            exit 1
 
-            echo "Public smoke check ${attempt}/12 passed."
-            sleep 10
-          done
-
-      - name: Dump EC2 diagnostics on failure
+      - name: Show deployment diagnostics
         if: failure()
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ env.AWS_APP_HOST }}
-          username: ${{ env.AWS_APP_USER }}
-          key: ${{ env.AWS_APP_SSH_KEY }}
+          host: ${{ secrets.AWS_APP_HOST }}
+          username: ${{ secrets.AWS_APP_USER }}
+          key: ${{ secrets.AWS_APP_SSH_KEY }}
           script: |
-            set -uo pipefail
-
-            docker ps -a --filter "name=chart-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-            ss -ltnp || true
-
-            for container in chart-proxy chart-web chart-api chart-keycloak chart-postgres chart-keycloak-postgres; do
-              if docker ps -a --format "{{.Names}}" | grep -qx "$container"; then
-                echo "===== $container logs ====="
-                docker logs --tail 120 "$container" || true
+            set -u
+            cd "$HOME/chart-deploy/aws"
+            runtime_env="$PWD/.env.prod"
+            if [ -r "$runtime_env" ]; then
+              set -a
+              . "$runtime_env"
+              set +a
+              if docker compose version >/dev/null 2>&1; then
+                compose=(docker compose)
+              elif command -v docker-compose >/dev/null 2>&1; then
+                compose=(docker-compose)
+              else
+                exit 0
               fi
-            done
+              IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}" IMAGE_TAG="${{ needs.publish.outputs.image_tag }}" "${compose[@]}" ps -a
+              IMAGE_PREFIX="${{ needs.publish.outputs.image_prefix }}" IMAGE_TAG="${{ needs.publish.outputs.image_tag }}" "${compose[@]}" logs --tail 100
+            fi

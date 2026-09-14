@@ -2,16 +2,34 @@ node_modules/
 **/node_modules/
 
 **/.next/
+**/storybook-static/
 **/dist/
 **/build/
 **/coverage/
 *.tsbuildinfo
 
+**/__pycache__/
+**/*.egg-info/
+**/.cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+orchestration/.dagster_home/
+orchestration/.logs_queue/
+orchestration/logs/
+orchestration/storage/
+
 data/
 docs/
+pipelines/era5_heat/README.md
+pipelines/LBW_demo/README.md
+pipelines/models/lbw/web/index.html
+pipelines/places/**/shapes.geojson
 web/payload-types.ts
 web/src/app/(payload)/admin/importMap.ts
 chart-repository/payload-types.ts
 chart-repository/src/app/(payload)/admin/importMap.ts
 
 package-lock.json
+Makefile

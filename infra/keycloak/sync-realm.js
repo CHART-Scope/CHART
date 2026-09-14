@@ -17,25 +17,68 @@ async function main() {
   const realmSeed = JSON.parse(fs.readFileSync(realmFile, "utf8"));
   const token = await getAdminToken();
 
-  await syncRealmSettings(token, realmSeed);
+  await syncRealmSettings(token, realmSeed, process.env.CHART_WEB_ORIGIN);
+  await syncClientSettings(token, realmSeed.clients ?? []);
   await ensureClientRoles(token, realmSeed.roles?.client ?? {});
+  await ensureClientProtocolMappers(token, realmSeed.clients ?? []);
+  await ensureWebClientSettings(
+    token,
+    realmSeed.clients ?? [],
+    process.env.CHART_WEB_ORIGIN,
+  );
+  await ensureIdentityProvider(token, buildScopeGoogleIdentityProvider(process.env));
   await ensureGroups(token, realmSeed.groups ?? []);
   await importUsers(token, realmSeed.users ?? []);
 
   console.log(`Synced Keycloak realm '${targetRealm}' from ${realmFile}`);
 }
 
-async function syncRealmSettings(token, realmSeed) {
+async function syncClientSettings(token, clients) {
+  for (const clientSeed of clients) {
+    const clientSummary = await getClient(token, clientSeed.clientId);
+    const clientUrl = `${keycloakUrl}/admin/realms/${targetRealm}/clients/${clientSummary.id}`;
+    const client = await fetchJson(clientUrl, { headers: authHeaders(token) });
+
+    await fetchOk(clientUrl, {
+      method: "PUT",
+      headers: jsonHeaders(token),
+      body: JSON.stringify({
+        ...client,
+        redirectUris: clientSeed.redirectUris ?? client.redirectUris,
+        webOrigins: clientSeed.webOrigins ?? client.webOrigins,
+        attributes: {
+          ...(client.attributes ?? {}),
+          ...(clientSeed.attributes ?? {}),
+        },
+      }),
+    });
+  }
+}
+
+async function syncRealmSettings(token, realmSeed, configuredOrigin) {
   await fetchOk(`${keycloakUrl}/admin/realms/${targetRealm}`, {
     method: "PUT",
     headers: jsonHeaders(token),
-    body: JSON.stringify({
-      displayName: realmSeed.displayName,
-      enabled: realmSeed.enabled,
-      loginTheme: realmSeed.loginTheme,
-      sslRequired: realmSeed.sslRequired,
-    }),
+    body: JSON.stringify(buildRealmSettings(realmSeed, configuredOrigin)),
   });
+}
+
+function buildRealmSettings(realmSeed, configuredOrigin) {
+  const sslRequired = configuredOrigin
+    ? new URL(normalizePublicOrigin(configuredOrigin)).protocol === "http:"
+      ? "none"
+      : "external"
+    : realmSeed.sslRequired;
+  if (!["all", "external", "none"].includes(sslRequired)) {
+    throw new Error("The realm seed has an invalid sslRequired value.");
+  }
+
+  return {
+    displayName: realmSeed.displayName,
+    enabled: realmSeed.enabled,
+    loginTheme: realmSeed.loginTheme,
+    sslRequired,
+  };
 }
 
 async function getAdminToken() {
@@ -45,14 +88,25 @@ async function getAdminToken() {
     username: adminUsername,
     password: adminPassword,
   });
-  const response = await fetchJson(
-    `${keycloakUrl}/realms/${adminRealm}/protocol/openid-connect/token`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body,
-    },
-  );
+  let response;
+  try {
+    response = await fetchJson(
+      `${keycloakUrl}/realms/${adminRealm}/protocol/openid-connect/token`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body,
+      },
+    );
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("invalid_grant")) {
+      throw new Error(
+        "Local Keycloak rejected the configured admin credentials. " +
+          "If this is disposable development data, run: make identity-reset CONFIRM=1",
+      );
+    }
+    throw error;
+  }
 
   if (!response.access_token) {
     throw new Error("Keycloak admin token response did not include an access token.");
@@ -118,6 +172,194 @@ async function upsertClientRole(token, clientUuid, role) {
     headers: jsonHeaders(token),
     body: JSON.stringify({ ...role, name: role.name }),
   });
+}
+
+async function ensureClientProtocolMappers(token, clients) {
+  for (const clientSeed of clients) {
+    const mappers = clientSeed.protocolMappers ?? [];
+    if (mappers.length === 0) {
+      continue;
+    }
+
+    const client = await getClient(token, clientSeed.clientId);
+    const mapperUrl = `${keycloakUrl}/admin/realms/${targetRealm}/clients/${client.id}/protocol-mappers/models`;
+    const existingMappers = await fetchJson(mapperUrl, {
+      headers: authHeaders(token),
+    });
+
+    for (const mapper of mappers) {
+      const existing = existingMappers.find(
+        (candidate) => candidate.name === mapper.name,
+      );
+
+      if (!existing) {
+        await fetchOk(mapperUrl, {
+          method: "POST",
+          headers: jsonHeaders(token),
+          body: JSON.stringify(mapper),
+        });
+        continue;
+      }
+
+      await fetchOk(`${mapperUrl}/${existing.id}`, {
+        method: "PUT",
+        headers: jsonHeaders(token),
+        body: JSON.stringify({ ...mapper, id: existing.id }),
+      });
+    }
+  }
+}
+
+async function ensureWebClientSettings(token, clients, configuredOrigin) {
+  if (!configuredOrigin) {
+    return;
+  }
+
+  const clientSeed = clients.find((client) => client.clientId === "chart-web");
+  if (!clientSeed) {
+    throw new Error("Keycloak realm seed does not define the 'chart-web' client.");
+  }
+
+  const publicOrigin = normalizePublicOrigin(configuredOrigin);
+  const client = await getClient(token, clientSeed.clientId);
+  const clientUrl = `${keycloakUrl}/admin/realms/${targetRealm}/clients/${client.id}`;
+  const existing = await fetchJson(clientUrl, {
+    headers: authHeaders(token),
+  });
+  const settings = buildWebClientSettings(publicOrigin);
+
+  await fetchOk(clientUrl, {
+    method: "PUT",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({
+      ...existing,
+      ...settings,
+      attributes: {
+        ...(existing.attributes ?? {}),
+        ...(settings.attributes ?? {}),
+      },
+    }),
+  });
+}
+
+function buildWebClientSettings(configuredOrigin) {
+  const publicOrigin = normalizePublicOrigin(configuredOrigin);
+  const origins = unique([
+    publicOrigin,
+    "http://localhost:3100",
+    "http://127.0.0.1:3100",
+  ]);
+
+  return {
+    redirectUris: origins.map((origin) => `${origin}/auth/callback`),
+    webOrigins: origins,
+    attributes: {
+      "post.logout.redirect.uris": origins
+        .flatMap((origin) => [origin, `${origin}/*`])
+        .join("##"),
+    },
+  };
+}
+
+async function ensureIdentityProvider(token, provider) {
+  if (!provider) {
+    return;
+  }
+
+  const collectionUrl = `${keycloakUrl}/admin/realms/${targetRealm}/identity-provider/instances`;
+  const providerUrl = `${collectionUrl}/${encodeURIComponent(provider.alias)}`;
+  const response = await fetch(providerUrl, {
+    headers: authHeaders(token),
+  });
+
+  if (response.status === 404) {
+    await fetchOk(collectionUrl, {
+      method: "POST",
+      headers: jsonHeaders(token),
+      body: JSON.stringify(provider),
+    });
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Could not read Keycloak identity provider '${provider.alias}': ${response.status}`,
+    );
+  }
+
+  const existing = await response.json();
+  await fetchOk(providerUrl, {
+    method: "PUT",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({
+      ...existing,
+      ...provider,
+      config: {
+        ...(existing.config ?? {}),
+        ...provider.config,
+      },
+    }),
+  });
+}
+
+function buildScopeGoogleIdentityProvider(env) {
+  const clientId = env.KEYCLOAK_GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = env.KEYCLOAK_GOOGLE_CLIENT_SECRET?.trim();
+
+  if (!clientId && !clientSecret) {
+    return null;
+  }
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "Configure KEYCLOAK_GOOGLE_CLIENT_ID and KEYCLOAK_GOOGLE_CLIENT_SECRET together.",
+    );
+  }
+
+  const hostedDomains = (env.KEYCLOAK_GOOGLE_HOSTED_DOMAIN ?? "scopeimpact.fi")
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase())
+    .filter(Boolean);
+  if (
+    hostedDomains.length === 0 ||
+    hostedDomains.some(
+      (domain) => !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/.test(domain),
+    )
+  ) {
+    throw new Error("KEYCLOAK_GOOGLE_HOSTED_DOMAIN must contain valid email domains.");
+  }
+
+  return {
+    alias: env.KEYCLOAK_GOOGLE_ALIAS?.trim() || "scope-google",
+    displayName: env.KEYCLOAK_GOOGLE_DISPLAY_NAME?.trim() || "Scope Impact Google",
+    providerId: "google",
+    enabled: googleIdentityProviderEnabled(env.CHART_WEB_ORIGIN),
+    updateProfileFirstLoginMode: "missing",
+    trustEmail: true,
+    storeToken: false,
+    addReadTokenRoleOnCreate: false,
+    authenticateByDefault: false,
+    linkOnly: false,
+    firstBrokerLoginFlowAlias: "first broker login",
+    config: {
+      clientId,
+      clientSecret,
+      defaultScope: "openid profile email",
+      hostedDomain: hostedDomains.join(","),
+      syncMode: "IMPORT",
+      useJwksUrl: "true",
+    },
+  };
+}
+
+function googleIdentityProviderEnabled(configuredOrigin) {
+  if (!configuredOrigin) return true;
+  const origin = new URL(normalizePublicOrigin(configuredOrigin));
+  return (
+    origin.protocol === "https:" ||
+    origin.hostname === "localhost" ||
+    origin.hostname === "127.0.0.1" ||
+    origin.hostname === "::1"
+  );
 }
 
 async function ensureGroups(token, groups, parentId) {
@@ -217,7 +459,40 @@ function trimTrailingSlash(value) {
   return value.replace(/\/$/, "");
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+function normalizePublicOrigin(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("CHART_WEB_ORIGIN must be an absolute http or https origin.");
+  }
+  if (
+    !["http:", "https:"].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error("CHART_WEB_ORIGIN must be an absolute http or https origin.");
+  }
+  return url.origin;
+}
+
+function unique(values) {
+  return [...new Set(values)];
+}
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  buildRealmSettings,
+  buildScopeGoogleIdentityProvider,
+  buildWebClientSettings,
+  normalizePublicOrigin,
+};

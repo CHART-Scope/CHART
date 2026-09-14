@@ -1,0 +1,91 @@
+site_name: CHART
+site_description: Climate-health planning platform documentation
+site_url: https://chart-scope.github.io/CHART/docs/
+repo_url: https://github.com/CHART-Scope/CHART
+repo_name: CHART-Scope/CHART
+
+exclude_docs: |
+  architecture.md
+  tdd.md
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: teal
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+    - content.code.copy
+    - content.tabs.link
+
+plugins:
+  - search
+  - swagger-ui-tag:
+      docExpansion: full
+      filter: true
+      syntaxHighlightTheme: nord
+      tryItOutEnabled: false
+      supportedSubmitMethods: []
+      validatorUrl: none
+      extra_css:
+        - stylesheets/swagger-ui-theme.css
+      filter_files:
+        - api-reference.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Installation setup: installation-setup.md
+  - Architecture:
+      - System requirements and capacity: system-architecture-and-requirements.md
+  - Infrastructure:
+      - AWS sandbox deployment: aws-sandbox.md
+  - Python backend:
+      - Overview: python-backend.md
+      - Add a geography and model: add-geography-and-model.md
+      - Climate API: climate-api.md
+      - API explorer: api-reference.md
+  - Modeling:
+      - Overview: modeling.md
+      - Model releases: model-updates.md
+      - Health input contract: health-input-contract.md
+      - Survey exploration guide: health-survey-exploration-guide.md
+  - Data pipeline: data-pipeline.md
+  - Project:
+      - Digital public good and licensing: licensing.md
+
+extra:
+  generator: false

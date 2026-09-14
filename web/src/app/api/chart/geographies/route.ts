@@ -1,9 +1,9 @@
 import { type NextRequest } from "next/server";
 
-import { proxyChartApiRequest } from "@/lib/chartApiProxy";
+import { proxyPythonApiRequest } from "@/lib/pythonApiProxy";
 
 export const runtime = "nodejs";
 
 export function GET(request: NextRequest) {
-  return proxyChartApiRequest(request, { path: "geographies" });
+  return proxyPythonApiRequest(request, { path: "geographies" });
 }

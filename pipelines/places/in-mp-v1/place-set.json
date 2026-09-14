@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "id": "in-mp-state-divisions",
+  "version": "1",
+  "geography": {
+    "country_code": "IN",
+    "country_name": "India",
+    "root_id": "geo-in",
+    "root_path": "/india",
+    "analytics_slug": "madhya-pradesh",
+    "levels": [
+      {
+        "key": "geo_level_1",
+        "label": "State",
+        "sort_order": 10
+      },
+      {
+        "key": "geo_level_2",
+        "label": "Division",
+        "sort_order": 20
+      }
+    ],
+    "places": [
+      {
+        "place_code": "madhya-pradesh",
+        "country_code": "IN",
+        "level": "state",
+        "display_name": "Madhya Pradesh",
+        "geography_id": "geo-in-madhya-pradesh",
+        "app_level": "geo_level_1",
+        "level_label": "State",
+        "path": "/india/madhya-pradesh",
+        "sort_order": 10,
+        "boundary_key": "madhya-pradesh"
+      },
+      {
+        "place_code": "bhopal",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Bhopal Division",
+        "geography_id": "geo-in-madhya-pradesh-division-bhopal",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/bhopal",
+        "sort_order": 10,
+        "boundary_key": "bhopal"
+      },
+      {
+        "place_code": "chambal",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Chambal Division",
+        "geography_id": "geo-in-madhya-pradesh-division-chambal",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/chambal",
+        "sort_order": 20,
+        "boundary_key": "chambal"
+      },
+      {
+        "place_code": "gwalior",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Gwalior Division",
+        "geography_id": "geo-in-madhya-pradesh-division-gwalior",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/gwalior",
+        "sort_order": 30,
+        "boundary_key": "gwalior"
+      },
+      {
+        "place_code": "indore",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Indore Division",
+        "geography_id": "geo-in-madhya-pradesh-division-indore",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/indore",
+        "sort_order": 40,
+        "boundary_key": "indore"
+      },
+      {
+        "place_code": "jabalpur",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Jabalpur Division",
+        "geography_id": "geo-in-madhya-pradesh-division-jabalpur",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/jabalpur",
+        "sort_order": 50,
+        "boundary_key": "jabalpur"
+      },
+      {
+        "place_code": "narmadapuram",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Narmadapuram Division",
+        "geography_id": "geo-in-madhya-pradesh-division-narmadapuram",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/narmadapuram",
+        "sort_order": 60,
+        "boundary_key": "narmadapuram"
+      },
+      {
+        "place_code": "rewa",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Rewa Division",
+        "geography_id": "geo-in-madhya-pradesh-division-rewa",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/rewa",
+        "sort_order": 70,
+        "boundary_key": "rewa"
+      },
+      {
+        "place_code": "sagar",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Sagar Division",
+        "geography_id": "geo-in-madhya-pradesh-division-sagar",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/sagar",
+        "sort_order": 80,
+        "boundary_key": "sagar"
+      },
+      {
+        "place_code": "shahdol",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Shahdol Division",
+        "geography_id": "geo-in-madhya-pradesh-division-shahdol",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/shahdol",
+        "sort_order": 90,
+        "boundary_key": "shahdol"
+      },
+      {
+        "place_code": "ujjain",
+        "country_code": "IN",
+        "level": "division",
+        "display_name": "Ujjain Division",
+        "geography_id": "geo-in-madhya-pradesh-division-ujjain",
+        "app_level": "geo_level_2",
+        "level_label": "Division",
+        "parent_place_code": "madhya-pradesh",
+        "path": "/india/madhya-pradesh/divisions/ujjain",
+        "sort_order": 100,
+        "boundary_key": "ujjain"
+      }
+    ]
+  },
+  "shape": {
+    "path": "pipelines/places/in-mp-v1/shapes.geojson",
+    "sha256": "6b862619a914428317a916f001b001e971690c0a138951cfa797142a8c4c326e"
+  },
+  "provenance": {
+    "source": "MP division shapes supplied with both Madhya Pradesh model bundles",
+    "licence": "Review required: modeller-supplied MP_divisions shapefile",
+    "transform_id": "chart-mp-divisions-wgs84-precision-1e-5-state-union-v1",
+    "source_artifacts": [
+      {
+        "filename": "MP_divisions.shp",
+        "sha256": "f993613f14eaeca827c0db320cdbd5f89f5e10237036af41f5144ec868d6d60e"
+      },
+      {
+        "filename": "MP_divisions.shx",
+        "sha256": "2be0a2d1df9aa9f75f32b486cedcd2c34ac1814671cf0ef721ee5e265d36d0c4"
+      },
+      {
+        "filename": "MP_divisions.dbf",
+        "sha256": "b767390976f029830f5da42652786b1b57945c312dd3861edc98a931c74bbff1"
+      },
+      {
+        "filename": "MP_divisions.prj",
+        "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,77 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+import { TokenTable, TokenRow } from "./TokenTable";
+
+<Meta title="Foundations/Typography" />
+
+# Typography
+
+Two typefaces. Everything else follows from the token scale.
+
+## Fira Sans — display, data, labels
+
+<div
+  style={{
+    padding: 24,
+    background: "var(--color-white)",
+    border: "1px solid var(--border-subtle)",
+    borderRadius: "var(--radius-xl)",
+    marginBottom: 24,
+  }}
+>
+  <div
+    style={{
+      fontFamily: "var(--font-display)",
+      fontSize: "var(--fs-hero)",
+      fontWeight: 500,
+      color: "var(--color-charcoal)",
+    }}
+  >
+    Aa 35°C 12%
+  </div>
+  <p style={{ marginTop: 8, fontSize: 12, color: "var(--color-text-muted)" }}>
+    Used for: page titles, panel titles, eyebrow labels (uppercase, letter-spaced), stat
+    numbers, breadcrumb chips, buttons with numeric content.
+  </p>
+</div>
+
+## Noto Sans Display — body
+
+<div
+  style={{
+    padding: 24,
+    background: "var(--color-white)",
+    border: "1px solid var(--border-subtle)",
+    borderRadius: "var(--radius-xl)",
+    marginBottom: 24,
+  }}
+>
+  <div
+    style={{
+      fontFamily: "var(--font-body)",
+      fontSize: 16,
+    }}
+  >
+    Aa The quick brown fox jumps over the lazy dog
+  </div>
+  <p style={{ marginTop: 8, fontSize: 12, color: "var(--color-text-muted)" }}>
+    Used for: paragraphs, descriptions, form inputs, buttons, nav items — everything
+    that isn't a heading or a data value.
+  </p>
+</div>
+
+## Type scale
+
+<TokenTable>
+  <TokenRow token="--fs-hero">Design-system hero title (28px)</TokenRow>
+  <TokenRow token="--fs-h1">Page title (20px)</TokenRow>
+  <TokenRow token="--fs-section">Section header (19px)</TokenRow>
+  <TokenRow token="--fs-h2">Sub-section (18px)</TokenRow>
+  <TokenRow token="--fs-h3">Modal / card title (15px)</TokenRow>
+  <TokenRow token="--fs-body-lg">Large body (14px)</TokenRow>
+  <TokenRow token="--fs-body">Default body (13px)</TokenRow>
+  <TokenRow token="--fs-body-sm">Compact body (12.5px)</TokenRow>
+  <TokenRow token="--fs-caption">Caption (12px)</TokenRow>
+  <TokenRow token="--fs-eyebrow">Uppercase eyebrow (11px)</TokenRow>
+  <TokenRow token="--fs-micro">Micro labels (10.5px)</TokenRow>
+</TokenTable>

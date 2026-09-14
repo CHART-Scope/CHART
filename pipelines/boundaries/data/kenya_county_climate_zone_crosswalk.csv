@@ -1,0 +1,48 @@
+place_code,display_name,source_name,iso_code,climate_zone,model_supported
+baringo,Baringo,Baringo,KE-01,Lake Victoria Basin & Western Highlands,true
+bomet,Bomet,Bomet,KE-02,Lake Victoria Basin & Western Highlands,true
+bungoma,Bungoma,Bungoma,KE-03,Lake Victoria Basin & Western Highlands,true
+busia,Busia,Busia,KE-04,Lake Victoria Basin & Western Highlands,true
+elgeyo-marakwet,Elgeyo-Marakwet,Elgeyo-Marakwet,,Lake Victoria Basin & Western Highlands,true
+embu,Embu,Embu,KE-06,Central Highlands,true
+garissa,Garissa,Garissa,KE-07,North-eastern,true
+homa-bay,Homa Bay,HomaBay,KE-08,Lake Victoria Basin & Western Highlands,true
+isiolo,Isiolo,Isiolo,KE-09,North-eastern,true
+kajiado,Kajiado,Kajiado,KE-10,South-eastern,true
+kakamega,Kakamega,Kakamega,KE-11,Lake Victoria Basin & Western Highlands,true
+kericho,Kericho,Kericho,KE-12,Lake Victoria Basin & Western Highlands,true
+kiambu,Kiambu,Kiambu,KE-13,Central Highlands,true
+kilifi,Kilifi,Kilifi,KE-14,Coastal Strip,true
+kirinyaga,Kirinyaga,Kirinyaga,KE-15,Central Highlands,true
+kisii,Kisii,Kisii,KE-16,Lake Victoria Basin & Western Highlands,true
+kisumu,Kisumu,Kisumu,KE-17,Lake Victoria Basin & Western Highlands,true
+kitui,Kitui,Kitui,KE-18,South-eastern,true
+kwale,Kwale,Kwale,KE-19,Coastal Strip,true
+laikipia,Laikipia,Laikipia,KE-20,Lake Victoria Basin & Western Highlands,true
+lamu,Lamu,Lamu,KE-21,Coastal Strip,true
+machakos,Machakos,Machakos,KE-22,South-eastern,true
+makueni,Makueni,Makueni,KE-23,South-eastern,true
+mandera,Mandera,Mandera,KE-24,North-eastern,true
+marsabit,Marsabit,Marsabit,KE-25,North-eastern,true
+meru,Meru,Meru,KE-26,Central Highlands,true
+migori,Migori,Migori,KE-27,Lake Victoria Basin & Western Highlands,true
+mombasa,Mombasa,Mombasa,KE-28,Coastal Strip,true
+muranga,Murang'a,Murang'a,KE-29,Central Highlands,true
+nairobi,Nairobi,Nairobi,,Central Highlands,true
+nakuru,Nakuru,Nakuru,KE-31,Lake Victoria Basin & Western Highlands,true
+nandi,Nandi,Nandi,KE-32,Lake Victoria Basin & Western Highlands,true
+narok,Narok,Narok,KE-33,Lake Victoria Basin & Western Highlands,true
+nyamira,Nyamira,Nyamira,KE-34,Lake Victoria Basin & Western Highlands,true
+nyandarua,Nyandarua,Nyandarua,KE-35,Central Highlands,true
+nyeri,Nyeri,Nyeri,KE-36,Central Highlands,true
+samburu,Samburu,Samburu,KE-37,North-eastern,true
+siaya,Siaya,Siaya,KE-38,Lake Victoria Basin & Western Highlands,true
+taita-taveta,Taita-Taveta,TaitaTaveta,,South-eastern,true
+tana-river,Tana River,TanaRiver,KE-40,South-eastern,true
+tharaka-nithi,Tharaka-Nithi,Tharaka-Nithi,KE-41,Central Highlands,true
+trans-nzoia,Trans Nzoia,TransNzoia,KE-42,Lake Victoria Basin & Western Highlands,true
+turkana,Turkana,Turkana,KE-43,North-western,false
+uasin-gishu,Uasin Gishu,UasinGishu,KE-44,Lake Victoria Basin & Western Highlands,true
+vihiga,Vihiga,Vihiga,KE-45,Lake Victoria Basin & Western Highlands,true
+wajir,Wajir,Wajir,KE-46,North-eastern,true
+west-pokot,West Pokot,WestPokot,KE-47,Lake Victoria Basin & Western Highlands,true

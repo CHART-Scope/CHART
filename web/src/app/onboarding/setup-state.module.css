@@ -1,0 +1,86 @@
+.page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 20% 15%, var(--color-nexus-tint), transparent 30%),
+    var(--surface-app);
+}
+
+.card {
+  width: min(480px, 100%);
+  padding: 34px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-card);
+}
+
+.card > span {
+  color: var(--color-maroon);
+  font-family: var(--font-mono);
+  font-size: var(--fs-eyebrow);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+}
+
+.card h1 {
+  margin: 12px 0 10px;
+  color: var(--color-charcoal);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 500;
+}
+
+.card p {
+  color: var(--color-text-muted);
+  font-size: var(--fs-body);
+  line-height: 1.65;
+}
+
+.progress {
+  height: 4px;
+  margin-top: 24px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border-subtle);
+}
+
+.progress span {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-nexus);
+  animation: repository-progress 1.25s ease-in-out infinite alternate;
+}
+
+.card .resetNote {
+  margin: 12px 0 0;
+  color: var(--color-text-light);
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+@keyframes repository-progress {
+  from {
+    transform: translateX(-15%);
+  }
+
+  to {
+    transform: translateX(155%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress span {
+    width: 100%;
+    animation: none;
+  }
+}

@@ -1,5 +1,5 @@
-import { LandingRoutePage } from "../modules/routes/LandingRoutePage";
+import { Login } from "@/features/onboarding";
 
-export default function Page() {
-  return <LandingRoutePage />;
+export default function HomePage() {
+  return <Login />;
 }

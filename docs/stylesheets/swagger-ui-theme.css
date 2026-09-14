@@ -1,0 +1,170 @@
+:root {
+  --chart-teal: #00796b;
+  --chart-teal-dark: #005b50;
+  --chart-border: #d8e4e2;
+  --chart-surface: #ffffff;
+  --chart-text: #263238;
+  --chart-muted: #607d8b;
+}
+
+body {
+  margin: 0;
+  background: transparent;
+}
+
+.swagger-ui {
+  color: var(--chart-text);
+  font-family:
+    Roboto,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.swagger-ui .topbar {
+  display: none;
+}
+
+.swagger-ui .wrapper {
+  max-width: none;
+  padding: 0;
+}
+
+.swagger-ui .info {
+  margin: 0 0 1.5rem;
+}
+
+.swagger-ui .info .title,
+.swagger-ui .info h1,
+.swagger-ui .info h2,
+.swagger-ui .info h3,
+.swagger-ui .info h4,
+.swagger-ui .info h5 {
+  color: var(--chart-teal-dark);
+  font-family: inherit;
+}
+
+.swagger-ui .info p,
+.swagger-ui .info li,
+.swagger-ui .info table,
+.swagger-ui .info .base-url {
+  color: var(--chart-text);
+  font-family: inherit;
+}
+
+.swagger-ui .scheme-container {
+  margin: 0 0 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--chart-border);
+  border-radius: 0.5rem;
+  background: var(--chart-surface);
+  box-shadow: none;
+}
+
+.swagger-ui .filter .operation-filter-input {
+  min-width: min(100%, 24rem);
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #9fbcb7;
+  border-radius: 0.35rem;
+  color: var(--chart-text);
+  font-family: inherit;
+}
+
+.swagger-ui .filter .operation-filter-input:focus {
+  border-color: var(--chart-teal);
+  outline: 2px solid rgb(0 121 107 / 20%);
+}
+
+.swagger-ui .opblock-tag {
+  margin: 1.75rem 0 0.75rem;
+  border-bottom: 1px solid var(--chart-border);
+  color: var(--chart-text);
+  font-family: inherit;
+}
+
+.swagger-ui .opblock {
+  overflow: hidden;
+  margin: 0 0 0.8rem;
+  border-radius: 0.45rem;
+  box-shadow: none;
+}
+
+.swagger-ui .opblock .opblock-summary-description,
+.swagger-ui .opblock .opblock-summary-path,
+.swagger-ui .opblock .opblock-section-header h4,
+.swagger-ui .opblock-description-wrapper p,
+.swagger-ui .parameter__name,
+.swagger-ui .response-col_status,
+.swagger-ui table thead tr td,
+.swagger-ui table thead tr th {
+  font-family: inherit;
+}
+
+.swagger-ui .opblock .opblock-summary-method {
+  min-width: 5.25rem;
+  border-radius: 0.3rem;
+  font-family: inherit;
+  text-shadow: none;
+}
+
+.swagger-ui .model-box,
+.swagger-ui section.models {
+  border-radius: 0.45rem;
+}
+
+.swagger-ui a,
+.swagger-ui .info a,
+.swagger-ui .opblock-external-docs-wrapper a {
+  color: var(--chart-teal);
+}
+
+.swagger-ui .btn.authorize {
+  border-color: var(--chart-teal);
+  color: var(--chart-teal-dark);
+}
+
+.swagger-ui .btn.authorize svg {
+  fill: var(--chart-teal-dark);
+}
+
+html.dark-mode {
+  --chart-teal: #80cbc4;
+  --chart-teal-dark: #b2dfdb;
+  --chart-border: #455a64;
+  --chart-surface: #1e272c;
+  --chart-text: #eceff1;
+  --chart-muted: #b0bec5;
+}
+
+html.dark-mode body {
+  background: transparent;
+}
+
+html.dark-mode .swagger-ui .scheme-container {
+  background: var(--chart-surface);
+}
+
+html.dark-mode .swagger-ui .filter .operation-filter-input {
+  border-color: #607d8b;
+  background: #263238;
+  color: var(--chart-text);
+}
+
+html.dark-mode .swagger-ui .filter .operation-filter-input::placeholder {
+  color: var(--chart-muted);
+}
+
+@media (max-width: 44rem) {
+  .swagger-ui .opblock .opblock-summary {
+    align-items: flex-start;
+  }
+
+  .swagger-ui .opblock .opblock-summary-path {
+    overflow-wrap: anywhere;
+  }
+
+  .swagger-ui .opblock .opblock-summary-description {
+    display: none;
+  }
+}

@@ -1,0 +1,90 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.title {
+  font-family: var(--font-body);
+  font-size: var(--fs-body-lg);
+  color: var(--color-charcoal);
+  margin: 0;
+  font-weight: 500;
+}
+
+.svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.gridLine {
+  stroke: var(--color-grey-light);
+  stroke-width: 1;
+}
+
+.axisLabel {
+  font-size: 10px;
+  fill: var(--color-text-muted);
+  font-family: var(--font-body);
+}
+
+.legend {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+  flex-wrap: wrap;
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.empty,
+.skeleton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--fs-body-lg);
+  border-radius: var(--radius-xs);
+  padding: var(--space-4);
+  background: var(--surface-muted);
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-grey-light) 0%,
+    var(--color-grey-mid) 50%,
+    var(--color-grey-light) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-style: solid;
+  border-color: var(--border-subtle);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

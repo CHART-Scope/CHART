@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chart-boundaries"
+version = "0.1.0"
+description = "Versioned administrative-boundary preparation for CHART model areas."
+requires-python = ">=3.11"
+dependencies = [
+  "geopandas>=1.0",
+  "pandas>=2.0",
+  "shapely>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+chart-build-mp-boundaries = "chart_boundaries.mp_model_areas:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

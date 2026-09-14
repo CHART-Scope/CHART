@@ -16,11 +16,22 @@ coverage/
 out/
 **/dist/
 **/build/
+!web/src/app/api/build/
+!web/src/app/api/build/route.ts
 **/coverage/
 **/.next/
 **/out/
 web/storybook-static/
 *.tsbuildinfo
+
+# Python build and test artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
 
 # generated local app artifacts
 api/openapi.yaml
@@ -31,14 +42,27 @@ chart-repository/payload-types.ts
 chart-repository/public/uploads/
 outputs/
 
+# mkdocs build output
+site/
+
+# copied openapi for docs site (source: api/openapi.yaml)
+docs/openapi/fastify.yaml
+
 # local docs and notes
-data/
-data/
+/data/
 outputs/
 web/public/uploads/
 .local/
+pipelines/LBW_demo/model/
+pipelines/inference/models/
 
 # OS files
 .DS_Store
 .claude
 build-storybook.log
+.backlog
+new_design
+*.rds
+
+# locally recovered research archives and restricted DHS material
+/recovered/

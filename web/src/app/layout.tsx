@@ -1,18 +1,23 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 
-import "leaflet/dist/leaflet.css";
+import { AuditRuntime } from "@/lib/audit/AuditRuntime";
 
-import "./styles.css";
+import "../styles/tokens.css";
+import "../styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "CHART",
-  description: "Climate x Health Adaptation and Resilience Tool",
+  title: "CHART — Climate & Health Adaptation and Resilience Tool",
+  description: "CHART planning workspace for traceable climate and health predictions.",
 };
 
-export default function RootLayout({ children }: { children?: React.ReactNode }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AuditRuntime />
+        {children}
+      </body>
     </html>
   );
 }

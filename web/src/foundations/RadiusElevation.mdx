@@ -1,0 +1,74 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+import { TokenTable, TokenRow } from "./TokenTable";
+
+<Meta title="Foundations/Radius & Elevation" />
+
+# Radius & elevation
+
+## Radius scale
+
+<TokenTable>
+  <TokenRow token="--radius-xs">Icon accents (4px)</TokenRow>
+  <TokenRow token="--radius-sm">Buttons, inputs (6px)</TokenRow>
+  <TokenRow token="--radius-md">Filter selects, small chips (8px)</TokenRow>
+  <TokenRow token="--radius-lg">Nested cards, stepper container (10px)</TokenRow>
+  <TokenRow token="--radius-xl">Cards / panels (12px)</TokenRow>
+  <TokenRow token="--radius-2xl">Modals (14px)</TokenRow>
+  <TokenRow token="--radius-pill">Chips, badges, scenario pills (99px)</TokenRow>
+</TokenTable>
+
+## Elevation
+
+<TokenTable>
+  <TokenRow token="--shadow-modal">
+    Only elevated surface in the system. Cards / panels have no shadow at rest.
+  </TokenRow>
+  <TokenRow token="--shadow-thumb">Slider thumb only.</TokenRow>
+</TokenTable>
+
+<div style={{ marginTop: 24, display: "flex", gap: 24, flexWrap: "wrap" }}>
+  <div style={{
+    background: "var(--color-white)",
+    border: "1px solid var(--border-subtle)",
+    borderRadius: "var(--radius-xl)",
+    padding: 20,
+    minWidth: 220,
+  }}>
+    <div style={{
+      fontFamily: "var(--font-display)",
+      fontSize: 11,
+      textTransform: "uppercase",
+      letterSpacing: "0.06em",
+      color: "var(--color-text-light)",
+      marginBottom: 8,
+    }}>
+      Panel
+    </div>
+    <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+      12px radius · 1px grey-mid border · no shadow.
+    </div>
+  </div>
+
+  <div style={{
+    background: "var(--color-white)",
+    borderRadius: "var(--radius-2xl)",
+    padding: 22,
+    minWidth: 220,
+    boxShadow: "var(--shadow-modal)",
+  }}>
+    <div style={{
+      fontFamily: "var(--font-display)",
+      fontSize: 11,
+      textTransform: "uppercase",
+      letterSpacing: "0.06em",
+      color: "var(--color-text-light)",
+      marginBottom: 8,
+    }}>
+      Modal
+    </div>
+    <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+      14px radius · shadow-modal · centered, backdrop-dimmed.
+    </div>
+  </div>
+</div>

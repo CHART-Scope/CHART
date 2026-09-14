@@ -1,0 +1,57 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+import { SwatchGrid } from "./TokenTable";
+
+<Meta title="Foundations/Colors" />
+
+# Colors
+
+All values are read live from `src/styles/tokens.css` — the hex under each
+swatch is what the browser currently sees.
+
+## Base palette
+
+<SwatchGrid
+  swatches={[
+    { token: "--color-ivory", label: "Ivory", note: "bg" },
+    { token: "--color-white", label: "White", note: "card fill" },
+    { token: "--color-charcoal", label: "Charcoal", note: "text / nav" },
+    { token: "--color-nexus", label: "Nexus (blue)", note: "primary" },
+    { token: "--color-maroon", label: "Maroon", note: "critical / risk" },
+    { token: "--color-lime", label: "Lime", note: "active / done" },
+    { token: "--color-grey-mid", label: "Grey mid", note: "borders" },
+    { token: "--color-grey-light", label: "Grey light", note: "surfaces" },
+    { token: "--color-text-muted", label: "Text muted" },
+    { token: "--color-text-light", label: "Text light" },
+  ]}
+/>
+
+## Semantic — status, precision, solution type
+
+<SwatchGrid
+  swatches={[
+    { token: "--color-success", label: "Success / High" },
+    { token: "--color-amber", label: "Amber / Moderate" },
+    { token: "--color-sem-low", label: "Rose / Low, Policy" },
+    { token: "--color-env", label: "Environment" },
+    { token: "--color-sem-behaviour", label: "Behaviour change" },
+  ]}
+/>
+
+> **Rule.** Chips and badges use a 10–12% opacity tint of their semantic color
+> as background, and the full-strength color for text / border / icon. Never a
+> solid fill. See the matching `--color-*-tint` tokens.
+
+## Tints
+
+<SwatchGrid
+  swatches={[
+    { token: "--color-nexus-tint", label: "Nexus tint" },
+    { token: "--color-success-tint", label: "Success tint" },
+    { token: "--color-amber-tint", label: "Amber tint" },
+    { token: "--color-sem-low-tint", label: "Rose tint" },
+    { token: "--color-env-tint", label: "Env tint" },
+    { token: "--color-sem-behaviour-tint", label: "Behaviour tint" },
+    { token: "--color-maroon-tint", label: "Maroon tint" },
+  ]}
+/>

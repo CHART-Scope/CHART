@@ -1,0 +1,178 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  min-height: 22rem;
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-eyebrow);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.question {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-body-lg);
+  font-weight: 400;
+  color: var(--color-charcoal);
+  /* Extra line-height so the pill dropdowns get vertical breathing room
+   * as the question wraps across lines. */
+  line-height: 1.7;
+  /* Prevent English-language leading-space collapse — the JSX inserts
+   * a real space around each inline select and we want it preserved. */
+  word-spacing: 0.05em;
+}
+
+/* Keep each "…of [dropdown]" / "in [dropdown]" chunk together so the
+ * sentence only wraps at phrase boundaries, never mid-clause or right
+ * before the closing text. */
+.phrase {
+  white-space: nowrap;
+}
+
+.inlineStatic {
+  font-weight: 500;
+  color: var(--color-nexus);
+}
+
+.modelScopeNote {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-left: 3px solid var(--color-accent, #2f6f62);
+  background: var(--surface-muted, #f5f4ef);
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+  line-height: 1.45;
+}
+
+.iconArrayWrap {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-1) 0;
+}
+
+.skeletonGrid {
+  align-self: center;
+  width: 220px;
+  height: 200px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    100deg,
+    var(--surface-muted, #f0efe9) 30%,
+    rgba(255, 255, 255, 0.6) 50%,
+    var(--surface-muted, #f0efe9) 70%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonGrid {
+    animation: none;
+  }
+}
+
+.stat {
+  margin: 0;
+  color: var(--color-charcoal);
+  font-size: var(--fs-body-lg);
+  line-height: var(--lh-body);
+  text-align: center;
+}
+
+.stat strong {
+  color: var(--color-maroon);
+  font-family: var(--font-display);
+  font-size: var(--fs-h2);
+  font-weight: 500;
+}
+
+.stat[data-loading] {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Direction-aware colour on the % value in the odds sentence so the
+ * reader clocks direction at a glance without parsing the word.
+ * Up (heat elevates odds — the expected heat-hazard signal) uses a
+ * warm burnt-orange; down (heat lowers odds — often a small-sample
+ * spline dip at high temperatures in a division fit) uses a cool
+ * teal. Both are distinct from the panel's default maroon so the two
+ * cases are visually unmistakable. */
+.statValueUp {
+  color: var(--color-burnt-orange, #b64d1a);
+}
+
+.statValueDown {
+  color: var(--color-teal, #276674);
+}
+
+.afHint {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-body);
+  text-align: center;
+}
+
+.precisionRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.precisionLabel {
+  font-size: var(--fs-body);
+  color: var(--color-text-muted);
+}
+
+.tempReadout {
+  margin: 0;
+  text-align: center;
+  color: var(--color-blue, #1c4e9a);
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
+  font-weight: 500;
+}
+
+.sliderWrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sliderScale {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+}
+
+.footnote {
+  margin: var(--space-2) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+  text-align: left;
+  line-height: var(--lh-body);
+}
