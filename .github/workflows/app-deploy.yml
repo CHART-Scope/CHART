@@ -264,6 +264,15 @@ jobs:
             printf '%s' "$GHCR_TOKEN" | DOCKER_CONFIG="$docker_config" docker login ghcr.io -u "$GHCR_USER" --password-stdin
             DOCKER_CONFIG="$docker_config" "${compose[@]}" pull
             DOCKER_CONFIG="$docker_config" "${compose[@]}" up -d --remove-orphans
+            # Caddy mounts the Caddyfile, so Compose sees no reason to recreate it
+            # when only the routes change. Without this reload a routing change
+            # silently does not take effect until something else restarts it.
+            if docker exec chart-caddy caddy reload --config /etc/caddy/Caddyfile 2>/dev/null; then
+              echo "Reloaded Caddy configuration."
+            else
+              echo "Caddy reload failed; recreating the container." >&2
+              DOCKER_CONFIG="$docker_config" "${compose[@]}" up -d --force-recreate chart-caddy
+            fi
             for attempt in $(seq 1 60); do
               build_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$public_origin/api/build" || true)"
               api_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$public_origin/chart-core/ready" || true)"
