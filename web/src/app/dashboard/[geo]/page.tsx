@@ -145,10 +145,10 @@ function AuthorizedDashboard({
   const currentGeography = geographies.find((geo) => geo.id === geographyId);
   const effectiveGeography =
     geographies.find((geo) => geo.id === effectiveAdminUnit) ?? currentGeography;
-  const country = currentGeography ? countryFromPath(currentGeography.path) : "";
-  const areaName = currentGeography?.name ?? geographyId;
-  const stateLabel = currentGeography
-    ? `${currentGeography.name} (${currentGeography.levelLabel})`
+  const country = effectiveGeography ? countryFromPath(effectiveGeography.path) : "";
+  const areaName = effectiveGeography?.name ?? geographyId;
+  const stateLabel = effectiveGeography
+    ? `${effectiveGeography.name} (${effectiveGeography.levelLabel})`
     : areaName;
   const selectedCatalog = catalog.find((entry) => entry.outcome === outcome);
   const outcomeLabel = selectedCatalog?.outcome_label ?? humanizeCode(outcome);

@@ -65,16 +65,28 @@ export function DashboardContextBar({
     [geographies, geographyScopes],
   );
 
+  const selectedGeographyId = useMemo(() => {
+    if (!adminUnit || !geographies) return geographyId;
+    const byId = new Map(geographies.map((geo) => [geo.id, geo]));
+    const selected = byId.get(adminUnit);
+    let cursor = selected;
+    while (cursor?.parentId) {
+      if (cursor.parentId === geographyId) return selected?.id ?? geographyId;
+      cursor = byId.get(cursor.parentId);
+    }
+    return geographyId;
+  }, [adminUnit, geographies, geographyId]);
+
   const activeFamily = useMemo(() => {
     if (!families) return null;
     return (
       families.find((family) =>
-        familyContains(family, geographyId, geographies ?? undefined),
+        familyContains(family, selectedGeographyId, geographies ?? undefined),
       ) ??
       families[0] ??
       null
     );
-  }, [families, geographies, geographyId]);
+  }, [families, geographies, selectedGeographyId]);
 
   // Top-level areas visible under the current family — i.e. the ones
   // whose parent is the family root. For India that's just Madhya
@@ -97,12 +109,14 @@ export function DashboardContextBar({
   const topLevelValue = useMemo(() => {
     if (!geographies || !activeFamily) return topLevelAreas[0]?.id ?? "";
     const byId = new Map(geographies.map((geo) => [geo.id, geo]));
-    let cursor = byId.get(geographyId);
+    let cursor = byId.get(selectedGeographyId);
     while (cursor && cursor.parentId && cursor.parentId !== activeFamily.root.id) {
       cursor = byId.get(cursor.parentId);
     }
-    return cursor?.id ?? topLevelAreas[0]?.id ?? "";
-  }, [geographies, activeFamily, geographyId, topLevelAreas]);
+    return topLevelAreas.some((area) => area.id === cursor?.id)
+      ? (cursor?.id ?? "")
+      : (topLevelAreas[0]?.id ?? "");
+  }, [geographies, activeFamily, selectedGeographyId, topLevelAreas]);
 
   // Sub-level areas of the resolved top-level area (state / county).
   // Only rendered when the top-level place has model-backed children —
@@ -121,7 +135,8 @@ export function DashboardContextBar({
   // Sub-level select value: prefer the explicit ?admin_unit= override,
   // fall back to the URL's geographyId when the URL itself points at
   // a sub-level (division). Empty string == "Whole state".
-  const subLevelValue = adminUnit ?? (geographyId !== topLevelValue ? geographyId : "");
+  const subLevelValue =
+    selectedGeographyId !== topLevelValue ? selectedGeographyId : "";
 
   const subLevelLabel = subAreas[0]?.levelLabel ?? "";
   const topLevelLabel =
