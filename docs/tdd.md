@@ -1,9 +1,31 @@
 # CHART technical design
 
-Last updated: 27 July 2026
+Last updated: 15 September 2026
 
-This document describes the system that is now in the repository and the work
-that is still open.
+This document describes the target system and how far the repository has got
+towards it. Where the two differ, the status table below is the honest record;
+the sections that follow describe the target.
+
+## 0. Status at a glance
+
+Checked against the repository on 15 September 2026.
+
+| Section | Status | Note |
+| --- | --- | --- |
+| 1. Product outcome | Built | Planning flow, saved results, and reload all work. |
+| 2. Running system | Built | Fastify retired; Python and Alembic own the API and schema. |
+| 3. Prediction flow | Built | Durable requests, idempotent keys, Dagster execution. |
+| 4. Climate data contract | Built | ERA5, seasonal, and projection adapters land with provenance. |
+| 5. Places, boundaries, models | Built | India and Kenya model releases; under-five model alongside LBW. |
+| 6. Saved data | Built | One linear Alembic chain; the head gates readiness. |
+| 7. Python API | Built | Every operation carries curated docs, enforced at schema build. |
+| 8. Inference | Partial | LBW served; the swappable provider gateway is still open (task_017). |
+| 9. User interface | Partial | Planning, dashboard, and settings ship; VRA does not. |
+| 10. Deployment | Built | EC2 runs published images via Compose; no source on the host. |
+| 11. Tests for release | Built | Full suite plus migration and OpenAPI checks run in CI. |
+| 12. Done and next | — | See the section itself. |
+
+Update this table when a section's status changes, not on every commit.
 
 ## 1. Product outcome
 
@@ -236,13 +258,28 @@ Important tables:
 | `users`, `user_roles`, `user_geography_scopes` | user access |
 | `workspaces`, `workspace_members`, `setup_state` | application setup and planning ownership |
 
-Alembic revisions `001` through `013` create or adopt these tables. Revision
-`007` adopts old application tables without deleting their data and now fails
-fast when an existing table has an incompatible shape. Revision `013` adds
-scoped model activation, request and ingestion leases, immutable artifact and
-source snapshots, database-enforced request states, and the source-selection
-indexes. Both an empty PostGIS database and an existing CHART database must
-upgrade to `013` before the API reports ready.
+Later revisions add the analytical and content tables:
+
+| Table | Purpose |
+| --- | --- |
+| `health_impact` | persisted model results keyed by admin unit, month, scenario |
+| `covariate`, `erf_parameters` | model inputs and exposure-response parameters |
+| `recommended_action` | reviewed interventions seeded from the solution repository |
+| `audit_event` | the caller's own recorded activity |
+| `country_geo_config` | per-country labels for the place hierarchy |
+
+Alembic revisions from `001` onward create or adopt all of the above.
+Revision `007` adopts old application tables without deleting their data and
+fails fast when an existing table has an incompatible shape. Revision `013`
+adds scoped model activation, request and ingestion leases, immutable artifact
+and source snapshots, database-enforced request states, and the
+source-selection indexes.
+
+There is one linear chain and one head. Both an empty PostGIS database and an
+existing CHART database must upgrade to the current head before the API
+reports ready; `GET /ready` compares the database revision against the head on
+disk and returns 503 when they differ. Quoting a specific head here would go
+stale, so it is deliberately not named.
 
 ## 7. Python API
 
@@ -255,6 +292,10 @@ Public reads:
 - `GET /climate/locations`
 - `GET /hazards` and `GET /hazards/{id}`
 - `GET /solutions` and `GET /solutions/taxonomies`
+
+Every operation carries curated summary and description text in
+`chart/api/openapi.py`. The schema build fails when a route is added without
+it, so the published contract cannot drift from the code.
 
 Protected application routes:
 
@@ -276,7 +317,8 @@ request that creates the same group first is re-read instead of reported as an
 account conflict. Once setup completes, public bootstrap is locked.
 
 Prediction routes enforce both an allowed planning role and the user's place.
-The same place check applies when reading status or results.
+The same place check applies when reading status or results. Analytical reads
+under `/risk` apply the same rule.
 
 Ordinary users are scoped strictly to the Keycloak groups they were assigned.
 Installation administrators (`chart_admin`) get two additional broadenings so
