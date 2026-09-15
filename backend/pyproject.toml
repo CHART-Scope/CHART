@@ -40,3 +40,4 @@ include = ["chart*"]
 
 [tool.setuptools.package-data]
 "chart.solution_repository" = ["seed.json"]
+"chart.learning" = ["seed.json"]

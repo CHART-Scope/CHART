@@ -23,6 +23,10 @@
   --color-text: #2b2d31;
   --color-text-muted: #7a7872;
   --color-text-light: #a8a49e;
+  /* A cooler grey tier the Learning hub uses for source lines and metadata. */
+  --color-text-dim: #6b6e75;
+  --color-text-faint: #8a8d93;
+  --color-near-black: #1e1f21;
 
   /* --- §1 Palette · Semantic (status / precision / solution type) --- */
   --color-success: #3eae50;
@@ -51,6 +55,12 @@
   /* --- Borders --- */
   --border-subtle: var(--color-grey-mid);
   --border-strong: var(--color-charcoal);
+  /* Warmer, lighter rules introduced by the Learning hub design: a card
+     outline, a section divider, and a hairline inside a card. Additive —
+     nothing that already shipped changes. */
+  --border-card: #e7e2dc;
+  --border-divider: #dfd9d2;
+  --border-hairline: #f0ebe5;
 
   /* --- §1 Typography ---
      Fira Sans → display / data / labels / eyebrows / numeric buttons.

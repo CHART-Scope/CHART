@@ -1628,6 +1628,381 @@
         "description": "Returns three overlaid RCP scenarios and their 5- / 15- / 25-year horizon rows for the requested admin_unit under an SSP2 population baseline. Missing scenarios are omitted, so the client renders the scenarios that are available today. Requires a bearer token and geography scope."
       }
     },
+    "/learning/resources": {
+      "get": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Browse the curated Learning Hub resource catalogue",
+        "operationId": "list_resources_learning_resources_get",
+        "parameters": [
+          {
+            "name": "track",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Track"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "max_minutes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 600,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Minutes"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(featured|all)$",
+              "default": "featured",
+              "title": "Include"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 60,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The matching learning resources plus the unpaged total so the browser can show how many results a filter removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns the hand-picked shortlist by default; pass include=all for the whole catalogue. Results can be filtered by health outcome, track, kind, language, country, maximum length, and a free-text search over title, provider, objectives and tags. This catalogue is public so that practitioners can study the material before an installation grants them an account."
+      }
+    },
+    "/learning/taxonomies": {
+      "get": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "List Learning Hub facet values and their counts",
+        "operationId": "list_taxonomies_learning_taxonomies_get",
+        "parameters": [
+          {
+            "name": "include",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(featured|all)$",
+              "default": "featured",
+              "title": "Include"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every derived facet term with its type, label and resource count.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxonomyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Derives the filter vocabulary from the published resources rather than storing it, so a reseed can never leave an orphaned facet behind. Each term carries its type, display label and the number of resources that currently carry it, which the filter chips show."
+      }
+    },
+    "/learning/tracks": {
+      "get": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "List the ordered Learning Hub pathway stops",
+        "operationId": "list_tracks_learning_tracks_get",
+        "responses": {
+          "200": {
+            "description": "The ordered pathway tracks with their resource counts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackListResponse"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns the curriculum tracks in the order a newcomer should meet them, from the basic climate-health link through to what CHART contributes to planning and funding. Each track reports how many published resources belong to it so the pathway can show progress."
+      }
+    },
+    "/learning/me": {
+      "get": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Read the caller's Learning Hub pathway and picks",
+        "operationId": "read_personal_view_learning_me_get",
+        "responses": {
+          "200": {
+            "description": "The caller's preferences, progress, pathway completion and ranked recommendations with their reasons.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalViewResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Returns the signed-in user's declared audience and track interests, their watch progress, per-track completion counts, the part-watched item worth resuming, and ranked recommendations. Each recommendation carries the reason it was chosen so the interface can explain itself."
+      }
+    },
+    "/learning/me/preferences": {
+      "put": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Set the caller's learning audience and interests",
+        "operationId": "update_preferences_learning_me_preferences_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferencesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The refreshed personal view reflecting the saved preferences.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalViewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Stores the self-declared job the user is doing and the tracks they want to follow, used only to order recommendations. This is distinct from a Keycloak role, which governs permission; unknown track slugs are discarded rather than rejected."
+      }
+    },
+    "/learning/me/progress": {
+      "put": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Record how far the caller watched one resource",
+        "operationId": "update_progress_learning_me_progress_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProgressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The stored watch position and whether the resource now counts as completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Upserts a best-effort high-water mark for one resource, written when the player closes. Progress never moves backwards, and a resource is marked complete once most of its known duration has been watched or the caller says so explicitly."
+      }
+    },
     "/internal/erf-parameters": {
       "post": {
         "tags": [
@@ -4292,6 +4667,69 @@
         ],
         "title": "ModelSyncResponse"
       },
+      "PersonalViewResponse": {
+        "properties": {
+          "audience_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience Id"
+          },
+          "interested_track_slugs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Interested Track Slugs"
+          },
+          "tracks": {
+            "items": {
+              "$ref": "#/components/schemas/TrackSummary"
+            },
+            "type": "array",
+            "title": "Tracks"
+          },
+          "progress": {
+            "items": {
+              "$ref": "#/components/schemas/ProgressItem"
+            },
+            "type": "array",
+            "title": "Progress"
+          },
+          "continue_watching": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Recommendation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recommendations": {
+            "items": {
+              "$ref": "#/components/schemas/Recommendation"
+            },
+            "type": "array",
+            "title": "Recommendations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audience_id",
+          "interested_track_slugs",
+          "tracks",
+          "progress",
+          "continue_watching",
+          "recommendations"
+        ],
+        "title": "PersonalViewResponse"
+      },
       "PlaceListResponse": {
         "properties": {
           "items": {
@@ -5090,6 +5528,32 @@
         ],
         "title": "PredictionRequestSummaryResponse"
       },
+      "PreferencesRequest": {
+        "properties": {
+          "audience_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience Id"
+          },
+          "interested_track_slugs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Interested Track Slugs"
+          }
+        },
+        "type": "object",
+        "title": "PreferencesRequest"
+      },
       "PreviewRequest": {
         "properties": {
           "geography_id": {
@@ -5154,6 +5618,61 @@
         ],
         "title": "PreviewResponse"
       },
+      "ProgressItem": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "seconds_watched": {
+            "type": "integer",
+            "title": "Seconds Watched"
+          },
+          "completed": {
+            "type": "boolean",
+            "title": "Completed"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "seconds_watched",
+          "completed",
+          "last_seen_at"
+        ],
+        "title": "ProgressItem"
+      },
+      "ProgressRequest": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "maxLength": 160,
+            "title": "Slug"
+          },
+          "seconds_watched": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Seconds Watched"
+          },
+          "completed": {
+            "type": "boolean",
+            "title": "Completed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "seconds_watched"
+        ],
+        "title": "ProgressRequest"
+      },
       "ProjectionScenarioOptionResponse": {
         "properties": {
           "value": {
@@ -5181,6 +5700,24 @@
           "description"
         ],
         "title": "ProjectionScenarioOptionResponse"
+      },
+      "Recommendation": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/ResourceItem"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "reason"
+        ],
+        "title": "Recommendation",
+        "description": "A ranked suggestion plus the human-readable reason it was picked."
       },
       "ReleaseInfo": {
         "properties": {
@@ -5381,6 +5918,190 @@
           "status"
         ],
         "title": "ReloadResponse"
+      },
+      "ResourceItem": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "canonical_url": {
+            "type": "string",
+            "title": "Canonical Url"
+          },
+          "youtube_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Youtube Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "objectives": {
+            "type": "string",
+            "title": "Objectives"
+          },
+          "audience_summary": {
+            "type": "string",
+            "title": "Audience Summary"
+          },
+          "location_label": {
+            "type": "string",
+            "title": "Location Label"
+          },
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Countries"
+          },
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Languages"
+          },
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          },
+          "duration_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Label"
+          },
+          "format_label": {
+            "type": "string",
+            "title": "Format Label"
+          },
+          "published_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published On"
+          },
+          "access_label": {
+            "type": "string",
+            "title": "Access Label"
+          },
+          "embed_status": {
+            "type": "string",
+            "title": "Embed Status"
+          },
+          "tracks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tracks"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "health_outcomes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Health Outcomes"
+          },
+          "is_featured": {
+            "type": "boolean",
+            "title": "Is Featured"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "url",
+          "canonical_url",
+          "youtube_id",
+          "kind",
+          "title",
+          "provider",
+          "objectives",
+          "audience_summary",
+          "location_label",
+          "countries",
+          "languages",
+          "duration_seconds",
+          "duration_label",
+          "format_label",
+          "published_on",
+          "access_label",
+          "embed_status",
+          "tracks",
+          "tags",
+          "health_outcomes",
+          "is_featured"
+        ],
+        "title": "ResourceItem",
+        "description": "One catalogue entry, shaped for a card in the Learning Hub grid."
+      },
+      "ResourceListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ResourceListResponse"
       },
       "SectorOption": {
         "properties": {
@@ -5810,6 +6531,106 @@
           "cards"
         ],
         "title": "ShortTermRiskResponse"
+      },
+      "TaxonomyResponse": {
+        "properties": {
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/TaxonomyTerm"
+            },
+            "type": "array",
+            "title": "Terms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "terms"
+        ],
+        "title": "TaxonomyResponse"
+      },
+      "TaxonomyTerm": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "label",
+          "count"
+        ],
+        "title": "TaxonomyTerm",
+        "description": "A derived facet value and how many published resources carry it."
+      },
+      "TrackListResponse": {
+        "properties": {
+          "tracks": {
+            "items": {
+              "$ref": "#/components/schemas/TrackSummary"
+            },
+            "type": "array",
+            "title": "Tracks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tracks"
+        ],
+        "title": "TrackListResponse"
+      },
+      "TrackSummary": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "resource_count": {
+            "type": "integer",
+            "title": "Resource Count",
+            "default": 0
+          },
+          "completed_count": {
+            "type": "integer",
+            "title": "Completed Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "title",
+          "summary",
+          "position"
+        ],
+        "title": "TrackSummary",
+        "description": "One stop on the pathway, with how much of it the caller has watched."
       },
       "UserGeographyScope": {
         "properties": {
