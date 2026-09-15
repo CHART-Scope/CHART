@@ -4,7 +4,7 @@ x-python-environment: &python-environment
   DATABASE_URL: postgresql+psycopg://chart:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.prod}@chart-postgres:5432/chart
   PYTHON_DATABASE_URL: postgresql+psycopg://chart:${POSTGRES_PASSWORD}@chart-postgres:5432/chart
   KEYCLOAK_ISSUER_URL: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env.prod}/identity/realms/chart
-  KEYCLOAK_CLIENT_ID: chart-api
+  KEYCLOAK_CLIENT_ID: chart-core
   KEYCLOAK_JWKS_URL: http://chart-keycloak:8080/identity/realms/chart/protocol/openid-connect/certs
   KEYCLOAK_SERVER_URL: http://chart-keycloak:8080/identity
   KEYCLOAK_ADMIN_URL: http://chart-keycloak:8080/identity
@@ -58,7 +58,7 @@ services:
       retries: 20
 
   chart-db-prepare:
-    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}
     restart: "no"
     labels:
       chart.release: ${IMAGE_TAG:-dev}
@@ -92,7 +92,7 @@ services:
         find /backups -type f -name 'chart-*.dump' -mtime +14 -delete
 
   chart-migrate:
-    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}
     restart: "no"
     labels:
       chart.release: ${IMAGE_TAG:-dev}
@@ -144,7 +144,7 @@ services:
       retries: 20
 
   chart-bootstrap:
-    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}
     restart: "no"
     labels:
       chart.release: ${IMAGE_TAG:-dev}
@@ -216,9 +216,9 @@ services:
       - ../keycloak:/keycloak:ro
     command: ["node", "/keycloak/sync-realm.js"]
 
-  chart-api:
-    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
-    container_name: chart-api
+  chart-core:
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}
+    container_name: chart-core
     restart: unless-stopped
     depends_on:
       chart-bootstrap:
@@ -248,11 +248,11 @@ services:
     container_name: chart-web
     restart: unless-stopped
     depends_on:
-      chart-api:
+      chart-core:
         condition: service_healthy
     environment:
-      CHART_API_INTERNAL_URL: http://chart-api:3210
-      CHART_PYTHON_API_INTERNAL_URL: http://chart-api:3210
+      CHART_API_INTERNAL_URL: http://chart-core:3210
+      CHART_PYTHON_API_INTERNAL_URL: http://chart-core:3210
       CHART_WEB_ORIGIN: ${PUBLIC_ORIGIN}
       CHART_BOOTSTRAP_TOKEN: ${CHART_BOOTSTRAP_TOKEN}
       KEYCLOAK_BROWSER_URL: ${PUBLIC_ORIGIN}/identity
@@ -274,7 +274,7 @@ services:
       retries: 20
 
   chart-dagster-migrate:
-    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}
     restart: "no"
     labels:
       chart.release: ${IMAGE_TAG:-dev}
@@ -286,7 +286,7 @@ services:
     command: ["dagster", "instance", "migrate"]
 
   chart-dagster-webserver:
-    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}
     container_name: chart-dagster-webserver
     restart: unless-stopped
     depends_on:
@@ -324,7 +324,7 @@ services:
       retries: 20
 
   chart-dagster-daemon:
-    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-python:${IMAGE_TAG:-dev}
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}
     container_name: chart-dagster-daemon
     restart: unless-stopped
     depends_on:
@@ -349,7 +349,7 @@ services:
     container_name: chart-caddy
     restart: unless-stopped
     depends_on:
-      chart-api:
+      chart-core:
         condition: service_healthy
       chart-web:
         condition: service_healthy

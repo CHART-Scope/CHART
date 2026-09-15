@@ -54,7 +54,7 @@ def get_auth_config() -> AuthConfig:
         jwks_timeout_seconds = float(os.getenv("KEYCLOAK_JWKS_TIMEOUT_SECONDS", "5"))
     except ValueError as error:
         raise _auth_error("AUTH_CONFIG_INVALID", 500) from error
-    client_id = os.getenv("KEYCLOAK_CLIENT_ID", "chart-api")
+    client_id = os.getenv("KEYCLOAK_CLIENT_ID", "chart-core")
     if (
         not issuer_url
         or not client_id

@@ -14,5 +14,5 @@ export function getPythonApiBaseUrl(request: NextRequest) {
   if (isLocalOrigin(requestOrigin)) {
     return process.env.CHART_LOCAL_PYTHON_API_URL ?? "http://127.0.0.1:3210";
   }
-  return `${requestOrigin}/chart-api`;
+  return `${requestOrigin}/chart-core`;
 }

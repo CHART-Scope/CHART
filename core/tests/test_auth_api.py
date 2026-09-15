@@ -24,7 +24,7 @@ def signed_token(monkeypatch: pytest.MonkeyPatch):
     now = datetime.now(timezone.utc)
 
     monkeypatch.setenv("KEYCLOAK_ISSUER_URL", issuer)
-    monkeypatch.setenv("KEYCLOAK_CLIENT_ID", "chart-api")
+    monkeypatch.setenv("KEYCLOAK_CLIENT_ID", "chart-core")
     monkeypatch.setenv("KEYCLOAK_JWKS_URL", "http://keycloak.test/certs")
     monkeypatch.setattr(
         service,
@@ -38,10 +38,10 @@ def signed_token(monkeypatch: pytest.MonkeyPatch):
             "preferred_username": "verified-health-lead",
             "email": "lead@example.org",
             "iss": issuer,
-            "aud": "chart-api",
+            "aud": "chart-core",
             "exp": now + timedelta(minutes=5),
             "groups": ["/country-b/region-b"],
-            "resource_access": {"chart-api": {"roles": ["health_planning_lead"]}},
+            "resource_access": {"chart-core": {"roles": ["health_planning_lead"]}},
         }
         claims.update(overrides)
         return jwt.encode(
@@ -98,7 +98,7 @@ def test_auth_me_applies_an_allowed_active_geography(
 def test_admin_can_switch_within_assigned_country_but_not_to_another_country(
     client: TestClient, signed_token
 ) -> None:
-    token = signed_token(resource_access={"chart-api": {"roles": ["chart_admin"]}})
+    token = signed_token(resource_access={"chart-core": {"roles": ["chart_admin"]}})
     headers = {"Authorization": f"Bearer {token}"}
 
     profile = client.get("/auth/me", headers=headers)
@@ -121,7 +121,7 @@ def test_auth_me_unions_model_family_roots_into_admin_scopes_when_opted_in(
 ) -> None:
     monkeypatch.setenv("CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES", "true")
     monkeypatch.setattr(service, "_active_model_family_roots", lambda: ["/kenya"])
-    token = signed_token(resource_access={"chart-api": {"roles": ["chart_admin"]}})
+    token = signed_token(resource_access={"chart-core": {"roles": ["chart_admin"]}})
 
     response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
 
@@ -148,7 +148,7 @@ def test_admin_union_is_off_by_default(
 ) -> None:
     monkeypatch.delenv("CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES", raising=False)
     monkeypatch.setattr(service, "_active_model_family_roots", lambda: ["/kenya"])
-    token = signed_token(resource_access={"chart-api": {"roles": ["chart_admin"]}})
+    token = signed_token(resource_access={"chart-core": {"roles": ["chart_admin"]}})
 
     response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
 
@@ -164,7 +164,7 @@ def test_admin_union_requires_exact_true(
     # are all treated as false so a typo can't silently open scope up.
     monkeypatch.setenv("CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES", "yes")
     monkeypatch.setattr(service, "_active_model_family_roots", lambda: ["/kenya"])
-    token = signed_token(resource_access={"chart-api": {"roles": ["chart_admin"]}})
+    token = signed_token(resource_access={"chart-core": {"roles": ["chart_admin"]}})
 
     response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
 

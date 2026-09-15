@@ -29,7 +29,7 @@ Those jobs are dependencies of the long-running services, so the single
 
 Caddy is the public entrypoint. It obtains and renews HTTPS certificates when
 `PUBLIC_ORIGIN` is an HTTPS domain, stores them in a persistent volume, and
-routes `/chart-api`, `/climate`, and `/identity` to their services. Everything
+routes `/chart-core`, `/climate`, and `/identity` to their services. Everything
 else goes to the web app. Dagster remains bound to `127.0.0.1:3000`.
 
 ## One-time EC2 setup
@@ -87,7 +87,7 @@ Inspect the deployment on EC2:
 
 ```bash
 docker ps --filter label=com.docker.compose.project=chart
-docker logs --tail 100 chart-api
+docker logs --tail 100 chart-core
 ```
 
 The deployment workflow automatically includes full Compose status and recent

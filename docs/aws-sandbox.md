@@ -70,7 +70,7 @@ the current containers can be inspected with:
 
 ```bash
 docker ps --filter label=com.docker.compose.project=chart
-docker logs --tail 100 chart-api
+docker logs --tail 100 chart-core
 ```
 
 Database backups are created in `~/chart-deploy/aws/backups` before migrations

@@ -10,7 +10,7 @@ def _config() -> service.IdentityConfig:
         target_realm="chart",
         username="admin",
         password="admin",
-        client_id="chart-api",
+        client_id="chart-core",
     )
 
 

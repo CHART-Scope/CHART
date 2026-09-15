@@ -209,7 +209,7 @@ def _config() -> IdentityConfig:
         target_realm=os.getenv("KEYCLOAK_REALM", "chart"),
         username=username,
         password=password,
-        client_id=os.getenv("KEYCLOAK_CLIENT_ID", "chart-api"),
+        client_id=os.getenv("KEYCLOAK_CLIENT_ID", "chart-core"),
     )
 
 
