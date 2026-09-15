@@ -7,23 +7,23 @@
 			reverse_proxy chart-keycloak:8080
 		}
 
-		@api_docs path /chart-api /chart-api/
+		@api_docs path /chart-core /chart-core/
 		handle @api_docs {
 			rewrite * /docs
-			reverse_proxy chart-api:3210
+			reverse_proxy chart-core:3210
 		}
 
-		handle_path /chart-api/* {
-			reverse_proxy chart-api:3210
+		handle_path /chart-core/* {
+			reverse_proxy chart-core:3210
 		}
 
 		handle /climate/* {
-			reverse_proxy chart-api:3210
+			reverse_proxy chart-core:3210
 		}
 
 		handle /climate-api/health {
 			rewrite * /health
-			reverse_proxy chart-api:3210
+			reverse_proxy chart-core:3210
 		}
 
 		handle {

@@ -394,7 +394,7 @@ the web and R scorer images, then EC2 uses Docker Compose to:
    when both files and expected SHA-256 values are configured;
 5. starts the Python API, Dagster, `web`, Keycloak, and R scorer;
 6. waits for `/ready` and verifies that `/api/build` reports the deployed commit;
-7. exposes the web, `/chart-api`, and `/identity` through Caddy, which manages
+7. exposes the web, `/chart-core`, and `/identity` through Caddy, which manages
    HTTPS certificates for the configured public domain.
 
 `CDSAPI_KEY` is a deployment secret. Users do not enter Copernicus credentials

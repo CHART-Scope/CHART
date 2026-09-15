@@ -14,7 +14,7 @@
       }
     ],
     "client": {
-      "chart-api": [
+      "chart-core": [
         {
           "name": "health_planning_lead",
           "description": "Health planning lead at state, county, or equivalent geography"
@@ -77,12 +77,12 @@
           }
         },
         {
-          "name": "chart-api-audience",
+          "name": "chart-core-audience",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.client.audience": "chart-api",
+            "included.client.audience": "chart-core",
             "id.token.claim": "false",
             "access.token.claim": "true",
             "introspection.token.claim": "true"
@@ -91,7 +91,7 @@
       ]
     },
     {
-      "clientId": "chart-api",
+      "clientId": "chart-core",
       "name": "CHART API",
       "enabled": true,
       "publicClient": false,

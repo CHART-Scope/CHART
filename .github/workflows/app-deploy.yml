@@ -124,10 +124,10 @@ jobs:
       - name: Validate deploy images on pull requests
         if: github.event_name == 'pull_request'
         run: |
-          docker build -f core/Dockerfile -t chart-python:ci .
+          docker build -f core/Dockerfile -t chart-core:ci .
           docker build --build-arg "CHART_BUILD_ID=$GITHUB_SHA" -f web/Dockerfile -t chart-web:ci .
           docker build --target test -f pipelines/models/Dockerfile -t chart-lbw:ci pipelines/models
-          docker run --rm chart-python:ci python -c 'from chart.api.app import app; assert "/climate/predict" in app.openapi()["paths"]'
+          docker run --rm chart-core:ci python -c 'from chart.api.app import app; assert "/climate/predict" in app.openapi()["paths"]'
 
   publish:
     name: Build and publish images
@@ -162,10 +162,10 @@ jobs:
           file: core/Dockerfile
           push: true
           tags: |
-            ${{ steps.image.outputs.prefix }}-python:${{ github.sha }}
-            ${{ steps.image.outputs.prefix }}-python:dev
-          cache-from: type=gha,scope=python
-          cache-to: type=gha,mode=max,scope=python
+            ${{ steps.image.outputs.prefix }}-core:${{ github.sha }}
+            ${{ steps.image.outputs.prefix }}-core:dev
+          cache-from: type=gha,scope=core
+          cache-to: type=gha,mode=max,scope=core
 
       - name: Build and push web image
         uses: docker/build-push-action@v7
@@ -266,7 +266,7 @@ jobs:
             DOCKER_CONFIG="$docker_config" "${compose[@]}" up -d --remove-orphans
             for attempt in $(seq 1 60); do
               build_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$public_origin/api/build" || true)"
-              api_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$public_origin/chart-api/ready" || true)"
+              api_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$public_origin/chart-core/ready" || true)"
               if printf '%s' "$build_body" | grep -Eq '"buildId"[[:space:]]*:[[:space:]]*"'"$IMAGE_TAG"'"' \
                 && printf '%s' "$api_body" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"'; then
                 exit 0
