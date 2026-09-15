@@ -1,7 +1,7 @@
 # CHART data and prediction jobs
 
 Dagster runs background work. It does not own business rules or database
-tables; its steps call services from `backend/chart/`.
+tables; its steps call services from `core/chart/`.
 
 ## What the prediction job does
 

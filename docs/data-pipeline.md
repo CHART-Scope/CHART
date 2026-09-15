@@ -98,7 +98,7 @@ rows into `district_climate`.
 
 Postgres stores one row per admin unit × month × variable × climate run. A 60-month
 window with three variables (`tmax`, `tmin`, `precip`) yields 180 rows — not 60 wide
-columns. See `backend/README.md` for the rationale.
+columns. See `core/README.md` for the rationale.
 
 ## Orchestration package
 

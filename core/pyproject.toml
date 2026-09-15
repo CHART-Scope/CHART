@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "chart"
 version = "0.1.0"
-description = "CHART Python backend shared modules (schema owner for SQLAlchemy)."
+description = "CHART Python core shared modules (schema owner for SQLAlchemy)."
 requires-python = ">=3.11"
 dependencies = [
   "certifi>=2024.8.30",

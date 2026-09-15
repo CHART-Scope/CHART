@@ -70,9 +70,9 @@ Neither was checked.
 
 ## Existing foundations to reuse
 
-- `backend/chart/solution_repository/routes.py` — public, filterable,
+- `core/chart/solution_repository/routes.py` — public, filterable,
   taxonomy-tagged content reads with a derived vocabulary endpoint.
-- `backend/chart/setup/service.py` — `_auto_seed_recommended_actions` is the
+- `core/chart/setup/service.py` — `_auto_seed_recommended_actions` is the
   idempotent slug-keyed upsert pattern the learning seed copies.
 - `web/src/components/` — `Pill` for interactive filters, `Chip` for display
   tags, `Panel`, `Modal`, `TextInput`. No new primitive was needed.
@@ -140,8 +140,8 @@ dead end.
 
 ## Data defects repaired at ingest
 
-`backend/scripts/build_learning_seed.py` is run by hand against the workbook and
-writes both `backend/chart/learning/seed.json` and the web fallback slice.
+`core/scripts/build_learning_seed.py` is run by hand against the workbook and
+writes both `core/chart/learning/seed.json` and the web fallback slice.
 It repairs:
 
 - drifting track names merged onto eight canonical slugs;
@@ -162,7 +162,7 @@ finding them.
 
 ## Testing
 
-`backend/tests/test_learning_api.py` covers public reads, unpublished exclusion,
+`core/tests/test_learning_api.py` covers public reads, unpublished exclusion,
 facet derivation, the 401 on every `/me` route, the 404 on unknown slugs,
 progress not moving backwards, and completion counting towards a track. The
 frontend has no test runner; Storybook is the visual surface, with stories for

@@ -7,4 +7,4 @@ All browser routes now forward to the Python API on port 3210. SQLAlchemy and
 Alembic own all CHART application tables.
 
 Use [Getting started](getting-started.md) for the current local environment and
-[Python backend](python-backend.md) for the application API.
+[Python core](python-core.md) for the application API.

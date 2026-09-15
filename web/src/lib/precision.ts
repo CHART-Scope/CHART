@@ -1,7 +1,7 @@
 /**
  * Precision classification for confidence intervals.
  *
- * Mirrors ``backend/chart/risk/precision.py`` — keep the thresholds in
+ * Mirrors ``core/chart/risk/precision.py`` — keep the thresholds in
  * lockstep with that module so the badge shown by the frontend matches
  * the one the backend computes for the horizon cards.
  *

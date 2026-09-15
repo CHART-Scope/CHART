@@ -139,7 +139,7 @@ A build is acceptable when, in addition to the repository's standard gates:
 - opening and immediately closing a player leaves the item incomplete;
 - a Kenya-scoped user sees Kenya material ranked first, with that reason
   shown;
-- `backend/tests/test_learning_api.py` passes, including the 401 on every
+- `core/tests/test_learning_api.py` passes, including the 401 on every
   `/me` route and the 404 on an unknown slug.
 
 ## Known gaps

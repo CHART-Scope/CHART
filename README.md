@@ -16,7 +16,7 @@ Alliance.
 ## What runs
 
 - `web`: the canonical Next planning interface and design system.
-- `backend`: the single FastAPI application API and analytical engine.
+- `core`: the single FastAPI application API and analytical engine.
 - `orchestration`: Dagster jobs that fetch climate data before running a model.
 - `pipelines`: climate adapters, boundaries, and versioned model runtimes.
 - `infra`: local and EC2 deployment.
@@ -31,6 +31,11 @@ database.
 make install
 make run
 ```
+
+`core/` was named `backend/` until September 2026. If you have an existing
+checkout, run `make install` after pulling: editable installs pin an absolute
+path, so `import chart` keeps resolving to the old directory until they are
+rebuilt.
 
 Open:
 

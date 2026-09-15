@@ -1,1 +1,1 @@
-"""CHART Python backend package."""
+"""CHART Python core package."""

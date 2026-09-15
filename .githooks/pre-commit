@@ -44,8 +44,8 @@ if [ -n "${STAGED_WEB// /}" ]; then
   fi
 fi
 
-# --- OpenAPI: regenerate docs/openapi/climate.json when backend routes/schemas change
-if echo "$STAGED_ALL" | grep -qE '^backend/chart/.*\.py$'; then
+# --- OpenAPI: regenerate docs/openapi/climate.json when core routes/schemas change
+if echo "$STAGED_ALL" | grep -qE '^core/chart/.*\.py$'; then
   if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
     "$REPO_ROOT/.venv/bin/python" -m chart.api.export_openapi \
       --output "$REPO_ROOT/docs/openapi/climate.json"

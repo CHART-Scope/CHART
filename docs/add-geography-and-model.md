@@ -99,7 +99,7 @@ referenced by the manifest, then verifies their hashes before activation.
    during installation until at least one installed release maps it in `areas`.
 4. Validate the manifest and cached artifacts by running the backend test
    subset that covers registration and warming (`pytest
-   backend/tests/test_model_runtime.py backend/tests/test_place_sets.py`).
+   core/tests/test_model_runtime.py core/tests/test_place_sets.py`).
 5. Restart the backend. It discovers `model-release*.json` recursively below
    `pipelines/models/`; onboarding is populated from its `geography` and
    `areas` records. Review releases appear only when the generic review-model

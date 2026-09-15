@@ -7,7 +7,7 @@ on:
       - ".dockerignore"
       - ".prettierignore"
       - ".prettierrc.json"
-      - "backend/**"
+      - "core/**"
       - "docs/climate-api.md"
       - "docs/data-pipeline.md"
       - "docs/openapi/climate.json"
@@ -25,7 +25,7 @@ on:
       - ".dockerignore"
       - ".prettierignore"
       - ".prettierrc.json"
-      - "backend/**"
+      - "core/**"
       - "docs/climate-api.md"
       - "docs/data-pipeline.md"
       - "docs/openapi/climate.json"
@@ -83,7 +83,7 @@ jobs:
 
       - name: Install Python packages
         run: >-
-          python -m pip install -e 'backend[dev]' -e 'pipelines/era5_heat[dev]'
+          python -m pip install -e 'core[dev]' -e 'pipelines/era5_heat[dev]'
           -e 'pipelines/seasonal_c3s[dev]' -e 'pipelines/boundaries[dev]'
           -e 'pipelines/isimip_projection[dev]' -e orchestration
 
@@ -91,7 +91,7 @@ jobs:
         run: make python-check VENV_PYTHON=python
 
       - name: Validate database migrations
-        working-directory: backend
+        working-directory: core
         env:
           DATABASE_URL: postgresql+psycopg://chart:chart@127.0.0.1:5432/chart
         run: |
@@ -99,7 +99,7 @@ jobs:
           python -m alembic check
 
       - name: Test Python application and pipelines
-        run: python -m pytest backend/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests -q
+        run: python -m pytest core/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests -q
 
       - name: Validate Dagster and OpenAPI contracts
         run: |
@@ -124,7 +124,7 @@ jobs:
       - name: Validate deploy images on pull requests
         if: github.event_name == 'pull_request'
         run: |
-          docker build -f backend/Dockerfile -t chart-python:ci .
+          docker build -f core/Dockerfile -t chart-python:ci .
           docker build --build-arg "CHART_BUILD_ID=$GITHUB_SHA" -f web/Dockerfile -t chart-web:ci .
           docker build --target test -f pipelines/models/Dockerfile -t chart-lbw:ci pipelines/models
           docker run --rm chart-python:ci python -c 'from chart.api.app import app; assert "/climate/predict" in app.openapi()["paths"]'
@@ -159,7 +159,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: backend/Dockerfile
+          file: core/Dockerfile
           push: true
           tags: |
             ${{ steps.image.outputs.prefix }}-python:${{ github.sha }}
