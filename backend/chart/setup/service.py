@@ -6,7 +6,8 @@ import logging
 import os
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import cast
 
 from sqlalchemy import delete, func, select
@@ -37,6 +38,8 @@ from chart.shared.db.models import (
     Geography,
     HealthImpact,
     IngestionLeaseRecord,
+    LearningResource,
+    LearningTrack,
     ModelAreaMapping,
     ModelRelease,
     PredictionRequestRecord,
@@ -70,6 +73,8 @@ from .schemas import (
     SetupStatus,
     ModelSyncResponse,
 )
+
+_LEARNING_SEED_PATH = Path(__file__).resolve().parents[1] / "learning" / "seed.json"
 
 logger = logging.getLogger(__name__)
 
@@ -385,6 +390,112 @@ def _auto_seed_recommended_actions(session) -> None:
     logger.warning("auto_seed: recommended_action upserts=%d", upserts)
 
 
+def _auto_seed_learning(session) -> None:
+    """Upsert the bundled Learning Hub catalogue and pathway tracks.
+
+    Idempotent on ``slug`` for both tables, so re-running setup refreshes the
+    curated copy in place. Best-effort in the same way as the solution
+    repository seed: a broken bundle must not block installation.
+    """
+
+    try:
+        raw = json.loads(_LEARNING_SEED_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        logger.exception(
+            "auto_seed: could not read %s; learning hub left empty",
+            _LEARNING_SEED_PATH,
+        )
+        return
+
+    now = datetime.now(timezone.utc)
+
+    tracks = 0
+    for track in raw.get("tracks") or []:
+        slug = str(track.get("slug") or "").strip()
+        title = str(track.get("title") or "").strip()
+        if not slug or not title:
+            continue
+        existing = session.scalar(
+            select(LearningTrack).where(LearningTrack.slug == slug)
+        )
+        if existing is None:
+            session.add(
+                LearningTrack(
+                    slug=slug,
+                    title=title,
+                    summary=str(track.get("summary") or ""),
+                    position=int(track.get("position") or 0),
+                )
+            )
+        else:
+            existing.title = title
+            existing.summary = str(track.get("summary") or "")
+            existing.position = int(track.get("position") or 0)
+            existing.updated_at = now
+        tracks += 1
+
+    items = 0
+    skipped = 0
+    for item in raw.get("items") or []:
+        slug = str(item.get("slug") or "").strip()
+        title = str(item.get("title") or "").strip()
+        url = str(item.get("url") or "").strip()
+        if not slug or not title or not url:
+            continue
+        try:
+            published_on = item.get("publishedOn")
+            fields = {
+                "url": url,
+                "canonical_url": str(item.get("canonicalUrl") or url),
+                "youtube_id": item.get("youtubeId"),
+                "kind": str(item.get("kind") or "video"),
+                "title": title,
+                "provider": str(item.get("provider") or ""),
+                "objectives": str(item.get("objectives") or ""),
+                "audience_summary": str(item.get("audienceSummary") or ""),
+                "location_label": str(item.get("locationLabel") or ""),
+                "countries": list(item.get("countries") or []),
+                "languages": list(item.get("languages") or []),
+                "duration_seconds": item.get("durationSeconds"),
+                "duration_label": item.get("durationLabel"),
+                "format_label": str(item.get("formatLabel") or ""),
+                "published_on": (
+                    date.fromisoformat(published_on) if published_on else None
+                ),
+                "access_label": str(item.get("accessLabel") or ""),
+                "embed_status": str(item.get("embedStatus") or "open_unverified"),
+                "tracks": list(item.get("tracks") or []),
+                "tags": list(item.get("tags") or []),
+                "health_outcomes": list(item.get("healthOutcomes") or []),
+                "is_published": bool(item.get("isPublished", True)),
+                "is_featured": bool(item.get("isFeatured", False)),
+                "sort_weight": int(item.get("sortWeight") or 0),
+                "source": "seed",
+                "synced_at": now,
+            }
+            existing = session.scalar(
+                select(LearningResource).where(LearningResource.slug == slug)
+            )
+            if existing is None:
+                session.add(LearningResource(slug=slug, **fields))
+            else:
+                for name, value in fields.items():
+                    setattr(existing, name, value)
+                existing.updated_at = now
+            items += 1
+        except (TypeError, ValueError):
+            # One unparsable row must not truncate the whole catalogue.
+            logger.warning("auto_seed: skipping learning item %s", slug)
+            skipped += 1
+
+    logger.warning(
+        "auto_seed: learning tracks=%d resources=%d skipped=%d",
+        tracks,
+        items,
+        skipped,
+    )
+
+
 def _auto_seed_deployed_models(
     session, country_code: str, *, purge_stale: bool = False
 ) -> None:
@@ -628,6 +739,12 @@ def complete(
         except Exception:  # noqa: BLE001 - best-effort, must not fail setup
             logger.exception(
                 "auto_seed: recommended_action seed failed; setup will complete."
+            )
+        try:
+            _auto_seed_learning(session)
+        except Exception:  # noqa: BLE001 - best-effort, must not fail setup
+            logger.exception(
+                "auto_seed: learning hub seed failed; setup will complete."
             )
         state.completed = True
         state.phase = "complete"

@@ -970,3 +970,159 @@ class RecommendedAction(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class LearningTrack(Base):
+    """One stop on the Learning Hub pathway.
+
+    The eight tracks are an ordered curriculum: a planner who works through
+    them in ``position`` order meets the climate-health link before the
+    evidence, the evidence before the funding argument, and the funding
+    argument before the action. Seeded from ``chart/learning/seed.json``;
+    ``slug`` is the natural identity that survives a reseed.
+    """
+
+    __tablename__ = "learning_track"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(160), nullable=False, unique=True)
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    position: Mapped[int] = mapped_column(nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class LearningResource(Base):
+    """A curated item in the Learning Hub catalogue.
+
+    Mostly embeddable videos, but the source reference sheet also carries
+    courses, journal articles, reports and resource portals, so ``kind``
+    decides whether the web app renders a player or an outbound link card.
+
+    ``embed_status`` is a publish gate rather than a hint: only
+    ``embeddable`` rows may be played inline, because the rest have not been
+    checked for permission to reframe them.
+
+    ``tracks`` and ``tags`` are denormalised label arrays, matching
+    ``RecommendedAction``. The taxonomy is derived from them at read time
+    instead of being stored in join tables.
+    """
+
+    __tablename__ = "learning_resource"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(160), nullable=False, unique=True)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    canonical_url: Mapped[str] = mapped_column(Text, nullable=False)
+    youtube_id: Mapped[str | None] = mapped_column(String(32))
+    kind: Mapped[str] = mapped_column(String(32), nullable=False, default="video")
+    title: Mapped[str] = mapped_column(String(512), nullable=False)
+    provider: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    objectives: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    audience_summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    location_label: Mapped[str] = mapped_column(String(256), nullable=False, default="")
+    # JSONB on Postgres (matches migration 020); portable JSON on SQLite so
+    # unit tests that hit Base.metadata.create_all can render the table.
+    countries: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    languages: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    duration_label: Mapped[str | None] = mapped_column(String(64))
+    format_label: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    published_on: Mapped[date | None] = mapped_column(Date)
+    access_label: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    embed_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="open_unverified"
+    )
+    tracks: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    tags: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    # Derived at ingest from the free text. Often empty: much of the catalogue
+    # is general climate-health material that is not about one outcome.
+    health_outcomes: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    is_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # The hand-picked shortlist. The hub shows only these today; the rest of
+    # the catalogue is seeded and reachable through the API behind
+    # ``include=all``, ready for when the wider library is opened up.
+    is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sort_weight: Mapped[int] = mapped_column(nullable=False, default=0)
+    source: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="seed"
+    )
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_learning_resource_kind", "kind"),
+        Index("ix_learning_resource_published", "is_published", "sort_weight"),
+    )
+
+
+class LearningProgressRecord(Base):
+    """How far one user has got through one resource.
+
+    Written from the player when it closes, so ``seconds_watched`` is a
+    best-effort high-water mark rather than an exact viewing log. Feeds both
+    the "Continue watching" card and the per-track progress rings.
+    """
+
+    __tablename__ = "learning_progress"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    resource_id: Mapped[int] = mapped_column(
+        ForeignKey("learning_resource.id", ondelete="CASCADE"), primary_key=True
+    )
+    seconds_watched: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (Index("ix_learning_progress_user", "user_id", "last_seen_at"),)
+
+
+class LearningPreferenceRecord(Base):
+    """What a user told us they care about, for ranking the catalogue.
+
+    Distinct from ``user_roles``: a Keycloak role governs what someone may
+    do, whereas ``audience_id`` is a self-declared "this is the job I am
+    doing" used only to order recommendations. One row per user.
+    """
+
+    __tablename__ = "learning_preference"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    audience_id: Mapped[str | None] = mapped_column(String(64))
+    interested_track_slugs: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

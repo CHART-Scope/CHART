@@ -27,6 +27,7 @@ from chart.model_registry.routes import (
     releases_router as model_releases_router,
     router as model_catalog_router,
 )
+from chart.learning.routes import router as learning_router
 from chart.risk.routes import router as risk_router
 from chart.setup.routes import router as setup_router
 from chart.solution_repository.hazards import router as hazards_router
@@ -121,6 +122,7 @@ app.include_router(solutions_router)
 app.include_router(users_router)
 app.include_router(workspaces_router)
 app.include_router(risk_router)
+app.include_router(learning_router)
 app.include_router(erf_registry_router)
 app.include_router(model_catalog_router)
 app.include_router(model_releases_router)

@@ -544,6 +544,89 @@ OPERATION_DOCUMENTATION: dict[
             )
         },
     ),
+    ("get", "/learning/resources"): OperationDocumentation(
+        summary="Browse the curated Learning Hub resource catalogue",
+        description=(
+            "Returns the hand-picked shortlist by default; pass include=all for the "
+            "whole catalogue. Results can be filtered by "
+            "health outcome, track, kind, language, country, maximum length, and "
+            "a free-text search over title, provider, objectives and tags. This "
+            "catalogue is public so that practitioners can study the material "
+            "before an installation grants them an account."
+        ),
+        success_responses={
+            "200": (
+                "The matching learning resources plus the unpaged total so the "
+                "browser can show how many results a filter removed."
+            )
+        },
+    ),
+    ("get", "/learning/taxonomies"): OperationDocumentation(
+        summary="List Learning Hub facet values and their counts",
+        description=(
+            "Derives the filter vocabulary from the published resources rather "
+            "than storing it, so a reseed can never leave an orphaned facet "
+            "behind. Each term carries its type, display label and the number of "
+            "resources that currently carry it, which the filter chips show."
+        ),
+        success_responses={
+            "200": ("Every derived facet term with its type, label and resource count.")
+        },
+    ),
+    ("get", "/learning/tracks"): OperationDocumentation(
+        summary="List the ordered Learning Hub pathway stops",
+        description=(
+            "Returns the curriculum tracks in the order a newcomer should meet "
+            "them, from the basic climate-health link through to what CHART "
+            "contributes to planning and funding. Each track reports how many "
+            "published resources belong to it so the pathway can show progress."
+        ),
+        success_responses={
+            "200": "The ordered pathway tracks with their resource counts."
+        },
+    ),
+    ("get", "/learning/me"): OperationDocumentation(
+        summary="Read the caller's Learning Hub pathway and picks",
+        description=(
+            "Returns the signed-in user's declared audience and track interests, "
+            "their watch progress, per-track completion counts, the part-watched "
+            "item worth resuming, and ranked recommendations. Each recommendation "
+            "carries the reason it was chosen so the interface can explain itself."
+        ),
+        success_responses={
+            "200": (
+                "The caller's preferences, progress, pathway completion and "
+                "ranked recommendations with their reasons."
+            )
+        },
+    ),
+    ("put", "/learning/me/preferences"): OperationDocumentation(
+        summary="Set the caller's learning audience and interests",
+        description=(
+            "Stores the self-declared job the user is doing and the tracks they "
+            "want to follow, used only to order recommendations. This is distinct "
+            "from a Keycloak role, which governs permission; unknown track slugs "
+            "are discarded rather than rejected."
+        ),
+        success_responses={
+            "200": ("The refreshed personal view reflecting the saved preferences.")
+        },
+    ),
+    ("put", "/learning/me/progress"): OperationDocumentation(
+        summary="Record how far the caller watched one resource",
+        description=(
+            "Upserts a best-effort high-water mark for one resource, written when "
+            "the player closes. Progress never moves backwards, and a resource is "
+            "marked complete once most of its known duration has been watched or "
+            "the caller says so explicitly."
+        ),
+        success_responses={
+            "200": (
+                "The stored watch position and whether the resource now counts as "
+                "completed."
+            )
+        },
+    ),
 }
 
 

@@ -5,6 +5,7 @@
  */
 export const ICON_NAMES = [
   "info-circle",
+  "search",
   "book",
   "users",
   "settings",
@@ -201,6 +202,23 @@ export function IconSprite() {
             strokeWidth="1.8"
             strokeLinecap="round"
             strokeLinejoin="round"
+          />
+        </symbol>
+        <symbol id="ic-search" viewBox="0 0 24 24">
+          <circle
+            cx="10.5"
+            cy="10.5"
+            r="6.2"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+          <path
+            d="m15.3 15.3 4.3 4.3"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
           />
         </symbol>
         <symbol id="ic-play" viewBox="0 0 24 24">
