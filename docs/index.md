@@ -24,7 +24,7 @@ local environment, and verify that it is working.
 
 ## Runtime
 
-CHART has one Python backend (`backend/chart/`):
+CHART has one Python core (`core/chart/`):
 
 - **FastAPI** for synchronous app and engine endpoints
 - **Dagster** for batch climate ingestion and model handoffs
@@ -62,7 +62,7 @@ flowchart LR
 | [Getting started](getting-started.md) | Install and run CHART locally |
 | [Installation setup](installation-setup.md) | Complete the first-run onboarding wizard, reset an installation, or recover from a stuck bootstrap |
 | [System architecture and requirements](system-architecture-and-requirements.md) | Review users, end-to-end boundaries, functional requirements, capacity targets, and production quality goals |
-| [Python backend overview](python-backend.md) | Build FastAPI modules |
+| [Python core overview](python-core.md) | Build FastAPI modules |
 | [Modeling](modeling.md) | Understand the LBW model, inputs, outputs, and limitations |
 | [Climate API](climate-api.md) | Understand preview and prediction parameters |
 | [API explorer](api-reference.md) | Browse the published API contracts |

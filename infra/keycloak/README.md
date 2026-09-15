@@ -27,7 +27,7 @@ Microsoft Entra as an identity provider in the `chart` realm; the web app and Py
 API continue to trust only Keycloak. Provider client secrets belong in the deployment
 secret store, not `chart-realm.json`.
 
-The `chart-web` client adds `chart-api` as the access-token audience. The Python API
+The `chart-web` client adds `chart-core` as the access-token audience. The Python API
 rejects correctly signed tokens issued for another audience.
 
 For the Scope Google Workspace, `make identity-sync` or the production deploy
@@ -65,7 +65,7 @@ None. The realm ships without any pre-seeded users. Create the first administrat
 
 ## Roles
 
-Client roles on `chart-api`:
+Client roles on `chart-core`:
 
 - `chart_admin`
 - `content_editor`
@@ -77,4 +77,4 @@ Client roles on `chart-api`:
 
 ## Geography groups
 
-Geography scope is represented by Keycloak groups. The realm ships without any pre-seeded groups — the installation setup wizard and `_ensure_group_path` in `backend/chart/identity/service.py` create the required groups on demand from the country and administrative-area choices made during onboarding.
+Geography scope is represented by Keycloak groups. The realm ships without any pre-seeded groups — the installation setup wizard and `_ensure_group_path` in `core/chart/identity/service.py` create the required groups on demand from the country and administrative-area choices made during onboarding.

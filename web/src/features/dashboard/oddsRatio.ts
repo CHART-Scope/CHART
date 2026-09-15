@@ -6,7 +6,7 @@ export function affectedPercentFromOddsRatio(oddsRatio: number): number {
 }
 
 /** Signed percentage change in modelled odds relative to the model's
- * reference temperature. Mirrors ``backend/chart/climate/what_if.py``'s
+ * reference temperature. Mirrors ``core/chart/climate/what_if.py``'s
  * ``_relative_odds_change_percent`` — including the positive-excess-only
  * clamp when temperature + reference + policy are all known. Below the
  * reference on a positive-excess-only release the return is 0.0, so

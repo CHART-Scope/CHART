@@ -16,61 +16,72 @@ Generated code should be:
 CHART is a monorepo. Do not treat the root as a Next app.
 
 - `web`: CHART Next web app and current product UI.
-- `backend`: Python/FastAPI application API and analytical engine; owner of auth, workspaces, users, geographies, predictions, and analytical reads.
+- `core`: Python/FastAPI application API and analytical engine; owner of auth, workspaces, users, geographies, predictions, and analytical reads.
 - `orchestration`: Dagster data plane importing the Python `chart` package.
-- `api`: legacy Fastify/Drizzle API being retired module-by-module after Python parity.
-- `chart-repository`: separate Payload CMS service for maintaining published chart repository data. It is not required to run CHART core.
-- `infra`: local services, CHART workload manifests, and AWS deployment handoff.
-- `data/`: local generated seed/import outputs, ignored by git.
-- `docs/`: local planning notes, ignored by git.
+- `pipelines`: climate adapters, boundaries, and versioned model runtimes.
+- `infra`: local services, remote development dependencies, and AWS deployment handoff.
+- `docs/`: the published documentation site, built with MkDocs. Tracked.
+- `data/`: generated seed and import outputs, ignored by git.
 
-Python or data-processing code belongs in `backend`, `orchestration`, or a focused `pipelines` package, never inside `web`.
+The Fastify/Drizzle API is gone. Python and Alembic own the application API and
+the database; there is no second service to keep in parity with.
 
-Next route handlers may be thin browser/session proxies during migration. They must not own business workflows, Keycloak authorization policy, or CHART database tables. Do not add a Next.js BFF.
+The published solution repository is a separate Payload CMS deployment, not part
+of this repo. Python reads its public snapshot or HTTP API through an adapter.
+
+Python or data-processing code belongs in `core`, `orchestration`, or a focused `pipelines` package, never inside `web`.
+
+Next route handlers may be thin browser/session proxies. They must not own business workflows, Keycloak authorization policy, or CHART database tables. Do not add a Next.js BFF.
 
 ## Directory Boundaries
 
 Use this target structure while preserving current top-level names:
 
 ```txt
-backend/
-  chart/api/
-  chart/auth/
-  chart/climate/
-  chart/shared/db/
+core/
+  alembic/versions/        one linear migration chain
+  chart/api/               app factory, router registration, OpenAPI catalog
+  chart/shared/db/         every SQLAlchemy model, in one models.py
+  chart/<domain>/          one package per domain, shape below
 
 orchestration/
   src/chart_pipeline/
 
-web/
-  src/features/
-  src/lib/
+pipelines/
+  <adapter-or-model>/
 
-chart-repository/
-  payload.config.ts
-  src/collections/
-  src/app/(payload)/
-  src/lib/
-  Dockerfile
-  infra/docker-compose.yml
+web/
+  src/app/                 routes and layouts
+  src/components/          shared primitives
+  src/features/            feature UI
+  src/lib/                 typed clients for the Python API
 ```
+
+Domain packages under `core/chart/` are: `audit`, `auth`, `climate`,
+`email`, `erf_registry`, `geographies`, `health_impact`, `identity`,
+`inference`, `learning`, `model_registry`, `risk`, `setup`, `solution_repository`,
+`users`, and `workspaces`. `api` and `shared` are infrastructure rather than
+domains, and `vra` is a placeholder.
 
 The chart repository and CHART core mean different things:
 
-- `backend/chart/solution_repository`: CHART adapter for reading a public repository snapshot/API. It must not define repository-owned Payload tables.
-- `chart-repository`: standalone Payload CMS service that owns editing, media, publishing workflow, and repository auth.
+- `core/chart/solution_repository`: CHART adapter for reading a public repository snapshot/API. It must not define repository-owned Payload tables.
+- the chart repository: a standalone Payload CMS service, deployed separately
+  and not present in this repo, owning editing, media, publishing workflow, and
+  repository auth.
 
 Dependency direction:
 
 ```txt
-chart-repository publishes data
+the chart repository publishes data
         ↓
-Python backend reads public snapshot/API responses
+Python core reads public snapshot/API responses
         ↓
-web reads from Python backend
+web reads from Python core
 ```
 
-Never import from `chart-repository/` into `backend/` or `web/`. Use an HTTP API or public JSON snapshot instead.
+Never vendor repository code into `core/` or `web/`. Read it over HTTP or
+from a public JSON snapshot.
 
 ## Current Stack
 
@@ -112,7 +123,7 @@ module/
   service.py
   routes.py
 
-backend/tests/
+core/tests/
   test_<module>_api.py
 ```
 
@@ -141,7 +152,7 @@ Keep current feature UI under `web/src/features/`.
 ## Naming
 
 - Folders: `kebab-case`.
-- Python backend files: `schemas.py`, `service.py`, `routes.py`; route tests live under `backend/tests/`.
+- Python core files: `schemas.py`, `service.py`, `routes.py`; route tests live under `core/tests/`.
 - React components: `PascalCase.tsx`.
 - Functions: `camelCase` with clear verbs, such as `getCurrentUser` or `listSources`.
 - Types: `PascalCase`.
@@ -160,10 +171,10 @@ Keep current feature UI under `web/src/features/`.
 
 ## Validation
 
-Before finishing Python backend work:
+Before finishing Python core work:
 
 ```bash
-python -m pytest backend/tests -q
+python -m pytest core/tests -q
 python -m pytest orchestration/tests -q
 ```
 

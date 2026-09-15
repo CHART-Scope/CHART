@@ -3,6 +3,7 @@ const test = require("node:test");
 
 const {
   buildRealmSettings,
+  syncClientSettings,
   buildScopeGoogleIdentityProvider,
   buildWebClientSettings,
   normalizePublicOrigin,
@@ -132,5 +133,43 @@ test("public origin validation rejects IP fallbacks with paths or credentials", 
   assert.throws(
     () => normalizePublicOrigin("https://user@example.org/chart"),
     /CHART_WEB_ORIGIN/,
+  );
+});
+
+test("syncClientSettings creates a client the realm does not have yet", async () => {
+  // Regression: a renamed client shipped a realm export that could never be
+  // applied, because the sync only ever updated an existing client. The deploy
+  // failed and took the site down.
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  let created = false;
+
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push(`${init.method ?? "GET"} ${url}`);
+
+    if (url.includes("clients?clientId=")) {
+      const body = created ? [{ id: "new-id", clientId: "chart-core" }] : [];
+      return { ok: true, status: 200, text: async () => JSON.stringify(body) };
+    }
+    if (init.method === "POST") {
+      created = true;
+      return { ok: true, status: 201, text: async () => "" };
+    }
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ id: "new-id", clientId: "chart-core" }),
+    };
+  };
+
+  try {
+    await syncClientSettings("token", [{ clientId: "chart-core", enabled: true }]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.ok(
+    calls.some((c) => c.startsWith("POST") && c.endsWith("/clients")),
+    `expected the client to be created, saw: ${calls.join(", ")}`,
   );
 });

@@ -16,7 +16,7 @@ Alliance.
 ## What runs
 
 - `web`: the canonical Next planning interface and design system.
-- `backend`: the single FastAPI application API and analytical engine.
+- `core`: the single FastAPI application API and analytical engine.
 - `orchestration`: Dagster jobs that fetch climate data before running a model.
 - `pipelines`: climate adapters, boundaries, and versioned model runtimes.
 - `infra`: local and EC2 deployment.
@@ -32,19 +32,31 @@ make install
 make run
 ```
 
+`core/` was named `backend/` until September 2026. If you have an existing
+checkout, run `make install` after pulling: editable installs pin an absolute
+path, so `import chart` keeps resolving to the old directory until they are
+rebuilt.
+
 Open:
 
 - Planning app: `http://127.0.0.1:3100/plan`
+- Risk dashboard: `http://127.0.0.1:3100/dashboard/<place>`
+- Design system: `http://127.0.0.1:3100/design-system`
 - Python API docs: `http://127.0.0.1:3210/docs`
 - Dagster: `http://127.0.0.1:3002`
 - R prediction model health: `http://127.0.0.1:8000/health`
 - Keycloak: `http://127.0.0.1:8080`
 
-The planning page lets an authorised MP user plan the next three months, save the
-next hot season, or explore long-term heat. It shows the real climate values and
-sources plus only the low-birth-weight model results validated for the selected
-place. The current state-wide release shows one population association without
-claiming a pregnancy-stage result. Saved plans and results survive reloads.
+The planning page lets an authorised user plan the next three months, save the
+next hot season, or explore long-term heat. It shows the real climate values
+and sources plus only the model results validated for the selected place.
+Model releases currently cover India and Kenya, for low birth weight and for
+under-five mortality. A state- or county-wide release shows one population
+association without claiming a pregnancy-stage result. Saved plans and results
+survive reloads.
+
+The dashboard reads those saved results back for a place. `/design-system`
+renders the live token and component gallery.
 
 ## Useful commands
 

@@ -265,6 +265,7 @@ function AuthorizedDashboard({
               selectedCatalog?.health_domain_label ?? "Climate-sensitive health"
             }
             title={selectedCatalog?.dashboard_title ?? selectedCatalog?.outcome_label}
+            onPlayVideo={() => router.push("/learning")}
           />
 
           {selectedCatalog?.visualization_type === "odds_ratio_icon_array" ||
