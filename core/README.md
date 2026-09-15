@@ -1,4 +1,4 @@
-# CHART Python backend
+# CHART Python core
 
 This is the single CHART application API and analytical engine.
 
@@ -105,6 +105,6 @@ instead when the caller must handle a delivery failure.
 ## Tests
 
 ```bash
-python -m pytest backend/tests -q
+python -m pytest core/tests -q
 python -m pytest orchestration/tests -q
 ```

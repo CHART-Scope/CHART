@@ -12,11 +12,11 @@ ENV CHART_REPO_ROOT=/app
 
 WORKDIR /app
 
-COPY backend/pyproject.toml backend/pyproject.toml
-COPY backend/alembic.ini backend/alembic.ini
-COPY backend/alembic backend/alembic
-COPY backend/chart backend/chart
-COPY backend/scripts backend/scripts
+COPY core/pyproject.toml core/pyproject.toml
+COPY core/alembic.ini core/alembic.ini
+COPY core/alembic core/alembic
+COPY core/chart core/chart
+COPY core/scripts core/scripts
 COPY pipelines/era5_heat/pyproject.toml pipelines/era5_heat/pyproject.toml
 COPY pipelines/era5_heat/src pipelines/era5_heat/src
 COPY pipelines/seasonal_c3s/pyproject.toml pipelines/seasonal_c3s/pyproject.toml
@@ -38,10 +38,10 @@ COPY orchestration/src orchestration/src
 COPY orchestration/dagster.production.yaml /opt/dagster/dagster_home/dagster.yaml
 
 RUN python -m pip install --upgrade pip \
-  && python -m pip install ./backend ./pipelines/era5_heat ./pipelines/seasonal_c3s ./pipelines/isimip_projection ./pipelines/boundaries ./orchestration \
+  && python -m pip install ./core ./pipelines/era5_heat ./pipelines/seasonal_c3s ./pipelines/isimip_projection ./pipelines/boundaries ./orchestration \
   && mkdir -p /opt/dagster/storage
 
-WORKDIR /app/backend
+WORKDIR /app/core
 
 EXPOSE 3000 3210
 

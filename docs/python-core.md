@@ -1,9 +1,9 @@
-# Python backend
+# Python core
 
-`backend/chart/` is the only CHART backend.
+`core/chart/` is the only CHART core.
 
 ```txt
-backend/
+core/
   chart/
     api/                  # FastAPI application and OpenAPI export
     auth/                 # Keycloak token and access checks
@@ -39,7 +39,7 @@ then optionally calls the LBW Plumber service for `outcome.type=lbw`.
 ## Database
 
 Postgres holds the climate spine (`district_climate`, `data_source`, …). Migrations
-and application tables. Alembic in `backend/` is the sole schema owner.
+and application tables. Alembic in `core/` is the sole schema owner.
 
 ```bash
 make migrate

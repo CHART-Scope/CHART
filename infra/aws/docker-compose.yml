@@ -69,7 +69,7 @@ services:
       POSTGRES_HOST: chart-postgres
       POSTGRES_USER: chart
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    command: ["python", "/app/backend/scripts/prepare_databases.py"]
+    command: ["python", "/app/core/scripts/prepare_databases.py"]
 
   chart-backup:
     image: postgis/postgis:16-3.5

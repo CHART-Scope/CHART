@@ -49,12 +49,12 @@ run: local-setup climate-install lbw-check
 	$(MAKE) -j4 lbw-run climate-api-run dagster-run web
 
 verify: climate-install identity-test python-check web-typecheck web-build format-check
-	$(VENV_PYTHON) -m pytest backend/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests -q
+	$(VENV_PYTHON) -m pytest core/tests orchestration/tests pipelines/boundaries/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests -q
 
 python-check:
-	$(VENV_PYTHON) -m ruff check backend orchestration pipelines/boundaries pipelines/era5_heat/src pipelines/era5_heat/tests pipelines/seasonal_c3s pipelines/isimip_projection
-	$(VENV_PYTHON) -m black --check backend orchestration pipelines/boundaries pipelines/seasonal_c3s pipelines/isimip_projection pipelines/era5_heat/src/era5_heat/__init__.py pipelines/era5_heat/src/era5_heat/aggregate.py pipelines/era5_heat/tests/test_aggregate.py
-	$(VENV_PYTHON) -m mypy backend/chart orchestration/src pipelines/boundaries/src pipelines/era5_heat/src pipelines/seasonal_c3s/src pipelines/isimip_projection/src --ignore-missing-imports --no-error-summary
+	$(VENV_PYTHON) -m ruff check core orchestration pipelines/boundaries pipelines/era5_heat/src pipelines/era5_heat/tests pipelines/seasonal_c3s pipelines/isimip_projection
+	$(VENV_PYTHON) -m black --check core orchestration pipelines/boundaries pipelines/seasonal_c3s pipelines/isimip_projection pipelines/era5_heat/src/era5_heat/__init__.py pipelines/era5_heat/src/era5_heat/aggregate.py pipelines/era5_heat/tests/test_aggregate.py
+	$(VENV_PYTHON) -m mypy core/chart orchestration/src pipelines/boundaries/src pipelines/era5_heat/src pipelines/seasonal_c3s/src pipelines/isimip_projection/src --ignore-missing-imports --no-error-summary
 
 local-setup: services postgres-wait identity-wait climate-migrate identity-sync
 
@@ -256,7 +256,7 @@ PROJECTION_DIR := pipelines/isimip_projection
 BOUNDARY_DIR := pipelines/boundaries
 MODEL_DIR := pipelines/models
 ORCH_DIR := orchestration
-BACKEND_DIR := backend
+CORE_DIR := core
 CLIMATE_OUT := data/climate
 PYTHON ?= python3.11
 UV := $(shell command -v uv 2>/dev/null)
@@ -333,12 +333,12 @@ climate-venv:
 climate-install: climate-venv
 	@if [ -n "$(UV)" ]; then \
 		$(UV) pip install --python "$(VENV_PYTHON)" \
-			-e '$(BACKEND_DIR)[dev]' -e '$(ERA5_DIR)[dev]' \
+			-e '$(CORE_DIR)[dev]' -e '$(ERA5_DIR)[dev]' \
 			-e '$(SEASONAL_DIR)[dev]' -e '$(PROJECTION_DIR)[dev]' \
 			-e '$(BOUNDARY_DIR)[dev]' -e '$(ORCH_DIR)'; \
 	else \
 		$(VENV_PYTHON) -m pip install \
-			-e '$(BACKEND_DIR)[dev]' -e '$(ERA5_DIR)[dev]' \
+			-e '$(CORE_DIR)[dev]' -e '$(ERA5_DIR)[dev]' \
 			-e '$(SEASONAL_DIR)[dev]' -e '$(PROJECTION_DIR)[dev]' \
 			-e '$(BOUNDARY_DIR)[dev]' -e '$(ORCH_DIR)'; \
 	fi
@@ -425,7 +425,7 @@ docs-build: docs-prepare
 
 climate-migrate: climate-install postgres-wait
 	PYTHON_BIN="$(VENV_PYTHON)" DATABASE_URL="$(CHART_DATABASE_URL)" \
-	  backend/scripts/migrate.sh
+	  core/scripts/migrate.sh
 
 climate-db-migrate: climate-migrate
 

@@ -358,7 +358,7 @@ place codes and the same model-file and fitted-block rules still apply to
     a review release.
 
 The authoritative validation rules live in
-[`backend/chart/model_registry/schemas.py`](https://github.com/CHART-Scope/CHART/blob/dev/backend/chart/model_registry/schemas.py).
+[`core/chart/model_registry/schemas.py`](https://github.com/CHART-Scope/CHART/blob/dev/core/chart/model_registry/schemas.py).
 For the installation workflow and pre-activation checks, see
 [Add a geography and model](add-geography-and-model.md).
 

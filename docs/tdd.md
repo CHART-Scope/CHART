@@ -66,7 +66,7 @@ flowchart LR
 | Part | Owner | Rule |
 |---|---|---|
 | Web | `web/` | current planning UI; display and browser/session forwarding only |
-| Application API | `backend/chart/` | all routes, access checks, and application rules |
+| Application API | `core/chart/` | all routes, access checks, and application rules |
 | Database | SQLAlchemy + Alembic | only CHART schema owner |
 | Background work | `orchestration/` | thin Dagster calls into Python services |
 | Climate code | `pipelines/` | source-specific download and area calculation |

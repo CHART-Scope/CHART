@@ -16,7 +16,7 @@ Generated code should be:
 CHART is a monorepo. Do not treat the root as a Next app.
 
 - `web`: CHART Next web app and current product UI.
-- `backend`: Python/FastAPI application API and analytical engine; owner of auth, workspaces, users, geographies, predictions, and analytical reads.
+- `core`: Python/FastAPI application API and analytical engine; owner of auth, workspaces, users, geographies, predictions, and analytical reads.
 - `orchestration`: Dagster data plane importing the Python `chart` package.
 - `pipelines`: climate adapters, boundaries, and versioned model runtimes.
 - `infra`: local services, remote development dependencies, and AWS deployment handoff.
@@ -29,7 +29,7 @@ the database; there is no second service to keep in parity with.
 The published solution repository is a separate Payload CMS deployment, not part
 of this repo. Python reads its public snapshot or HTTP API through an adapter.
 
-Python or data-processing code belongs in `backend`, `orchestration`, or a focused `pipelines` package, never inside `web`.
+Python or data-processing code belongs in `core`, `orchestration`, or a focused `pipelines` package, never inside `web`.
 
 Next route handlers may be thin browser/session proxies. They must not own business workflows, Keycloak authorization policy, or CHART database tables. Do not add a Next.js BFF.
 
@@ -38,7 +38,7 @@ Next route handlers may be thin browser/session proxies. They must not own busin
 Use this target structure while preserving current top-level names:
 
 ```txt
-backend/
+core/
   alembic/versions/        one linear migration chain
   chart/api/               app factory, router registration, OpenAPI catalog
   chart/shared/db/         every SQLAlchemy model, in one models.py
@@ -57,15 +57,15 @@ web/
   src/lib/                 typed clients for the Python API
 ```
 
-Domain packages under `backend/chart/` are: `audit`, `auth`, `climate`,
+Domain packages under `core/chart/` are: `audit`, `auth`, `climate`,
 `email`, `erf_registry`, `geographies`, `health_impact`, `identity`,
-`inference`, `model_registry`, `risk`, `setup`, `solution_repository`,
+`inference`, `learning`, `model_registry`, `risk`, `setup`, `solution_repository`,
 `users`, and `workspaces`. `api` and `shared` are infrastructure rather than
 domains, and `vra` is a placeholder.
 
 The chart repository and CHART core mean different things:
 
-- `backend/chart/solution_repository`: CHART adapter for reading a public repository snapshot/API. It must not define repository-owned Payload tables.
+- `core/chart/solution_repository`: CHART adapter for reading a public repository snapshot/API. It must not define repository-owned Payload tables.
 - the chart repository: a standalone Payload CMS service, deployed separately
   and not present in this repo, owning editing, media, publishing workflow, and
   repository auth.
@@ -75,12 +75,12 @@ Dependency direction:
 ```txt
 the chart repository publishes data
         ↓
-Python backend reads public snapshot/API responses
+Python core reads public snapshot/API responses
         ↓
-web reads from Python backend
+web reads from Python core
 ```
 
-Never vendor repository code into `backend/` or `web/`. Read it over HTTP or
+Never vendor repository code into `core/` or `web/`. Read it over HTTP or
 from a public JSON snapshot.
 
 ## Current Stack
@@ -123,7 +123,7 @@ module/
   service.py
   routes.py
 
-backend/tests/
+core/tests/
   test_<module>_api.py
 ```
 
@@ -152,7 +152,7 @@ Keep current feature UI under `web/src/features/`.
 ## Naming
 
 - Folders: `kebab-case`.
-- Python backend files: `schemas.py`, `service.py`, `routes.py`; route tests live under `backend/tests/`.
+- Python core files: `schemas.py`, `service.py`, `routes.py`; route tests live under `core/tests/`.
 - React components: `PascalCase.tsx`.
 - Functions: `camelCase` with clear verbs, such as `getCurrentUser` or `listSources`.
 - Types: `PascalCase`.
@@ -171,10 +171,10 @@ Keep current feature UI under `web/src/features/`.
 
 ## Validation
 
-Before finishing Python backend work:
+Before finishing Python core work:
 
 ```bash
-python -m pytest backend/tests -q
+python -m pytest core/tests -q
 python -m pytest orchestration/tests -q
 ```
 

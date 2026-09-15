@@ -73,8 +73,8 @@ nav:
       - System requirements and capacity: system-architecture-and-requirements.md
   - Infrastructure:
       - AWS sandbox deployment: aws-sandbox.md
-  - Python backend:
-      - Overview: python-backend.md
+  - Python core:
+      - Overview: python-core.md
       - Add a geography and model: add-geography-and-model.md
       - Climate API: climate-api.md
       - API explorer: api-reference.md

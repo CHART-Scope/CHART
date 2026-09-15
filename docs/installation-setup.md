@@ -12,7 +12,7 @@ saga.
 Backend endpoint: `POST /setup/bootstrap` (proxied through the web app at
 `/api/setup/bootstrap`).
 
-Handler: `bootstrap()` in `backend/chart/setup/service.py`.
+Handler: `bootstrap()` in `core/chart/setup/service.py`.
 
 The saga in order:
 
@@ -67,7 +67,7 @@ development or debugging one process in isolation.
 
 ## Backend environment file
 
-`backend/.env` is loaded at startup by `chart/api/app.py:main()` via
+`core/.env` is loaded at startup by `chart/api/app.py:main()` via
 `python-dotenv`. Anything the shell already has set (from the Makefile, a
 process manager, or Docker) wins — the file only fills in what the process
 environment hasn't provided. Edit values and restart the API for them to
@@ -81,7 +81,7 @@ Two categories of setting live in different places:
   R inference container always agree. They stay out of `.env` to avoid drift
   between the two processes.
 - **Application behavior flags** (`CHART_ENABLE_REVIEW_MODELS`,
-  `CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES`, `EMAIL_*`) live in `backend/.env`
+  `CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES`, `EMAIL_*`) live in `core/.env`
   because they don't need to match anything outside the API process.
 
 In production, put these settings in the gitignored
@@ -92,7 +92,7 @@ only the values declared in `infra/aws/docker-compose.yml`.
 
 By default an installation administrator sees exactly the geographies granted
 by their Keycloak groups — the same strict scope every other user gets. Set
-`CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES=true` in `backend/.env` to widen the
+`CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES=true` in `core/.env` to widen the
 admin's scope to every family root with an active model release, so the
 Settings context switcher lists every geography the deployment holds (India,
 Kenya, and any future country whose manifest ends up under
@@ -148,7 +148,7 @@ To override for a specific session, pass it on the command line:
 make run LBW_MODEL_CONTROL_TOKEN=my-dev-token
 ```
 
-Or set it in `backend/.env` alongside the other model-runtime variables
+Or set it in `core/.env` alongside the other model-runtime variables
 (`INFERENCE_LBW_BASE_URL`, `MODEL_CACHE_DIR`, `CHART_ENABLE_REVIEW_MODELS`).
 When you launch R by hand (rare), export the same value in that terminal.
 
@@ -181,7 +181,7 @@ port 8000 is free.
 
 **`MODEL_RUNTIME_NOT_CONFIGURED`** — Python resolved an empty URL. Either
 `INFERENCE_LBW_BASE_URL` is unset or `MODEL_CONTROL_TOKEN` is empty. Check
-`backend/.env`.
+`core/.env`.
 
 ## Reset
 
@@ -280,5 +280,5 @@ For a full Keycloak nuke (drop the database and re-seed from
 
 - Wizard component: `web/src/features/onboarding/OnboardingWizard.tsx`
 - Persisted store: `web/src/features/onboarding/store.ts`
-- Reset flow: `backend/chart/setup/service.py:reset`
+- Reset flow: `core/chart/setup/service.py:reset`
 - Realm seed (no users, no groups): `infra/keycloak/chart-realm.json`

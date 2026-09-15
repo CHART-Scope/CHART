@@ -77,4 +77,4 @@ Client roles on `chart-api`:
 
 ## Geography groups
 
-Geography scope is represented by Keycloak groups. The realm ships without any pre-seeded groups — the installation setup wizard and `_ensure_group_path` in `backend/chart/identity/service.py` create the required groups on demand from the country and administrative-area choices made during onboarding.
+Geography scope is represented by Keycloak groups. The realm ships without any pre-seeded groups — the installation setup wizard and `_ensure_group_path` in `core/chart/identity/service.py` create the required groups on demand from the country and administrative-area choices made during onboarding.
