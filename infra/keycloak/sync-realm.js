@@ -35,7 +35,22 @@ async function main() {
 
 async function syncClientSettings(token, clients) {
   for (const clientSeed of clients) {
-    const clientSummary = await getClient(token, clientSeed.clientId);
+    // A realm that has never seen this client — a fresh install, or a client
+    // that was renamed in the seed — must be created rather than failing the
+    // whole deploy. Without this, renaming a client ships a realm export that
+    // can never be applied.
+    let clientSummary = await findClient(token, clientSeed.clientId);
+
+    if (!clientSummary) {
+      await fetchOk(`${keycloakUrl}/admin/realms/${targetRealm}/clients`, {
+        method: "POST",
+        headers: jsonHeaders(token),
+        body: JSON.stringify(clientSeed),
+      });
+      console.log(`Created Keycloak client '${clientSeed.clientId}'.`);
+      clientSummary = await getClient(token, clientSeed.clientId);
+    }
+
     const clientUrl = `${keycloakUrl}/admin/realms/${targetRealm}/clients/${clientSummary.id}`;
     const client = await fetchJson(clientUrl, { headers: authHeaders(token) });
 
@@ -125,14 +140,19 @@ async function ensureClientRoles(token, rolesByClientId) {
   }
 }
 
-async function getClient(token, clientId) {
+async function findClient(token, clientId) {
   const clients = await fetchJson(
     `${keycloakUrl}/admin/realms/${targetRealm}/clients?clientId=${encodeURIComponent(
       clientId,
     )}`,
     { headers: authHeaders(token) },
   );
-  const client = clients.find((candidate) => candidate.clientId === clientId);
+
+  return clients.find((candidate) => candidate.clientId === clientId) ?? null;
+}
+
+async function getClient(token, clientId) {
+  const client = await findClient(token, clientId);
 
   if (!client) {
     throw new Error(
@@ -492,6 +512,7 @@ if (require.main === module) {
 
 module.exports = {
   buildRealmSettings,
+  syncClientSettings,
   buildScopeGoogleIdentityProvider,
   buildWebClientSettings,
   normalizePublicOrigin,
