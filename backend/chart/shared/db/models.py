@@ -1075,6 +1075,7 @@ class LearningResource(Base):
     __table_args__ = (
         Index("ix_learning_resource_kind", "kind"),
         Index("ix_learning_resource_published", "is_published", "sort_weight"),
+        Index("ix_learning_resource_featured", "is_featured", "sort_weight"),
     )
 
 
