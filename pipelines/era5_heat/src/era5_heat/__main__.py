@@ -22,24 +22,33 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     target = p.add_mutually_exclusive_group(required=True)
     target.add_argument(
-        "--preset", choices=list_slugs(),
+        "--preset",
+        choices=list_slugs(),
         help="Use a built-in district preset (sets --district and --bbox).",
     )
     target.add_argument("--district", help="District label (free text).")
     p.add_argument(
-        "--bbox", nargs=4, type=float, metavar=("N", "W", "S", "E"),
+        "--bbox",
+        nargs=4,
+        type=float,
+        metavar=("N", "W", "S", "E"),
         help="Bounding box as four floats: north west south east (degrees). "
-             "Required unless --preset is used.",
+        "Required unless --preset is used.",
     )
-    p.add_argument("--years", type=int, default=20, help="Number of years (default 20).")
     p.add_argument(
-        "--end-year", type=int, default=None,
+        "--years", type=int, default=20, help="Number of years (default 20)."
+    )
+    p.add_argument(
+        "--end-year",
+        type=int,
+        default=None,
         help="Last calendar year to include (default: last completed year).",
     )
     p.add_argument("--threshold-c", type=float, default=35.0)
     p.add_argument("--min-run", type=int, default=3)
     p.add_argument(
-        "--outdir", type=Path,
+        "--outdir",
+        type=Path,
         default=Path("outputs") / "era5_heat",
         help="Output directory (default: outputs/era5_heat relative to the current working directory).",
     )
@@ -50,17 +59,21 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Tabular output format (default: csv). Use parquet only with a working pyarrow install.",
     )
     p.add_argument(
-        "--cache-dir", type=Path, default=None,
+        "--cache-dir",
+        type=Path,
+        default=None,
         help="NetCDF cache directory (default: pipelines/era5_heat/.cache).",
     )
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--refresh", action="store_true", help="Re-download even if cached.")
     p.add_argument("--max-workers", type=int, default=3)
     p.add_argument(
-        "--plot", choices=["heatwave_days", "tmax_monthly_max_c", "tmax_monthly_mean_c"],
-        nargs="*", default=None,
+        "--plot",
+        choices=["heatwave_days", "tmax_monthly_max_c", "tmax_monthly_mean_c"],
+        nargs="*",
+        default=None,
         help="Also write PNG heatmap(s) of the chosen column(s). "
-             "Pass with no value to plot all three.",
+        "Pass with no value to plot all three.",
     )
     p.add_argument("-v", "--verbose", action="count", default=0)
     args = p.parse_args(argv)
@@ -84,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    df, meta = compute_heat_series(
+    df, meta, _daily = compute_heat_series(
         district=args.district,
         bbox=tuple(args.bbox),
         years=args.years,
@@ -98,8 +111,10 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     table_path, json_path = output_paths(
-        args.outdir, args.district,
-        meta["window"]["start_year"], meta["window"]["end_year"],
+        args.outdir,
+        args.district,
+        meta["window"]["start_year"],
+        meta["window"]["end_year"],
         table_format=args.format,
     )
     sha = write_table(df, table_path, table_format=args.format)
@@ -116,6 +131,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.plot:
         from .viz import monthly_heatmap, save_figure
+
         for col in args.plot:
             fig = monthly_heatmap(df, value=col, title=f"{args.district} — {col}")
             png_path = table_path.with_name(f"{table_path.stem}__{col}.png")

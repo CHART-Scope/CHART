@@ -16,16 +16,22 @@ from chart.auth.service import (
 from chart.shared.db.models import AppGeography
 from chart.shared.db.session import get_session_factory
 
+from chart.shared.outcomes import DEFAULT_OUTCOME
+
 from .schemas import (
     CurrentObservationResponse,
     LongTermRiskResponse,
     ShortTermRiskResponse,
+    MonthlyRiskResponse,
+    MapResponse,
 )
 from .service import (
     NoAdminUnitForGeography,
     load_current_observation,
     load_long_term_view,
     load_short_term_view,
+    load_monthly_view,
+    load_map_view,
 )
 
 router = APIRouter(prefix="/risk", tags=["risk"])
@@ -66,6 +72,63 @@ def _require_read_access(user: CurrentUserContext, geography_id: str) -> None:
     require_any_role(user, risk_reader_roles)
     place_path = _resolve_place_path(geography_id)
     require_geography_access(user, place_path)
+
+
+@router.get(
+    "/{geography_id}/monthly",
+    response_model=MonthlyRiskResponse,
+    summary="Read month-keyed ERA5 mean daily maxima and attributable impacts",
+)
+def read_monthly(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    month: Annotated[
+        str | None,
+        Query(
+            pattern=r"^([1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(0[1-9]|1[0-2])$"
+        ),
+    ] = None,
+    outcome: str = DEFAULT_OUTCOME,
+) -> MonthlyRiskResponse:
+    _require_read_access(user, geography_id)
+    with get_session_factory()() as session:
+        return load_monthly_view(
+            session,
+            geography_id,
+            month,
+            user_id=user.user_id,
+            outcome=outcome,
+        )
+
+
+@router.get(
+    "/{geography_id}/map",
+    response_model=MapResponse,
+    summary="Read administrative areas shaded by attributable fraction",
+)
+def read_map(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    month: Annotated[
+        str | None,
+        Query(
+            pattern=r"^([1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(0[1-9]|1[0-2])$"
+        ),
+    ] = None,
+    outcome: str = DEFAULT_OUTCOME,
+) -> MapResponse:
+    """Every area beneath this geography, with a value where one exists.
+
+    Areas with no fitted model and areas whose month has not been computed are
+    returned with a null value and a stated reason rather than omitted, so the
+    map can draw them as absent rather than as safe.
+    """
+    _require_read_access(user, geography_id)
+    with get_session_factory()() as session:
+        try:
+            return load_map_view(session, geography_id, month, outcome=outcome)
+        except NoAdminUnitForGeography as exc:
+            raise HTTPException(status_code=404, detail="GEOGRAPHY_NOT_FOUND") from exc
 
 
 @router.get(

@@ -38,13 +38,17 @@ _HAZARD_LABELS: dict[str, str] = {
 }
 _DOMAIN_LABELS: dict[str, str] = {
     "maternal_newborn_child_health": "Maternal, newborn and child health",
-    "respiratory_health": "Respiratory health",
-    "cardiovascular_health": "Cardiovascular health",
+    "child_health": "Child health",
 }
+# Fallbacks only. A release's presentation block is the source of truth for
+# how its outcome is named, and _release_label prefers it; these are used when
+# a manifest ships no presentation. Codes here must correspond to a real
+# manifest - entries for outcomes nobody ships made this map look like a
+# registry of supported outcomes, and under_5_mortality was missing from it
+# while preterm and asthma, which have no model, were present.
 _OUTCOME_LABELS: dict[str, str] = {
     "lbw": "Low birth weight",
-    "preterm": "Preterm birth",
-    "asthma": "Asthma exacerbation",
+    "under_5_mortality": "Under-five mortality",
 }
 
 
@@ -212,14 +216,14 @@ def _input_contract_value(release: ModelRelease, field: str) -> str | None:
 
 
 def _domain_from_outcome(outcome: str) -> str:
-    return _OUTCOME_TO_DOMAIN.get(outcome.strip(), "unspecified")
+    """Last resort when a manifest declares no health_domain.
 
+    Every shipped release declares one, so this is only reached by a manifest
+    that omits it. Guessing a domain from an outcome code would encode
+    modelling knowledge in the backend, so it deliberately does not try.
+    """
 
-_OUTCOME_TO_DOMAIN: dict[str, str] = {
-    "lbw": "maternal_newborn_child_health",
-    "preterm": "maternal_newborn_child_health",
-    "asthma": "respiratory_health",
-}
+    return "unspecified"
 
 
 class ModelFileInfo(BaseModel):

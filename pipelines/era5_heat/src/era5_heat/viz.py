@@ -11,8 +11,20 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+_MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+]
 
 
 def to_year_month_matrix(df: pd.DataFrame, value: str) -> pd.DataFrame:
@@ -21,11 +33,13 @@ def to_year_month_matrix(df: pd.DataFrame, value: str) -> pd.DataFrame:
         raise KeyError(f"{value!r} not in DataFrame columns {list(df.columns)}")
     months = pd.to_datetime(df["month"])
     pivot = (
-        pd.DataFrame({
-            "year": months.dt.year,
-            "month": months.dt.month,
-            "v": df[value].to_numpy(),
-        })
+        pd.DataFrame(
+            {
+                "year": months.dt.year,
+                "month": months.dt.month,
+                "v": df[value].to_numpy(),
+            }
+        )
         .pivot(index="year", columns="month", values="v")
         .reindex(columns=range(1, 13))
         .sort_index()
@@ -85,8 +99,13 @@ def monthly_heatmap(
                         continue
                     text = f"{v:.0f}" if value == "heatwave_days" else f"{v:.1f}"
                     ax.text(
-                        x, y, text, ha="center", va="center",
-                        color="white" if v >= mid else "black", fontsize=7,
+                        x,
+                        y,
+                        text,
+                        ha="center",
+                        va="center",
+                        color="white" if v >= mid else "black",
+                        fontsize=7,
                     )
 
     cb = fig.colorbar(im, ax=ax, shrink=0.85)

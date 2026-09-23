@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from chart.shared.outcomes import DEFAULT_OUTCOME
+
 from datetime import date
 from typing import Literal
 
@@ -42,7 +44,11 @@ class PreviewRequest(BaseModel):
 
 
 class PredictRequest(PreviewRequest):
-    outcome: Literal["lbw"] = "lbw"
+    # Not pinned to one outcome: what gates a request is whether the resolved
+    # release is ready for the queued path, which validate_prediction_request
+    # checks against the manifest's batch_status. Pinning the literal here
+    # rejected under-5 before that check could give a usable reason.
+    outcome: str = Field(default=DEFAULT_OUTCOME, min_length=1)
     planning_target: PlanningTarget = "month"
     projection_scenario: ProjectionScenario | None = None
     projection_period: ProjectionPeriod | None = None
@@ -135,8 +141,25 @@ class LbwPrediction(BaseModel):
 
     area: str
     geography_level: str
-    pregnancy_window: PregnancyWindow
-    temperatures_c: list[float] = Field(min_length=3, max_length=3)
+    # None for models with no pregnancy window - it is a low-birth-weight
+    # concept, and the under-five association models do not carry one.
+    pregnancy_window: PregnancyWindow | None = None
+    # The observations actually scored, newest first. Length is the model's
+    # own contract, checked against the release before scoring; pinning 3 here
+    # encoded one model family's shape into every model's response. Low birth
+    # weight sends three monthly means. A day-grain model sends the month's
+    # daily series together with the lead-in days the first of the month is
+    # scored against: `days_in_month + length - 1`. The cap is the largest a
+    # valid contract can produce - a 31-day month plus the 63-day lead-in of
+    # the longest permitted vector (`ModelInputVariableSpec.length`, le=64).
+    # Sizing it to today's 4-day model instead would have rejected a longer
+    # release *after* its Copernicus download and its R score had both
+    # succeeded, turning a completed run into a 500 with no usable code.
+    temperatures_c: list[float] = Field(min_length=1, max_length=94)
+    # The observed days behind a day-grain exposure vector, lag 0 first, so a
+    # stored prediction can name which days it was scored on. None for a
+    # month-grain model, whose months are already named by the planning date.
+    exposure_dates: list[date] | None = None
     reference_temperature_c: float
     odds_ratio: float = Field(gt=0)
     ci95_low: float = Field(gt=0)
@@ -274,7 +297,7 @@ class HealthResponse(BaseModel):
 class WhatIfRequest(BaseModel):
     geography_id: str = Field(min_length=1)
     temperature_c: float = Field(ge=-30, le=60)
-    outcome: str = Field(default="lbw", min_length=1)
+    outcome: str = Field(default=DEFAULT_OUTCOME, min_length=1)
 
 
 class WhatIfResponse(BaseModel):
@@ -286,7 +309,7 @@ class WhatIfResponse(BaseModel):
 
     geography_id: str
     temperature_c: float
-    outcome: str = "lbw"
+    outcome: str = DEFAULT_OUTCOME
     area: str
     geography_level: str
     pregnancy_window: PregnancyWindow | None = None

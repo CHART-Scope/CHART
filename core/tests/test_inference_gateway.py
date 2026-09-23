@@ -211,10 +211,10 @@ def test_association_provider_and_gateway_preserve_four_day_profile() -> None:
             model_sha256="b" * 64,
             model_area="Bhopal",
             outcome="under_5_mortality",
-            exposure_values_c=(32.0, 32.0, 32.0, 32.0),
+            exposure_profiles_c=((32.0, 32.0, 32.0, 32.0),),
             service_url="http://model.test",
         )
-    assert score.exposure_values_c == (32.0, 32.0, 32.0, 32.0)
+    assert score.exposure_profiles_c == ((32.0, 32.0, 32.0, 32.0),)
     assert score.n_model_rows == 943
     assert score.n_training == 943
     assert score.n_events == 215
@@ -260,10 +260,12 @@ def test_association_provider_sends_outcome_and_generic_exposure() -> None:
             model_sha256="b" * 64,
             model_area="Bhopal",
             outcome="under_5_mortality",
-            exposure_values_c=(32.0, 32.0, 32.0, 32.0),
+            exposure_profiles_c=((32.0, 32.0, 32.0, 32.0),),
         )
     sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
     assert sent["outcome"] == "under_5_mortality"
+    # One profile still goes out flat, so the R side sees the vector it always
+    # saw and jsonlite does not turn it into a one-row matrix.
     assert sent["exposure_values_c"] == [32.0, 32.0, 32.0, 32.0]
 
 
@@ -504,3 +506,75 @@ def test_reset_circuit_clears_state(monkeypatch) -> None:
             )
     assert after_reset.value.code == "LBW_SERVICE_UNAVAILABLE"
     lbw_r.reset_circuit()
+
+
+def test_a_month_of_profiles_is_sent_as_a_matrix_and_echoed_back() -> None:
+    """Several profiles in one call: the shape a day-grain month needs.
+
+    The scorer returns a matrix when it is given one, and the gateway's echo
+    check must compare profiles to profiles rather than flattening them - a
+    flattened comparison would accept a response for different inputs.
+    """
+    profiles = ((32.0, 31.0, 30.0, 29.0), (33.0, 32.0, 31.0, 30.0))
+    response = {
+        "area": "Bhopal",
+        "geography_level": "division",
+        "outcome": "under_5_mortality",
+        "exposure_values_c": [list(profile) for profile in profiles],
+        "ref_temp": 30.0,
+        "effect_measure": "odds_ratio",
+        "odds_ratio": 1.1,
+        "ci95_low": 1.0,
+        "ci95_high": 1.2,
+        "on_training_support": True,
+        "model_file": "under5.rds",
+        "model_version": "0.1.0-review",
+        "model_sha256": "b" * 64,
+    }
+    with patch("chart.inference.service.call_association_r", return_value=response):
+        score = score_association(
+            model_release_id="under5-review",
+            model_file="under5.rds",
+            model_version="0.1.0-review",
+            model_sha256="b" * 64,
+            model_area="Bhopal",
+            outcome="under_5_mortality",
+            exposure_profiles_c=profiles,
+            service_url="http://model.test",
+        )
+    assert score.exposure_profiles_c == profiles
+
+
+def test_a_response_for_different_profiles_is_refused() -> None:
+    """The echo check has to survive the move from one profile to many."""
+    response = {
+        "area": "Bhopal",
+        "geography_level": "division",
+        "outcome": "under_5_mortality",
+        "exposure_values_c": [[32.0, 31.0, 30.0, 29.0], [99.0, 32.0, 31.0, 30.0]],
+        "ref_temp": 30.0,
+        "effect_measure": "odds_ratio",
+        "odds_ratio": 1.1,
+        "ci95_low": 1.0,
+        "ci95_high": 1.2,
+        "on_training_support": True,
+        "model_file": "under5.rds",
+        "model_version": "0.1.0-review",
+        "model_sha256": "b" * 64,
+    }
+    with patch("chart.inference.service.call_association_r", return_value=response):
+        with pytest.raises(InferenceError) as caught:
+            score_association(
+                model_release_id="under5-review",
+                model_file="under5.rds",
+                model_version="0.1.0-review",
+                model_sha256="b" * 64,
+                model_area="Bhopal",
+                outcome="under_5_mortality",
+                exposure_profiles_c=(
+                    (32.0, 31.0, 30.0, 29.0),
+                    (33.0, 32.0, 31.0, 30.0),
+                ),
+                service_url="http://model.test",
+            )
+    assert caught.value.code == "MODEL_RESPONSE_INPUT_MISMATCH"

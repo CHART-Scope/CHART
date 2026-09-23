@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 
 from collections.abc import Iterator
 from unittest.mock import patch
@@ -83,15 +84,19 @@ def test_setup_options_return_manifest_geographies(
     assert kenya["levels"] == [
         {"key": "geo_level_1", "label": "County", "sortOrder": 10}
     ]
-    assert len(kenya["places"]) == 46
+    # All 47 counties are selectable: the under-5 climate-zone release fits
+    # North-western, so Turkana is supported for at least one outcome.
+    assert len(kenya["places"]) == 47
     assert {place["name"] for place in kenya["places"]} >= {
         "Kajiado",
         "West Pokot",
+        "Turkana",
     }
-    assert "Turkana" not in {place["name"] for place in kenya["places"]}
     assert all(place["predictionSupported"] for place in kenya["places"])
     assert {place["levelLabel"] for place in kenya["places"]} == {"County"}
     kajiado = next(place for place in kenya["places"] if place["name"] == "Kajiado")
+    # Kajiado now scores against two outcomes, both fitted for its climate
+    # zone: low birth weight and under-five mortality.
     assert kajiado["modelMappings"] == [
         {
             "releaseId": "lbw-ke-climate-zone-0.2.1-review",
@@ -99,7 +104,14 @@ def test_setup_options_return_manifest_geographies(
             "outcomeLabel": "Low birth weight",
             "modelAreaName": "South-eastern",
             "modelScopeLabel": "climate-zone model",
-        }
+        },
+        {
+            "releaseId": "under5-mortality-ke-climate-zone-0.1.0-review",
+            "outcome": "under_5_mortality",
+            "outcomeLabel": "Under-five mortality",
+            "modelAreaName": "South-eastern",
+            "modelScopeLabel": "climate-zone model",
+        },
     ]
 
     india = countries["IN"]
@@ -308,3 +320,23 @@ def _bootstrap_request() -> dict:
             "password": "valid-password",
         },
     }
+
+
+def test_a_rejected_request_body_names_the_failing_field_in_the_log(
+    planning_user_client: TestClient, caplog
+) -> None:
+    """A 422 must be diagnosable from the server log alone.
+
+    Validation failures previously surfaced as a bare status code, so the only
+    way to learn which field was at fault was to replay the call by hand with a
+    valid token.
+    """
+    with caplog.at_level(logging.WARNING, logger="chart.api.app"):
+        response = planning_user_client.post(
+            "/climate/predict",
+            json={"geography_id": "geo-in-mp", "planning_date": "not-a-date"},
+        )
+    assert response.status_code == 422
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert "validation_failed" in logged
+    assert "planning_date" in logged

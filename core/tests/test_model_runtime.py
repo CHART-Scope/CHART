@@ -24,8 +24,16 @@ def _spec(digest: str, *, filename: str = "kenya.rds") -> ModelReleaseSpec:
                 "artifact_type": "rds",
             },
             "base_uri": "s3://private/models",
-            "temperature_input": "three monthly temperatures",
-            "months_required": 3,
+            "input_contract": {
+                "variables": [
+                    {
+                        "name": "tmax_lag",
+                        "unit": "Celsius",
+                        "order": "newest_first",
+                        "length": 3,
+                    }
+                ]
+            },
             "model_files": [{"filename": filename, "sha256": digest}],
             "areas": [
                 {
@@ -120,8 +128,16 @@ def test_model_release_rejects_place_label_that_disagrees_with_level() -> None:
         "outcome": "lbw",
         "version": "1.0.0",
         "base_uri": "s3://private/models",
-        "temperature_input": "three monthly temperatures",
-        "months_required": 3,
+        "input_contract": {
+            "variables": [
+                {
+                    "name": "tmax_lag",
+                    "unit": "Celsius",
+                    "order": "newest_first",
+                    "length": 3,
+                }
+            ]
+        },
         "model_files": [{"filename": "model.rds", "sha256": "a" * 64}],
         "geography": {
             "country_code": "IN",

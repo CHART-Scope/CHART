@@ -43,7 +43,9 @@ class AssociationScore:
     area: str
     geography_level: str
     outcome: str
-    exposure_values_c: tuple[float, ...]
+    #: One profile per scored day, each newest value first. A month-grain
+    #: request carries exactly one.
+    exposure_profiles_c: tuple[tuple[float, ...], ...]
     reference_temperature_c: float
     effect_measure: str
     estimate: float
@@ -61,6 +63,19 @@ class AssociationScore:
     modelled_temperature_range_c: tuple[float, float] | None = None
 
 
+def _as_profiles(value: object) -> tuple[tuple[float, ...], ...]:
+    """Normalise the scorer's echo to profiles.
+
+    R returns a vector for one profile and a matrix for several, so a single
+    request comes back flat. Both are read as a tuple of profiles, which is
+    what the request was.
+    """
+    items = list(value)  # type: ignore[call-overload]
+    if items and not isinstance(items[0], (list, tuple)):
+        return (tuple(float(item) for item in items),)
+    return tuple(tuple(float(item) for item in profile) for profile in items)
+
+
 def score_association(
     *,
     model_release_id: str,
@@ -69,7 +84,7 @@ def score_association(
     model_sha256: str,
     model_area: str,
     outcome: str,
-    exposure_values_c: tuple[float, ...],
+    exposure_profiles_c: tuple[tuple[float, ...], ...],
     service_url: str | None = None,
     reference_temperature_c: float | None = None,
 ) -> AssociationScore:
@@ -91,14 +106,14 @@ def score_association(
             model_sha256=model_sha256,
             model_area=model_area,
             outcome=outcome,
-            exposure_values_c=exposure_values_c,
+            exposure_profiles_c=exposure_profiles_c,
             reference_temperature_c=reference_temperature_c,
         )
     except LbwProviderError as error:
         raise InferenceError(error.code, error.detail) from error
 
     try:
-        response_values = tuple(float(value) for value in payload["exposure_values_c"])
+        response_values = _as_profiles(payload["exposure_values_c"])
         estimate = float(payload["odds_ratio"])
         low = float(payload["ci95_low"])
         high = float(payload["ci95_high"])
@@ -108,13 +123,19 @@ def score_association(
         response_version = str(payload["model_version"])
     except (KeyError, TypeError, ValueError) as error:
         raise InferenceError("MODEL_RESPONSE_INVALID", str(error)) from error
-    if response_values != exposure_values_c:
+    if response_values != exposure_profiles_c:
         raise InferenceError("MODEL_RESPONSE_INPUT_MISMATCH")
     if str(payload.get("outcome")) != outcome:
         raise InferenceError("MODEL_RESPONSE_OUTCOME_MISMATCH")
     if not all(
         math.isfinite(value)
-        for value in (*response_values, estimate, low, high, reference)
+        for value in (
+            *(item for profile in response_values for item in profile),
+            estimate,
+            low,
+            high,
+            reference,
+        )
     ):
         raise InferenceError("MODEL_RESPONSE_INVALID", "numeric values must be finite")
     if estimate <= 0 or low <= 0 or high <= 0 or not low <= estimate <= high:
@@ -140,7 +161,7 @@ def score_association(
         area=str(payload["area"]),
         geography_level=str(payload["geography_level"]),
         outcome=outcome,
-        exposure_values_c=response_values,
+        exposure_profiles_c=response_values,
         reference_temperature_c=reference,
         effect_measure=str(payload["effect_measure"]),
         estimate=estimate,

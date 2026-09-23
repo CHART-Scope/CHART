@@ -1,0 +1,471 @@
+{
+  "schema_version": 2,
+  "id": "under5-mortality-ke-climate-zone-0.1.0-review",
+  "module": "prediction",
+  "outcome": "under_5_mortality",
+  "climate_hazard": "extreme_heat",
+  "health_domain": "child_health",
+  "version": "0.1.0-climate-zone-review",
+  "runtime": {
+    "adapter": "compact_r_registry",
+    "artifact_type": "rds"
+  },
+  "input_contract": {
+    "variables": [
+      {
+        "name": "daily_tmax_lag",
+        "description": "Daily maximum 2m air temperature at lag 0 through lag 3",
+        "unit": "Celsius",
+        "interval": "day",
+        "order": "newest_first",
+        "length": 4
+      }
+    ],
+    "interactive_profile": "repeat_selected_temperature_across_all_lags",
+    "batch_profile": "trailing_window_mean"
+  },
+  "output_contract": {
+    "effect_measure": "odds_ratio",
+    "confidence_level": 0.95,
+    "attributable_fraction": "positive_excess_only"
+  },
+  "presentation": {
+    "climate_hazard_label": "Extreme heat",
+    "health_domain_label": "Child health",
+    "outcome_label": "Under-five mortality",
+    "dashboard_title": "Protecting children from extreme heat",
+    "population_label": "children under five",
+    "model_scope_label": "climate-zone model",
+    "visualization": {
+      "kind": "odds_ratio_icon_array",
+      "figure": "baby",
+      "context_figure": "baby"
+    },
+    "risk_description": "Exposure to extreme heat is associated with increased under-five mortality risk, while cooler environments can reduce exposure.",
+    "reference_kind": "median"
+  },
+  "base_uri": "s3://chart-predictive-models/kenya/under-five-mortality/0.1.0-climate-zone-review",
+  "release_notes": "Kenya climate-zone conditional-logistic DLNM review artifact, packaged from the modeller's 2026-08-14 source by pipelines/models/under_five_mortality/inference/package_kenya_model.R. Six fitted climate-zone blocks cover all 47 counties. Each block carries the temperature basis, coefficients and covariance for the Under_5_Mortality outcome only; the source's neonatal, post-neonatal, under-1 and child blocks are not included. The reference temperature is the block's reducedCrossPred centring, which the modelling script sets from median(Var_center) - it is not the MMT_crosspred artefact, which this release does not use. Not approved for activation; no batch path.",
+  "source_git_ref": "pipelines/models/under_five_mortality/inference/package_kenya_model.R",
+  "model_files": [
+    {
+      "filename": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "sha256": "1244e77216fb9f27121cf3748f07ccd641a11f7df097ff11f61b4e4a38980222"
+    }
+  ],
+  "place_set": {
+    "id": "ke-counties",
+    "version": "1",
+    "path": "pipelines/places/ke-counties-v1/place-set.json",
+    "sha256": "179a0c0d5f0bf58fb8533b6e04cae4cdef5ce5c1556e559d69462a0574beb78d"
+  },
+  "coverage": [
+    {
+      "place_code": "baringo",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "bomet",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "bungoma",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "busia",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "elgeyo-marakwet",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "homa-bay",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "kakamega",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "kericho",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "kisii",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "kisumu",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "laikipia",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "migori",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "nakuru",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "nandi",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "narok",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "nyamira",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "siaya",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "trans-nzoia",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "uasin-gishu",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "vihiga",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "west-pokot",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Lake Victoria Basin & Western Highlands"
+    },
+    {
+      "place_code": "embu",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Central Highlands"
+    },
+    {
+      "place_code": "kiambu",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Central Highlands"
+    },
+    {
+      "place_code": "kirinyaga",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Central Highlands"
+    },
+    {
+      "place_code": "meru",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Central Highlands"
+    },
+    {
+      "place_code": "muranga",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Central Highlands"
+    },
+    {
+      "place_code": "nairobi",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Central Highlands"
+    },
+    {
+      "place_code": "nyandarua",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Central Highlands"
+    },
+    {
+      "place_code": "nyeri",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Central Highlands"
+    },
+    {
+      "place_code": "tharaka-nithi",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Central Highlands"
+    },
+    {
+      "place_code": "garissa",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "North-eastern"
+    },
+    {
+      "place_code": "isiolo",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "North-eastern"
+    },
+    {
+      "place_code": "mandera",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "North-eastern"
+    },
+    {
+      "place_code": "marsabit",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "North-eastern"
+    },
+    {
+      "place_code": "samburu",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "North-eastern"
+    },
+    {
+      "place_code": "wajir",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "North-eastern"
+    },
+    {
+      "place_code": "kajiado",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "South-eastern"
+    },
+    {
+      "place_code": "kitui",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "South-eastern"
+    },
+    {
+      "place_code": "machakos",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "South-eastern"
+    },
+    {
+      "place_code": "makueni",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "South-eastern"
+    },
+    {
+      "place_code": "taita-taveta",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "South-eastern"
+    },
+    {
+      "place_code": "tana-river",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "South-eastern"
+    },
+    {
+      "place_code": "kilifi",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Coastal Strip"
+    },
+    {
+      "place_code": "kwale",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Coastal Strip"
+    },
+    {
+      "place_code": "lamu",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Coastal Strip"
+    },
+    {
+      "place_code": "mombasa",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "Coastal Strip"
+    },
+    {
+      "place_code": "turkana",
+      "country_code": "KE",
+      "level": "county",
+      "model_file": "KE_climate_zone_under5_mortality_tmax_v0.1.0-review.rds",
+      "model_area_name": "North-western"
+    }
+  ],
+  "model_areas": [
+    {
+      "name": "Lake Victoria Basin & Western Highlands",
+      "level": "climate_zone",
+      "members": [
+        "baringo",
+        "bomet",
+        "bungoma",
+        "busia",
+        "elgeyo-marakwet",
+        "homa-bay",
+        "kakamega",
+        "kericho",
+        "kisii",
+        "kisumu",
+        "laikipia",
+        "migori",
+        "nakuru",
+        "nandi",
+        "narok",
+        "nyamira",
+        "siaya",
+        "trans-nzoia",
+        "uasin-gishu",
+        "vihiga",
+        "west-pokot"
+      ]
+    },
+    {
+      "name": "Central Highlands",
+      "level": "climate_zone",
+      "members": [
+        "embu",
+        "kiambu",
+        "kirinyaga",
+        "meru",
+        "muranga",
+        "nairobi",
+        "nyandarua",
+        "nyeri",
+        "tharaka-nithi"
+      ]
+    },
+    {
+      "name": "North-eastern",
+      "level": "climate_zone",
+      "members": ["garissa", "isiolo", "mandera", "marsabit", "samburu", "wajir"]
+    },
+    {
+      "name": "South-eastern",
+      "level": "climate_zone",
+      "members": [
+        "kajiado",
+        "kitui",
+        "machakos",
+        "makueni",
+        "taita-taveta",
+        "tana-river"
+      ]
+    },
+    {
+      "name": "Coastal Strip",
+      "level": "climate_zone",
+      "members": ["kilifi", "kwale", "lamu", "mombasa"]
+    },
+    {
+      "name": "North-western",
+      "level": "climate_zone",
+      "members": ["turkana"]
+    }
+  ],
+  "coverage_gaps": [],
+  "artifact_source": {
+    "filename": "Dlnm_Mod_obj_by_Under_5_Mortality_and_ClimateZone_Kenya_2026_08_14.rds",
+    "sha256": "f10bb60e902494374182b460274708dcd776a0ebddfed502ba83716b27e285b8",
+    "produced_on": "2026-08-14",
+    "note": "Reference is reducedCrossPred cen, the median of same-day maxima."
+  }
+}

@@ -71,6 +71,14 @@ make verify
 
 Adding a place or model: [docs/add-geography-and-model.md](docs/add-geography-and-model.md).
 
+What the dashboard shows and what it queues on its own:
+[docs/dashboard.md](docs/dashboard.md). Worth reading before changing the
+spatial map — opening a country's dashboard queues a **small, capped** number
+of missing areas (three per visit), because climate is fetched per area and an
+uncached month takes minutes against Copernicus. The cap is what keeps page
+load cheap as the number of areas grows; the explicit _Prepare remaining_
+action is how a planner asks for the rest.
+
 ## Digital public good and licence
 
 CHART is designed to be inspected, adapted, self-hosted, and improved by

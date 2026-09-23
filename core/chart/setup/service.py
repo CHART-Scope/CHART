@@ -34,7 +34,12 @@ from chart.shared.db.models import (
     ClimateRun,
     CountryGeoConfig,
     Covariate,
+    ClimateIngestionJob,
+    ClimateInputDayRecord,
+    DataSource,
     DistrictClimate,
+    DistrictClimateDay,
+    ErfParameters,
     Geography,
     HealthImpact,
     IngestionLeaseRecord,
@@ -43,6 +48,7 @@ from chart.shared.db.models import (
     ModelAreaMapping,
     ModelRelease,
     PredictionRequestRecord,
+    PredictionResult,
     RecommendedAction,
     SetupStateRecord,
     UserGeographyScopeRecord,
@@ -587,11 +593,17 @@ def _auto_seed_deployed_models(
             release.status = "validated"
             activate_release(session, release)
             session.flush()
+            # Name the modeller output this artifact came from. Without it
+            # the log says which release was installed but not which fitted
+            # model it actually is, which is the question anyone debugging a
+            # number ends up asking.
+            source = spec.artifact_source
             logger.warning(
-                "auto_seed: success — areas=%d release=%s status=%s",
+                "auto_seed: success — areas=%d release=%s status=%s source=%s",
                 result.areas_seeded,
                 result.model_release_id,
                 release.status,
+                f"{source.filename} ({source.produced_on})" if source else "unrecorded",
             )
         except (PlaceBootstrapError, ModelRegistryError) as error:
             logger.exception(
@@ -840,8 +852,15 @@ def reset(user: CurrentUserContext) -> SetupStatus:
         session.execute(delete(HealthImpact))
         session.execute(delete(Covariate))
         session.execute(delete(AuditEventRecord))
+        # Newer tables first: district_climate_day's foreign keys to
+        # climate_run and admin_unit carry no ondelete, so they default to
+        # RESTRICT and would block the deletes below once daily rows exist.
+        session.execute(delete(ClimateInputDayRecord))
+        session.execute(delete(PredictionResult))
         session.execute(delete(PredictionRequestRecord))
+        session.execute(delete(ClimateIngestionJob))
         session.execute(delete(IngestionLeaseRecord))
+        session.execute(delete(DistrictClimateDay))
         session.execute(delete(DistrictClimate))
         session.execute(delete(ClimateInputMonthRecord))
         session.execute(delete(ClimateInputWindowRecord))
@@ -851,6 +870,14 @@ def reset(user: CurrentUserContext) -> SetupStatus:
         session.execute(delete(ModelRelease))
         session.execute(delete(AdminUnit))
         session.execute(delete(AppGeography))
+        # data_source is keyed per geography (`_get_or_create_era5_data_source`
+        # looks it up by geography id), so it is not shared seed data the way
+        # the comment above implies: once its geography goes it is unreachable,
+        # and its foreign key has no ondelete, so leaving it here blocked the
+        # delete below outright. erf_parameters is RESTRICT for the same
+        # reason, and is empty in every environment today.
+        session.execute(delete(ErfParameters))
+        session.execute(delete(DataSource))
         session.execute(delete(Geography))
         session.execute(delete(UserGeographyScopeRecord))
         session.execute(delete(UserRoleRecord))

@@ -4,6 +4,10 @@ export PATH := $(dir $(NPM)):$(PATH)
 
 CHART_REPOSITORY_DIR := chart-repository
 CHART_REPOSITORY_COMPOSE := $(DOCKER) compose -f $(CHART_REPOSITORY_DIR)/docker-compose.yml
+CHART_SERVICES ?= $(if $(wildcard .local/remote-dev.enabled),remote,local)
+ifeq ($(filter $(CHART_SERVICES),local remote),)
+$(error CHART_SERVICES must be local or remote)
+endif
 
 .PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run wait-for-lbw bootstrap-token install-hooks
 
@@ -23,6 +27,9 @@ help:
 	@printf "  make all            Provision local services and run verification checks\n"
 	@printf "  make local-setup    Start Docker services, migrate, seed, and sync identity\n"
 	@printf "  make services       Start local Postgres and Keycloak\n"
+	@printf "  make remote-connect Connect isolated EC2 development dependencies over SSH\n"
+	@printf "  make remote-check   Verify tunneled development dependencies\n"
+	@printf "  make remote-disconnect Close only the development SSH tunnel\n"
 	@printf "  make mail           Start local Mailpit (SMTP :1025, inbox :8025)\n"
 	@printf "  make bootstrap-token  Ensure CHART_BOOTSTRAP_TOKEN exists in web/.env.local\n"
 	@printf "  make install-hooks    Enable local pre-commit hooks (OpenAPI regen)\n"
@@ -56,11 +63,20 @@ python-check:
 	$(VENV_PYTHON) -m black --check core orchestration pipelines/boundaries pipelines/seasonal_c3s pipelines/isimip_projection pipelines/era5_heat/src/era5_heat/__init__.py pipelines/era5_heat/src/era5_heat/aggregate.py pipelines/era5_heat/tests/test_aggregate.py
 	$(VENV_PYTHON) -m mypy core/chart orchestration/src pipelines/boundaries/src pipelines/era5_heat/src pipelines/seasonal_c3s/src pipelines/isimip_projection/src --ignore-missing-imports --no-error-summary
 
+ifeq ($(CHART_SERVICES),remote)
+local-setup: services postgres-wait identity-wait climate-migrate
+else
 local-setup: services postgres-wait identity-wait climate-migrate identity-sync
+endif
 
 check-docker:
 	@if [ -z "$(DOCKER)" ]; then printf "Docker CLI not found. Start Docker Desktop or install docker CLI.\n"; exit 1; fi
 
+ifeq ($(CHART_SERVICES),remote)
+postgres services mail identity-db: remote-connect
+
+postgres-wait: remote-check
+else
 postgres: check-docker
 	@if docker inspect chart-postgres >/dev/null 2>&1; then \
 		host_port=$$(docker inspect chart-postgres \
@@ -107,6 +123,7 @@ postgres-wait: postgres
 identity-db: postgres-wait
 	$(DOCKER) exec chart-postgres psql -v ON_ERROR_STOP=1 -U chart -d postgres \
 		-f /docker-entrypoint-initdb.d/10-keycloak.sql >/dev/null
+endif
 
 identity: services
 
@@ -170,6 +187,18 @@ identity-sync: identity-wait
 identity-test:
 	$(NPM) run identity:test
 
+ifeq ($(CHART_SERVICES),remote)
+identity-restart:
+	ssh -o BatchMode=yes -o ConnectTimeout=10 "$(CHART_SSH_HOST)" 'cd ~/chart-dev/infra/remote-dev && docker compose -p chart-dev restart keycloak'
+	$(MAKE) identity-wait
+
+identity-down:
+	ssh -o BatchMode=yes -o ConnectTimeout=10 "$(CHART_SSH_HOST)" 'cd ~/chart-dev/infra/remote-dev && docker compose -p chart-dev stop keycloak'
+
+identity-reset:
+	@printf 'Remote mode: automatic database deletion is disabled. Restore a development backup explicitly.\n'
+	@exit 2
+else
 identity-restart: check-docker
 	$(MAKE) services
 	$(DOCKER) restart chart-keycloak
@@ -197,6 +226,7 @@ identity-reset: check-docker
 	$(MAKE) identity-sync
 identity-down: check-docker
 	@if docker inspect chart-keycloak >/dev/null 2>&1; then docker stop chart-keycloak; fi
+endif
 
 chart-repo: chart-repo-install chart-repo-db chart-repo-db-wait
 	cd $(CHART_REPOSITORY_DIR) && $(NPM) run dev
@@ -280,6 +310,7 @@ lbw-check:
 	fi
 	@Rscript $(MODEL_DIR)/inference/tests/test_serialization.R
 	@Rscript $(MODEL_DIR)/inference/tests/test_compact_score.R
+	@Rscript $(MODEL_DIR)/inference/tests/test_profile_batch.R
 
 lbw-run: lbw-check
 	@health=$$(curl -fsS "http://127.0.0.1:$(LBW_PORT)/health" 2>/dev/null || true); \
@@ -430,3 +461,5 @@ climate-migrate: climate-install postgres-wait
 climate-db-migrate: climate-migrate
 
 dagster-dev: dev
+
+include infra/remote-dev/remote.mk

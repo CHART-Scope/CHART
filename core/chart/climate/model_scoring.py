@@ -48,7 +48,7 @@ def score_association_model(
     model: ActiveModelMapping,
     *,
     outcome: str,
-    exposure_values_c: tuple[float, ...],
+    exposure_profiles_c: tuple[tuple[float, ...], ...],
     service_url: str | None = None,
 ) -> AssociationScore:
     editorial_ref = _editorial_reference_temperature_c(model.input_spec)
@@ -61,7 +61,7 @@ def score_association_model(
             model_sha256=model.artifact_sha256,
             model_area=model.model_area_name,
             outcome=outcome,
-            exposure_values_c=exposure_values_c,
+            exposure_profiles_c=exposure_profiles_c,
             service_url=service_url,
             reference_temperature_c=editorial_ref,
         ),

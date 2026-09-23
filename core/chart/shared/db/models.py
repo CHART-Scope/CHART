@@ -452,6 +452,93 @@ class DistrictClimate(Base):
     )
 
 
+class DistrictClimateDay(Base):
+    """One day's area-aggregated climate value for an admin unit.
+
+    The sibling of :class:`DistrictClimate`, at day grain. It exists because
+    the under-five association models are fitted on daily maximum temperature
+    with daily lags, and a monthly mean cannot stand in for that: feeding a
+    month's mean of daily maxima into a model expecting four consecutive days
+    answers a different question than the one the model was fitted to.
+
+    Same aggregation, provenance and quality columns as the monthly grain, so
+    a day and a month are traceable to the same climate run.
+    """
+
+    __tablename__ = "district_climate_day"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    admin_unit_id: Mapped[int] = mapped_column(
+        ForeignKey("admin_unit.id"), nullable=False
+    )
+    climate_run_id: Mapped[int] = mapped_column(
+        ForeignKey("climate_run.id"), nullable=False
+    )
+    period_date: Mapped[date] = mapped_column(Date, nullable=False)
+    variable: Mapped[str] = mapped_column(String(64), nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    agg_method: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="bbox_mean"
+    )
+    unit: Mapped[str | None] = mapped_column(String(32))
+    quality_status: Mapped[str | None] = mapped_column(String(32))
+    record_hash: Mapped[str | None] = mapped_column(String(64))
+
+    admin_unit: Mapped[AdminUnit] = relationship()
+    climate_run: Mapped[ClimateRun] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint(
+            "admin_unit_id",
+            "climate_run_id",
+            "period_date",
+            "variable",
+            name="uq_district_climate_day_grain",
+        ),
+        Index(
+            "ix_district_climate_day_selection",
+            "admin_unit_id",
+            "period_date",
+            "variable",
+        ),
+    )
+
+
+class ClimateInputDayRecord(Base):
+    """One day of a day-grain input window, at a known lag.
+
+    ``lag_index`` 0 is the target day and counts backwards, matching the
+    ``newest_first`` ordering the model manifests declare.
+    """
+
+    __tablename__ = "climate_input_day"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    climate_input_window_id: Mapped[int] = mapped_column(
+        ForeignKey("climate_input_window.id", ondelete="CASCADE"), nullable=False
+    )
+    district_climate_day_id: Mapped[int] = mapped_column(
+        ForeignKey("district_climate_day.id"), nullable=False
+    )
+    lag_index: Mapped[int] = mapped_column(nullable=False)
+
+    window: Mapped[ClimateInputWindowRecord] = relationship(back_populates="days")
+    climate_value: Mapped[DistrictClimateDay] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint(
+            "climate_input_window_id",
+            "lag_index",
+            name="uq_climate_input_window_day_lag",
+        ),
+        UniqueConstraint(
+            "climate_input_window_id",
+            "district_climate_day_id",
+            name="uq_climate_input_window_day_value",
+        ),
+    )
+
+
 class ModelRelease(Base):
     """One immutable, versioned model release supplied by a modelling team."""
 
@@ -544,6 +631,14 @@ class ClimateInputWindowRecord(Base):
         ForeignKey("admin_unit.id"), nullable=False
     )
     target_end_month: Mapped[date] = mapped_column(Date, nullable=False)
+    # "month" or "day". A window records exactly which observations were fed
+    # to a model, and the two model families read different grains, so the
+    # grain has to be part of the record rather than inferred from which
+    # member list happens to be populated.
+    grain: Mapped[str] = mapped_column(String(16), nullable=False, default="month")
+    # The last day of a day-grain window. Null for month-grain windows, whose
+    # target is already fully described by target_end_month.
+    target_end_date: Mapped[date | None] = mapped_column(Date)
     input_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     contract_version: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -551,6 +646,9 @@ class ClimateInputWindowRecord(Base):
     )
 
     months: Mapped[list[ClimateInputMonthRecord]] = relationship(
+        back_populates="window", cascade="all, delete-orphan"
+    )
+    days: Mapped[list[ClimateInputDayRecord]] = relationship(
         back_populates="window", cascade="all, delete-orphan"
     )
 
@@ -924,6 +1022,177 @@ class HealthImpact(Base):
         Index(
             "ix_health_impact_climate_run",
             "climate_run_id",
+        ),
+    )
+
+
+class PredictionResult(Base):
+    """One model result, keyed by what actually identifies it.
+
+    The sibling of :class:`PredictionRequestRecord`, and the division of
+    labour between them is the point: a request records *a job* - who asked,
+    when, its lease, its attempts, its result payload - while a row here
+    records *a fact about a place and a month*, independent of who asked for
+    it or on which day.
+
+    That split exists because request identity legitimately includes the
+    requester and the submission date (see ``request_key``), so the same month
+    forks a new request row per user per day. Reading predictions out of those
+    rows meant scanning every completed request for a user and filtering in
+    Python, and meant one planner could never see a month another had already
+    computed. The grain below is the answer to "has this month been computed?"
+    in a form SQL can answer.
+
+    Deliberately carries no ``requested_by_user_id``: a result is shared.
+    ``health_impact`` is left alone for the exposure-response direction it was
+    designed for - its grain has no outcome, and it cannot be written at all
+    without a fitted ERF row.
+    """
+
+    __tablename__ = "prediction_result"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    admin_unit_id: Mapped[int] = mapped_column(
+        ForeignKey("admin_unit.id", ondelete="CASCADE"), nullable=False
+    )
+    outcome: Mapped[str] = mapped_column(String(64), nullable=False)
+    model_release_id: Mapped[str] = mapped_column(
+        ForeignKey("model_release.id"), nullable=False
+    )
+    valid_month: Mapped[date] = mapped_column(Date, nullable=False)
+    scenario: Mapped[str] = mapped_column(String(32), nullable=False)
+    horizon: Mapped[str] = mapped_column(String(16), nullable=False)
+    # Part of the grain: a prediction for the middle trimester is a different
+    # prediction from one for the final trimester, and leaving it out would
+    # let one silently overwrite the other. ``0`` means the model has no
+    # pregnancy window at all (under five), rather than NULL - Postgres treats
+    # NULLs as distinct in a unique constraint, so a nullable column here
+    # would stop the grain from constraining anything for those models.
+    pregnancy_window: Mapped[int] = mapped_column(
+        nullable=False, default=0, server_default="0"
+    )
+
+    # Floats, not milli-integers: the scorer returns floats and the dashboard
+    # renders them, so rounding on the way in would make the stored number
+    # disagree with the one already shown.
+    odds_ratio: Mapped[float] = mapped_column(Float, nullable=False)
+    ci95_low: Mapped[float] = mapped_column(Float, nullable=False)
+    ci95_high: Mapped[float] = mapped_column(Float, nullable=False)
+    # Computed once, with the below-reference clamp applied, so the stored
+    # value is the value on screen rather than a second opinion.
+    attributable_fraction_milli: Mapped[int] = mapped_column(nullable=False)
+
+    reference_temperature_c: Mapped[float | None] = mapped_column(Float)
+    reference_kind: Mapped[str | None] = mapped_column(String(32))
+    on_training_support: Mapped[bool] = mapped_column(nullable=False, default=True)
+    warning: Mapped[str | None] = mapped_column(Text)
+
+    model_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    model_artifact_sha256: Mapped[str | None] = mapped_column(String(64))
+    # The exposure vector scored, lag 0 first - three months for low birth
+    # weight, four days for under five - and the observed days behind it when
+    # the model reads days.
+    exposure_values_c: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    exposure_dates: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    input_statistic: Mapped[str | None] = mapped_column(String(64))
+    data_label: Mapped[DataLabel] = mapped_column(
+        Enum(DataLabel, name="data_label"), nullable=False
+    )
+
+    climate_input_window_id: Mapped[int | None] = mapped_column(
+        ForeignKey("climate_input_window.id")
+    )
+    # Which job produced this, so a number on screen can be traced back to its
+    # run, its lease and its raw result payload.
+    prediction_request_id: Mapped[int | None] = mapped_column(
+        ForeignKey("prediction_request.id", ondelete="SET NULL")
+    )
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    admin_unit: Mapped[AdminUnit] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint(
+            "admin_unit_id",
+            "outcome",
+            "model_release_id",
+            "valid_month",
+            "scenario",
+            "horizon",
+            "pregnancy_window",
+            name="uq_prediction_result_grain",
+        ),
+        Index(
+            "ix_prediction_result_dashboard_read",
+            "admin_unit_id",
+            "outcome",
+            "valid_month",
+        ),
+    )
+
+
+class ClimateIngestionJob(Base):
+    """One operator-triggered climate pull, so it can be watched.
+
+    Climate used to arrive only as a side effect of asking for a prediction,
+    which made a slow Copernicus queue look like a broken dashboard. This is
+    the same work asked for deliberately, with somewhere for the UI to read
+    progress from - the API cannot hold the request open while it runs,
+    because the web proxy times out after 15 seconds and a pull takes minutes.
+
+    Scoped to a country rather than an area: one download covers every
+    deployed area in it, which is the whole reason the bulk path exists.
+    """
+
+    __tablename__ = "climate_ingestion_job"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    country_code: Mapped[str] = mapped_column(String(8), nullable=False)
+    #: Months requested, as "YYYY-MM" strings, oldest first.
+    months: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="queued", server_default="queued"
+    )
+    stage: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="queued", server_default="queued"
+    )
+    #: Progress, so a country of 47 areas does not look stalled while it works.
+    areas_total: Mapped[int] = mapped_column(nullable=False, default=0)
+    areas_done: Mapped[int] = mapped_column(nullable=False, default=0)
+    climate_run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("climate_run.id", ondelete="SET NULL")
+    )
+    requested_by_user_id: Mapped[str | None] = mapped_column(String(128))
+    dagster_run_id: Mapped[str | None] = mapped_column(String(64))
+    error_code: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('queued','running','completed','failed')",
+            name="ck_climate_ingestion_job_status",
+        ),
+        Index(
+            "ix_climate_ingestion_job_live",
+            "country_code",
+            "status",
         ),
     )
 
