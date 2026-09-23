@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
 from typing import Literal, Mapping, NoReturn, Sequence
 
@@ -245,17 +245,6 @@ def build_climate_input_window(
         records=validated,  # type: ignore[arg-type]
         input_hash=_hash_payload(payload),
     )
-
-
-def with_freshness(
-    record: MonthlyClimateRecord,
-    *,
-    status: ClimateFreshnessStatus,
-    fresh_until: datetime | None = None,
-) -> MonthlyClimateRecord:
-    """Return a copy when an adapter refresh check changes freshness metadata."""
-
-    return replace(record, freshness_status=status, fresh_until=fresh_until)
 
 
 def _record_payload(record: MonthlyClimateRecord) -> dict[str, object]:

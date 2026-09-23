@@ -102,9 +102,64 @@ result = email_service.send_best_effort(message)
 transport failures without logging the recipient or message body. Use `send`
 instead when the caller must handle a delivery failure.
 
+## Monthly dashboard reads
+
+`GET /risk/{geography_id}/monthly` returns ERA5 monthly maximum temperature
+and precomputed LBW health impacts keyed by `YYYY-MM`. Pass the selected
+place's `AppGeography.id` directly, including for a division. Authentication,
+reader roles and geography scope are enforced. Optional `?month=2026-09`
+selects one calendar month; invalid month keys return 422.
+
+Each `months` entry contains:
+
+- `temperature`: `tmax_monthly_max_c`, `unit` (`degC`), source, run ID and
+  data label, or `null` if no ERA5 MAX observation is available.
+- `health_impacts`: persisted LBW results for that exact `valid_month`, with
+  scenario, horizon, run ID, attributable fraction and attributable number.
+  Fraction units follow the existing fixed-point contract: `130` milli is
+  `0.130`, displayed as `13.0%`. An empty array means no computed result;
+  zero means a computed zero. A null attributable number remains unknown.
+
+The month list is the sorted union of available observations and impacts.
+Scenarios/horizons are never collapsed into one estimate, and gaps are not
+interpolated. Temperature revisions prefer the newest `generated_at`, then
+run ID. The ERA5 loader already persists both MAX and mean, so no migration
+or data rewrite is needed. This endpoint never falls back to mean temperature.
+
+MAX uses the existing ERA5 aggregation: hourly temperature to daily maximum
+per cell, cosine-latitude weighted spatial mean over the selected area, then
+the maximum of those daily area values within each calendar month. It is
+neither the mean of daily maxima nor the maximum over the whole history.
+
+The LBW dashboard uses this endpoint for month navigation. Stored health
+impacts retain the existing OR-based AF approximation described in
+`chart/health_impact/derivation.py`; they are not recalculated from the displayed
+observation. Prediction input windows still select `tmax_monthly_mean_c` in
+`chart/climate/input_windows.py`, and the canonical model input contract still
+requires that variable. Aligning those model inputs with the September 10
+meeting's MAX requirement is separate from this read/display change and
+requires updating the source adapters and validating the model contract.
+
 ## Tests
 
 ```bash
 python -m pytest core/tests -q
 python -m pytest orchestration/tests -q
 ```
+
+The monthly response also includes `prediction` for the signed-in user's completed,
+observed LBW request ending in that month. This reads the current model registry's
+durable result even when no legacy `erf_parameters` / `health_impact` row exists.
+It does not expose another user's saved requests. Forecasts, projections, sample
+inputs, and other pregnancy windows are excluded from this observed estimate.
+`input_statistic` identifies the existing model contract, and `fraction_method`
+identifies the positive-excess odds-ratio approximation; missing case counts remain
+unknown.
+
+The dashboard offers the last twelve complete calendar months and any already
+stored months. For eligible model areas and planning roles, selecting a missing
+month submits the existing durable prediction request, polls it, and rereads the
+monthly results. Preparation continues in Dagster after navigation. Failure offers
+a retry; the temperature scenario tool remains available while there are no
+monthly results. This preparation uses the model's existing three-month mean-Tmax
+input contract while the temperature display reads the separate ERA5 monthly peak.

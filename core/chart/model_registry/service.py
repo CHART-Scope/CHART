@@ -10,6 +10,7 @@ from typing import cast
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from chart.shared.outcomes import DEFAULT_OUTCOME
 from chart.shared.db.models import (
     ActiveModelAssignment,
     AdminUnit,
@@ -38,7 +39,7 @@ class ActiveModelMapping:
     model_file: str
     artifact_sha256: str
     validated_pregnancy_windows: tuple[PregnancyWindow, ...]
-    outcome: str = "lbw"
+    outcome: str = DEFAULT_OUTCOME
     input_spec: dict | None = None
 
 
@@ -94,6 +95,23 @@ def register_model_release(
         merged_input_spec = _merge_additive_presentation(
             existing.input_spec or {}, payload["input_spec"]
         )
+        # The manifest owns the input contract. `_input_contract_identity`
+        # holds the immutable part - the exposure vector's name, arity,
+        # spacing and order - and the check above has already established the
+        # stored and incoming contracts agree on it. Everything else in there
+        # is explicitly allowed to change on the same release id:
+        # `batch_status` flips when a modeller signs off, `batch_profile`
+        # changes when we learn how the model was actually fitted, prose gets
+        # reworded, and a legacy {temperature_input, months_required} pair
+        # becomes the typed shape.
+        #
+        # Preserving the stored contract instead made those changes
+        # unreachable: the compatibility check accepted them and the write
+        # path discarded them, so a manifest edit only ever took effect on a
+        # database that had never seen the release.
+        manifest_contract = payload["input_spec"].get("input_contract")
+        if manifest_contract is not None:
+            merged_input_spec["input_contract"] = manifest_contract
         if merged_input_spec != existing.input_spec:
             # editorial_reference_temperature_c re-anchors the R DLNM, so
             # a change here silently shifts every subsequent OR/CI on the
@@ -166,7 +184,7 @@ def get_active_model_mapping(
     *,
     admin_unit_id: int,
     module: str = "prediction",
-    outcome: str = "lbw",
+    outcome: str = DEFAULT_OUTCOME,
 ) -> ActiveModelMapping | None:
     row = session.execute(
         select(ModelRelease, ModelAreaMapping)
@@ -206,7 +224,7 @@ def get_active_model_mappings(
     admin_unit_ids: list[int],
     *,
     module: str = "prediction",
-    outcome: str = "lbw",
+    outcome: str = DEFAULT_OUTCOME,
 ) -> dict[int, ActiveModelMapping]:
     if not admin_unit_ids:
         return {}
@@ -499,19 +517,71 @@ def _model_file_identities(model_files: list[dict]) -> list[tuple[str, str]]:
     return sorted((entry["filename"], entry["sha256"]) for entry in model_files)
 
 
-def _input_spec_is_compatible(current: dict, expected: dict) -> bool:
-    """Permit presentation revisions on an existing release.
+def _input_contract_identity(contract: dict) -> tuple:
+    """The part of an input contract that decides what the scorer is handed.
 
-    Runtime, model input, and model output contracts remain immutable —
-    those determine what the scorer is and what it returns. Presentation
-    is UI metadata (labels, icons, editorial reference anchors) and the
-    latest manifest is the source of truth: values may update as well as
-    be added. Otherwise a label rebrand or figure swap would force every
+    A release id must always mean the same model, so the exposure vector's
+    shape - variable name, arity, spacing and order - is immutable. The prose
+    around it is not: descriptions get reworded, supersedes lists grow, and
+    ``batch_status`` flips from blocked to cleared when a modeller signs off.
+    Comparing the raw dict treated all of those as model changes.
+
+    The legacy ``{temperature_input, months_required}`` shape could only ever
+    express arity, so it compares on arity alone. That lets a release migrate
+    from the legacy pair to the typed contract without a version bump, which
+    is a description becoming precise rather than a model changing.
+    """
+
+    if not contract:
+        return ()
+    variables = contract.get("variables")
+    if variables is None:
+        months = contract.get("months_required")
+        return ((None, months, "month", "newest_first"),) if months else ()
+    return tuple(
+        (
+            variable.get("name"),
+            variable.get("length"),
+            variable.get("interval", "month"),
+            variable.get("order", "newest_first"),
+        )
+        for variable in variables
+    )
+
+
+def _is_legacy_contract(contract: dict) -> bool:
+    return bool(contract) and contract.get("variables") is None
+
+
+def _input_contracts_are_compatible(current: dict, expected: dict) -> bool:
+    current_identity = _input_contract_identity(current)
+    expected_identity = _input_contract_identity(expected)
+    if _is_legacy_contract(current) or _is_legacy_contract(expected):
+        # The legacy shape carries no variable name, so only arity and spacing
+        # can be compared. Anything more would reject a faithful migration.
+        return [item[1:] for item in current_identity] == [
+            item[1:] for item in expected_identity
+        ]
+    return current_identity == expected_identity
+
+
+def _input_spec_is_compatible(current: dict, expected: dict) -> bool:
+    """Permit presentation and prose revisions on an existing release.
+
+    Runtime, the exposure vector's shape, and the output contract remain
+    immutable - those determine what the scorer is and what it returns.
+    Presentation is UI metadata (labels, icons, editorial reference anchors)
+    and the latest manifest is the source of truth: values may update as well
+    as be added. Otherwise a label rebrand or figure swap would force every
     caller to bump the release id even though the fitted parameters and
     output shape are unchanged.
     """
 
-    for key in ("input_contract", "output_contract", "runtime"):
+    if not _input_contracts_are_compatible(
+        current.get("input_contract") or {}, expected.get("input_contract") or {}
+    ):
+        return False
+    for key in ("output_contract", "runtime"):
         if current.get(key) != expected.get(key):
             return False
     return True
@@ -599,15 +669,18 @@ def _release_payload(spec: ModelReleaseSpec) -> dict:
             for item in spec.model_files
         ],
         "input_spec": {
+            # Stored as plain JSON so the persisted spec stays readable and
+            # comparable without importing the schema.
             "input_contract": (
-                {
-                    "temperature_input": spec.temperature_input,
-                    "months_required": spec.months_required,
-                }
-                if spec.temperature_input is not None
-                else spec.input_contract
+                spec.input_contract.model_dump(mode="json", exclude_none=True)
+                if spec.input_contract is not None
+                else None
             ),
-            "output_contract": spec.output_contract,
+            "output_contract": (
+                spec.output_contract.model_dump(mode="json", exclude_none=True)
+                if spec.output_contract is not None
+                else None
+            ),
             "presentation": (
                 spec.presentation.model_dump(mode="json")
                 if spec.presentation is not None

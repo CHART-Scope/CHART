@@ -45,7 +45,7 @@ def test_review_model_requires_explicit_local_enablement(monkeypatch) -> None:
     assert configs_for_country("KE") == ()
 
     monkeypatch.setenv("CHART_ENABLE_REVIEW_MODELS", "true")
-    assert len(configs_for_country("KE")) == 1
+    assert len(configs_for_country("KE")) == 2
     kenya_ids = deployed_geography_ids_by_country()["KE"]
     assert len(kenya_ids) == 48
     assert "geo-ke" in kenya_ids
@@ -294,11 +294,13 @@ def test_new_kenya_release_replaces_an_existing_review_release() -> None:
             update={
                 "id": "lbw-ke-climate-zone-0.1.1-review",
                 "version": "0.1.1-review",
-                "input_contract": {
-                    key: value
-                    for key, value in (current.input_contract or {}).items()
-                    if key != "supersedes_release_ids"
-                },
+                "input_contract": (
+                    current.input_contract.model_copy(
+                        update={"supersedes_release_ids": []}
+                    )
+                    if current.input_contract is not None
+                    else None
+                ),
             }
         )
         register_model_release(session, old, activate=False)
@@ -413,8 +415,11 @@ def test_kenya_onboarding_warms_and_activates_kajiado(monkeypatch) -> None:
         )
 
     assert status.completed is True
+    # Every shipped release is warmed: the selected country's releases first,
+    # then the rest.
     assert [call.args[0].id for call in warm.call_args_list] == [
         "lbw-ke-climate-zone-0.2.1-review",
+        "under5-mortality-ke-climate-zone-0.1.0-review",
         "lbw-mp-1.0.1-compact-review",
         "under5-mortality-mp-0.1.0-review",
     ]
@@ -459,7 +464,13 @@ def test_kenya_onboarding_warms_and_activates_kajiado(monkeypatch) -> None:
         assert children == []
 
 
-def test_kenya_onboarding_rejects_county_without_model_mapping(monkeypatch) -> None:
+def test_turkana_is_onboardable_once_under_five_covers_its_zone(monkeypatch) -> None:
+    """Turkana has no LBW block but the under-5 release fits its zone.
+
+    Kenya LBW has no North-western block, so Turkana was previously rejected at
+    onboarding. The under-5 climate-zone release fits all six zones, so the
+    county is now supported for at least one outcome and must be selectable.
+    """
     monkeypatch.setenv("CHART_ENABLE_REVIEW_MODELS", "true")
     setup = CompleteSetupInput.model_validate(
         {
@@ -481,10 +492,8 @@ def test_kenya_onboarding_rejects_county_without_model_mapping(monkeypatch) -> N
         }
     )
 
-    with pytest.raises(SetupError) as caught:
-        _validate_setup_geographies(setup)
-
-    assert caught.value.code == "SETUP_GEOGRAPHY_MODEL_UNAVAILABLE"
+    # No SetupError: under-5 covers North-western, so the county is supported.
+    _validate_setup_geographies(setup)
 
 
 def test_kenya_onboarding_fails_instead_of_activating_an_unwarmed_model(
@@ -537,4 +546,58 @@ def test_kenya_onboarding_fails_instead_of_activating_an_unwarmed_model(
     with factory() as session:
         assert (
             session.scalar(select(AdminUnit).where(AdminUnit.code == "kajiado")) is None
+        )
+
+
+def test_re_registering_adopts_the_manifest_batch_profile() -> None:
+    """A changed batch_profile must reach the database, not stop at the check.
+
+    `_input_contract_identity` deliberately leaves `batch_profile` out of the
+    immutable part of a contract, so the field is allowed to change on one
+    release id. The write path used to preserve whatever was stored first
+    regardless, so the manifest edit moving under-five off
+    `peak_consecutive_window` was accepted by the compatibility check and then
+    discarded - taking effect only on a database that had never seen the
+    release, and leaving every existing deployment asking for a profile the
+    code no longer supports.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    manifest_path = Path(
+        "pipelines/models/under_five_mortality/model-release.mp.review.json"
+    )
+
+    with factory() as session:
+        bootstrap_place_from_release(
+            session, model_release_path=manifest_path, activate=False
+        )
+        spec = ModelReleaseSpec.model_validate(
+            json.loads(manifest_path.read_text(encoding="utf-8"))
+        )
+        stored = session.get(ModelRelease, spec.id)
+        assert stored is not None
+
+        # Put the row back into the state an older deployment left it in.
+        spec_dict = dict(stored.input_spec)
+        contract = dict(spec_dict["input_contract"])
+        contract["batch_profile"] = "peak_consecutive_window"
+        spec_dict["input_contract"] = contract
+        stored.input_spec = spec_dict
+        flag_modified(stored, "input_spec")
+        session.flush()
+
+        register_model_release(session, spec, activate=False)
+        session.flush()
+
+        stored = session.get(ModelRelease, spec.id)
+        assert (
+            stored.input_spec["input_contract"]["batch_profile"]
+            == "trailing_window_mean"
         )

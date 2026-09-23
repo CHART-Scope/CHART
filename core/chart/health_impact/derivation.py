@@ -45,15 +45,37 @@ def relative_risk_milli(odds_ratio: float) -> int:
     return _clamp_milli(odds_ratio * 1000)
 
 
-def attributable_fraction_milli(odds_ratio: float) -> int:
+def attributable_fraction_milli(
+    odds_ratio: float,
+    *,
+    temperature_c: float | None = None,
+    reference_temperature_c: float | None = None,
+) -> int:
     """Return AF = max(0, (OR - 1) / OR) as milli-integer.
 
     Zero when OR <= 1 (no attributable share when exposure is neutral
     or protective). The formula assumes rare outcomes; see the module
     docstring.
+
+    Pass ``temperature_c`` and ``reference_temperature_c`` whenever the
+    caller knows them. Below the reference there is no heat to attribute
+    anything to, so the fraction is zero regardless of what the fitted
+    spline returns there - a division fit can come back with OR > 1 at a
+    cooler-than-reference exposure, and reporting that as a heat-
+    attributable share inverts the public-health message. This mirrors
+    the ``positive_excess_only`` policy already applied to the signed
+    odds change (see docs/modeling.md). Both arguments are optional so
+    callers that genuinely have no exposure context keep the OR-only
+    behaviour rather than silently getting a clamp they did not ask for.
     """
 
     if odds_ratio <= 1:
+        return 0
+    if (
+        temperature_c is not None
+        and reference_temperature_c is not None
+        and temperature_c < reference_temperature_c
+    ):
         return 0
     fraction = (odds_ratio - 1) / odds_ratio
     return _clamp_milli(fraction * 1000)

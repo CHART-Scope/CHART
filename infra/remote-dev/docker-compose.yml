@@ -1,0 +1,57 @@
+name: chart-dev
+
+# Private development dependencies. Never merge this with infra/aws Compose.
+services:
+  postgres:
+    build:
+      context: ../postgres
+    image: chart-dev-postgis:16
+    command: ["postgres", "-c", "cluster_name=chart-dev"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chart
+      POSTGRES_USER: chart
+      POSTGRES_PASSWORD: chart
+    ports:
+      - "127.0.0.1:15434:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../postgres/init-keycloak.sql:/docker-entrypoint-initdb.d/10-keycloak.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chart -d chart"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.6.1
+    restart: unless-stopped
+    command: ["start-dev", "--import-realm"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/chart_keycloak
+      KC_DB_USERNAME: chart_keycloak
+      KC_DB_PASSWORD: chart_keycloak
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME: http://127.0.0.1:8080
+      KC_HOSTNAME_STRICT: "true"
+    ports:
+      - "127.0.0.1:18080:8080"
+    volumes:
+      - ../keycloak/chart-realm.json:/opt/keycloak/data/import/chart-realm.json:ro
+      - ../keycloak/themes/chart:/opt/keycloak/themes/chart:ro
+
+  mailpit:
+    image: axllent/mailpit:v1.30.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:11025:1025"
+      - "127.0.0.1:18025:8025"
+
+volumes:
+  postgres-data:

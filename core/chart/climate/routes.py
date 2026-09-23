@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from datetime import date, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from sqlalchemy import select
 
@@ -42,6 +45,13 @@ from .service import (
     get_planning_options,
     list_locations,
     preview,
+)
+from .ingestion_jobs import (
+    CountryCoverage,
+    IngestionJobView,
+    create_job,
+    list_jobs,
+    load_coverage,
 )
 from .what_if import score_what_if
 
@@ -230,6 +240,123 @@ def _require_geography_only_access(user: CurrentUserContext, geography_id: str) 
     if path is None:
         raise ClimateServiceError("GEOGRAPHY_NOT_FOUND", 404)
     require_geography_access(user, path)
+
+
+class IngestionJobRequest(BaseModel):
+    """Ask for one country's climate data.
+
+    Months are optional: omitted, the last twelve complete months are used,
+    which is the range the dashboard's picker opens on.
+    """
+
+    country_code: str = Field(min_length=2, max_length=8)
+    months: list[str] = Field(default_factory=list)
+
+
+@router.get(
+    "/coverage",
+    response_model=list[CountryCoverage],
+    summary="Read which places already hold climate data",
+)
+def read_coverage(
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+) -> list[CountryCoverage]:
+    """Per country and per area: how many months of observations are held."""
+    require_any_role(user, {"chart_admin"})
+    with get_session_factory()() as session:
+        return load_coverage(session)
+
+
+@router.post(
+    "/ingestion-jobs",
+    response_model=IngestionJobView,
+    status_code=202,
+    summary="Queue one country-wide climate pull",
+)
+def create_ingestion_job(
+    request: IngestionJobRequest,
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+) -> IngestionJobView:
+    """Queue the pull and return immediately; progress is read by polling.
+
+    Accepted rather than performed: a pull takes minutes and the web proxy
+    times out after fifteen seconds. A country already pulling hands back the
+    job in flight rather than starting a second download of the same grid.
+    """
+    require_any_role(user, {"chart_admin"})
+    months = _requested_months(request.months)
+    with get_session_factory()() as session:
+        job, _created = create_job(
+            session,
+            country_code=request.country_code.upper(),
+            months=months,
+            requested_by_user_id=user.user_id,
+        )
+        view = IngestionJobView.model_validate(job, from_attributes=True)
+        session.commit()
+    return view
+
+
+@router.get(
+    "/ingestion-jobs",
+    response_model=list[IngestionJobView],
+    summary="Read recent climate pulls and their progress",
+)
+def read_ingestion_jobs(
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    country_code: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+) -> list[IngestionJobView]:
+    """Newest first, so a caller can poll the one it just created."""
+    require_any_role(user, {"chart_admin"})
+    with get_session_factory()() as session:
+        return list_jobs(
+            session,
+            country_code=country_code.upper() if country_code else None,
+            limit=limit,
+        )
+
+
+#: ERA5 monthly fields appear in the first days of the month after the one
+#: they cover. "A few days in arrears" therefore rules out the month in
+#: progress *and*, early in a month, the one that has just ended: asking for
+#: it in the first week returns nothing and fails the job.
+ERA5_PUBLICATION_LAG_DAYS = 6
+
+
+def newest_complete_month(today: date) -> date:
+    """The newest month ERA5 can actually be expected to have published."""
+    previous = (date(today.year, today.month, 1) - timedelta(days=1)).replace(day=1)
+    if today.day <= ERA5_PUBLICATION_LAG_DAYS:
+        return (previous - timedelta(days=1)).replace(day=1)
+    return previous
+
+
+def _requested_months(raw: list[str]) -> list[date]:
+    """Parse "YYYY-MM" strings, or default to the last twelve complete months.
+
+    ERA5 lands a few days in arrears, so neither the month in progress nor -
+    in the first days of a month - the month just ended is requested.
+    """
+    if raw:
+        months: list[date] = []
+        for item in raw:
+            try:
+                year, month = item.split("-")
+                months.append(date(int(year), int(month), 1))
+            except (ValueError, AttributeError) as error:
+                raise HTTPException(
+                    status_code=422, detail="CLIMATE_MONTH_INVALID"
+                ) from error
+        return sorted(set(months))
+
+    newest = newest_complete_month(date.today())
+    months = []
+    cursor = newest
+    for _ in range(12):
+        months.append(cursor)
+        cursor = (cursor - timedelta(days=1)).replace(day=1)
+    return sorted(months)
 
 
 def _http_error(error: ClimateServiceError) -> HTTPException:

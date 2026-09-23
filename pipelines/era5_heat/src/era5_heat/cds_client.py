@@ -95,9 +95,7 @@ def _make_client():
     try:
         import cdsapi
     except ImportError as exc:
-        raise RuntimeError(
-            "cdsapi is not installed; run `pip install cdsapi`"
-        ) from exc
+        raise RuntimeError("cdsapi is not installed; run `pip install cdsapi`") from exc
 
     url = os.environ.get("CDSAPI_URL")
     key = os.environ.get("CDSAPI_KEY")
@@ -173,6 +171,7 @@ def download_year(
 
     if not no_cache:
         import cdsapi  # for version stamp
+
         _atomic_write_text(
             meta_path,
             json.dumps(
@@ -215,7 +214,8 @@ def download_years(
                 bbox,
                 cache_dir,
                 months=(months_by_year or {}).get(y),
-                no_cache=no_cache, refresh=refresh,
+                no_cache=no_cache,
+                refresh=refresh,
             ): y
             for y in years
         }

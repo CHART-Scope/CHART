@@ -63,8 +63,17 @@ def test_v2_release_resolves_shared_mp_place_set() -> None:
             "outcome": "under_5_mortality",
             "version": "2.0.0",
             "base_uri": "s3://chart-models/under5/2.0.0",
+            "input_contract": {
+                "variables": [
+                    {
+                        "name": "tmax_lag",
+                        "unit": "Celsius",
+                        "order": "newest_first",
+                        "length": 3,
+                    }
+                ]
+            },
             "runtime": {"adapter": "compact_r_registry", "artifact_type": "rds"},
-            "input_contract": {"variables": [{"name": "tmax_lag"}]},
             "model_files": [{"filename": "under5.rds", "sha256": "a" * 64}],
             "place_set": {
                 "id": "in-mp-state-divisions",
@@ -106,8 +115,16 @@ def test_v2_release_rejects_tampered_place_set_checksum() -> None:
                     "outcome": "lbw",
                     "version": "2.0.0",
                     "base_uri": "s3://chart-models/lbw/2.0.0",
-                    "temperature_input": "three monthly temperatures",
-                    "months_required": 3,
+                    "input_contract": {
+                        "variables": [
+                            {
+                                "name": "tmax_lag",
+                                "unit": "Celsius",
+                                "order": "newest_first",
+                                "length": 3,
+                            }
+                        ]
+                    },
                     "model_files": [{"filename": "lbw.rds", "sha256": "a" * 64}],
                     "place_set": {
                         "id": "ke-counties",
@@ -144,11 +161,20 @@ def test_v2_release_bootstraps_shared_places_and_only_covered_models(
                 "outcome": "under_5_mortality",
                 "version": "2.0.0",
                 "base_uri": "s3://chart-models/under5/2.0.0",
+                "input_contract": {
+                    "variables": [
+                        {
+                            "name": "tmax_lag",
+                            "unit": "Celsius",
+                            "order": "newest_first",
+                            "length": 3,
+                        }
+                    ]
+                },
                 "runtime": {
                     "adapter": "compact_r_registry",
                     "artifact_type": "rds",
                 },
-                "input_contract": {"variables": [{"name": "tmax_lag"}]},
                 "model_files": [{"filename": "under5.rds", "sha256": "a" * 64}],
                 "place_set": {
                     "id": "in-mp-state-divisions",
@@ -215,11 +241,20 @@ def test_v2_place_set_drives_setup_parent_and_supported_child(
                 "outcome": "under_5_mortality",
                 "version": "2.0.0",
                 "base_uri": "s3://chart-models/under5/2.0.0",
+                "input_contract": {
+                    "variables": [
+                        {
+                            "name": "tmax_lag",
+                            "unit": "Celsius",
+                            "order": "newest_first",
+                            "length": 3,
+                        }
+                    ]
+                },
                 "runtime": {
                     "adapter": "compact_r_registry",
                     "artifact_type": "rds",
                 },
-                "input_contract": {"variables": [{"name": "tmax_lag"}]},
                 "model_files": [{"filename": "under5.rds", "sha256": "a" * 64}],
                 "place_set": {
                     "id": "in-mp-state-divisions",

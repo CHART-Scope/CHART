@@ -93,9 +93,17 @@ def call_association_r(
     model_sha256: str,
     model_area: str,
     outcome: str,
-    exposure_values_c: tuple[float, ...],
+    exposure_profiles_c: tuple[tuple[float, ...], ...],
     reference_temperature_c: float | None = None,
 ) -> dict:
+    # R's jsonlite turns a nested array into a matrix and a flat one into a
+    # vector, and the scorer reads either, so a single-profile request stays
+    # byte-for-byte what it always was.
+    exposure: list[float] | list[list[float]]
+    if len(exposure_profiles_c) == 1:
+        exposure = list(exposure_profiles_c[0])
+    else:
+        exposure = [list(profile) for profile in exposure_profiles_c]
     body: dict[str, object] = {
         "release_id": model_release_id,
         "model_file": model_file,
@@ -103,7 +111,7 @@ def call_association_r(
         "model_sha256": model_sha256,
         "area": model_area,
         "outcome": outcome,
-        "exposure_values_c": list(exposure_values_c),
+        "exposure_values_c": exposure,
     }
     if reference_temperature_c is not None:
         body["ref"] = float(reference_temperature_c)

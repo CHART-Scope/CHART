@@ -53,8 +53,13 @@ def list_geographies(
 
     with get_session_factory()() as session:
         configured_ids = deployed_geography_ids_by_country()
+        # Only the admin unit's id is ever read below. Selecting the whole
+        # entity also loaded AdminUnit.boundary - a MULTIPOLYGON per row - so
+        # every call shipped and parsed the full national geometry just to
+        # discard it, which is what made this endpoint take ~6s and time the
+        # web proxy out at 15s.
         rows = session.execute(
-            select(AppGeography, AdminUnit)
+            select(AppGeography, AdminUnit.id)
             .outerjoin(AdminUnit, AdminUnit.app_geography_id == AppGeography.id)
             .order_by(
                 AppGeography.country_code,
@@ -64,7 +69,7 @@ def list_geographies(
         ).all()
         models = get_active_model_mappings(
             session,
-            [admin_unit.id for _, admin_unit in rows if admin_unit is not None],
+            [admin_unit_id for _, admin_unit_id in rows if admin_unit_id is not None],
         )
         all_model_rows = session.execute(
             select(
@@ -97,7 +102,7 @@ def list_geographies(
             )
         parent_ids = {row.parent_id for row, _ in rows if row.parent_id}
         response = []
-        for row, admin_unit in rows:
+        for row, admin_unit_id in rows:
             country_ids = configured_ids.get(row.country_code)
             if country_ids is not None and row.id not in country_ids:
                 continue
@@ -108,8 +113,8 @@ def list_geographies(
             # direct model but with model-backed divisions is still
             # usable as a parent.
             is_leaf = row.id not in parent_ids
-            has_any_model = admin_unit is not None and bool(
-                models_by_admin.get(admin_unit.id)
+            has_any_model = admin_unit_id is not None and bool(
+                models_by_admin.get(admin_unit_id)
             )
             if not include_unsupported and is_leaf and not has_any_model:
                 continue
@@ -125,16 +130,16 @@ def list_geographies(
                     path=row.path,
                     sortOrder=row.sort_order,
                     supportsPrediction=(
-                        admin_unit is not None and admin_unit.id in models
+                        admin_unit_id is not None and admin_unit_id in models
                     ),
                     modelAreaName=(
-                        models[admin_unit.id].model_area_name
-                        if admin_unit is not None and admin_unit.id in models
+                        models[admin_unit_id].model_area_name
+                        if admin_unit_id is not None and admin_unit_id in models
                         else None
                     ),
                     models=(
-                        models_by_admin.get(admin_unit.id, [])
-                        if admin_unit is not None
+                        models_by_admin.get(admin_unit_id, [])
+                        if admin_unit_id is not None
                         else []
                     ),
                 )
