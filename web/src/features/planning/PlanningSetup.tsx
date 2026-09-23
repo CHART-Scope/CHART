@@ -3,6 +3,7 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 
 import { Button } from "@/components/Button";
+import { InlineSelect } from "@/components/InlineSelect";
 import { Icon } from "@/components/Icon";
 import type { GeographyRecord, ModelCatalogEntry } from "@/lib/planningClient";
 import type { PlanningSelection } from "./planningWireframe";
@@ -280,22 +281,18 @@ function PillSelect({
 }) {
   const disabled = options.length === 0;
   return (
-    <span className={styles.modelPill} title={hint}>
-      <span className={styles.modelPillLabel}>{label}</span>
-      <Icon name="chevron-down" size={12} />
-      <select
-        className={styles.modelPillSelect}
+    <span title={hint}>
+      <InlineSelect
         value={value}
-        onChange={(event) => onChange(event.currentTarget.value)}
+        onChange={onChange}
         aria-label={ariaLabel}
         disabled={disabled}
-      >
-        {options.map((option) => (
-          <option key={option.code} value={option.code}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        options={
+          options.length
+            ? options.map((option) => ({ value: option.code, label: option.label }))
+            : [{ value: "", label }]
+        }
+      />
     </span>
   );
 }

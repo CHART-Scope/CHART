@@ -1,0 +1,115 @@
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  max-width: 100%;
+  padding: 4px 10px;
+  border: 1px solid var(--color-nexus-tint);
+  border-radius: 999px;
+  background: var(--color-nexus-tint);
+  color: var(--color-nexus);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.trigger > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trigger:hover:not(:disabled) {
+  border-color: var(--color-nexus);
+}
+.trigger:focus-visible,
+.search:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.trigger:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.chevron {
+  flex: 0 0 auto;
+}
+.popup {
+  position: fixed;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-card);
+  box-shadow: 0 12px 36px rgb(43 45 49 / 16%);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  color: var(--color-charcoal);
+}
+.search {
+  flex-shrink: 0;
+  width: calc(100% - 8px);
+  margin: 4px 4px 8px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--color-charcoal);
+  font: inherit;
+}
+.list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  outline: none;
+}
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.option[data-active] {
+  background: var(--surface-muted);
+}
+.option[aria-selected="true"] {
+  background: var(--color-nexus-tint);
+  color: var(--color-nexus);
+  font-weight: 500;
+}
+.option[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
+}
+.check {
+  width: 16px;
+  flex-shrink: 0;
+  color: var(--color-nexus);
+}
+.group {
+  padding: 12px 12px 5px;
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+}
+.empty {
+  margin: 0;
+  padding: 16px 12px;
+  color: var(--color-text-muted);
+}
+
+@media (pointer: coarse) {
+  .trigger,
+  .option {
+    min-height: 40px;
+  }
+}

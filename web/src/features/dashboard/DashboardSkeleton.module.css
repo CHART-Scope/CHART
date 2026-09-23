@@ -1,0 +1,36 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.contextBar {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(0, 2.2fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+.riskLayout {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.85fr) minmax(0, 1.8fr);
+  gap: var(--space-4);
+}
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .riskLayout {
+    grid-template-columns: 1fr;
+  }
+}

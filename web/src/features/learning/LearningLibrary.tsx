@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { Icon } from "@/components/Icon";
 import {
@@ -11,6 +11,7 @@ import {
 
 import { groupCatalogue } from "./grouping";
 import styles from "./LearningLibrary.module.css";
+import { useLearningPlayer } from "./useLearningPlayer";
 import { PlayerModal } from "./PlayerModal";
 import { ResourceCard } from "./ResourceCard";
 import { useLearningCatalogue } from "./useLearningCatalogue";
@@ -74,8 +75,7 @@ export function LearningLibraryContent({
 }: ContentProps) {
   const [query, setQuery] = useState("");
   const [place, setPlace] = useState<string | null>(null);
-  const [playing, setPlaying] = useState<LearningResource | null>(null);
-  const openedAt = useRef<number | null>(null);
+  const { playing, openPlayer, handleClose } = useLearningPlayer(onWatched);
 
   // Grouped once against the search, so the place pills can show honest
   // counts even while a single place is selected.
@@ -93,26 +93,6 @@ export function LearningLibraryContent({
       section.modules.flatMap((module) => module.items.map((item) => item.slug)),
     ),
   ).size;
-
-  const openPlayer = (resource: LearningResource) => {
-    openedAt.current = Date.now();
-    setPlaying(resource);
-  };
-
-  const handleClose = () => {
-    if (playing && openedAt.current !== null) {
-      // The YouTube embed does not report playback position without the
-      // IFrame API, so time-with-the-player-open is the honest estimate.
-      // Capped at the known duration; a click-and-close records ~nothing.
-      const elapsed = Math.floor((Date.now() - openedAt.current) / 1000);
-      const watched = playing.duration_seconds
-        ? Math.min(elapsed, playing.duration_seconds)
-        : elapsed;
-      if (watched > 0) onWatched?.(playing, watched);
-    }
-    openedAt.current = null;
-    setPlaying(null);
-  };
 
   return (
     <div className={styles.page} data-source={usingFallback ? "fallback" : "api"}>

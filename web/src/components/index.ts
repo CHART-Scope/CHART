@@ -11,6 +11,7 @@ export * from "./Panel";
 export * from "./Pill";
 export * from "./PrecisionBadge";
 export * from "./Select";
+export * from "./Skeleton";
 export * from "./Slider";
 export * from "./StatCardWithBadge";
 export * from "./Stepper";

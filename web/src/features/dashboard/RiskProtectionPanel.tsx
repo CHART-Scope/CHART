@@ -1,5 +1,7 @@
 "use client";
 
+import { type ReactNode } from "react";
+
 import { Icon, type IconName } from "@/components/Icon";
 
 import styles from "./RiskProtectionPanel.module.css";
@@ -30,26 +32,35 @@ const COLUMNS: readonly Column[] = [
 
 export function RiskProtectionPanel({
   outcomeLabel = "Health outcome",
-  figure = "newborn",
+  outcomeControl,
   contextFigure = "pregnant-woman",
   description,
 }: {
   outcomeLabel?: string;
   figure?: IconName;
+  outcomeControl?: ReactNode;
   contextFigure?: IconName;
   description?: string | null;
 }) {
   const columns: readonly RenderedColumn[] = [
-    { ...COLUMNS[0], caption: `Higher ${outcomeLabel.toLowerCase()} risk` },
-    { ...COLUMNS[1], caption: `Lower ${outcomeLabel.toLowerCase()} risk` },
+    {
+      ...COLUMNS[0],
+      caption: `Elevated ${outcomeLabel.toLowerCase() === "low birth weight" ? "LBW" : outcomeLabel.toLowerCase()} risk`,
+    },
+    {
+      ...COLUMNS[1],
+      caption: `Reduced ${outcomeLabel.toLowerCase() === "low birth weight" ? "LBW" : outcomeLabel.toLowerCase()} risk`,
+    },
   ];
   return (
     <section className={styles.panel} aria-labelledby="risk-protection-heading">
       <header>
-        <p className={styles.eyebrow}>Risk vs Protection</p>
+        <p className={styles.eyebrow}>Understanding risk & prevention</p>
       </header>
-      <h2 id="risk-protection-heading" className={styles.visuallyHidden}>
-        How heat exposure and protection affect {outcomeLabel.toLowerCase()}
+      <h2 id="risk-protection-heading" className={styles.question}>
+        How does extreme heat increase the risk of{" "}
+        {outcomeControl ?? outcomeLabel.toLowerCase()} — and how can that risk be
+        reduced?
       </h2>
       <div className={styles.figures}>
         {columns.map((column) => (
@@ -63,11 +74,12 @@ export function RiskProtectionPanel({
               </span>
               {column.eyebrowLabel}
             </span>
-            <Icon name={contextFigure} size={72} className={styles.pregnantIcon} />
-            <span className={styles.arrow} aria-hidden>
-              ↓
+            <Icon name={contextFigure} size={100} className={styles.pregnantIcon} />
+            <span className={styles.population}>
+              {contextFigure === "pregnant-woman"
+                ? "pregnant women"
+                : "children under five"}
             </span>
-            <Icon name={figure} size={44} className={styles.newbornIcon} />
             <p className={styles.figureCaption}>{column.caption}</p>
           </div>
         ))}

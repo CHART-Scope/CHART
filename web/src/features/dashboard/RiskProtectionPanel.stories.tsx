@@ -1,3 +1,5 @@
+import { IconSprite } from "@/components/Icon";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { RiskProtectionPanel } from "./RiskProtectionPanel";
@@ -5,6 +7,14 @@ import { RiskProtectionPanel } from "./RiskProtectionPanel";
 const meta: Meta<typeof RiskProtectionPanel> = {
   title: "Dashboard/RiskProtectionPanel",
   component: RiskProtectionPanel,
+  decorators: [
+    (Story) => (
+      <>
+        <IconSprite />
+        <Story />
+      </>
+    ),
+  ],
   parameters: {
     layout: "padded",
   },

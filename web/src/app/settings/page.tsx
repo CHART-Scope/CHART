@@ -7,8 +7,13 @@ import { AppShell } from "@/components/AppShell";
 import { IconSprite } from "@/components/Icon";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
+
+import { ResetInstallationCard } from "@/features/planning/ResetInstallationCard";
+import styles from "./page.module.css";
 import { RunsStrip } from "@/features/dashboard";
 import {
+  ClimateDataCard,
+  SettingsSkeleton,
   GeographyContextCard,
   ModelHubCard,
   UserManagement,
@@ -18,7 +23,9 @@ import { listGeographies, type GeographyRecord } from "@/lib/planningClient";
 
 export default function SettingsPage() {
   return (
-    <RequireAuth>{(session) => <AuthorizedSettings session={session} />}</RequireAuth>
+    <RequireAuth fallback={<SettingsSkeleton />}>
+      {(session) => <AuthorizedSettings session={session} />}
+    </RequireAuth>
   );
 }
 
@@ -70,27 +77,32 @@ function AuthorizedSettings({ session }: { session: AuthSession }) {
         onSignOut={signOutOfKeycloak}
         userLabel={session.user.username}
       >
-        <GeographyContextCard
-          geographyScopes={session.user.geographyScopes}
-          activeGeographyId={session.user.activeGeographyId}
-        />
-        <ModelHubCard />
-        <UserManagement
-          accessToken={session.accessToken}
-          geographyScopes={session.user.geographyScopes}
-        />
-        {runsGeography ? (
-          <div style={{ marginTop: "var(--space-6)" }}>
-            <RunsStrip
-              geographyId={runsGeography.id}
-              adminUnit={null}
-              accessToken={session.accessToken}
-              linkForRun={(id) =>
-                `/dashboard/${encodeURIComponent(runsGeography.id)}/runs/${id}`
-              }
+        <div className={styles.layout}>
+          <div className={styles.pair}>
+            <GeographyContextCard
+              geographyScopes={session.user.geographyScopes}
+              activeGeographyId={session.user.activeGeographyId}
             />
+            <ModelHubCard />
           </div>
-        ) : null}
+          <ClimateDataCard accessToken={session.accessToken} />
+          <div className={styles.pair}>
+            <UserManagement accessToken={session.accessToken} />
+            {runsGeography ? (
+              <div className={styles.runs}>
+                <RunsStrip
+                  geographyId={runsGeography.id}
+                  adminUnit={null}
+                  accessToken={session.accessToken}
+                  linkForRun={(id) =>
+                    `/dashboard/${encodeURIComponent(runsGeography.id)}/runs/${id}`
+                  }
+                />
+              </div>
+            ) : null}
+          </div>
+          <ResetInstallationCard accessToken={session.accessToken} />
+        </div>
       </AppShell>
     </>
   );

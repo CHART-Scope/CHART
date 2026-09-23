@@ -195,7 +195,7 @@ export function OnboardingWizard({
                       className={styles.setupSelect}
                       placeholder="— Choose a country —"
                       value={state.country ?? ""}
-                      onChange={(event) => setCountry(event.currentTarget.value)}
+                      onChange={setCountry}
                       options={countries.map((country) => ({
                         value: country,
                         label: country,
@@ -225,7 +225,7 @@ export function OnboardingWizard({
                       className={styles.setupSelect}
                       placeholder="— Choose a level —"
                       value={state.level ?? ""}
-                      onChange={(event) => setLevel(event.currentTarget.value)}
+                      onChange={setLevel}
                       options={levels.map((level) => ({
                         value: level,
                         label: level,
@@ -239,7 +239,7 @@ export function OnboardingWizard({
                         className={styles.setupSelect}
                         placeholder="— Choose —"
                         value={state.geo ?? ""}
-                        onChange={(event) => setGeo(event.currentTarget.value)}
+                        onChange={setGeo}
                         options={levelCfg.options.map((option) => ({
                           value: option,
                           label: onboardingPlaceLabel(option, selectedCountry),
@@ -256,7 +256,7 @@ export function OnboardingWizard({
                         className={styles.setupSelect}
                         placeholder="— Choose —"
                         value={state.subgeo ?? ""}
-                        onChange={(event) => setSubgeo(event.currentTarget.value)}
+                        onChange={setSubgeo}
                         options={subOptions.map((option) => ({
                           value: option,
                           label: onboardingPlaceLabel(option, selectedCountry),
