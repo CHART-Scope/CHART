@@ -35,70 +35,10 @@
   border: 1px solid var(--color-nexus);
 }
 
-.card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-4);
+/* Each step carries its own separator so the trail can be any depth without
+   the caller interleaving markup. */
+.step {
+  display: inline-flex;
   align-items: center;
-  padding: var(--space-5);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-card);
-}
-
-.videoButton {
-  appearance: none;
-  border: none;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-}
-
-.videoButton:disabled {
-  cursor: default;
-}
-
-.videoCircle {
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-pill);
-  background: var(--color-charcoal);
-  color: var(--color-white);
-  transition: background 120ms ease;
-}
-
-.videoButton:not(:disabled):hover .videoCircle,
-.videoButton:not(:disabled):focus-visible .videoCircle {
-  background: var(--color-nexus);
-}
-
-.videoButton:focus-visible .videoCircle {
-  outline: var(--focus-ring);
-  outline-offset: 3px;
-}
-
-.cardBody {
-  display: flex;
-  flex-direction: column;
   gap: var(--space-2);
-}
-
-.eyebrow {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-eyebrow);
-  letter-spacing: var(--ls-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-h1);
-  font-weight: 500;
-  color: var(--color-charcoal);
-  line-height: var(--lh-tight);
 }

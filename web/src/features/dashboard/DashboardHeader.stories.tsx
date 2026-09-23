@@ -23,20 +23,29 @@ type Story = StoryObj<typeof DashboardHeader>;
 
 export const IndiaMadhyaPradesh: Story = {
   args: {
-    country: "India",
-    areaName: "Madhya Pradesh",
+    trail: ["India", "Madhya Pradesh", "Bhopal Division"],
     hazardLabel: "Extreme heat",
     healthDomainLabel: "MNCH",
-    onPlayVideo: () => undefined,
   },
 };
 
 export const KenyaKajiado: Story = {
   args: {
-    country: "Kenya",
-    areaName: "Kajiado",
+    trail: ["Kenya", "Kajiado"],
     hazardLabel: "Extreme heat",
     healthDomainLabel: "MNCH",
-    onPlayVideo: () => undefined,
+  },
+};
+
+/**
+ * A country-level view. The trail collapses to one step rather than
+ * rendering "Kenya › Kenya", which is what a separately derived country and
+ * area name produced here.
+ */
+export const CountryLevelDoesNotRepeatItself: Story = {
+  args: {
+    trail: ["Kenya", "Kenya"],
+    hazardLabel: "Extreme heat",
+    healthDomainLabel: "Maternal, newborn and child health",
   },
 };

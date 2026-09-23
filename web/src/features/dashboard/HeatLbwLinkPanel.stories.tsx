@@ -1,3 +1,5 @@
+import { IconSprite } from "@/components/Icon";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { HeatLbwLinkPanel } from "./HeatLbwLinkPanel";
@@ -5,6 +7,14 @@ import { HeatLbwLinkPanel } from "./HeatLbwLinkPanel";
 const meta: Meta<typeof HeatLbwLinkPanel> = {
   title: "Dashboard/HeatLbwLinkPanel",
   component: HeatLbwLinkPanel,
+  decorators: [
+    (Story) => (
+      <>
+        <IconSprite />
+        <Story />
+      </>
+    ),
+  ],
   parameters: {
     layout: "padded",
   },
@@ -86,6 +96,54 @@ export const BelowReference: Story = {
           referenceTemperatureC: 27,
           ci95Low: 0.8,
           ci95High: 1.0,
+        }}
+      />
+    </div>
+  ),
+};
+
+/**
+ * A month the model attributes nothing to. The sentence must read "no
+ * attributable cases" rather than "0%", which would say heat is safe here —
+ * and the pictogram must be empty to match. Agreed on the 17 Sep call.
+ */
+export const NoAttributableCases: Story = {
+  render: () => (
+    <div style={{ maxWidth: 420 }}>
+      <HeatLbwLinkPanel
+        placeLabel="Bhopal Division"
+        outcome="lbw"
+        outcomeLabel="low birth weight"
+        previewPrediction={{
+          percent: -44,
+          oddsRatio: 0.56,
+          referenceTemperatureC: 27,
+          ci95Low: 0.22,
+          ci95High: 1.39,
+        }}
+      />
+    </div>
+  ),
+};
+
+/**
+ * Under-five mortality, showing the same panel carrying a different outcome
+ * label and an MMT-worded reference clause rather than a plain reference.
+ */
+export const UnderFiveMortality: Story = {
+  render: () => (
+    <div style={{ maxWidth: 420 }}>
+      <HeatLbwLinkPanel
+        placeLabel="Kajiado"
+        outcome="under_5_mortality"
+        outcomeLabel="under-five mortality"
+        figure="baby"
+        previewPrediction={{
+          percent: 21,
+          oddsRatio: 1.27,
+          referenceTemperatureC: 28.73,
+          ci95Low: 0.66,
+          ci95High: 2.44,
         }}
       />
     </div>

@@ -1,7 +1,10 @@
 .frame {
   display: flex;
   flex-direction: column;
+  /* dvh so the mobile browser chrome collapsing does not leave a dead strip
+     under the page; vh first for engines that do not know dvh. */
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--surface-app);
   font-family: var(--font-body);
 }
@@ -15,14 +18,52 @@
   border: 1px solid var(--border-subtle);
 }
 
+/* Visible only once it has focus: the first Tab on any page should be able to
+   jump the whole sidebar rather than walk it. */
+.skip {
+  position: absolute;
+  left: var(--space-2);
+  top: -100%;
+  z-index: 40;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  color: var(--color-text);
+  font-size: var(--fs-body);
+}
+
+.skip:focus-visible {
+  top: var(--space-2);
+}
+
 .topbar {
   flex-shrink: 0;
-  height: 42px;
+  min-height: 42px;
   background: var(--surface-inverse);
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 20px;
+}
+
+.menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin-left: -6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+
+.menu:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-white);
 }
 
 .logo {
@@ -35,6 +76,11 @@
   border: none;
   cursor: pointer;
   padding: 0;
+  flex-shrink: 0;
+}
+
+span.logo {
+  cursor: default;
 }
 
 .sep {
@@ -45,12 +91,19 @@
 .tagline {
   font-size: var(--fs-caption);
   color: rgba(255, 255, 255, 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .account {
   margin-left: auto;
   color: rgba(255, 255, 255, 0.72);
   font-size: var(--fs-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 14ch;
 }
 
 .activityBtn {
@@ -58,6 +111,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   width: 28px;
   height: 28px;
   border-radius: 6px;
@@ -85,6 +139,11 @@
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative;
+}
+
+.scrim {
+  display: none;
 }
 
 .sidebar {
@@ -94,17 +153,32 @@
   padding: 20px 16px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   transition:
     width 0.2s ease,
     padding 0.2s ease,
-    opacity 0.15s ease;
+    opacity 0.15s ease,
+    transform 0.2s ease,
+    visibility 0s;
 }
-.sidebar.collapsed {
+
+/* `visibility` and not only width/opacity: a zero-width sidebar still held its
+   links in the tab order, so keyboard users walked three invisible items
+   before reaching the page. The delay belongs to the closing direction only —
+   declared on the base rule it would also blank the sidebar while it opens. */
+.sidebar.closed {
   width: 0;
   padding-left: 0;
   padding-right: 0;
   opacity: 0;
+  visibility: hidden;
+  transition:
+    width 0.2s ease,
+    padding 0.2s ease,
+    opacity 0.15s ease,
+    transform 0.2s ease,
+    visibility 0s linear 0.2s;
 }
 
 .nav {
@@ -112,12 +186,17 @@
   flex-direction: column;
   gap: 2px;
   flex: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
 }
 
 .navitem {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   padding: 9px 10px;
   border-radius: 7px;
   font-size: var(--fs-body);
@@ -129,16 +208,49 @@
   border: none;
   text-align: left;
   font-family: inherit;
+  text-decoration: none;
 }
+
 .navitem:hover {
   background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.8);
 }
+
 .navitem.active {
   background: rgba(255, 255, 255, 0.08);
   color: var(--color-white);
 }
+
 .navitem.active :global(svg) {
   color: var(--color-lime);
+}
+
+/* The global focus ring is nexus blue, which all but disappears against
+   charcoal. Lime is the accent this surface already uses. */
+.navitem:focus-visible,
+.settings:focus-visible,
+.menu:focus-visible,
+.activityBtn:focus-visible,
+.logo:focus-visible {
+  outline: 2px solid var(--color-lime);
+  outline-offset: 2px;
+}
+
+.navSkeleton {
+  display: flex;
+  align-items: center;
+  padding: 9px 10px;
+}
+
+.nav .navShimmer {
+  --surface-muted: rgba(255, 255, 255, 0.1);
+
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 70%
+  );
 }
 
 .settings {
@@ -156,6 +268,7 @@
   border: none;
   font-family: inherit;
 }
+
 .settings:hover {
   background: rgba(255, 255, 255, 0.05);
 }
@@ -169,10 +282,91 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
 }
 
 .page {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-5) var(--space-5) var(--space-6) var(--space-8);
+}
+
+/* The skip link lands here, so it must not paint a focus ring around the whole
+   page when it does. */
+.page:focus {
+  outline: none;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 900px) {
+  /* Below this width the sidebar floats over the page instead of taking a
+     column from it — 220px of chrome plus a dashboard card no longer fit side
+     by side, and the page, not the nav, is what the user came for. */
+  .sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 30;
+    width: 264px;
+    max-width: 82vw;
+    box-shadow: var(--shadow-modal);
+    transform: translateX(0);
+  }
+
+  .sidebar.closed {
+    width: 264px;
+    padding-left: 16px;
+    padding-right: 16px;
+    opacity: 1;
+    transform: translateX(-100%);
+  }
+
+  .scrim {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    background: rgba(30, 31, 33, 0.45);
+  }
+
+  .scrim[hidden] {
+    display: none;
+  }
+
+  .page {
+    padding: var(--space-4);
+  }
+}
+
+@media (max-width: 600px) {
+  .topbar {
+    padding: 0 var(--space-3);
+  }
+
+  /* Two labels and a tagline will not fit; the account name is the one that
+     tells the user which session they are in. */
+  .tagline,
+  .sep {
+    display: none;
+  }
+
+  .topbar .logo + .account {
+    margin-left: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
 }
