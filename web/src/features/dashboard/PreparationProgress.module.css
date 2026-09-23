@@ -1,0 +1,38 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  width: 100%;
+  max-width: 220px;
+  align-self: center;
+}
+
+.track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.25rem;
+}
+
+.segment {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-muted, #f0efe9);
+  overflow: hidden;
+  position: relative;
+}
+
+.segment[data-state="done"] {
+  background: var(--color-forest, #2f6f4e);
+}
+
+.segment[data-state="active"] {
+  background: var(--color-nexus);
+}
+
+.caption {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-slate, #5c6660);
+  text-align: center;
+}

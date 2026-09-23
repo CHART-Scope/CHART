@@ -1,4 +1,6 @@
 .panel {
+  container-type: inline-size;
+  container-name: risk-panel;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -7,6 +9,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-card);
   min-height: 22rem;
+  min-width: 0;
 }
 
 .eyebrow {
@@ -31,12 +34,8 @@
    * a real space around each inline select and we want it preserved. */
   word-spacing: 0.05em;
 }
-
-/* Keep each "…of [dropdown]" / "in [dropdown]" chunk together so the
- * sentence only wraps at phrase boundaries, never mid-clause or right
- * before the closing text. */
 .phrase {
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .inlineStatic {
@@ -58,6 +57,8 @@
   display: flex;
   justify-content: center;
   margin: var(--space-1) 0;
+  min-height: 230px;
+  align-items: center;
 }
 
 .skeletonGrid {
@@ -89,6 +90,14 @@
     animation: none;
   }
 }
+.emptyGrid {
+  align-self: center;
+  width: 220px;
+  height: 200px;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-muted, #ddd9cc);
+  background: transparent;
+}
 
 .stat {
   margin: 0;
@@ -109,30 +118,6 @@
   color: var(--color-text-muted);
   font-style: italic;
 }
-
-/* Direction-aware colour on the % value in the odds sentence so the
- * reader clocks direction at a glance without parsing the word.
- * Up (heat elevates odds — the expected heat-hazard signal) uses a
- * warm burnt-orange; down (heat lowers odds — often a small-sample
- * spline dip at high temperatures in a division fit) uses a cool
- * teal. Both are distinct from the panel's default maroon so the two
- * cases are visually unmistakable. */
-.statValueUp {
-  color: var(--color-burnt-orange, #b64d1a);
-}
-
-.statValueDown {
-  color: var(--color-teal, #276674);
-}
-
-.afHint {
-  margin: calc(-1 * var(--space-2)) 0 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-caption);
-  line-height: var(--lh-body);
-  text-align: center;
-}
-
 .precisionRow {
   display: flex;
   align-items: center;
@@ -145,34 +130,105 @@
   color: var(--color-text-muted);
 }
 
-.tempReadout {
-  margin: 0;
+.pickerHint {
+  margin: 0 0 var(--space-2);
   text-align: center;
-  color: var(--color-blue, #1c4e9a);
-  font-family: var(--font-display);
-  font-size: var(--fs-h3);
-  font-weight: 500;
+  font-size: var(--fs-body);
+  color: var(--color-text-muted);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
-.sliderWrap {
+.pickerWrap {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
 }
-
-.sliderScale {
+.preparing {
   display: flex;
-  justify-content: space-between;
-  font-size: var(--fs-caption);
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+.riskLayout {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.85fr) minmax(0, 1.8fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.estimate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: #eeece9;
+  min-height: 190px;
+}
+.summary .stat {
+  text-align: left;
+  font-size: var(--fs-body);
+}
+.summary .precisionRow {
+  justify-content: flex-start;
+}
+.details {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-3);
   color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+}
+.details summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.retry {
+  align-self: flex-start;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  padding: 6px 12px;
+  color: var(--color-nexus);
+  font: inherit;
+  cursor: pointer;
+}
+@container risk-panel (max-width: 570px) {
+  .riskLayout {
+    grid-template-columns: 1fr;
+  }
 }
 
-.footnote {
-  margin: var(--space-2) 0 0;
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border-subtle);
+.preparing,
+.emptyGrid {
+  min-height: 230px;
+}
+.iconArrayWrap > div {
+  width: 100%;
+  max-width: 260px;
+}
+
+.requestStatus {
+  margin: 0;
   font-size: var(--fs-caption);
   color: var(--color-text-muted);
-  text-align: left;
-  line-height: var(--lh-body);
+  line-height: 1.5;
+}
+
+.skeletonGrid[data-pending] {
+  display: grid;
+  place-items: center;
+  animation: none;
+  background: var(--surface-muted, #eeece9);
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+  border: 1px dashed var(--border-subtle);
 }

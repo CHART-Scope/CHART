@@ -1,25 +1,37 @@
-/* Horizontal context bar. Every switcher (country, top-level area,
- * optional sub-area, hazard, outcome) uses the same labelled Field
- * wrapper + shared InlineSelect pill so the row reads as one uniform
- * strip — no oversized country to steal the eye. */
+/* Content-sized controls keep the context compact at every screen width. */
 .bar {
   display: flex;
   align-items: flex-end;
-  gap: var(--space-4) var(--space-5);
   flex-wrap: wrap;
-  padding: var(--space-3) 0 var(--space-4);
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  gap: 10px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
 }
-
-/* Static "Country" cell for users scoped to a single family — matches
- * the InlineSelect .field / .fieldLabel column so the row stays aligned
- * whether the country is a dropdown or plain text. */
+.bar > label {
+  flex: 0 1 auto;
+  max-width: 100%;
+  gap: 4px;
+}
+.bar select,
+.bar button[role="combobox"] {
+  min-height: 32px;
+  border-radius: 8px;
+  padding: 4px 10px;
+}
+.bar label > span:last-child {
+  margin: 0;
+  max-width: 100%;
+}
 .staticField {
   display: inline-flex;
   flex-direction: column;
-  gap: 6px;
   min-width: 0;
 }
-
 .staticLabel {
   color: var(--color-text-muted);
   font-family: var(--font-body);
@@ -27,13 +39,18 @@
   font-weight: 500;
   line-height: 1;
 }
-
 .staticValue {
   display: inline-flex;
   align-items: center;
-  padding: 4px 12px;
+  min-height: 32px;
+  padding: 4px 10px;
   color: var(--color-charcoal);
   font-family: var(--font-body);
   font-weight: 500;
   line-height: 1.4;
+}
+@media (pointer: coarse) {
+  .bar button[role="combobox"] {
+    min-height: 40px;
+  }
 }

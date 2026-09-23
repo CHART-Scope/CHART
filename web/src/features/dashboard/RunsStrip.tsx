@@ -80,9 +80,7 @@ export function RunsStrip({
       ) : load.status === "error" ? (
         <p className={styles.empty}>{load.message}</p>
       ) : chips.length === 0 ? (
-        <p className={styles.empty}>
-          No runs yet — your first prediction is being prepared above.
-        </p>
+        <p className={styles.empty}>No recent runs for this location.</p>
       ) : (
         <ul className={styles.chips}>
           {chips.map((run) => (

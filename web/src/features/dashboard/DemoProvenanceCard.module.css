@@ -1,0 +1,63 @@
+/* DEMO-ONLY. Delete this file together with DemoProvenanceCard.tsx. */
+
+.card {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-caption);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-eyebrow);
+  color: var(--color-text-muted);
+}
+
+.badge {
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-1);
+}
+
+.rows {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px var(--space-2);
+  margin: 0;
+  font-size: var(--fs-caption);
+}
+
+.rows dt {
+  color: var(--color-text-muted);
+}
+
+.rows dd {
+  margin: 0;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+}
+
+.hint {
+  color: var(--color-slate, #5c6660);
+  font-size: 0.75rem;
+}

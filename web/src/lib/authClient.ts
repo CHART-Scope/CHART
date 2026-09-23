@@ -64,8 +64,24 @@ export async function completeKeycloakSignIn(search: string) {
     body: JSON.stringify({ code, state }),
     signal: AbortSignal.timeout(15_000),
   });
-  if (!response.ok) throw new Error("CHART sign-in did not return a valid token.");
+  if (!response.ok) {
+    // AUTH_CALLBACK_INVALID means the PKCE cookie was already consumed, so
+    // this code has been exchanged once before; callers can recover from the
+    // session cookies that first exchange set.
+    const failure = new Error("CHART sign-in did not return a valid token.");
+    failure.name = await readAuthErrorCode(response);
+    throw failure;
+  }
   return storeTokenSession((await response.json()) as TokenResponse);
+}
+
+async function readAuthErrorCode(response: Response) {
+  try {
+    const body = (await response.json()) as { error?: unknown };
+    return typeof body.error === "string" ? body.error : "AUTH_EXCHANGE_FAILED";
+  } catch {
+    return "AUTH_EXCHANGE_FAILED";
+  }
 }
 
 export function startKeycloakSignIn() {

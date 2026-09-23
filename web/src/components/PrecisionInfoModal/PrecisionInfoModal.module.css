@@ -1,114 +1,110 @@
-/* Precision explainer — matches the "How we assess precision" popover:
-   dark maroon header, tinted classification cards, collapsible literature. */
-
 .header {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 14px 16px;
-  background: var(--color-maroon);
-  color: var(--color-white);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-card);
 }
-
 .headerBadge {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-sm);
-  background: var(--color-lime);
-  color: var(--color-maroon);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-nexus-tint);
+  color: var(--color-nexus);
 }
 .headerBadge svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
-
-.headerTitle {
+.heading {
   flex: 1;
-  margin: 0;
-  font-family: var(--font-body);
-  font-size: var(--fs-h3);
-  font-weight: 500;
-  color: var(--color-white);
-  letter-spacing: 0.01em;
+  min-width: 0;
 }
-
+.headerTitle {
+  margin: 4px 0 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-body-lg);
+  font-weight: 500;
+  color: var(--color-charcoal);
+}
 .headerClose {
-  background: transparent;
-  border: none;
-  color: var(--color-white);
-  font-size: 20px;
-  line-height: 1;
-  padding: 4px 6px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 50%;
+  background: var(--surface-card);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 22px;
   cursor: pointer;
-  border-radius: var(--radius-xs);
 }
 .headerClose:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--surface-muted);
+  color: var(--color-charcoal);
 }
-.headerClose:focus-visible {
-  outline: 2px solid var(--color-white);
-  outline-offset: 1px;
+.headerClose:focus-visible,
+.literatureToggle:focus-visible,
+.refLink:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 3px;
 }
-
 .body {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 18px 20px 20px;
-  background: var(--color-white);
+  overscroll-behavior: contain;
+  padding: var(--space-4);
+  background: var(--surface-card);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
-
-.intro {
+.intro,
+.rowBody,
+.calloutText {
   margin: 0;
-  font-family: var(--font-body);
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-  color: var(--color-text);
+  font-size: var(--fs-body-sm);
+  line-height: 1.5;
+  color: var(--color-charcoal);
 }
-
 .eyebrow {
-  font-family: var(--font-body);
+  margin: 0;
+  font-family: var(--font-display);
   font-size: var(--fs-eyebrow);
-  font-weight: 600;
   letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
-
 .formulaCard {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3) var(--space-4);
-  background: var(--surface-muted);
-  border: 1px solid var(--border-subtle);
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: #eeece9;
   border-radius: var(--radius-md);
 }
-
 .formula {
-  margin: 2px 0 0;
-  font-family: var(--font-mono);
+  margin: 0;
   font-size: var(--fs-body-lg);
-  font-weight: 600;
-  color: var(--color-maroon);
+  font-weight: 500;
+  color: var(--color-charcoal);
 }
-
 .formulaNote {
-  margin: 4px 0 0;
-  font-family: var(--font-body);
+  margin: 0;
   font-size: var(--fs-caption);
   line-height: var(--lh-body);
   color: var(--color-text-muted);
 }
-
-.list {
+.list,
+.refList {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -116,142 +112,81 @@
   flex-direction: column;
   gap: var(--space-2);
 }
-
 .row {
-  position: relative;
-  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  --level-color: var(--color-text-muted);
+  padding: var(--space-3);
   border: 1px solid var(--border-subtle);
-  border-left-width: 3px;
   border-radius: var(--radius-md);
   background: var(--surface-card);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-2);
 }
-
 .row[data-level="high"] {
-  background: var(--color-success-tint);
-  border-color: var(--color-success);
+  --level-color: var(--color-success);
 }
 .row[data-level="moderate"] {
-  background: var(--color-amber-tint);
-  border-color: var(--color-amber);
+  --level-color: var(--color-amber);
 }
 .row[data-level="low"] {
-  background: var(--color-sem-low-tint);
-  border-color: var(--color-sem-low);
+  --level-color: var(--color-sem-low);
 }
-
 .row[data-active] {
-  box-shadow: 0 0 0 2px var(--color-maroon-tint);
+  border-color: var(--level-color);
+  background: color-mix(in srgb, var(--level-color) 6%, var(--surface-card));
 }
-
-/* When the modal is opened from a specific badge, mute the other two so the
-   active level reads as the focus of the explanation. */
-.row[data-dim] {
-  background: var(--surface-card);
-  border-color: var(--border-subtle);
-  opacity: 0.72;
-}
-.row[data-dim] .rowTitle,
-.row[data-dim] .rowBody {
-  color: var(--color-text-muted);
-}
-.row[data-dim] .pill {
-  color: var(--color-text-muted);
-  border-color: var(--border-subtle);
-  background: var(--color-white);
-}
-
 .rowHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
-
 .rowTitle {
-  font-family: var(--font-body);
   font-size: var(--fs-body);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--color-text);
-}
-
-.pill {
-  font-family: var(--font-body);
-  font-size: var(--fs-eyebrow);
   font-weight: 600;
-  padding: 2px 8px;
+  color: var(--color-charcoal);
+}
+.pill {
+  padding: 3px 9px;
+  border: 1px solid var(--level-color);
   border-radius: var(--radius-pill);
-  border: 1px solid;
-  background: var(--color-white);
-  white-space: nowrap;
-}
-.row[data-level="high"] .pill {
-  color: var(--color-success);
-  border-color: var(--color-success);
-}
-.row[data-level="moderate"] .pill {
-  color: var(--color-amber);
-  border-color: var(--color-amber);
-}
-.row[data-level="low"] .pill {
-  color: var(--color-sem-low);
-  border-color: var(--color-sem-low);
-}
-
-.rowCaption {
-  margin: 0;
-  font-family: var(--font-body);
+  color: var(--level-color);
   font-size: var(--fs-caption);
-  font-style: italic;
-  color: var(--color-text-muted);
+  line-height: 1.4;
 }
-
+.current {
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--color-charcoal);
+}
 .rowBody {
-  margin: 2px 0 0;
-  font-family: var(--font-body);
   font-size: var(--fs-body-sm);
-  line-height: var(--lh-body);
-  color: var(--color-text);
 }
-
 .callout {
   display: flex;
   gap: var(--space-2);
   padding: var(--space-3);
   background: var(--color-nexus-tint);
-  border-left: 3px solid var(--color-nexus);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
 }
-
 .calloutIcon {
-  color: var(--color-nexus);
   display: inline-flex;
-  align-items: flex-start;
   flex: 0 0 auto;
-  margin-top: 1px;
+  color: var(--color-nexus);
+  margin-top: 2px;
 }
 .calloutIcon svg {
   width: 16px;
   height: 16px;
 }
-
 .calloutText {
-  margin: 0;
-  font-family: var(--font-body);
   font-size: var(--fs-caption);
-  line-height: var(--lh-body);
-  color: var(--color-text);
 }
-
 .literature {
   border-top: 1px solid var(--border-subtle);
   padding-top: var(--space-2);
-  margin-top: var(--space-1);
 }
-
 .literatureToggle {
   width: 100%;
   display: flex;
@@ -262,93 +197,72 @@
   background: transparent;
   border: none;
   cursor: pointer;
-  font-family: var(--font-body);
-  color: var(--color-text);
+  font: inherit;
+  color: var(--color-nexus);
 }
-.literatureToggle:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-  border-radius: var(--radius-xs);
-}
-
-.literatureLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--fs-body);
-  font-weight: 500;
-  color: var(--color-maroon);
-}
-.literatureLabel svg {
-  width: 16px;
-  height: 16px;
-}
-
+.literatureLabel,
 .literatureMeta {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  color: var(--color-text-muted);
+  font-size: var(--fs-body);
 }
-
-.literatureCount {
-  font-family: var(--font-display);
-  font-size: var(--fs-caption);
-  font-weight: 500;
-}
-
-.literatureChevron {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 160ms ease;
-}
+.literatureLabel svg,
 .literatureChevron svg {
   width: 16px;
   height: 16px;
 }
+.literatureMeta {
+  color: var(--color-text-muted);
+}
+.literatureCount {
+  font-size: var(--fs-caption);
+}
+.literatureChevron {
+  display: inline-flex;
+  transition: transform 160ms ease;
+}
 .literatureChevron[data-open] {
   transform: rotate(180deg);
 }
-
 .refList {
-  list-style: none;
-  margin: var(--space-2) 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
-
 .refItem {
   display: flex;
   gap: var(--space-2);
-  font-family: var(--font-body);
   font-size: var(--fs-caption);
   line-height: 1.55;
-  color: var(--color-text);
+  color: var(--color-charcoal);
 }
-
 .refIndex {
   flex: 0 0 auto;
-  color: var(--color-maroon);
-  font-weight: 600;
+  color: var(--color-text-muted);
 }
-
 .refBody {
   flex: 1;
+  min-width: 0;
 }
-
 .refAuthors {
   font-weight: 600;
 }
-
 .refLink {
   color: var(--color-nexus);
   text-decoration: underline;
   text-underline-offset: 2px;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 .refLink:hover {
   color: var(--color-nexus-hover);
+}
+@media (max-width: 480px) {
+  .header,
+  .body {
+    padding: var(--space-4);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .literatureChevron {
+    transition: none;
+  }
 }

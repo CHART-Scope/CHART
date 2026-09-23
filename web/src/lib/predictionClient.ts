@@ -178,44 +178,6 @@ export async function getPlanningOptions(geographyId: string, accessToken?: stri
   return (await response.json()) as PlanningOptions;
 }
 
-export async function submitLbwPrediction(
-  geographyId: string,
-  planningMonth: string,
-  accessToken?: string,
-  selection?: {
-    target: PlanningTarget;
-    pregnancyWindows: (1 | 2 | 3)[];
-    projection?: {
-      scenario: "ssp126" | "ssp370" | "ssp585";
-      period: "2031-2040";
-    };
-  },
-) {
-  const projection = selection?.projection;
-  const response = await fetch("/api/chart/climate/predict", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...authHeaders(accessToken),
-    },
-    body: JSON.stringify({
-      geography_id: geographyId,
-      planning_date: `${planningMonth}-01`,
-      outcome: "lbw",
-      pregnancy_windows: selection?.pregnancyWindows ?? [1],
-      planning_target: selection?.target ?? "month",
-      projection_scenario: projection?.scenario,
-      projection_period: projection?.period,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(await readPredictionError(response));
-  }
-
-  return (await response.json()) as PredictionAccepted | PredictionResult;
-}
-
 export async function getPredictionRequest(requestId: number, accessToken?: string) {
   const response = await fetch(`/api/chart/climate/prediction-requests/${requestId}`, {
     cache: "no-store",
