@@ -1,34 +1,34 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import { AppShell } from "@/components/AppShell";
+import { InlineSelect } from "@/components/InlineSelect";
 import { IconSprite } from "@/components/Icon";
+import { ScienceVideoPlaceholder } from "@/features/dashboard/ScienceVideoPlaceholder";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import {
   DashboardHeader,
   HeatLbwLinkPanel,
-  PredictionsPanel,
   RecommendedActionsPanel,
   RiskProtectionPanel,
-  RunsStrip,
+  SpatialRiskMap,
+  DashboardSkeleton,
+  lastCompleteMonth,
 } from "@/features/dashboard";
 import { DashboardContextBar } from "@/features/dashboard";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
-import {
-  listGeographies,
-  listModelCatalog,
-  type GeographyRecord,
-  type ModelCatalogEntry,
-} from "@/lib/planningClient";
+import { useGeographies } from "@/lib/useGeographies";
+import { useModelCatalog } from "@/lib/useModelCatalog";
+import { type GeographyRecord } from "@/lib/planningClient";
 
 import styles from "./page.module.css";
 
 type PageProps = {
   params: Promise<{ geo: string }>;
-  searchParams: Promise<{ admin_unit?: string; outcome?: string }>;
+  searchParams: Promise<{ admin_unit?: string; outcome?: string; month?: string }>;
 };
 
 // Repository-native hazard label the /solutions taxonomy is keyed on. The
@@ -41,15 +41,20 @@ export default function DashboardGeoPage(props: PageProps) {
   const searchParams = use(props.searchParams);
   const adminUnit = searchParams.admin_unit ?? null;
   const outcome = searchParams.outcome ?? "lbw";
+  // The selected month lives in the URL beside admin_unit and outcome so a
+  // reload, a back button or a shared link all land on the same month. Held
+  // in component state it was lost on every refresh.
+  const month = searchParams.month ?? null;
 
   return (
-    <RequireAuth>
+    <RequireAuth fallback={<DashboardSkeleton />}>
       {(session) => (
         <AuthorizedDashboard
           session={session}
           geographyId={params.geo}
           adminUnit={adminUnit}
           outcome={outcome}
+          month={month}
         />
       )}
     </RequireAuth>
@@ -61,15 +66,35 @@ function AuthorizedDashboard({
   geographyId,
   adminUnit,
   outcome,
+  month,
 }: {
   session: AuthSession;
   geographyId: string;
   adminUnit: string | null;
   outcome: string;
+  month: string | null;
 }) {
   const router = useRouter();
-  const [geographies, setGeographies] = useState<GeographyRecord[]>([]);
-  const [catalog, setCatalog] = useState<ModelCatalogEntry[]>([]);
+  const [mapRefresh, setMapRefresh] = useState(0);
+  const refreshMap = useCallback(() => setMapRefresh((value) => value + 1), []);
+  const [isPending, startTransition] = useTransition();
+  const navigate = useCallback(
+    (href: string, options = { scroll: false }) => {
+      startTransition(() => router.push(href, options));
+    },
+    [router],
+  );
+  // Both lists come from module-scoped caches rather than a fetch per mount.
+  // The page previously called listGeographies() and listModelCatalog()
+  // directly, so every location switch re-fetched values that had not
+  // changed - and the context bar, sidebar and cards all went blank while it
+  // happened, even though the answer was already in memory.
+  const { geographies: cachedGeographies } = useGeographies();
+  // Null means "still loading" in the hook; the page treats an unknown list
+  // the same as an empty one, and the skeleton covers the wait.
+  const geographies = cachedGeographies ?? [];
+  const { catalog: cachedCatalog } = useModelCatalog(geographyId);
+  const catalog = cachedCatalog ?? [];
 
   const hasAccess = useMemo(
     () => session.user.roles.length > 0 && session.user.geographyScopes.length > 0,
@@ -79,20 +104,6 @@ function AuthorizedDashboard({
   useEffect(() => {
     if (!hasAccess) router.replace("/access-pending");
   }, [hasAccess, router]);
-
-  useEffect(() => {
-    let cancelled = false;
-    listGeographies()
-      .then((records) => {
-        if (!cancelled) setGeographies(records);
-      })
-      .catch(() => {
-        if (!cancelled) setGeographies([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const effectiveAdminUnit = useMemo(() => {
     if (!adminUnit) return null;
@@ -106,9 +117,18 @@ function AuthorizedDashboard({
   useEffect(() => {
     if (!adminUnit || geographies.length === 0 || effectiveAdminUnit) return;
     router.replace(
-      `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(outcome)}`,
+      `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(outcome)}${month ? `&month=${encodeURIComponent(month)}` : ""}`,
+      { scroll: false },
     );
-  }, [adminUnit, effectiveAdminUnit, geographies.length, geographyId, outcome, router]);
+  }, [
+    adminUnit,
+    effectiveAdminUnit,
+    geographies.length,
+    geographyId,
+    outcome,
+    month,
+    router,
+  ]);
 
   // Landing directly on a leaf geography (division / county with no children of
   // its own) reuses the parent's dashboard scope so the sibling switcher is
@@ -124,32 +144,32 @@ function AuthorizedDashboard({
     const parent = geographies.find((geo) => geo.id === current.parentId);
     if (!parent) return;
     router.replace(
-      `/dashboard/${encodeURIComponent(parent.id)}?admin_unit=${encodeURIComponent(geographyId)}&outcome=${encodeURIComponent(outcome)}`,
+      `/dashboard/${encodeURIComponent(parent.id)}?admin_unit=${encodeURIComponent(geographyId)}&outcome=${encodeURIComponent(outcome)}${month ? `&month=${encodeURIComponent(month)}` : ""}`,
+      { scroll: false },
     );
-  }, [geographies, geographyId, adminUnit, outcome, router]);
-
-  useEffect(() => {
-    let cancelled = false;
-    listModelCatalog(geographyId, { includeDescendants: true })
-      .then((items) => {
-        if (!cancelled) setCatalog(items);
-      })
-      .catch(() => {
-        if (!cancelled) setCatalog([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [geographyId]);
+  }, [geographies, geographyId, adminUnit, outcome, month, router]);
 
   const currentGeography = geographies.find((geo) => geo.id === geographyId);
   const effectiveGeography =
     geographies.find((geo) => geo.id === effectiveAdminUnit) ?? currentGeography;
   const country = currentGeography ? countryFromPath(currentGeography.path) : "";
-  const areaName = currentGeography?.name ?? geographyId;
+  // The place trail, broadest first, walked from the area actually selected
+  // rather than from the page's geography. Built from the ancestry so it
+  // follows the sub-area picker: choosing a division must move the
+  // breadcrumb, and a country-level view must not render its own name twice.
+  const placeTrail = useMemo(() => {
+    const byId = new Map(geographies.map((geo) => [geo.id, geo]));
+    const names: string[] = [];
+    let cursor = byId.get(effectiveAdminUnit ?? geographyId);
+    while (cursor) {
+      names.unshift(cursor.name);
+      cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
+    }
+    return names.length > 0 ? names : [country || geographyId];
+  }, [geographies, effectiveAdminUnit, geographyId, country]);
   const stateLabel = currentGeography
     ? `${currentGeography.name} (${currentGeography.levelLabel})`
-    : areaName;
+    : geographyId;
   const selectedCatalog = catalog.find((entry) => entry.outcome === outcome);
   const outcomeLabel = selectedCatalog?.outcome_label ?? humanizeCode(outcome);
   const selectedModel = effectiveGeography?.models?.find(
@@ -172,9 +192,9 @@ function AuthorizedDashboard({
   useEffect(() => {
     if (catalog.length === 0 || selectedCatalog) return;
     router.replace(
-      `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(catalog[0].outcome)}`,
+      `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(catalog[0].outcome)}${month ? `&month=${encodeURIComponent(month)}` : ""}`,
     );
-  }, [catalog, geographyId, router, selectedCatalog]);
+  }, [catalog, geographyId, month, router, selectedCatalog]);
 
   useEffect(() => {
     if (
@@ -186,13 +206,15 @@ function AuthorizedDashboard({
       return;
     }
     router.replace(
-      `/dashboard/${encodeURIComponent(geographyId)}?admin_unit=${encodeURIComponent(districts[0].code)}&outcome=${encodeURIComponent(outcome)}`,
+      `/dashboard/${encodeURIComponent(geographyId)}?admin_unit=${encodeURIComponent(districts[0].code)}&outcome=${encodeURIComponent(outcome)}${month ? `&month=${encodeURIComponent(month)}` : ""}`,
+      { scroll: false },
     );
   }, [
     districts,
     effectiveAdminUnit,
     geographyId,
     outcome,
+    month,
     router,
     selectedCatalog,
     selectedModel,
@@ -202,9 +224,9 @@ function AuthorizedDashboard({
   const handleNavigate = useCallback(
     (id: string) => {
       const target = NAV_ROUTE[id];
-      if (target) router.push(target);
+      if (target) navigate(target);
     },
-    [router],
+    [navigate],
   );
 
   const handleAdminUnitChange = useCallback(
@@ -213,17 +235,49 @@ function AuthorizedDashboard({
         code === null
           ? `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(outcome)}`
           : `/dashboard/${encodeURIComponent(geographyId)}?admin_unit=${encodeURIComponent(code)}&outcome=${encodeURIComponent(outcome)}`;
-      router.push(target);
+      navigate(month ? `${target}&month=${encodeURIComponent(month)}` : target, {
+        scroll: false,
+      });
     },
-    [geographyId, outcome, router],
+    [geographyId, outcome, month, navigate],
   );
   const handleOutcomeChange = useCallback(
     (nextOutcome: string) => {
-      router.push(
-        `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(nextOutcome)}`,
+      navigate(
+        `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(nextOutcome)}${effectiveAdminUnit ? `&admin_unit=${encodeURIComponent(effectiveAdminUnit)}` : ""}${month ? `&month=${encodeURIComponent(month)}` : ""}`,
+        { scroll: false },
       );
     },
-    [geographyId, router],
+    [geographyId, effectiveAdminUnit, month, navigate],
+  );
+
+  const outcomeControl = (
+    <InlineSelect
+      menu
+      aria-label="Health outcome"
+      value={outcome}
+      onChange={handleOutcomeChange}
+      options={
+        catalog.length === 0
+          ? [{ value: outcome, label: outcomeLabel }]
+          : catalog.map((entry) => ({
+              value: entry.outcome,
+              label: `${entry.outcome_label}${entry.batch_status === "blocked_pending_modeller_confirmation" ? " — not ready" : ""}`,
+            }))
+      }
+    />
+  );
+  const placeControl = (
+    <InlineSelect
+      menu
+      aria-label="Risk estimate area"
+      value={effectiveAdminUnit ?? ""}
+      onChange={(value) => handleAdminUnitChange(value || null)}
+      options={[
+        { value: "", label: stateLabel },
+        ...districts.map((area) => ({ value: area.code, label: area.name })),
+      ]}
+    />
   );
 
   if (!hasAccess) return null;
@@ -238,7 +292,12 @@ function AuthorizedDashboard({
         onSignOut={signOutOfKeycloak}
         userLabel={session.user.username}
       >
-        <main className={styles.page}>
+        <main className={styles.page} aria-busy={isPending}>
+          {isPending && (
+            <div className={styles.updating} role="status">
+              Updating dashboard…
+            </div>
+          )}
           <DashboardContextBar
             geographyScopes={session.user.geographyScopes}
             geographyId={geographyId}
@@ -253,49 +312,117 @@ function AuthorizedDashboard({
               const params = new URLSearchParams();
               if (nextAdmin) params.set("admin_unit", nextAdmin);
               if (nextOutcome) params.set("outcome", nextOutcome);
+              if (month) params.set("month", month);
               const query = params.toString() ? `?${params.toString()}` : "";
-              router.push(`/dashboard/${encodeURIComponent(nextGeo)}${query}`);
+              navigate(`/dashboard/${encodeURIComponent(nextGeo)}${query}`);
             }}
           />
           <DashboardHeader
-            country={country}
-            areaName={areaName}
+            trail={placeTrail}
             hazardLabel={selectedCatalog?.climate_hazard_label ?? "Climate hazard"}
             healthDomainLabel={
               selectedCatalog?.health_domain_label ?? "Climate-sensitive health"
             }
-            title={selectedCatalog?.dashboard_title ?? selectedCatalog?.outcome_label}
-            onPlayVideo={() => router.push("/learning")}
           />
 
           {selectedCatalog?.visualization_type === "odds_ratio_icon_array" ||
           !selectedCatalog?.visualization_type ? (
             <div className={styles.grid}>
-              <RiskProtectionPanel
-                outcomeLabel={outcomeLabel}
-                description={selectedCatalog?.risk_description}
-              />
+              <aside className={styles.learning}>
+                <ScienceVideoPlaceholder />
+                <RiskProtectionPanel
+                  outcomeLabel={outcomeLabel}
+                  outcomeControl={outcomeControl}
+                  contextFigure={
+                    selectedCatalog?.visualization_context_figure ?? "pregnant-woman"
+                  }
+                  description={selectedCatalog?.risk_description}
+                />
+              </aside>
               <HeatLbwLinkPanel
+                onPredictionReady={refreshMap}
                 placeLabel={effectiveGeography?.name ?? stateLabel}
                 modelAreaName={selectedModel?.modelAreaName ?? null}
                 outcome={outcome}
                 outcomeLabel={outcomeLabel}
-                figure="newborn"
+                outcomeControl={outcomeControl}
+                placeControl={placeControl}
+                figure={
+                  outcome === "lbw"
+                    ? "newborn"
+                    : (selectedCatalog?.visualization_figure ?? "baby")
+                }
                 batchEnabled={
                   selectedCatalog?.batch_status !==
                   "blocked_pending_modeller_confirmation"
                 }
                 geographyId={effectiveAdminUnit ?? geographyId}
+                month={month}
+                onMonthChange={(nextMonth) => {
+                  const params = new URLSearchParams();
+                  if (adminUnit) params.set("admin_unit", adminUnit);
+                  if (outcome) params.set("outcome", outcome);
+                  if (nextMonth) params.set("month", nextMonth);
+                  // push, not replace: choosing a month is a step the reader
+                  // took, and replacing the entry meant Back left the
+                  // dashboard entirely instead of walking the months visited.
+                  navigate(
+                    `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
+                    { scroll: false },
+                  );
+                }}
                 accessToken={selectedModel ? session.accessToken : undefined}
-              />
-              {/* Predictions card temporarily hidden while the pipeline stabilises.
-            <PredictionsPanel
-              geographyId={geographyId}
-              adminUnit={adminUnit}
-              accessToken={session.accessToken}
-              supportsPrediction={currentGeography?.supportsPrediction ?? undefined}
-            />
-            */}
+                canPrepare={
+                  Boolean(selectedModel) &&
+                  selectedCatalog?.batch_status !==
+                    "blocked_pending_modeller_confirmation" &&
+                  session.user.roles.some((role) =>
+                    [
+                      "chart_admin",
+                      "health_planning_lead",
+                      "cross_sector_planning_lead",
+                      "health_implementation_officer",
+                      "cross_sector_implementation_officer",
+                    ].includes(role),
+                  )
+                }
+              >
+                <SpatialRiskMap
+                  dataRefreshKey={mapRefresh}
+                  embedded
+                  geographyId={geographyId}
+                  accessToken={session.accessToken}
+                  month={month ?? lastCompleteMonth()}
+                  outcome={outcome}
+                  // Falls back to the place the dashboard is on. The map now
+                  // frames a leaf selection on its siblings, so without this
+                  // nothing is picked out among them when you land on a
+                  // division directly rather than choosing a sub-area.
+                  selectedGeographyId={effectiveAdminUnit ?? adminUnit ?? geographyId}
+                  canPrepare={
+                    selectedCatalog?.batch_status !==
+                      "blocked_pending_modeller_confirmation" &&
+                    session.user.roles.some((role) =>
+                      [
+                        "chart_admin",
+                        "health_planning_lead",
+                        "cross_sector_planning_lead",
+                        "health_implementation_officer",
+                        "cross_sector_implementation_officer",
+                      ].includes(role),
+                    )
+                  }
+                  onSelect={(nextGeography: string) => {
+                    const params = new URLSearchParams();
+                    params.set("admin_unit", nextGeography);
+                    if (outcome) params.set("outcome", outcome);
+                    if (month) params.set("month", month);
+                    navigate(
+                      `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
+                    );
+                  }}
+                />
+              </HeatLbwLinkPanel>
             </div>
           ) : (
             <section className={styles.unsupportedVisualization} role="status">
@@ -303,20 +430,6 @@ function AuthorizedDashboard({
               installed.
             </section>
           )}
-
-          {/* Recent runs moved to Settings (Dagster + DB view live together there).
-          <RunsStrip
-            geographyId={geographyId}
-            adminUnit={adminUnit}
-            accessToken={session.accessToken}
-            linkForRun={(id) => {
-              const base = `/dashboard/${encodeURIComponent(geographyId)}/runs/${id}`;
-              return adminUnit === null
-                ? base
-                : `${base}?admin_unit=${encodeURIComponent(adminUnit)}`;
-            }}
-          />
-          */}
 
           <RecommendedActionsPanel
             hazard={DEPLOYED_HAZARD_REPOSITORY_KEY}

@@ -97,12 +97,12 @@ export function DashboardContextBar({
   const topLevelValue = useMemo(() => {
     if (!geographies || !activeFamily) return topLevelAreas[0]?.id ?? "";
     const byId = new Map(geographies.map((geo) => [geo.id, geo]));
-    let cursor = byId.get(geographyId);
+    let cursor = byId.get(adminUnit ?? geographyId);
     while (cursor && cursor.parentId && cursor.parentId !== activeFamily.root.id) {
       cursor = byId.get(cursor.parentId);
     }
     return cursor?.id ?? topLevelAreas[0]?.id ?? "";
-  }, [geographies, activeFamily, geographyId, topLevelAreas]);
+  }, [geographies, activeFamily, geographyId, adminUnit, topLevelAreas]);
 
   // Sub-level areas of the resolved top-level area (state / county).
   // Only rendered when the top-level place has model-backed children —
@@ -112,11 +112,16 @@ export function DashboardContextBar({
   // at a division still shows all sibling divisions in the picker.
   const subAreas = useMemo(() => {
     if (!geographies || !topLevelValue) return [];
+    // Never when the top-level selection is the family root itself. The root's
+    // children *are* the top-level list, so computing sub-areas here rendered
+    // the same 47 counties a second time under an identical "County" label -
+    // which is what a country-level Kenya dashboard showed.
+    if (topLevelValue === activeFamily?.root.id) return [];
     return geographies
       .filter((geo) => geo.parentId === topLevelValue)
       .filter((geo) => (geo.models?.length ?? 0) > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [geographies, topLevelValue]);
+  }, [geographies, topLevelValue, activeFamily]);
 
   // Sub-level select value: prefer the explicit ?admin_unit= override,
   // fall back to the URL's geographyId when the URL itself points at
@@ -126,6 +131,26 @@ export function DashboardContextBar({
   const subLevelLabel = subAreas[0]?.levelLabel ?? "";
   const topLevelLabel =
     topLevelAreas[0]?.levelLabel ?? activeFamily?.root.levelLabel ?? "Area";
+
+  // A country-level dashboard has no top-level area selected, so the select
+  // needs an option that says so. Without one its value matched no option and
+  // the browser displayed the first county, claiming a selection the page was
+  // not actually showing.
+  const topLevelOptions = useMemo(() => {
+    const areas = topLevelAreas.map((area) => ({
+      value: area.id,
+      label: area.name,
+    }));
+    return activeFamily
+      ? [
+          {
+            value: activeFamily.root.id,
+            label: `All ${pluralLabel(topLevelLabel)}`,
+          },
+          ...areas,
+        ]
+      : areas;
+  }, [topLevelAreas, activeFamily, topLevelLabel]);
 
   const hazards = useMemo(
     () =>
@@ -153,7 +178,13 @@ export function DashboardContextBar({
       dedupe(
         catalog
           .filter((entry) => entry.climate_hazard === activeHazard)
-          .map((entry) => ({ value: entry.outcome, label: entry.outcome_label })),
+          .map((entry) => ({
+            value: entry.outcome,
+            label:
+              entry.batch_status === "blocked_pending_modeller_confirmation"
+                ? `${entry.outcome_label} — not ready`
+                : entry.outcome_label,
+          })),
         (item) => item.value,
       ),
     [catalog, activeHazard],
@@ -173,7 +204,14 @@ export function DashboardContextBar({
   }
 
   function handleTopLevelChange(nextGeographyId: string) {
-    onNavigate({ geographyId: nextGeographyId, adminUnit: null, outcome });
+    const selected = geographies?.find((geo) => geo.id === nextGeographyId);
+    const hasChildren = geographies?.some((geo) => geo.parentId === nextGeographyId);
+    onNavigate({
+      geographyId:
+        !hasChildren && selected?.parentId ? selected.parentId : nextGeographyId,
+      adminUnit: !hasChildren && selected?.parentId ? nextGeographyId : null,
+      outcome,
+    });
   }
 
   function handleSubLevelChange(nextAdminUnit: string) {
@@ -206,6 +244,7 @@ export function DashboardContextBar({
     <div className={styles.bar} role="group" aria-label="Dashboard context">
       {showCountryDropdown && families ? (
         <InlineSelect
+          menu
           label="Country"
           aria-label="Country"
           value={activeFamily?.root.path ?? ""}
@@ -223,19 +262,18 @@ export function DashboardContextBar({
       )}
 
       <InlineSelect
+        menu
         label={topLevelLabel}
         aria-label={topLevelLabel}
         value={topLevelValue}
         onChange={handleTopLevelChange}
-        options={topLevelAreas.map((area) => ({
-          value: area.id,
-          label: area.name,
-        }))}
+        options={topLevelOptions}
         disabled={topLevelAreas.length === 0}
       />
 
       {subAreas.length > 0 ? (
         <InlineSelect
+          menu
           label={subLevelLabel}
           aria-label={subLevelLabel}
           value={subLevelValue}
@@ -248,6 +286,7 @@ export function DashboardContextBar({
       ) : null}
 
       <InlineSelect
+        menu
         label="Climate hazard"
         aria-label="Climate hazard"
         value={activeHazard}
@@ -257,6 +296,7 @@ export function DashboardContextBar({
       />
 
       <InlineSelect
+        menu
         label="Health outcome"
         aria-label="Health outcome"
         value={outcome}
@@ -288,4 +328,15 @@ function countryLabel(family: Family | null): string {
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+/** "County" -> "counties", "State" -> "states", "Division" -> "divisions". */
+function pluralLabel(label: string): string {
+  const lower = label.toLowerCase();
+  if (!lower) return "areas";
+  return lower.endsWith("y")
+    ? `${lower.slice(0, -1)}ies`
+    : lower.endsWith("s")
+      ? lower
+      : `${lower}s`;
 }

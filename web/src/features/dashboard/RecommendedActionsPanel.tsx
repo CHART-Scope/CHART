@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { Skeleton } from "@/components/Skeleton";
+
 import { Icon, type IconName } from "@/components/Icon";
 import { listRecommendedActions, type RecommendedAction } from "@/lib/planningClient";
 
@@ -141,6 +143,10 @@ export function RecommendedActionsPanel({ hazard, hazardLabel }: Props = {}) {
   const [items, setItems] = useState<readonly RecommendedAction[]>(filteredFallback);
   const [usingFallback, setUsingFallback] = useState(true);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  // Only true while the repository call is in flight AND there is nothing
+  // bundled to show. The seeded fallback normally renders immediately, so
+  // swapping it for placeholder bars would replace real content with less.
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setItems(filteredFallback);
@@ -149,6 +155,7 @@ export function RecommendedActionsPanel({ hazard, hazardLabel }: Props = {}) {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     listRecommendedActions({ limit: 7, hazard })
       .then((rows) => {
         if (cancelled || rows.length === 0) return;
@@ -157,6 +164,9 @@ export function RecommendedActionsPanel({ hazard, hazardLabel }: Props = {}) {
       })
       .catch(() => {
         // Repository unavailable -> the fallback stays; nothing to log.
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -192,29 +202,40 @@ export function RecommendedActionsPanel({ hazard, hazardLabel }: Props = {}) {
             </span>
           ) : null}
         </header>
-        <ul className={styles.list}>
-          {items.map((item) => (
-            <li key={item.slug}>
-              <button
-                type="button"
-                className={styles.item}
-                onClick={() => setSelectedSlug(item.slug)}
-                aria-label={`Open ${item.title}`}
-              >
-                <div className={styles.itemBody}>
-                  <p className={styles.title}>{item.title}</p>
-                  <div className={styles.pillRow}>
-                    {(item.categories.length > 0
-                      ? item.categories
-                      : ["Recommended"]
-                    ).map(renderPill)}
+        {loading && items.length === 0 ? (
+          <ul className={styles.list} aria-busy="true" aria-label="Loading actions">
+            {Array.from({ length: 4 }, (_, index) => (
+              <li key={index} className={styles.skeletonItem}>
+                <Skeleton width="70%" height="1rem" />
+                <Skeleton width="45%" height="0.75rem" radius="full" />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <ul className={styles.list}>
+            {items.map((item) => (
+              <li key={item.slug}>
+                <button
+                  type="button"
+                  className={styles.item}
+                  onClick={() => setSelectedSlug(item.slug)}
+                  aria-label={`Open ${item.title}`}
+                >
+                  <div className={styles.itemBody}>
+                    <p className={styles.title}>{item.title}</p>
+                    <div className={styles.pillRow}>
+                      {(item.categories.length > 0
+                        ? item.categories
+                        : ["Recommended"]
+                      ).map(renderPill)}
+                    </div>
                   </div>
-                </div>
-                <Icon name="arrow-right" size={16} className={styles.itemChevron} />
-              </button>
-            </li>
-          ))}
-        </ul>
+                  <Icon name="arrow-right" size={16} className={styles.itemChevron} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <button type="button" className={styles.seeAll}>
           See all recommended actions
         </button>

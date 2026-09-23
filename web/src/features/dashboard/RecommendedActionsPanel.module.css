@@ -170,3 +170,12 @@
   border-color: var(--color-text-muted);
   outline: none;
 }
+
+/* Matches the real row's padding so the list does not resize when the
+   repository rows replace the placeholders. */
+.skeletonItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: var(--space-3) 0;
+}

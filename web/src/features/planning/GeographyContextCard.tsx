@@ -1,5 +1,6 @@
 "use client";
 
+import { InlineSelect } from "@/components/InlineSelect";
 import { useMemo, useState } from "react";
 
 import { rememberActiveGeography } from "@/lib/authClient";
@@ -11,22 +12,15 @@ import {
   familyLabel,
   familyMeta,
 } from "./contextFamilies";
+import { SettingsCard } from "./SettingsCard";
 import styles from "./GeographyContextCard.module.css";
 
 type Props = {
   geographyScopes: string[];
   activeGeographyId?: string;
-  /** Compact rendering — trims the subtitle and metadata line so the
-   * card fits above the plan/dashboard content without dominating the
-   * page. Full presentation is used on Settings. */
-  compact?: boolean;
 };
 
-export function GeographyContextCard({
-  geographyScopes,
-  activeGeographyId,
-  compact = false,
-}: Props) {
+export function GeographyContextCard({ geographyScopes, activeGeographyId }: Props) {
   const { geographies } = useGeographies();
   const families = useMemo(
     () => (geographies ? computeFamilies(geographies, geographyScopes) : null),
@@ -50,54 +44,51 @@ export function GeographyContextCard({
   }
 
   return (
-    <section className={styles.card} data-compact={compact || undefined}>
-      <div className={styles.header}>
-        <p className={styles.title}>Context</p>
-        {compact ? null : (
-          <p className={styles.subtitle}>
-            The place CHART plans and predicts for. Only areas we have installed models
-            for appear here.
-          </p>
-        )}
-      </div>
-      <div className={styles.row}>
-        <select
-          className={styles.select}
+    <SettingsCard
+      eyebrow="Location"
+      title="Planning location"
+      headingId="geography-context-heading"
+      loading={families === null}
+      loadingRows={1}
+      action={
+        <InlineSelect
           value={activeFamily?.root.path ?? ""}
-          onChange={(event) => handleChange(event.currentTarget.value)}
+          onChange={handleChange}
           disabled={families === null || families.length === 0}
           aria-label="Active context"
-        >
-          {families === null ? (
-            <option value="">Loading…</option>
-          ) : families.length === 0 ? (
-            <option value="">No installed models for your scope</option>
-          ) : (
-            <>
-              {activeFamily === null ? (
-                <option value="" disabled>
-                  Choose a context
-                </option>
-              ) : null}
-              {families.map((family) => (
-                <option key={family.root.id} value={family.root.path}>
-                  {familyLabel(family.root)}
-                </option>
-              ))}
-            </>
-          )}
-        </select>
-        <span
-          className={saved ? styles.savedShown : styles.savedHidden}
-          role="status"
-          aria-live="polite"
-        >
-          Saved · applies on next Plan / Dashboard visit
-        </span>
-      </div>
-      {activeFamily && !compact ? (
-        <p className={styles.meta}>{familyMeta(activeFamily)}</p>
+          options={[
+            ...(activeFamily === null
+              ? [
+                  {
+                    value: "",
+                    label:
+                      families?.length === 0
+                        ? "No installed models for your scope"
+                        : "Choose a location",
+                    disabled: true,
+                  },
+                ]
+              : []),
+            ...(families ?? []).map((family) => ({
+              value: family.root.path,
+              label: familyLabel(family.root),
+            })),
+          ]}
+        />
+      }
+    >
+      {saved ? (
+        <div className={styles.row}>
+          <span
+            className={saved ? styles.savedShown : styles.savedHidden}
+            role="status"
+            aria-live="polite"
+          >
+            Saved · applies on next Plan / Dashboard visit
+          </span>
+        </div>
       ) : null}
-    </section>
+      {activeFamily ? <p className={styles.meta}>{familyMeta(activeFamily)}</p> : null}
+    </SettingsCard>
   );
 }

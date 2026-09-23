@@ -1,0 +1,27 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  container-type: inline-size;
+}
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.layout > section,
+.pair > section {
+  margin: 0;
+}
+.runs {
+  min-width: 0;
+}
+.runs > section {
+  padding: 12px;
+}
+@container (max-width: 640px) {
+  .pair {
+    grid-template-columns: 1fr;
+  }
+}
