@@ -66,3 +66,6 @@ new_design
 
 # locally recovered research archives and restricted DHS material
 /recovered/
+
+# Local Dagster instance state (run history, schedule DBs)
+.dagster_home/

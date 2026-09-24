@@ -2,17 +2,22 @@
 
 import type { ReactNode } from "react";
 
-import { Icon } from "@/components/Icon";
-
 import styles from "./DashboardHeader.module.css";
 
 type Props = {
-  country: string;
-  areaName: string;
+  /**
+   * The place trail, broadest first: `["Kenya", "Garissa"]` or
+   * `["India", "Madhya Pradesh", "Bhopal Division"]`.
+   *
+   * A trail rather than a country plus an area name, because those two were
+   * derived independently and could say the same thing twice: on a
+   * country-level dashboard both resolved to "Kenya", rendering
+   * "Kenya › Kenya". Consecutive repeats are dropped here so that cannot
+   * happen however the caller composes it.
+   */
+  trail: string[];
   hazardLabel: string;
   healthDomainLabel: string;
-  title?: string;
-  onPlayVideo?: () => void;
   /** Optional inline element rendered in place of the country name — the
    * dashboard passes an `<InlineContextSwitcher />` here so users can
    * flip between installed families straight from the breadcrumb without
@@ -21,54 +26,46 @@ type Props = {
 };
 
 /**
- * Top of the dashboard: breadcrumb + planning-context pill, then the
- * hero card with a video placeholder and the "Understand the climate-
- * health risk" explainer.
+ * Top of the dashboard: breadcrumb + planning-context pill.
  *
- * The hazard + health-domain pill mirrors what the user picked (or was
- * defaulted to) on the /plan Mad Libs card. Today those are locked to
- * the deployed LBW model, so we render "Extreme heat + MNCH" verbatim.
+ * The hazard + health-domain pill mirrors the model actually selected, so
+ * switching outcome changes it: low birth weight and under-five mortality
+ * belong to different health domains and must not share one caption.
  */
 export function DashboardHeader({
-  country,
-  areaName,
+  trail,
   hazardLabel,
   healthDomainLabel,
-  title = "Understand the climate-health risk and the actions that can save lives",
-  onPlayVideo,
   countrySlot,
 }: Props) {
   const pill = `${hazardLabel} + ${healthDomainLabel}`;
+  const steps = trail.filter((step, index) => step && step !== trail[index - 1]);
   return (
     <header className={styles.wrap}>
       <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
-        <span>{countrySlot ?? country}</span>
-        <span className={styles.separator} aria-hidden>
-          ›
-        </span>
-        <strong>{areaName}</strong>
+        {steps.map((step, index) => {
+          const last = index === steps.length - 1;
+          return (
+            <span key={`${step}-${index}`} className={styles.step}>
+              {index > 0 ? (
+                <span className={styles.separator} aria-hidden>
+                  ›
+                </span>
+              ) : null}
+              {index === 0 && countrySlot ? (
+                countrySlot
+              ) : last ? (
+                <strong>{step}</strong>
+              ) : (
+                <span>{step}</span>
+              )}
+            </span>
+          );
+        })}
         <span className={styles.pill} title="Planning context">
           {pill}
         </span>
       </nav>
-
-      <article className={styles.card}>
-        <button
-          type="button"
-          className={styles.videoButton}
-          aria-label="Play the climate-health risk overview video"
-          onClick={onPlayVideo}
-          disabled={!onPlayVideo}
-        >
-          <span className={styles.videoCircle}>
-            <Icon name="play" size={16} />
-          </span>
-        </button>
-        <div className={styles.cardBody}>
-          <p className={styles.eyebrow}>Understand the climate-health risk</p>
-          <h1 className={styles.title}>{title}</h1>
-        </div>
-      </article>
     </header>
   );
 }

@@ -338,6 +338,103 @@ OPERATION_DOCUMENTATION: dict[
             "200": "The compatibility readiness check completed successfully."
         },
     ),
+    ("get", "/climate/coverage"): OperationDocumentation(
+        summary="Read which places already hold climate data",
+        description=(
+            "Returns every country and each of its administrative areas with the "
+            "number of distinct months of observed climate data held, and the "
+            "range those months span. Requires the chart_admin role. Months "
+            "are counted distinctly rather than by row because each month "
+            "holds several variables, which would otherwise read as several "
+            "times more coverage than exists. A country's range is the union "
+            "of its areas' ranges, not a sum. Used by the Settings data "
+            "section to show what is present before anything is pulled."
+        ),
+        success_responses={
+            "200": (
+                "One entry per country with its areas nested, ordered by "
+                "country code then area name."
+            )
+        },
+    ),
+    ("post", "/climate/ingestion-jobs"): OperationDocumentation(
+        summary="Queue one country-wide climate pull",
+        description=(
+            "Queues a single Copernicus download covering every deployed area "
+            "in one country and returns immediately with the job to poll. "
+            "Requires the chart_admin role. Accepted rather than performed "
+            "because a pull takes minutes while the web proxy times out after "
+            "fifteen seconds. Omitting months requests the last twelve "
+            "complete ones; the month in progress is never requested because "
+            "ERA5 lands a few days in arrears. A country that already has a "
+            "pull in flight returns that job rather than starting a second "
+            "download of the same grid."
+        ),
+        success_responses={
+            "202": ("The queued job, or the one already running for this country.")
+        },
+    ),
+    ("get", "/climate/ingestion-jobs"): OperationDocumentation(
+        summary="Read recent climate pulls and their progress",
+        description=(
+            "Returns recent country-wide climate pulls, newest first, with "
+            "their status, stage, and how many of the country's areas have "
+            "been written so far. Requires the chart_admin role. Progress is "
+            "reported per area because one download feeds every area in the "
+            "country, and a country of forty-seven would otherwise look "
+            "stalled while it works."
+        ),
+        success_responses={
+            "200": "Recent jobs, newest first, optionally filtered by country."
+        },
+    ),
+    ("get", "/risk/{geography_id}/map"): OperationDocumentation(
+        summary="Read administrative areas shaded by attributable fraction",
+        description=(
+            "Returns every administrative area beneath the selected geography "
+            "with its display geometry and, where one exists, the share of "
+            "cases attributable to heat for the requested month. Requires a "
+            "risk reader role and access to the exact geography path. Areas "
+            "with no fitted model for the outcome, and areas whose month has "
+            "not been computed, are returned with a null value and a "
+            "missing_reason of no_model or no_prediction rather than being "
+            "omitted - a map that drops uncovered areas reads as though those "
+            "places carry no risk. Geometry is simplified for drawing only, by "
+            "the disclosed tolerance in degrees; climate extraction always "
+            "uses the unsimplified boundary. These are area-level values on "
+            "administrative shapes, not a modelled grid, and must not be "
+            "rendered as cells."
+        ),
+        success_responses={
+            "200": (
+                "Areas beneath the geography with display geometry, bounds, "
+                "and a value or a stated reason for its absence."
+            )
+        },
+    ),
+    ("get", "/risk/{geography_id}/monthly"): OperationDocumentation(
+        summary="Read month-keyed ERA5 maximum temperature and attributable impacts",
+        description=(
+            "Returns the selected AppGeography's ERA5 maximum temperature in "
+            "Celsius and persisted health impacts, keyed by YYYY-MM. An optional "
+            "month query selects one calendar month, and an optional outcome "
+            "selects which model's predictions to read. Requires a risk reader "
+            "role and access to the exact geography path. The monthly value is "
+            "the area-level mean of daily maximum temperature - the statistic the "
+            "model consumes - never the month's single hottest day. "
+            "Missing temperatures are null and missing impacts are empty arrays. "
+            "Scenario and horizon are retained for each impact; no interpolation "
+            "or model evaluation occurs. Fraction milli-units divide by ten for "
+            "display as a percentage. Below the release's reference temperature "
+            "the attributable fraction is zero: there is no heat to attribute."
+        ),
+        success_responses={
+            "200": (
+                "The linked admin unit and sorted monthly temperature/impact map; "
+                "the map is empty when the geography has no matching data."
+            )
+        },
+    ),
     ("get", "/risk/{geography_id}/short-term"): OperationDocumentation(
         summary="Read the Short-term dashboard series and horizon cards",
         description=(

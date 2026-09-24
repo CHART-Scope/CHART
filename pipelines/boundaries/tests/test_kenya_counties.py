@@ -52,19 +52,32 @@ def test_kenya_county_boundaries_match_crosswalk_and_are_valid():
 
 
 def test_kenya_release_separates_navigation_counties_from_model_mappings():
-    release = json.loads(RELEASE.read_text(encoding="utf-8"))
-    places = release["geography"]["places"]
-    mappings = release["areas"]
+    """All 47 counties are navigable; only 46 of them have a fitted zone.
 
-    assert len(places) == 47
-    assert len(mappings) == 46
-    assert {item["model_area_name"] for item in mappings} == FITTED_ZONES
-    assert {item["place_code"] for item in places} - {
-        item["place_code"] for item in mappings
-    } == {"turkana"}
-    assert (
-        next(item for item in mappings if item["place_code"] == "kajiado")[
-            "model_area_name"
-        ]
-        == "South-eastern"
-    )
+    The release used to carry its own `geography.places` list beside an
+    `areas` mapping. Places now live in a shared place set and the release
+    declares only its `model_areas`, each naming the counties it covers - so
+    the gap is read by subtracting the members from the crosswalk rather than
+    by comparing two lists inside one file.
+
+    Turkana is that gap: the North-western zone has no fitted LBW block, so
+    the county is navigable and unmodelled rather than quietly absent.
+    """
+    release = json.loads(RELEASE.read_text(encoding="utf-8"))
+    model_areas = release["model_areas"]
+    with CROSSWALK.open(newline="", encoding="utf-8") as source:
+        counties = {row["place_code"] for row in csv.DictReader(source)}
+
+    assert {area["name"] for area in model_areas} == FITTED_ZONES
+    covered = [code for area in model_areas for code in area["members"]]
+    # No county may be claimed by two zones: the mapping is a partition.
+    assert len(covered) == len(set(covered))
+    assert set(covered) <= counties
+    assert counties - set(covered) == {"turkana"}
+    assert len(covered) == 46
+
+    # The release points at the shared place set rather than restating it.
+    assert release["place_set"]["id"] == "ke-counties"
+
+    kajiado = next(area for area in model_areas if "kajiado" in area["members"])
+    assert kajiado["name"] == "South-eastern"

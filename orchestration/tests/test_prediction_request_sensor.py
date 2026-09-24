@@ -62,19 +62,21 @@ def test_projection_source_failure_is_explicit_and_never_falls_back() -> None:
 
 
 def _run_config(use_fixture: bool = True) -> dict:
+    # Both steps of the job describe the same request, so both take the same
+    # config block - mirroring what the sensor emits.
+    config = {
+        "request_id": 42,
+        "geography_id": "geo-in-madhya-pradesh",
+        "admin_unit_id": 7,
+        "planning_date": "2026-10-01",
+        "source_as_of": "2026-07-22",
+        "lease_token": "test-lease-token",
+        "use_fixture": use_fixture,
+    }
     return {
         "ops": {
-            "process_prediction_request": {
-                "config": {
-                    "request_id": 42,
-                    "geography_id": "geo-in-madhya-pradesh",
-                    "admin_unit_id": 7,
-                    "planning_date": "2026-10-01",
-                    "source_as_of": "2026-07-22",
-                    "lease_token": "test-lease-token",
-                    "use_fixture": use_fixture,
-                }
-            }
+            "ensure_climate_inputs": {"config": dict(config)},
+            "score_prediction": {"config": dict(config)},
         }
     }
 
@@ -97,7 +99,7 @@ def test_sensor_carries_place_and_planning_date() -> None:
         ),
     ):
         requests = list(pending_prediction_requests_sensor(dg.build_sensor_context()))
-    config = requests[0].run_config["ops"]["process_prediction_request"]["config"]
+    config = requests[0].run_config["ops"]["ensure_climate_inputs"]["config"]
     assert config["geography_id"] == queued.geography_id
     assert config["admin_unit_id"] == 7
     assert config["planning_date"] == "2026-10-01"
@@ -127,7 +129,7 @@ def test_sensor_carries_the_explicit_long_term_choice() -> None:
     ):
         requests = list(pending_prediction_requests_sensor(dg.build_sensor_context()))
 
-    config = requests[0].run_config["ops"]["process_prediction_request"]["config"]
+    config = requests[0].run_config["ops"]["ensure_climate_inputs"]["config"]
     assert config["planning_target"] == "long_term_hot_season"
     assert config["projection_scenario"] == "ssp126"
     assert config["projection_period"] == "2031-2040"
@@ -391,3 +393,62 @@ def test_live_refresh_includes_sample_rows_alongside_missing_rows() -> None:
         date(2026, 7, 1),
     ]
     assert metadata["new_runs"] == 2
+
+
+def test_scoring_is_skipped_when_the_request_belongs_to_another_run() -> None:
+    """A request claimed elsewhere must not be scored twice.
+
+    Splitting the job put the claim in one step and the model call in another,
+    so the claim's answer has to reach the second step. If it did not, a
+    request another worker already owns would be scored a second time here.
+    """
+    with (
+        patch(
+            "chart_pipeline.definitions.claim_prediction_request", return_value=False
+        ),
+        patch("chart_pipeline.definitions.prepare_prediction_input") as prepare,
+        patch("chart_pipeline.definitions.complete_prediction_request") as model,
+        patch("chart_pipeline.definitions.set_prediction_request_stage"),
+        patch("chart_pipeline.definitions.fail_prediction_request") as failed,
+    ):
+        result = prediction_request_job.execute_in_process(run_config=_run_config())
+
+    assert result.success
+    prepare.assert_not_called()
+    model.assert_not_called()
+    # Not ours is not a failure: the run that owns it is still working on it.
+    failed.assert_not_called()
+
+
+def test_a_scoring_failure_does_not_discard_the_persisted_climate_inputs() -> None:
+    """The reason the job is split.
+
+    Climate ingestion can take minutes; scoring is a local call. When scoring
+    fails, the inputs step has already succeeded and its work stays committed,
+    so re-executing scoring alone is possible rather than re-downloading.
+    """
+    with (
+        patch("chart_pipeline.definitions.claim_prediction_request", return_value=True),
+        patch(
+            "chart_pipeline.definitions.prepare_prediction_input", return_value=9
+        ) as prepare,
+        patch(
+            "chart_pipeline.definitions.complete_prediction_request",
+            side_effect=ClimateServiceError("MODEL_RUNTIME_UNAVAILABLE", 503),
+        ),
+        patch("chart_pipeline.definitions.set_prediction_request_stage"),
+        patch("chart_pipeline.definitions.fail_prediction_request") as failed,
+    ):
+        result = prediction_request_job.execute_in_process(
+            run_config=_run_config(), raise_on_error=False
+        )
+
+    assert not result.success
+
+    def step_outcomes(node: str) -> set[str]:
+        return {event.event_type_value for event in result.events_for_node(node)}
+
+    assert "STEP_SUCCESS" in step_outcomes("ensure_climate_inputs")
+    assert "STEP_FAILURE" in step_outcomes("score_prediction")
+    prepare.assert_called_once()
+    failed.assert_called_once()

@@ -1,0 +1,167 @@
+/* Rows only: the card shell owns the header, description, error and
+   loading states so every settings block shares them. */
+.empty {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+.rowMain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* The country name doubles as the disclosure control, so the whole label is
+   the target rather than a separate arrow the size of a full stop. */
+.disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--color-charcoal);
+  font: inherit;
+}
+
+.chevron {
+  display: inline-block;
+  transition: transform 120ms ease-out;
+  color: var(--color-text-muted);
+}
+
+.chevron[data-open] {
+  transform: rotate(90deg);
+}
+
+.country {
+  font-weight: 600;
+}
+
+.summary {
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+  margin-right: auto;
+}
+
+.range {
+  color: var(--color-text-muted);
+}
+
+.pull {
+  padding: 0.3125rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  background: var(--surface-card);
+  color: var(--color-charcoal);
+  font-size: var(--fs-caption);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pull:hover:not(:disabled) {
+  background: var(--surface-muted);
+}
+
+.pull:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.progress {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-caption);
+  color: var(--color-nexus);
+  white-space: nowrap;
+}
+
+.spinner {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--color-nexus) 30%, transparent);
+  border-top-color: var(--color-nexus);
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
+}
+
+.rowError {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--color-maroon);
+}
+
+.areas {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.25rem var(--space-4);
+}
+
+.area {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--fs-caption);
+  color: var(--color-charcoal);
+  padding: 0.125rem 0;
+}
+
+.areaMonths {
+  color: var(--color-text-muted);
+}
+
+/* An area with nothing is the actionable state, so it is not left to read as
+   quietly as one that is fully covered. */
+.areaMonths[data-empty] {
+  color: var(--color-maroon);
+}
+
+@media (max-width: 720px) {
+  .summary {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .areas {
+    grid-template-columns: 1fr;
+  }
+}

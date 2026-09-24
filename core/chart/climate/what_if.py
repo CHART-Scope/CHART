@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import math
 
+from chart.shared.outcomes import DEFAULT_OUTCOME
 from chart.inference import InferenceError
 from chart.shared.db.session import get_session_factory
 
@@ -34,7 +35,7 @@ def score_what_if(
     *,
     geography_id: str,
     temperature_c: float,
-    outcome: str = "lbw",
+    outcome: str = DEFAULT_OUTCOME,
     session_factory=None,
     lbw_service_url: str | None = None,
 ) -> WhatIfResponse:
@@ -43,7 +44,7 @@ def score_what_if(
         place = _resolve_place(session, geography_id, outcome=outcome)
         if place.model is None:
             raise ClimateServiceError("MODEL_NOT_AVAILABLE_FOR_PLACE", 409)
-        if outcome != "lbw":
+        if outcome != DEFAULT_OUTCOME:
             return _score_association_what_if(
                 geography_id=geography_id,
                 temperature_c=temperature_c,
@@ -93,7 +94,7 @@ def score_what_if(
     return WhatIfResponse(
         geography_id=geography_id,
         temperature_c=temperature,
-        outcome="lbw",
+        outcome=DEFAULT_OUTCOME,
         area=score.area,
         geography_level=score.geography_level,
         pregnancy_window=window,
@@ -148,7 +149,9 @@ def _score_association_what_if(
         score = score_association_model(
             model,
             outcome=outcome,
-            exposure_values_c=values,
+            # One profile: the interactive slider asks a single what-if, not
+            # a month's worth of days.
+            exposure_profiles_c=(values,),
             service_url=service_url,
         )
     except InferenceError as error:
@@ -181,8 +184,9 @@ def _score_association_what_if(
         outcome=outcome,
         area=score.area,
         geography_level=score.geography_level,
-        exposure_values_c=list(score.exposure_values_c),
-        tmax_lag=list(score.exposure_values_c),
+        # The what-if sends exactly one profile, so it reads exactly one back.
+        exposure_values_c=list(score.exposure_profiles_c[0]),
+        tmax_lag=list(score.exposure_profiles_c[0]),
         reference_temperature_c=score.reference_temperature_c,
         effect_measure=score.effect_measure,
         odds_ratio=score.estimate,

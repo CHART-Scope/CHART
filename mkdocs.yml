@@ -84,6 +84,7 @@ nav:
       - Health input contract: health-input-contract.md
       - Survey exploration guide: health-survey-exploration-guide.md
   - Data pipeline: data-pipeline.md
+  - Dashboard: dashboard.md
   - Project:
       - Digital public good and licensing: licensing.md
 

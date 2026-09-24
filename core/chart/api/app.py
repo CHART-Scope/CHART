@@ -11,7 +11,9 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import text
 
@@ -76,25 +78,23 @@ async def lifespan(_app: FastAPI):
     # The R runtime intentionally starts with an empty in-memory cache. On API
     # startup, reconcile immutable manifests and warm every installed artifact
     # so a service restart does not leave active DB assignments unscoreable.
-    restore_task: asyncio.Task[None] | None = None
-    try:
-        from chart.setup.service import restore_deployed_models
-
-        # When the runtime is already available, complete reconciliation before
-        # accepting traffic so the first slider request cannot observe a stale
-        # assignment. If service start order prevents that, accept non-model
-        # traffic and keep retrying in the background.
-        await asyncio.to_thread(restore_deployed_models)
-    except Exception:  # noqa: BLE001 - background retry handles start order
-        logger.exception("Initial model release restoration failed")
-        restore_task = asyncio.create_task(_restore_models_after_startup())
+    #
+    # This runs in the background rather than before accepting traffic.
+    # Blocking meant the API refused every request until all releases were
+    # warmed - around a minute once a fourth release was installed - and the
+    # frontend renders an unreachable API as "your account has not been
+    # invited yet", which is alarming and wrong. Warming behind an open door
+    # is safe because scoring an unwarmed artifact is already guarded: the
+    # runtime answers MODEL_RELEASE_NOT_LOADED (api_registry.R:140), a clear
+    # error rather than a stale or wrong result. Trading a whole-app outage
+    # for a precise error on one endpoint is the better bargain.
+    restore_task = asyncio.create_task(_restore_models_after_startup())
     try:
         yield
     finally:
-        if restore_task is not None:
-            restore_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await restore_task
+        restore_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await restore_task
         dispose_engines()
 
 
@@ -212,6 +212,31 @@ def http_exception_handler(_request, exc: HTTPException):
         status_code=exc.status_code,
         content=ErrorResponse(error=detail).model_dump(),
         headers=exc.headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+def validation_exception_handler(request, exc: RequestValidationError):
+    """Log which field rejected a request before returning the usual 422.
+
+    A 422 otherwise appears in the server log as a bare status code, so the
+    only way to learn which field was at fault was to reproduce the call by
+    hand with a valid token. The response body is deliberately unchanged -
+    this handler exists to make the failure visible on the server side.
+    """
+    fields = [
+        ".".join(str(part) for part in error.get("loc", ()) if part != "body") or "body"
+        for error in exc.errors()
+    ]
+    logger.warning(
+        "validation_failed: %s %s rejected fields=%s detail=%s",
+        request.method,
+        request.url.path,
+        ", ".join(fields) or "(none)",
+        "; ".join(error.get("msg", "") for error in exc.errors()),
+    )
+    return JSONResponse(
+        status_code=422, content={"detail": jsonable_encoder(exc.errors())}
     )
 
 

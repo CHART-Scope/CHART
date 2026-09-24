@@ -48,3 +48,22 @@ export const Inline: Story = {
     </p>
   ),
 };
+
+export const Searchable: Story = {
+  args: {
+    label: "Planning area",
+    defaultValue: "Nairobi",
+    options: [
+      "Baringo",
+      "Bomet",
+      "Bungoma",
+      "Busia",
+      "Kakamega",
+      "Kiambu",
+      "Nairobi",
+      "Nakuru",
+      "Trans Nzoia",
+    ].map((label) => ({ value: label, label })),
+  },
+};
+export const Disabled: Story = { args: { disabled: true } };

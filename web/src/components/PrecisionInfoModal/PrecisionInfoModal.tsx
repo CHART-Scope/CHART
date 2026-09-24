@@ -22,31 +22,27 @@ type Row = {
   level: PrecisionLevel;
   title: string;
   threshold: string;
-  caption: string;
   body: string;
 };
 
 const ROWS: readonly Row[] = [
   {
     level: "high",
-    title: "HIGH precision",
+    title: "High precision",
     threshold: `CI ratio ≤ ${HIGH_CI_RATIO_MAX}`,
-    caption: "No indication of substantial imprecision",
-    body: "The confidence interval is relatively narrow, indicating limited uncertainty around the effect estimate.",
+    body: "A narrow confidence interval indicates limited uncertainty around the estimate.",
   },
   {
     level: "moderate",
-    title: "MODERATE precision",
+    title: "Moderate precision",
     threshold: `CI ratio > ${HIGH_CI_RATIO_MAX} and ≤ ${MODERATE_CI_RATIO_MAX}`,
-    caption: "Potential imprecision",
-    body: "The confidence interval is wider, indicating greater uncertainty around the effect estimate.",
+    body: "A wider confidence interval indicates greater uncertainty around the estimate.",
   },
   {
     level: "low",
-    title: "LOW precision",
+    title: "Low precision",
     threshold: `CI ratio > ${MODERATE_CI_RATIO_MAX}`,
-    caption: "Imprecise / wide confidence interval",
-    body: "The confidence interval is very wide, indicating substantial uncertainty. The point estimate should be interpreted with caution.",
+    body: "A very wide confidence interval indicates substantial uncertainty. Interpret the estimate with caution.",
   },
 ];
 
@@ -113,12 +109,15 @@ function doiUrl(doi: string): string {
 export function PrecisionInfoModal({ open, onClose, activeLevel }: Props) {
   const [litOpen, setLitOpen] = useState(false);
   return (
-    <Modal open={open} onClose={onClose} bare size="md">
+    <Modal open={open} onClose={onClose} bare size="lg">
       <header className={styles.header}>
         <div className={styles.headerBadge} aria-hidden>
           <Icon name="info-circle" />
         </div>
-        <h2 className={styles.headerTitle}>How we assess precision</h2>
+        <div className={styles.heading}>
+          <p className={styles.eyebrow}>Understanding the estimate</p>
+          <h2 className={styles.headerTitle}>How we assess precision</h2>
+        </div>
         <button
           type="button"
           className={styles.headerClose}
@@ -131,17 +130,15 @@ export function PrecisionInfoModal({ open, onClose, activeLevel }: Props) {
 
       <div className={styles.body}>
         <p className={styles.intro}>
-          <strong>Precision</strong> tells you how much uncertainty surrounds an effect
-          estimate — it&apos;s the width of the 95% confidence interval (CI). Narrower
-          CIs mean more precision; wider CIs mean less.
+          <strong>Precision</strong> describes uncertainty around an estimate. A
+          narrower 95% confidence interval (CI) means more precision.
         </p>
 
         <section className={styles.formulaCard}>
           <span className={styles.eyebrow}>We measure it with the CI ratio</span>
           <p className={styles.formula}>CI ratio = upper CI ÷ lower CI</p>
           <p className={styles.formulaNote}>
-            A simple way to capture how wide the interval is, relative to itself. The
-            higher the ratio, the less precise the estimate.
+            A higher ratio means a wider interval and less precision.
           </p>
         </section>
 
@@ -154,13 +151,16 @@ export function PrecisionInfoModal({ open, onClose, activeLevel }: Props) {
               className={styles.row}
               data-level={row.level}
               data-active={row.level === activeLevel || undefined}
-              data-dim={activeLevel && row.level !== activeLevel ? "" : undefined}
             >
               <div className={styles.rowHead}>
-                <span className={styles.rowTitle}>{row.title}</span>
+                <span className={styles.rowTitle}>
+                  {row.title}
+                  {row.level === activeLevel && (
+                    <span className={styles.current}> · Current estimate</span>
+                  )}
+                </span>
                 <span className={styles.pill}>{row.threshold}</span>
               </div>
-              <p className={styles.rowCaption}>{row.caption}</p>
               <p className={styles.rowBody}>{row.body}</p>
             </li>
           ))}

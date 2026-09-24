@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from pathlib import Path
 
@@ -174,6 +174,30 @@ class ModelPresentationSpec(BaseModel):
     # the modeller's bundled reference (e.g. climate-zone models where a
     # single fixed anchor across zones is not defensible).
     editorial_reference_temperature_c: float | None = Field(default=None, ge=-50, le=60)
+    # What kind of anchor the shipped reference actually is, so the UI can
+    # name it correctly. The modeller's rule (Sewe, Sep 2026) is that an MMT
+    # must be called a minimum mortality temperature and anything else is
+    # stated as a plain reference; nothing in a model artifact declares which
+    # it is, so the release has to say. Defaults to "editorial" when an
+    # editorial anchor is set, otherwise to the bundled value's kind.
+    #   mmt      - a fitted minimum-mortality/minimum-risk temperature
+    #   median   - the median of the observed exposure distribution
+    #   mean     - the mean of the observed exposure distribution
+    #   editorial- a value chosen for presentation (e.g. from a paper)
+    # "p25" is its own kind rather than a flavour of "median": the Kenya
+    # LBW blocks are centred on the 25th percentile of the exposure, and
+    # calling that a median in the provenance card misreports the anchor
+    # every odds ratio on screen is measured from.
+    reference_kind: Literal["mmt", "median", "mean", "p25", "editorial"] | None = None
+
+    @model_validator(mode="after")
+    def _default_reference_kind(self) -> "ModelPresentationSpec":
+        if (
+            self.reference_kind is None
+            and self.editorial_reference_temperature_c is not None
+        ):
+            object.__setattr__(self, "reference_kind", "editorial")
+        return self
 
 
 class ModelAreaSpec(BaseModel):
@@ -203,6 +227,106 @@ class ModelAreaSpec(BaseModel):
         return self
 
 
+class ModelInputVariableSpec(BaseModel):
+    """One exposure vector a model consumes.
+
+    ``length`` is the number of values and ``interval`` the spacing between
+    them, so the two LBW/under-5 shapes are expressible in one type: three
+    monthly means, or four daily maxima. This used to be an untyped dict, which
+    meant a manifest could name the wrong variable or declare the wrong arity
+    and still register - the mismatch only surfaced as an R error at score
+    time.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    length: int = Field(ge=1, le=64)
+    unit: Literal["Celsius"] = "Celsius"
+    interval: Literal["month", "day"] = "month"
+    order: Literal["newest_first", "oldest_first"] = "newest_first"
+    description: str | None = None
+
+
+class ModelInputContractSpec(BaseModel):
+    """What the runtime must be handed, and what this release replaces."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    variables: list[ModelInputVariableSpec] = Field(min_length=1)
+    supersedes_release_ids: list[str] = Field(default_factory=list)
+    interactive_profile: (
+        Literal["repeat_selected_temperature_across_all_lags"] | None
+    ) = None
+    batch_status: Literal["blocked_pending_modeller_confirmation"] | None = None
+    # How a month is reduced to the consecutive days a day-grain model
+    # scores. Declared rather than assumed: the choice changes the answer.
+    batch_profile: Literal["trailing_window_mean"] | None = None
+
+
+class ModelOutputContractSpec(BaseModel):
+    """What the runtime returns, and how the dashboard may present it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    effect_measure: Literal["odds_ratio"] = "odds_ratio"
+    confidence_level: float = Field(default=0.95, gt=0, lt=1)
+    attributable_fraction: Literal["positive_excess_only"] = "positive_excess_only"
+
+
+class ModelArtifactSourceSpec(BaseModel):
+    """Which modeller output the packaged artifact was derived from.
+
+    The compact ``.rds`` we score with is built from a much larger fitted
+    object the modelling team produces. That lineage previously lived only
+    inside the artifact's own provenance block, which needs R to read, so
+    nothing in the backend or its logs could say where a model came from -
+    and one release shipped with no provenance recorded at all.
+
+    Deliberately a filename and checksum rather than an absolute path: the
+    source lives outside the repository on whichever machine packaged it, so
+    a path would be true for one person and misleading for everyone else.
+    The checksum is what proves identity.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    filename: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    produced_on: str | None = None
+    note: str | None = None
+
+
+class ModelAreaGroupSpec(BaseModel):
+    """One fitted block and every place that scores against it.
+
+    A model is fitted at some granularity - a Kenya LBW block covers a whole
+    climate zone of many counties; an MP block covers a single division. Today
+    that grouping is only visible as a string repeated once per member in
+    ``coverage``, so nothing can answer "what are the blocks and what does each
+    cover?" without grouping the list by hand. Declaring it makes the two
+    countries the same shape: Kenya lists many members per block, MP lists one.
+    """
+
+    name: str = Field(min_length=1)
+    level: str = Field(min_length=1)
+    members: tuple[str, ...] = Field(min_length=1)
+    description: str | None = None
+
+
+class ModelCoverageGapSpec(BaseModel):
+    """A place the release deliberately does not score, and why.
+
+    A gap is currently implicit - the place is declared but absent from
+    ``coverage`` - and the reason lives only in release-note prose. Naming it
+    lets a map render "not modelled" from data rather than from inference, and
+    keeps that distinct from a modelled zero.
+    """
+
+    place_code: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+
+
 class ModelReleaseSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -215,13 +339,11 @@ class ModelReleaseSpec(BaseModel):
     version: str = Field(min_length=1)
     base_uri: str = Field(min_length=1)
     runtime: ModelRuntimeSpec | None = None
-    input_contract: dict[str, Any] | None = None
-    output_contract: dict[str, Any] | None = None
+    input_contract: ModelInputContractSpec | None = None
+    output_contract: ModelOutputContractSpec | None = None
     presentation: ModelPresentationSpec | None = None
     # Backwards-compatible fields for older temperature releases. New model
     # families should use input_contract instead.
-    temperature_input: str | None = Field(default=None, min_length=1)
-    months_required: int | None = Field(default=None, ge=1)
     release_notes: str | None = None
     source_git_ref: str | None = None
     model_files: list[ModelFileSpec] = Field(min_length=1)
@@ -229,6 +351,9 @@ class ModelReleaseSpec(BaseModel):
     place_set: PlaceSetReferenceSpec | None = None
     areas: list[ModelAreaSpec] = Field(default_factory=list)
     coverage: list[ModelAreaSpec] | None = None
+    model_areas: list[ModelAreaGroupSpec] | None = None
+    artifact_source: ModelArtifactSourceSpec | None = None
+    coverage_gaps: list[ModelCoverageGapSpec] | None = None
 
     @model_validator(mode="after")
     def validate_release(self) -> ModelReleaseSpec:
@@ -248,25 +373,44 @@ class ModelReleaseSpec(BaseModel):
             ):
                 raise ValueError("MODEL_RELEASE_V2_PLACE_SET_AND_COVERAGE_REQUIRED")
             self.areas = list(self.coverage)
-        if self.input_contract is None and self.temperature_input is None:
+        if self.model_areas is not None:
+            declared = {area.model_area_name for area in self.areas}
+            grouped: dict[str, str] = {}
+            for group in self.model_areas:
+                if group.name not in declared:
+                    raise ValueError("MODEL_RELEASE_AREA_GROUP_UNKNOWN")
+                for member in group.members:
+                    if member in grouped:
+                        raise ValueError("MODEL_RELEASE_AREA_GROUP_DUPLICATE_MEMBER")
+                    grouped[member] = group.name
+            # Every scored place must appear in exactly one group, against the
+            # block it actually scores with. Otherwise the grouping could claim
+            # a coverage story the coverage list does not support.
+            for area in self.areas:
+                if grouped.get(area.place_code) != area.model_area_name:
+                    raise ValueError("MODEL_RELEASE_AREA_GROUP_MISMATCH")
+        if self.coverage_gaps is not None:
+            scored = {area.place_code for area in self.areas}
+            gaps = [gap.place_code for gap in self.coverage_gaps]
+            if len(gaps) != len(set(gaps)):
+                raise ValueError("MODEL_RELEASE_COVERAGE_GAP_DUPLICATE")
+            # A gap names a place the release does not score; claiming one for
+            # a scored place would make the map contradict the data.
+            if scored & set(gaps):
+                raise ValueError("MODEL_RELEASE_COVERAGE_GAP_SCORED")
+        if self.input_contract is None:
             raise ValueError("MODEL_RELEASE_INPUT_CONTRACT_REQUIRED")
-        supersedes = (self.input_contract or {}).get("supersedes_release_ids", [])
-        if not isinstance(supersedes, list) or any(
-            not isinstance(item, str) or not item for item in supersedes
-        ):
+        supersedes = (
+            self.input_contract.supersedes_release_ids
+            if self.input_contract is not None
+            else []
+        )
+        if any(not item for item in supersedes):
             raise ValueError("MODEL_RELEASE_SUPERSEDES_INVALID")
         if self.id in supersedes:
             raise ValueError("MODEL_RELEASE_CANNOT_SUPERSEDE_ITSELF")
         if len(supersedes) != len(set(supersedes)):
             raise ValueError("MODEL_RELEASE_SUPERSEDES_DUPLICATE")
-        if self.temperature_input is not None and self.months_required != 3:
-            raise ValueError("MODEL_RELEASE_MONTHS_MUST_EQUAL_THREE")
-        if self.temperature_input is not None:
-            # Compatibility for legacy LBW manifests. Generic input_contract
-            # releases receive no pregnancy-window semantics by default.
-            for area in self.areas:
-                if area.validated_pregnancy_windows is None:
-                    area.validated_pregnancy_windows = (1, 2, 3)
         filenames = [item.filename for item in self.model_files]
         if len(filenames) != len(set(filenames)):
             raise ValueError("MODEL_RELEASE_FILE_DUPLICATE")

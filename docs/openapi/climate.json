@@ -797,6 +797,153 @@
         "description": "Returns the durable state of a user-owned prediction request, including queued, running, completed, or failed status and the model result when available. The route rejects requests outside the caller's user and geography scope."
       }
     },
+    "/climate/coverage": {
+      "get": {
+        "tags": [
+          "climate"
+        ],
+        "summary": "Read which places already hold climate data",
+        "description": "Returns every country and each of its administrative areas with the number of distinct months of observed climate data held, and the range those months span. Requires the chart_admin role. Months are counted distinctly rather than by row because each month holds several variables, which would otherwise read as several times more coverage than exists. A country's range is the union of its areas' ranges, not a sum. Used by the Settings data section to show what is present before anything is pulled.",
+        "operationId": "read_coverage_climate_coverage_get",
+        "responses": {
+          "200": {
+            "description": "One entry per country with its areas nested, ordered by country code then area name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CountryCoverage"
+                  },
+                  "type": "array",
+                  "title": "Response Read Coverage Climate Coverage Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/climate/ingestion-jobs": {
+      "post": {
+        "tags": [
+          "climate"
+        ],
+        "summary": "Queue one country-wide climate pull",
+        "description": "Queues a single Copernicus download covering every deployed area in one country and returns immediately with the job to poll. Requires the chart_admin role. Accepted rather than performed because a pull takes minutes while the web proxy times out after fifteen seconds. Omitting months requests the last twelve complete ones; the month in progress is never requested because ERA5 lands a few days in arrears. A country that already has a pull in flight returns that job rather than starting a second download of the same grid.",
+        "operationId": "create_ingestion_job_climate_ingestion_jobs_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestionJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The queued job, or the one already running for this country.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestionJobView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "climate"
+        ],
+        "summary": "Read recent climate pulls and their progress",
+        "description": "Returns recent country-wide climate pulls, newest first, with their status, stage, and how many of the country's areas have been written so far. Requires the chart_admin role. Progress is reported per area because one download feeds every area in the country, and a country of forty-seven would otherwise look stalled while it works.",
+        "operationId": "read_ingestion_jobs_climate_ingestion_jobs_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "country_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country Code"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent jobs, newest first, optionally filtered by country.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IngestionJobView"
+                  },
+                  "title": "Response Read Ingestion Jobs Climate Ingestion Jobs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/setup": {
       "get": {
         "tags": [
@@ -1428,6 +1575,156 @@
           }
         },
         "description": "Returns a durable planning workspace only when the signed-in user has the required ownership, role, and geography access. Callers cannot use a known workspace identifier to cross authorization boundaries."
+      }
+    },
+    "/risk/{geography_id}/monthly": {
+      "get": {
+        "tags": [
+          "risk"
+        ],
+        "summary": "Read month-keyed ERA5 maximum temperature and attributable impacts",
+        "operationId": "read_monthly_risk__geography_id__monthly_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The linked admin unit and sorted monthly temperature/impact map; the map is empty when the geography has no matching data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthlyRiskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns the selected AppGeography's ERA5 maximum temperature in Celsius and persisted health impacts, keyed by YYYY-MM. An optional month query selects one calendar month, and an optional outcome selects which model's predictions to read. Requires a risk reader role and access to the exact geography path. The monthly value is the area-level mean of daily maximum temperature - the statistic the model consumes - never the month's single hottest day. Missing temperatures are null and missing impacts are empty arrays. Scenario and horizon are retained for each impact; no interpolation or model evaluation occurs. Fraction milli-units divide by ten for display as a percentage. Below the release's reference temperature the attributable fraction is zero: there is no heat to attribute."
+      }
+    },
+    "/risk/{geography_id}/map": {
+      "get": {
+        "tags": [
+          "risk"
+        ],
+        "summary": "Read administrative areas shaded by attributable fraction",
+        "description": "Returns every administrative area beneath the selected geography with its display geometry and, where one exists, the share of cases attributable to heat for the requested month. Requires a risk reader role and access to the exact geography path. Areas with no fitted model for the outcome, and areas whose month has not been computed, are returned with a null value and a missing_reason of no_model or no_prediction rather than being omitted - a map that drops uncovered areas reads as though those places carry no risk. Geometry is simplified for drawing only, by the disclosed tolerance in degrees; climate extraction always uses the unsimplified boundary. These are area-level values on administrative shapes, not a modelled grid, and must not be rendered as cells.",
+        "operationId": "read_map_risk__geography_id__map_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([1-9][0-9]{3}|0[1-9][0-9]{2}|00[1-9][0-9]|000[1-9])-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Areas beneath the geography with display geometry, bounds, and a value or a stated reason for its absence.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/risk/{geography_id}/short-term": {
@@ -2453,6 +2750,98 @@
   },
   "components": {
     "schemas": {
+      "AreaBoundingBox": {
+        "properties": {
+          "north": {
+            "type": "number",
+            "title": "North"
+          },
+          "west": {
+            "type": "number",
+            "title": "West"
+          },
+          "south": {
+            "type": "number",
+            "title": "South"
+          },
+          "east": {
+            "type": "number",
+            "title": "East"
+          }
+        },
+        "type": "object",
+        "required": [
+          "north",
+          "west",
+          "south",
+          "east"
+        ],
+        "title": "AreaBoundingBox",
+        "description": "The area the climate data for this place was requested over.\n\nERA5 is retrieved from the Climate Data Store as a bounding box, not by\nplace name, so this is the literal `area` in that request. Surfacing it is\nwhat lets the dashboard say which patch of the grid a temperature came\nfrom; the Climate Data Store has no per-location URL, so the box is the\naddressable part."
+      },
+      "AreaCoverage": {
+        "properties": {
+          "geography_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geography Id"
+          },
+          "admin_unit_id": {
+            "type": "integer",
+            "title": "Admin Unit Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "months": {
+            "type": "integer",
+            "title": "Months",
+            "default": 0
+          },
+          "earliest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "admin_unit_id",
+          "code",
+          "name"
+        ],
+        "title": "AreaCoverage"
+      },
       "AuditBatchAck": {
         "properties": {
           "inserted": {
@@ -3435,6 +3824,70 @@
         ],
         "title": "CompleteSetupInput"
       },
+      "CountryCoverage": {
+        "properties": {
+          "country_code": {
+            "type": "string",
+            "title": "Country Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "areas_total": {
+            "type": "integer",
+            "title": "Areas Total"
+          },
+          "areas_with_data": {
+            "type": "integer",
+            "title": "Areas With Data"
+          },
+          "months": {
+            "type": "integer",
+            "title": "Months",
+            "default": 0
+          },
+          "earliest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/AreaCoverage"
+            },
+            "type": "array",
+            "title": "Areas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "country_code",
+          "name",
+          "areas_total",
+          "areas_with_data"
+        ],
+        "title": "CountryCoverage"
+      },
       "CreateUserInput": {
         "properties": {
           "name": {
@@ -4329,6 +4782,109 @@
         "title": "HorizonCard",
         "description": "One \"IN 3 MONTHS\" / \"IN 6 MONTHS\" style card."
       },
+      "IngestionJobRequest": {
+        "properties": {
+          "country_code": {
+            "type": "string",
+            "maxLength": 8,
+            "minLength": 2,
+            "title": "Country Code"
+          },
+          "months": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Months"
+          }
+        },
+        "type": "object",
+        "required": [
+          "country_code"
+        ],
+        "title": "IngestionJobRequest",
+        "description": "Ask for one country's climate data.\n\nMonths are optional: omitted, the last twelve complete months are used,\nwhich is the range the dashboard's picker opens on."
+      },
+      "IngestionJobView": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "country_code": {
+            "type": "string",
+            "title": "Country Code"
+          },
+          "months": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Months"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "areas_total": {
+            "type": "integer",
+            "title": "Areas Total"
+          },
+          "areas_done": {
+            "type": "integer",
+            "title": "Areas Done"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "country_code",
+          "status",
+          "stage",
+          "areas_total",
+          "areas_done",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "IngestionJobView"
+      },
       "LagWindowSpec": {
         "properties": {
           "months": {
@@ -4374,11 +4930,18 @@
             "title": "Geography Level"
           },
           "pregnancy_window": {
-            "type": "integer",
-            "enum": [
-              1,
-              2,
-              3
+            "anyOf": [
+              {
+                "type": "integer",
+                "enum": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
             "title": "Pregnancy Window"
           },
@@ -4387,9 +4950,24 @@
               "type": "number"
             },
             "type": "array",
-            "maxItems": 3,
-            "minItems": 3,
+            "maxItems": 94,
+            "minItems": 1,
             "title": "Temperatures C"
+          },
+          "exposure_dates": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exposure Dates"
           },
           "reference_temperature_c": {
             "type": "number",
@@ -4463,7 +5041,6 @@
         "required": [
           "area",
           "geography_level",
-          "pregnancy_window",
           "temperatures_c",
           "reference_temperature_c",
           "odds_ratio",
@@ -4628,6 +5205,161 @@
         ],
         "title": "LongTermTableRow"
       },
+      "MapArea": {
+        "properties": {
+          "geography_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geography Id"
+          },
+          "admin_unit_id": {
+            "type": "integer",
+            "title": "Admin Unit Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "value_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Percent"
+          },
+          "missing_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Reason"
+          },
+          "odds_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Odds Ratio"
+          },
+          "on_training_support": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Training Support"
+          },
+          "geometry": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geometry"
+          }
+        },
+        "type": "object",
+        "required": [
+          "admin_unit_id",
+          "code",
+          "name",
+          "level"
+        ],
+        "title": "MapArea",
+        "description": "One administrative area, its shape, and its value if it has one.\n\nAn area with no fitted model, or with a model but no computed month, is\nstill returned - with a null value and a stated reason. Dropping it would\nredraw the country as though the gap were sea."
+      },
+      "MapResponse": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric",
+            "default": "attributable_fraction"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": "percent"
+          },
+          "bounds": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Bounds"
+          },
+          "simplify_tolerance_degrees": {
+            "type": "number",
+            "title": "Simplify Tolerance Degrees",
+            "default": 0.0
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/MapArea"
+            },
+            "type": "array",
+            "title": "Areas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "outcome"
+        ],
+        "title": "MapResponse",
+        "description": "A choropleth of one metric over the areas beneath a geography.\n\nDeliberately not the grid in the design references: these are\nadministrative areas carrying an area-level value. Rendering cells from an\narea value would imply a spatial resolution the model does not have."
+      },
       "ModelFileInfo": {
         "properties": {
           "filename": {
@@ -4666,6 +5398,302 @@
           "assignmentCount"
         ],
         "title": "ModelSyncResponse"
+      },
+      "MonthlyHealthImpactPoint": {
+        "properties": {
+          "valid_month": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid Month"
+          },
+          "relative_risk_milli": {
+            "type": "integer",
+            "title": "Relative Risk Milli"
+          },
+          "rr_ci_low_milli": {
+            "type": "integer",
+            "title": "Rr Ci Low Milli"
+          },
+          "rr_ci_high_milli": {
+            "type": "integer",
+            "title": "Rr Ci High Milli"
+          },
+          "attributable_fraction_milli": {
+            "type": "integer",
+            "title": "Attributable Fraction Milli"
+          },
+          "attributable_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributable Number"
+          },
+          "ensemble_spread_milli": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ensemble Spread Milli"
+          },
+          "scenario": {
+            "type": "string",
+            "title": "Scenario"
+          },
+          "data_label": {
+            "type": "string",
+            "title": "Data Label"
+          },
+          "horizon": {
+            "type": "string",
+            "title": "Horizon"
+          },
+          "climate_run_id": {
+            "type": "integer",
+            "title": "Climate Run Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valid_month",
+          "relative_risk_milli",
+          "rr_ci_low_milli",
+          "rr_ci_high_milli",
+          "attributable_fraction_milli",
+          "attributable_number",
+          "ensemble_spread_milli",
+          "scenario",
+          "data_label",
+          "horizon",
+          "climate_run_id"
+        ],
+        "title": "MonthlyHealthImpactPoint"
+      },
+      "MonthlyPrediction": {
+        "properties": {
+          "request_id": {
+            "type": "integer",
+            "title": "Request Id"
+          },
+          "attributable_fraction_milli": {
+            "type": "integer",
+            "title": "Attributable Fraction Milli"
+          },
+          "odds_ratio": {
+            "type": "number",
+            "title": "Odds Ratio"
+          },
+          "reference_temperature_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Temperature C"
+          },
+          "reference_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Kind"
+          },
+          "ci95_low": {
+            "type": "number",
+            "title": "Ci95 Low"
+          },
+          "ci95_high": {
+            "type": "number",
+            "title": "Ci95 High"
+          },
+          "on_training_support": {
+            "type": "boolean",
+            "title": "On Training Support"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "exposure_temperatures_c": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Exposure Temperatures C"
+          },
+          "exposure_dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Exposure Dates"
+          },
+          "input_statistic": {
+            "type": "string",
+            "title": "Input Statistic",
+            "default": "tmax_monthly_mean_c"
+          },
+          "fraction_method": {
+            "type": "string",
+            "title": "Fraction Method",
+            "default": "positive_excess_odds_ratio_approximation"
+          },
+          "attributable_fraction_policy": {
+            "type": "string",
+            "title": "Attributable Fraction Policy",
+            "default": "positive_excess_only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "attributable_fraction_milli",
+          "odds_ratio",
+          "ci95_low",
+          "ci95_high",
+          "on_training_support",
+          "warning",
+          "model_version"
+        ],
+        "title": "MonthlyPrediction"
+      },
+      "MonthlyRiskResponse": {
+        "properties": {
+          "admin_unit_id": {
+            "type": "integer",
+            "title": "Admin Unit Id"
+          },
+          "admin_unit_code": {
+            "type": "string",
+            "title": "Admin Unit Code"
+          },
+          "area_bbox": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AreaBoundingBox"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Bounding box the ERA5 request for this place was made over."
+          },
+          "months": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MonthlyRiskValues"
+            },
+            "type": "object",
+            "title": "Months",
+            "description": "Calendar months keyed YYYY-MM. Missing data is never interpolated."
+          }
+        },
+        "type": "object",
+        "required": [
+          "admin_unit_id",
+          "admin_unit_code"
+        ],
+        "title": "MonthlyRiskResponse"
+      },
+      "MonthlyRiskValues": {
+        "properties": {
+          "prediction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MonthlyPrediction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MonthlyTemperature"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "health_impacts": {
+            "items": {
+              "$ref": "#/components/schemas/MonthlyHealthImpactPoint"
+            },
+            "type": "array",
+            "title": "Health Impacts"
+          }
+        },
+        "type": "object",
+        "title": "MonthlyRiskValues"
+      },
+      "MonthlyTemperature": {
+        "properties": {
+          "tmax_monthly_mean_c": {
+            "type": "number",
+            "title": "Tmax Monthly Mean C"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "source_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Name"
+          },
+          "climate_run_id": {
+            "type": "integer",
+            "title": "Climate Run Id"
+          },
+          "data_label": {
+            "type": "string",
+            "title": "Data Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tmax_monthly_mean_c",
+          "unit",
+          "source_name",
+          "climate_run_id",
+          "data_label"
+        ],
+        "title": "MonthlyTemperature",
+        "description": "The month's maximum temperature, area-level, from ERA5.\n\nThe variable is maximum temperature; the monthly value is the mean of\nits daily values, which is what the model was fitted on and therefore\nwhat it consumes. The month's single hottest day is deliberately not\nused. The dashboard says \"maximum temperature\" rather than \"average\nmaximum temperature\", which reads as a contradiction - agreed on the\n17 Sep modelling call."
       },
       "PersonalViewResponse": {
         "properties": {
@@ -4899,7 +5927,7 @@
           },
           "outcome": {
             "type": "string",
-            "const": "lbw",
+            "minLength": 1,
             "title": "Outcome",
             "default": "lbw"
           },

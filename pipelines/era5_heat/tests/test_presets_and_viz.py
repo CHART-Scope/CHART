@@ -23,7 +23,7 @@ def test_presets_contain_focus_districts():
 @pytest.mark.parametrize("slug", ["madhya-pradesh", "kajiado"])
 def test_preset_bboxes_pass_validation(slug):
     preset = get(slug)
-    validate_bbox(preset.bbox)            # no exception
+    validate_bbox(preset.bbox)  # no exception
     n, w, s, e = preset.bbox
     assert n > s
     assert -180 <= w < e <= 180
@@ -81,8 +81,18 @@ def test_to_year_month_matrix_shape():
     mat = to_year_month_matrix(df, "heatwave_days")
     assert mat.shape == (3, 12)
     assert list(mat.columns) == [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
     ]
     assert list(mat.index) == [2022, 2023, 2024]
 

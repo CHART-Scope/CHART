@@ -1,0 +1,243 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-eyebrow);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.panel h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-body-lg);
+  font-weight: 400;
+  color: var(--color-charcoal);
+}
+
+.map {
+  width: 100%;
+  height: auto;
+  /* Sized by its own aspect ratio rather than by leftover card height, so
+     the drawing keeps its proportions whatever the neighbours do. */
+  display: block;
+}
+
+.area {
+  stroke: var(--surface-card, #fff);
+  stroke-width: 0.75;
+  stroke-linejoin: round;
+  transition: opacity 120ms ease-out;
+}
+
+.area[data-interactive] {
+  cursor: pointer;
+}
+
+.area[data-interactive]:hover {
+  opacity: 0.82;
+}
+.area[data-selected] {
+  stroke: var(--color-charcoal, #2b2b26);
+  stroke-width: 2.25;
+}
+
+.readout {
+  margin: 0;
+  min-height: 1.25rem;
+  font-size: var(--fs-body-sm, 0.875rem);
+  color: var(--color-text-muted);
+}
+
+.notice {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  /* Row gap larger than column gap: when the legend wraps, the bands should
+     read as two lines rather than one crowded block. */
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  justify-content: center;
+  gap: 4px;
+}
+
+.legendPending,
+.legendUnmodelled,
+.legendRunning {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 3px;
+  border: 1px solid var(--border-muted, #cfcabb);
+}
+.mapWrap {
+  position: relative;
+}
+.tooltip {
+  position: absolute;
+  z-index: 2;
+  /* Offset from the cursor so the pointer never covers the first line. */
+  transform: translate(0.75rem, -2.75rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface-card, #fff);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 12%);
+  pointer-events: none;
+  max-width: 15rem;
+}
+
+.tooltipName {
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  color: var(--color-charcoal);
+}
+
+.tooltipValue {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-charcoal);
+}
+
+.tooltipValue[data-state="running"] {
+  color: var(--color-forest, #2f6f4e);
+}
+
+.tooltipValue[data-state="unmodelled"],
+.tooltipValue[data-state="pending"] {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.tooltipHint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.area:focus-visible {
+  outline: none;
+  stroke: var(--color-charcoal, #2b2b26);
+  stroke-width: 2.25;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.prepareAll {
+  padding: 0.3125rem 0.625rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.prepareAll:hover:not(:disabled) {
+  color: var(--color-charcoal);
+  border-color: var(--color-charcoal);
+  background: var(--surface-muted, #f4f3ee);
+}
+
+.prepareAll:focus-visible {
+  outline: 2px solid var(--color-forest, #2f6f4e);
+  outline-offset: 2px;
+}
+
+.prepareAll:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.loadingLegend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 5px 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 0.75rem;
+  min-height: 28px;
+  cursor: pointer;
+}
+
+.legendSwatch {
+  border-radius: 3px;
+  /* A hairline keeps the palest band visible against the card. */
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%);
+  width: 12px;
+  height: 12px;
+}
+
+.embedded {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 360px;
+}
+.embedded h2 {
+  margin: 0;
+  font-size: var(--fs-caption);
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+.area[data-muted] {
+  opacity: 0.12;
+}
+.legendItem[aria-pressed="true"] {
+  border-color: var(--color-charcoal);
+  background: var(--surface-muted, #f4f3ee);
+  color: var(--color-charcoal);
+}
+.legendItem:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .area {
+    transition: none;
+  }
+}

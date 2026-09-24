@@ -9,7 +9,12 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import dagster as dg
-from era5_heat import compute_heat_series, fixture_demo
+from era5_heat import (
+    AreaSpec,
+    compute_heat_series,
+    compute_heat_series_for_areas,
+    fixture_demo,
+)
 from era5_heat.io import output_paths, write_json, write_table
 from geoalchemy2.shape import to_shape
 from isimip_projection import (
@@ -45,12 +50,23 @@ from chart.climate.requests import (
     reserve_queued_prediction_requests,
     set_prediction_request_stage,
 )
+from chart.climate.ingestion_jobs import (
+    areas_for_country,
+    claim_job,
+    complete_job,
+    country_envelope,
+    fail_job,
+    record_progress,
+    reserve_queued_jobs,
+)
 from chart.climate.service import ClimateServiceError
 from chart.shared.db.climate_load import (
+    load_era5_daily_series,
     load_era5_monthly_frame,
+    load_era5_shared_download,
     load_monthly_climate_records,
 )
-from chart.shared.db.models import AdminUnit
+from chart.shared.db.models import AdminUnit, Geography
 from chart.shared.db.session import get_session_factory
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -70,14 +86,51 @@ class PredictionRequestConfig(dg.Config):
     projection_period: str | None = None
 
 
-@dg.op
-def process_prediction_request(
+def _source_as_of(config: PredictionRequestConfig) -> datetime:
+    value = datetime.fromisoformat(config.source_as_of)
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+@contextmanager
+def _failing_the_request_on_error(config: PredictionRequestConfig):
+    """Mark the request failed if the step raises, then re-raise.
+
+    Both steps need this and both must record the same way, so a request can
+    never be left `running` behind a failed Dagster step.
+    """
+    try:
+        yield
+    except Exception as error:
+        fail_prediction_request(
+            config.request_id,
+            error_code=getattr(error, "code", type(error).__name__),
+            lease_token=config.lease_token,
+        )
+        raise
+
+
+@dg.op(
+    description=(
+        "Claim the request and persist the exact climate inputs it will be "
+        "scored on, fetching observations first if they are missing."
+    )
+)
+def ensure_climate_inputs(
     context: dg.OpExecutionContext,
     config: PredictionRequestConfig,
-) -> None:
-    source_as_of = datetime.fromisoformat(config.source_as_of)
-    if source_as_of.tzinfo is None:
-        source_as_of = source_as_of.replace(tzinfo=timezone.utc)
+) -> bool:
+    """Everything up to, and not including, the model.
+
+    Split from scoring because the two fail for unrelated reasons and on
+    unrelated timescales: this step waits on an external provider and can take
+    minutes, while scoring is a local call that either works or does not. Kept
+    separate, a scoring failure can be re-executed from the Dagster UI without
+    re-downloading observations that are already stored.
+
+    Returns whether the request is ours to score. A request already claimed by
+    another run is not an error; it simply is not ours.
+    """
+    source_as_of = _source_as_of(config)
     if not claim_prediction_request(
         config.request_id,
         dagster_run_id=context.run_id,
@@ -86,9 +139,9 @@ def process_prediction_request(
         context.log.info(
             "Request %s is already claimed or completed", config.request_id
         )
-        return
+        return False
 
-    try:
+    with _failing_the_request_on_error(config):
         with _prediction_lease_heartbeat(
             context, config.request_id, config.lease_token
         ):
@@ -103,8 +156,12 @@ def process_prediction_request(
                     )
                     break
                 except ClimateServiceError as error:
+                    # Only a genuinely absent observation is worth another
+                    # pass. Anything else means ingestion itself is broken,
+                    # and retrying would just repeat the same failure.
                     refreshable_errors = {
                         "CLIMATE_DATA_NOT_READY",
+                        "CLIMATE_DAILY_DATA_NOT_READY",
                         "CLIMATE_WINDOW_GRAIN_MISMATCH",
                         "CLIMATE_SAMPLE_NOT_LIVE",
                         "CLIMATE_DATA_STALE",
@@ -112,6 +169,12 @@ def process_prediction_request(
                     if error.code not in refreshable_errors or refresh_attempts >= 2:
                         raise
                     refresh_attempts += 1
+                    context.log.info(
+                        "Request %s needs observations (%s); ingesting, attempt %d",
+                        config.request_id,
+                        error.code,
+                        refresh_attempts,
+                    )
                     metadata = _prepare_required_climate(
                         context,
                         admin_unit_id=config.admin_unit_id,
@@ -134,7 +197,41 @@ def process_prediction_request(
                         config.request_id, lease_token=config.lease_token
                     ):
                         raise ClimateServiceError("PREDICTION_LEASE_LOST", 409)
+    context.log.info("Climate inputs ready for request %s", config.request_id)
+    return True
 
+
+@dg.op(description="Score the persisted climate inputs and store the prediction.")
+def score_prediction(
+    context: dg.OpExecutionContext,
+    config: PredictionRequestConfig,
+    inputs_ready: bool,
+) -> None:
+    if not inputs_ready:
+        context.log.info(
+            "Request %s was not claimed by this run; nothing to score",
+            config.request_id,
+        )
+        return
+
+    with _failing_the_request_on_error(config):
+        # Ownership rather than a fresh claim: both steps run inside one
+        # Dagster run, so the lease is already ours. A heartbeat proves that
+        # and extends it without resetting the stage the way re-claiming
+        # would.
+        #
+        # Inside the wrapper, not before it: a lost lease raises, and raising
+        # outside left the request sitting in `running` until its own lease
+        # expired - the exact state `_failing_the_request_on_error` exists to
+        # make impossible.
+        if not heartbeat_prediction_request(
+            config.request_id, lease_token=config.lease_token
+        ):
+            raise ClimateServiceError("PREDICTION_LEASE_LOST", 409)
+
+        with _prediction_lease_heartbeat(
+            context, config.request_id, config.lease_token
+        ):
             set_prediction_request_stage(
                 config.request_id,
                 "predicting",
@@ -149,18 +246,202 @@ def process_prediction_request(
                 config.request_id,
                 prediction.prediction.odds_ratio,
             )
-    except Exception as error:
-        fail_prediction_request(
-            config.request_id,
-            error_code=getattr(error, "code", type(error).__name__),
-            lease_token=config.lease_token,
+
+
+class ClimateIngestionConfig(dg.Config):
+    job_id: int
+    country_code: str
+    months: list[str]
+
+
+@dg.op(
+    description=(
+        "Download one grid covering a whole country and write every deployed "
+        "area's climate from it."
+    )
+)
+def pull_country_climate(
+    context: dg.OpExecutionContext,
+    config: ClimateIngestionConfig,
+) -> None:
+    """One Copernicus request for a country, instead of one per area per month.
+
+    Copernicus charges in queue time, not bytes: a county-month is ~600 kB but
+    waits a median 215s. Asking per area meant hundreds of waits for one
+    country and enough contention that requests expired before a worker
+    reached them. The aggregation never cared about the grid's extent, so one
+    country-sized download serves every area inside it.
+    """
+    session_factory = get_session_factory()
+    months = [date.fromisoformat(f"{item}-01") for item in config.months]
+
+    with session_factory() as session:
+        job = claim_job(session, config.job_id, dagster_run_id=context.run_id)
+        if job is None:
+            context.log.info("Job %s is not ours to run", config.job_id)
+            return
+        units = areas_for_country(session, config.country_code)
+        if not units:
+            fail_job(session, config.job_id, error_code="CLIMATE_NO_AREAS")
+            session.commit()
+            raise ClimateServiceError("CLIMATE_NO_AREAS", 409)
+        envelope = country_envelope(units)
+        areas = [
+            AreaSpec(
+                id=unit.id,
+                code=unit.code,
+                name=unit.name,
+                geometry=_area_geometry(unit),
+            )
+            for unit in units
+        ]
+        geography = session.get(Geography, units[0].geography_id)
+        if geography is None:
+            raise ValueError(
+                f"admin unit {units[0].id} points at missing geography "
+                f"{units[0].geography_id}"
+            )
+        preset_slug = geography.slug
+        session.commit()
+
+    context.log.info(
+        "Pulling %s: one grid (N,W,S,E)=%s for %d months, %d areas",
+        config.country_code,
+        tuple(round(value, 2) for value in envelope),
+        len(months),
+        len(areas),
+    )
+
+    try:
+        _ensure_climate_storage_capacity()
+        if not _cds_credentials_available():
+            raise ClimateServiceError("CLIMATE_INGEST_NOT_CONFIGURED", 503)
+        results = compute_heat_series_for_areas(
+            areas, bbox=envelope, target_months=tuple(months)
         )
+        if not results:
+            raise ClimateServiceError("CLIMATE_NO_GRID_CENTRES", 422)
+
+        with session_factory() as session:
+            record_progress(session, config.job_id, stage="writing")
+            session.commit()
+
+        csv_paths: dict[int, str] = {}
+        for area in areas:
+            if area.id not in results:
+                continue
+            frame, meta, _ = results[area.id]
+            path, _ = _write_observed_output(area.code, frame, meta, months)
+            csv_paths[area.id] = str(path)
+
+        with session_factory() as session:
+            run, monthly_rows, daily_rows = load_era5_shared_download(
+                session,
+                preset_slug=preset_slug,
+                results=results,
+                csv_paths=csv_paths,
+            )
+            complete_job(
+                session,
+                config.job_id,
+                climate_run_id=run.id,
+                areas_done=len(results),
+            )
+            session.commit()
+        context.log.info(
+            "Pulled %s from one download: run=%s, %d areas, %d monthly rows, "
+            "%d daily rows",
+            config.country_code,
+            run.id,
+            len(results),
+            monthly_rows,
+            daily_rows,
+        )
+        context.log_event(
+            dg.AssetMaterialization(
+                asset_key=["climate", "country_pull"],
+                metadata={
+                    "country": config.country_code,
+                    "areas": len(results),
+                    "monthly_rows": monthly_rows,
+                    "daily_rows": daily_rows,
+                    "climate_run_id": run.id,
+                },
+            )
+        )
+    except Exception as error:
+        with session_factory() as session:
+            fail_job(
+                session,
+                config.job_id,
+                error_code=getattr(error, "code", type(error).__name__),
+            )
+            session.commit()
         raise
 
 
-@dg.job(description="Prepare three traceable climate months, then run one prediction.")
+def _area_geometry(unit) -> dict:
+    """GeoJSON for an admin unit, whichever backend stored it."""
+    boundary = unit.boundary
+    if isinstance(boundary, str):
+        return json.loads(boundary)
+    return mapping(to_shape(boundary))
+
+
+@dg.job(description="Download one country's climate grid and derive its areas.")
+def climate_ingestion_job():
+    pull_country_climate()
+
+
+@dg.sensor(
+    job=climate_ingestion_job,
+    minimum_interval_seconds=10,
+    default_status=dg.DefaultSensorStatus.RUNNING,
+)
+def pending_climate_ingestions_sensor(_context: dg.SensorEvaluationContext):
+    """Dispatch operator-triggered pulls, one country at a time.
+
+    Deliberately narrower than the prediction sensor: each run holds a whole
+    country's download, and running several at once would recreate the queue
+    contention this path exists to remove.
+    """
+    session_factory = get_session_factory()
+    with session_factory() as session:
+        jobs = reserve_queued_jobs(session, limit=1)
+        pending = [(job.id, job.country_code, list(job.months or [])) for job in jobs]
+    if not pending:
+        yield dg.SkipReason("No queued climate pulls.")
+        return
+    for job_id, country_code, months in pending:
+        yield dg.RunRequest(
+            run_key=f"climate-ingestion:{job_id}",
+            run_config={
+                "ops": {
+                    "pull_country_climate": {
+                        "config": {
+                            "job_id": job_id,
+                            "country_code": country_code,
+                            "months": months,
+                        }
+                    }
+                }
+            },
+            tags={
+                "trigger": "climate-ingestion",
+                "country_code": country_code,
+                "climate_ingestion_job_id": str(job_id),
+            },
+        )
+
+
+@dg.job(
+    description=(
+        "Persist the exact climate inputs a request will be scored on, then "
+        "run the model on them."
+    )
+)
 def prediction_request_job():
-    process_prediction_request()
+    score_prediction(ensure_climate_inputs())
 
 
 @dg.sensor(
@@ -183,9 +464,11 @@ def pending_prediction_requests_sensor(_context: dg.SensorEvaluationContext):
     for request in queued_requests:
         yield dg.RunRequest(
             run_key=f"prediction-request:{request.id}:attempt:{request.attempt_count}",
+            # Both steps describe the same request, so they take the same
+            # config rather than one step inferring it from the other's output.
             run_config={
                 "ops": {
-                    "process_prediction_request": {
+                    op_name: {
                         "config": {
                             "request_id": request.id,
                             "geography_id": request.geography_id,
@@ -199,6 +482,7 @@ def pending_prediction_requests_sensor(_context: dg.SensorEvaluationContext):
                             "projection_period": request.projection_period,
                         }
                     }
+                    for op_name in ("ensure_climate_inputs", "score_prediction")
                 }
             },
             tags={
@@ -538,7 +822,7 @@ def _load_fixture(
 def _load_observed(context, place: dict, months: list[date], session_factory) -> int:
     if not _cds_credentials_available():
         raise ClimateServiceError("CLIMATE_INGEST_NOT_CONFIGURED", 503)
-    df, meta = compute_heat_series(
+    df, meta, daily = compute_heat_series(
         district=place["name"],
         bbox=place["bbox"],
         geometry=place["geometry"],
@@ -554,8 +838,19 @@ def _load_observed(context, place: dict, months: list[date], session_factory) ->
             meta=meta,
             csv_path=str(csv_path),
         )
+        # The same pull, stored at day grain for the models fitted on daily
+        # lags. Both grains hang off this one run, so they cannot drift.
+        day_count = load_era5_daily_series(
+            session,
+            admin_unit_id=place["id"],
+            climate_run_id=run.id,
+            daily=daily,
+            agg_method=str(meta.get("aggregation_method") or "bbox_coslat_mean_v1"),
+        )
         session.commit()
-        context.log.info("Loaded observed climate run %s", run.id)
+        context.log.info(
+            "Loaded observed climate run %s (%d daily rows)", run.id, day_count
+        )
         return run.id
 
 
@@ -876,6 +1171,6 @@ def _ensure_climate_storage_capacity() -> None:
 
 
 defs = dg.Definitions(
-    jobs=[prediction_request_job],
-    sensors=[pending_prediction_requests_sensor],
+    jobs=[prediction_request_job, climate_ingestion_job],
+    sensors=[pending_prediction_requests_sensor, pending_climate_ingestions_sensor],
 )

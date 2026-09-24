@@ -368,6 +368,7 @@ export async function submitPrediction(
     geographyId: string;
     planningMonth: string;
     target: PlanningTarget;
+    outcome?: string;
     scenario?: "ssp126" | "ssp370" | "ssp585";
     projectionPeriod?: "2031-2040";
   },
@@ -381,7 +382,10 @@ export async function submitPrediction(
       body: JSON.stringify({
         geography_id: input.geographyId,
         planning_date: `${input.planningMonth}-01`,
-        outcome: "lbw",
+        // Hardcoding this queued every request as low birth weight regardless
+        // of the outcome the dashboard was showing, so under-five mortality
+        // could never be prepared at all.
+        outcome: input.outcome ?? "lbw",
         // The state-level MP model release validates window 1 only.
         // Divisions default to (1, 2, 3). Sending [1] keeps the state
         // default working; when the dashboard lets the user pick a

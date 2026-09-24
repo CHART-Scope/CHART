@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone
@@ -24,9 +25,12 @@ from .models import (
     DataLabel,
     DataSource,
     DistrictClimate,
+    DistrictClimateDay,
     Geography,
     Provenance,
 )
+
+logger = logging.getLogger(__name__)
 
 ERA5_DATA_SOURCE_NAME = "Copernicus ERA5 single levels"
 
@@ -621,3 +625,245 @@ def _validate_handoff_columns(df: pd.DataFrame, meta: dict) -> None:
         actual = {str(value) for value in df[column].dropna().unique()}
         if actual != {str(expected)}:
             raise ValueError(f"ERA5_HANDOFF_METADATA_MISMATCH: {column}")
+
+
+def load_era5_daily_series(
+    session: Session,
+    *,
+    admin_unit_id: int,
+    climate_run_id: int,
+    daily: pd.Series,
+    agg_method: str,
+    variable: str = "tmax_c",
+    unit: str = "degC",
+) -> int:
+    """Upsert daily district values for one climate run.
+
+    Written alongside the monthly rows from the same ERA5 pull, so a day and
+    the month containing it share a climate run and a provenance record.
+    Idempotent on ``(admin_unit, run, date, variable)``: re-running an
+    ingestion updates values in place rather than accumulating duplicates a
+    later window selection would have to choose between.
+    """
+    if daily is None or daily.empty:
+        return 0
+
+    existing = {
+        row.period_date: row
+        for row in session.scalars(
+            select(DistrictClimateDay).where(
+                DistrictClimateDay.admin_unit_id == admin_unit_id,
+                DistrictClimateDay.climate_run_id == climate_run_id,
+                DistrictClimateDay.variable == variable,
+            )
+        )
+    }
+
+    written = 0
+    for timestamp, value in daily.items():
+        if value is None or (isinstance(value, float) and math.isnan(value)):
+            continue
+        period = pd.Timestamp(timestamp).date()
+        numeric = float(value)
+        record_hash = hashlib.sha256(
+            json.dumps(
+                {
+                    "admin_unit_id": admin_unit_id,
+                    "climate_run_id": climate_run_id,
+                    "date": period.isoformat(),
+                    "variable": variable,
+                    "value": numeric,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+
+        row = existing.get(period)
+        if row is None:
+            session.add(
+                DistrictClimateDay(
+                    admin_unit_id=admin_unit_id,
+                    climate_run_id=climate_run_id,
+                    period_date=period,
+                    variable=variable,
+                    value=numeric,
+                    agg_method=agg_method,
+                    unit=unit,
+                    quality_status="ok",
+                    record_hash=record_hash,
+                )
+            )
+        else:
+            row.value = numeric
+            row.agg_method = agg_method
+            row.unit = unit
+            row.record_hash = record_hash
+        written += 1
+
+    session.flush()
+    return written
+
+
+def load_era5_shared_download(
+    session: Session,
+    *,
+    preset_slug: str,
+    results: dict[int, tuple[pd.DataFrame, dict, pd.Series]],
+    csv_paths: dict[int, str],
+) -> tuple[ClimateRun, int, int]:
+    """Write many areas' values against one climate run.
+
+    One Copernicus download is one acquisition, so it is one ``climate_run``
+    with ``district_climate`` rows for every area derived from it. Nothing in
+    the schema ever required a run per admin unit - ``district_climate`` holds
+    a plain FK - and filing each area under its own run would claim as many
+    separate acquisitions as there are areas, which is not what happened.
+
+    Returns ``(run, monthly_rows, daily_rows)``. Areas whose frame fails audit
+    are skipped and counted out rather than aborting the country: one bad
+    geometry must not cost the other forty-six.
+    """
+
+    if not results:
+        raise ValueError("results must not be empty")
+
+    first_id = next(iter(results))
+    _, shared_meta, _ = results[first_id]
+    data_source = None
+    climate_run: ClimateRun | None = None
+    monthly_rows = 0
+    daily_rows = 0
+
+    for admin_unit_id, (frame, meta, daily) in results.items():
+        admin_unit = session.get(AdminUnit, admin_unit_id)
+        if admin_unit is None:
+            raise KeyError(f"unknown admin unit id: {admin_unit_id}")
+        try:
+            records, input_hash, data_label = audit_era5_monthly_frame(
+                preset_slug=preset_slug,
+                admin_unit=admin_unit,
+                df=frame,
+                meta=meta,
+                csv_path=csv_paths[admin_unit_id],
+            )
+        except Exception:
+            logger.exception(
+                "era5 shared download: %s failed audit; skipping this area",
+                admin_unit.code,
+            )
+            continue
+
+        if climate_run is None:
+            geography = session.get(Geography, admin_unit.geography_id)
+            if geography is None:
+                raise KeyError(f"unknown geography for admin unit: {admin_unit_id}")
+            data_source = _get_or_create_era5_data_source(session, geography.id)
+            # The run's identity is the download, so it is hashed from the
+            # shared metadata rather than from whichever area happened to be
+            # written first.
+            run_hash = hashlib.sha256(
+                json.dumps(
+                    {
+                        "contract": "chart-era5-shared-download-v1",
+                        "bbox": shared_meta.get("bbox"),
+                        "cache": shared_meta.get("cache"),
+                        "requested_months": shared_meta.get("requested_months"),
+                        "dataset": shared_meta.get("dataset"),
+                        "variable": shared_meta.get("variable"),
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    default=str,
+                ).encode()
+            ).hexdigest()
+            existing = session.scalar(
+                select(ClimateRun).where(ClimateRun.input_hash == run_hash)
+            )
+            if existing is not None:
+                _touch_data_source(data_source)
+                return existing, 0, 0
+            provenance = Provenance(
+                source_uri=csv_paths[admin_unit_id],
+                input_hash=run_hash,
+                license="Copernicus CDS terms",
+            )
+            session.add(provenance)
+            session.flush()
+            climate_run = ClimateRun(
+                data_source_id=data_source.id,
+                provenance_id=provenance.id,
+                tier="observed",
+                source_class="observed",
+                source_name=records[0].source_name,
+                source_version=records[0].source_version,
+                source_uri=records[0].source_uri,
+                source_license=records[0].source_license,
+                input_hash=run_hash,
+                scenario=None,
+                resolution="ERA5 0.25 deg shared-area aggregate",
+                data_label=data_label,
+                window_start_year=shared_meta.get("window", {}).get("start_year"),
+                window_end_year=shared_meta.get("window", {}).get("end_year"),
+                generated_at=(
+                    datetime.fromisoformat(shared_meta["generated_at"])
+                    if shared_meta.get("generated_at")
+                    else None
+                ),
+                valid_from=records[0].valid_from,
+                valid_to=records[-1].valid_to,
+                fresh_until=records[-1].fresh_until,
+                boundary_version=records[0].boundary_version,
+                aggregation_version=records[0].aggregation_method,
+                downscaling_method=records[0].downscaling_method,
+                quality_status=records[0].quality_status,
+                raw_object_uri=csv_paths[admin_unit_id],
+                raw_object_hash=run_hash,
+            )
+            session.add(climate_run)
+            session.flush()
+
+        rows_by_month = {_parse_month(row["month"]): row for _, row in frame.iterrows()}
+        for record in records:
+            row = rows_by_month[record.period_month]
+            for variable, unit in ERA5_VARIABLES:
+                session.add(
+                    DistrictClimate(
+                        admin_unit_id=admin_unit.id,
+                        climate_run_id=climate_run.id,
+                        period_month=record.period_month,
+                        variable=variable,
+                        value=float(row[variable]),
+                        agg_method=record.aggregation_method,
+                        unit=unit,
+                        observed_days=(
+                            int(row["observed_days"])
+                            if "observed_days" in row
+                            and not pd.isna(row["observed_days"])
+                            else None
+                        ),
+                        expected_days=(
+                            int(row["expected_days"])
+                            if "expected_days" in row
+                            and not pd.isna(row["expected_days"])
+                            else None
+                        ),
+                        quality_status=record.quality_status,
+                        record_hash=record.record_hash,
+                    )
+                )
+                monthly_rows += 1
+        daily_rows += load_era5_daily_series(
+            session,
+            admin_unit_id=admin_unit.id,
+            climate_run_id=climate_run.id,
+            daily=daily,
+            agg_method=str(meta.get("aggregation_method") or "bbox_coslat_mean_v1"),
+        )
+
+    if climate_run is None:
+        raise ValueError("no area survived the audit; nothing was written")
+    if data_source is not None:
+        _touch_data_source(data_source)
+    session.flush()
+    return climate_run, monthly_rows, daily_rows

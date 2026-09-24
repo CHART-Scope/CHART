@@ -293,8 +293,8 @@ export default function DesignSystemPage() {
                 ]}
               />
               <p className={styles.note}>
-                Bordered pill, white fill — used for filters and any standalone
-                dropdown, e.g. the geography selector.
+                Nexus-tinted pill with a searchable menu for longer lists — used for
+                filters and standalone dropdown, e.g. the geography selector.
               </p>
             </div>
           </div>

@@ -2,6 +2,8 @@
 
 import type { CSSProperties } from "react";
 
+import { SelectMenu } from "./SelectMenu";
+
 import { Icon } from "@/components/Icon";
 
 import styles from "./InlineSelect.module.css";
@@ -18,6 +20,7 @@ export type InlineSelectGroup = {
 };
 
 type Props = {
+  menu?: boolean;
   value: string;
   onChange: (value: string) => void;
   options?: readonly InlineSelectOption[];
@@ -41,6 +44,7 @@ type Props = {
  * comfortable hover / focus state.
  */
 export function InlineSelect({
+  menu = true,
   value,
   onChange,
   options,
@@ -63,23 +67,36 @@ export function InlineSelect({
       }
       style={style}
     >
-      <select
-        aria-label={ariaLabel}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        disabled={disabled}
-      >
-        {groups
-          ? groups
-              .filter((group): group is InlineSelectGroup => group !== null)
-              .map((group) => (
-                <optgroup key={group.label} label={group.label}>
-                  {group.options.map(renderOption)}
-                </optgroup>
-              ))
-          : options?.map(renderOption)}
-      </select>
-      <Icon name="chevron-down" size={12} className={styles.chevron} />
+      {menu ? (
+        <SelectMenu
+          value={value}
+          onChange={onChange}
+          options={options}
+          groups={groups}
+          label={ariaLabel}
+          disabled={disabled}
+        />
+      ) : (
+        <>
+          <select
+            aria-label={ariaLabel}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            disabled={disabled}
+          >
+            {groups
+              ? groups
+                  .filter((group): group is InlineSelectGroup => group !== null)
+                  .map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.options.map(renderOption)}
+                    </optgroup>
+                  ))
+              : options?.map(renderOption)}
+          </select>
+          <Icon name="chevron-down" size={12} className={styles.chevron} />
+        </>
+      )}
     </span>
   );
   if (!label) return pill;

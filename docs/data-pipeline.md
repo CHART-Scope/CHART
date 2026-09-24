@@ -119,3 +119,58 @@ already exist and materialises only the requested geography when they are missin
 
 See [Modeling](modeling.md) for the scorer's inputs, artifact provenance, and
 interpretation limits.
+
+## What the dashboard queues on its own
+
+The spatial risk map draws every administrative area beneath the selected
+geography, so on a country with many areas most of them have no result the
+first time anyone looks. Rather than leaving a map of blanks, a visit queues a
+small number of the missing ones.
+
+**Three areas per visit.** The cap is deliberate and it is the whole design.
+Climate is fetched per area bounding box, and a month that is not already
+cached takes minutes against the Copernicus Climate Data Store. Queueing a
+whole country on page load would start one download per area — 47 for Kenya —
+because somebody opened a page, and would do it again for the next month they
+looked at. Three per visit fills a map in over a few visits while keeping page
+load cheap and predictable, and it scales to countries with far more areas
+without changing behaviour.
+
+The constant lives in one place, `AUTO_PREPARE_PER_VISIT` in
+`web/src/features/dashboard/SpatialRiskMap.tsx`.
+
+**Automatic never replaces explicit.** A *Prepare remaining N* action sits on
+the map for anyone with a planning role, and queues every runnable area at
+once. The automatic allowance exists so a map is not empty on arrival, not to
+ration what a planner can ask for.
+
+Three rules keep this from misbehaving:
+
+- **Only genuinely runnable areas.** An area is queued only when it has an
+  active model for the selected outcome, has no stored result, and has no run
+  already in flight. Areas with no fitted model are never queued — there is
+  nothing to run.
+- **Never twice in a session.** Queued geography ids are remembered for the
+  life of the page. Without that, a run that failed would return to "not
+  calculated", be picked up on the next render, and loop.
+- **Role-gated, like every other run.** The same planning roles that may
+  prepare a month from the risk card may trigger this; a read-only viewer
+  queues nothing, automatically or otherwise.
+
+### What the map's four states mean
+
+| State | Meaning |
+|---|---|
+| Shaded amber → red | A stored result for this area, outcome and month |
+| Loading data | A run is in flight — queued, fetching observations, or scoring |
+| Not calculated yet | Runnable, but nobody has asked for it |
+| Not integrated | No model has been fitted for this area |
+
+"Loading data" is read from live `prediction_request` rows rather than assumed
+from what the browser just submitted, so a run started by a colleague shows as
+loading here too. The last two are kept distinct because they need different
+things: one is a selection away, the other needs a fitted model from the
+modelling team.
+
+Areas in every state are always drawn. An area omitted from a map reads as
+though it carries no risk, which is the opposite of what an absent model means.

@@ -1,15 +1,24 @@
-import type { SelectHTMLAttributes } from "react";
+"use client";
 
+import { useId, useState } from "react";
+import { SelectMenu } from "../InlineSelect/SelectMenu";
+import type { InlineSelectOption } from "../InlineSelect/InlineSelect";
 import styles from "./Select.module.css";
 
-type Option = { value: string; label: string };
-
-type Props = Omit<SelectHTMLAttributes<HTMLSelectElement>, "children"> & {
+type Props = {
   label?: string;
-  options: Option[];
+  "aria-label"?: string;
+  options: InlineSelectOption[];
   placeholder?: string;
   variant?: "default" | "filter" | "inline";
   fullWidth?: boolean;
+  className?: string;
+  id?: string;
+  name?: string;
+  value?: string;
+  defaultValue?: string;
+  disabled?: boolean;
+  onChange?: (value: string) => void;
 };
 
 export function Select({
@@ -20,31 +29,49 @@ export function Select({
   fullWidth,
   className,
   id,
-  ...rest
+  name,
+  value,
+  defaultValue,
+  disabled,
+  onChange,
+  "aria-label": ariaLabel,
 }: Props) {
-  const cls = [
-    styles.select,
-    styles[variant],
-    fullWidth ? "" : variant === "default" ? styles.maxWidth : "",
-    className ?? "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const generatedId = useId();
+  const [localValue, setLocalValue] = useState(
+    defaultValue ?? (placeholder ? "" : (options[0]?.value ?? "")),
+  );
+  const selected = value ?? localValue;
+  const controlId = id ?? generatedId;
   return (
-    <div className={styles.wrap}>
+    <div
+      className={[
+        styles.wrap,
+        variant === "inline" ? styles.inline : "",
+        !fullWidth && variant === "default" ? styles.maxWidth : "",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       {label && (
-        <label className={styles.label} htmlFor={id}>
+        <label className={styles.label} htmlFor={controlId}>
           {label}
         </label>
       )}
-      <select id={id} className={cls} {...rest}>
-        {placeholder ? <option value="">{placeholder}</option> : null}
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      <SelectMenu
+        id={controlId}
+        label={ariaLabel ?? label ?? placeholder ?? "Choose an option"}
+        value={selected}
+        disabled={disabled}
+        options={
+          placeholder ? [{ value: "", label: placeholder }, ...options] : options
+        }
+        onChange={(next) => {
+          setLocalValue(next);
+          onChange?.(next);
+        }}
+      />
+      {name && <input type="hidden" name={name} value={selected} disabled={disabled} />}
     </div>
   );
 }

@@ -62,10 +62,10 @@ def session_factory():
     return factory
 
 
-def _request() -> PredictRequest:
+def _request(planning_date: date | None = None) -> PredictRequest:
     return PredictRequest(
         geography_id="geo-in-madhya-pradesh",
-        planning_date=date(2026, 7, 1),
+        planning_date=planning_date or date(2026, 7, 1),
     )
 
 
@@ -114,10 +114,7 @@ def _seed_place_and_model(session_factory) -> None:
             version="1.0.0",
             status="active",
             model_files=[{"filename": "state.rds", "sha256": "a" * 64}],
-            input_spec={
-                "temperature_input": "tmax_monthly_mean_c",
-                "months_required": 3,
-            },
+            input_spec={},
             activated_at=datetime.now(timezone.utc),
         )
         session.add(release)
@@ -335,7 +332,17 @@ def test_stale_worker_cannot_mutate_a_reassigned_request(session_factory) -> Non
         )
 
 
-def test_same_request_on_a_new_day_gets_a_new_source_check(session_factory) -> None:
+def test_asking_again_the_next_day_joins_the_run_already_under_way(
+    session_factory,
+) -> None:
+    """The same month is the same prediction, whatever day it is asked for.
+
+    It used to fork a second request, because the identity hash includes the
+    submission date. With a map that can ask for many areas at once that
+    became a queue the workers could not drain: reserved requests whose leases
+    expired before they ran, then failed as PREDICTION_LEASE_EXPIRED - for work
+    that was already in flight.
+    """
     first = submit_prediction(
         _request(),
         session_factory=session_factory,
@@ -347,12 +354,20 @@ def test_same_request_on_a_new_day_gets_a_new_source_check(session_factory) -> N
         now=TEST_NOW + timedelta(days=1),
     )
 
-    assert first.request_id != second.request_id
+    assert first.request_id == second.request_id
     assert first.source_as_of == TEST_NOW.date()
-    assert second.source_as_of == (TEST_NOW + timedelta(days=1)).date()
 
 
-def test_request_history_is_separate_for_each_user(session_factory) -> None:
+def test_a_second_planner_joins_the_run_rather_than_starting_another(
+    session_factory,
+) -> None:
+    """Two people asking for one month is one download, not two.
+
+    Their *histories* stay their own - a planner still sees only what they
+    asked for, and cannot read another planner's request by id - but the work
+    behind them is shared, because the prediction is a fact about a place and
+    a month rather than about who asked.
+    """
     first = submit_prediction(
         _request(),
         requested_by_user_id="planner-one",
@@ -366,7 +381,7 @@ def test_request_history_is_separate_for_each_user(session_factory) -> None:
         now=TEST_NOW,
     )
 
-    assert first.request_id != second.request_id
+    assert first.request_id == second.request_id
     history = list_prediction_requests(
         requested_by_user_id="planner-one",
         geography_id="geo-in-madhya-pradesh",
@@ -771,6 +786,44 @@ def test_score_rejects_place_from_country_without_approved_model(
     assert error.value.code == "MODEL_NOT_AVAILABLE_FOR_PLACE"
 
 
+def test_release_not_cleared_for_the_queued_path_is_refused_with_a_reason(
+    session_factory,
+) -> None:
+    """A registered-but-unconfirmed release must fail early, not inside R.
+
+    The under-5 artifact reads four daily lags; the monthly climate spine can
+    only supply monthly means. Its manifest says so via batch_status, and the
+    request has to stop here rather than building a wrong-shaped vector and
+    failing per-request in the runtime.
+    """
+
+    with session_factory() as session:
+        place = session.get(AppGeography, "geo-in-madhya-pradesh")
+        admin_unit = session.scalar(
+            select(AdminUnit).where(AdminUnit.app_geography_id == place.id)
+        )
+        release = session.scalar(select(ModelRelease))
+        spec = dict(release.input_spec or {})
+        contract = dict(spec.get("input_contract") or {})
+        contract["batch_status"] = "blocked_pending_modeller_confirmation"
+        spec["input_contract"] = contract
+        release.input_spec = spec
+        session.commit()
+        assert admin_unit is not None
+
+    with pytest.raises(ClimateServiceError) as error:
+        submit_prediction(
+            PredictRequest(
+                geography_id="geo-in-madhya-pradesh",
+                planning_date=date(2026, 7, 1),
+            ),
+            session_factory=session_factory,
+        )
+
+    assert error.value.code == "MODEL_BATCH_NOT_CONFIRMED"
+    assert error.value.status_code == 409
+
+
 def test_partial_reanalysis_month_is_not_selected_as_input(session_factory) -> None:
     """tdd.md §4: an incomplete ERA5 (reanalysis) month is rejected."""
 
@@ -861,3 +914,90 @@ def test_failed_request_is_requeued_with_same_id(session_factory) -> None:
         assert record is not None
         assert record.attempt_count == 2
         assert record.error_code is None
+
+
+def test_a_failed_request_does_not_block_a_retry(session_factory) -> None:
+    """Idempotency must not become a trap.
+
+    Only work that will still produce an answer is matched. If a failed
+    request counted, a month that failed once could never be asked for again.
+    """
+    first = submit_prediction(_request(), session_factory=session_factory, now=TEST_NOW)
+    fail_prediction_request(
+        first.request_id,
+        error_code="MODEL_RUNTIME_UNAVAILABLE",
+        session_factory=session_factory,
+    )
+
+    second = submit_prediction(
+        _request(), session_factory=session_factory, now=TEST_NOW
+    )
+    assert second.request_id == first.request_id or second.request_id is not None
+    # The retry is live again rather than stuck on the failure.
+    reopened = get_prediction_request(
+        second.request_id,
+        requested_by_user_id=None,
+        session_factory=session_factory,
+    )
+    assert reopened.status in {"queued", "waiting", "running"}
+
+
+def test_a_different_month_is_its_own_request(session_factory) -> None:
+    """The guard is per grain, not per place."""
+    august = submit_prediction(
+        _request(planning_date=date(2026, 8, 1)),
+        session_factory=session_factory,
+        now=TEST_NOW,
+    )
+    july = submit_prediction(
+        _request(planning_date=date(2026, 7, 1)),
+        session_factory=session_factory,
+        now=TEST_NOW,
+    )
+    assert august.request_id != july.request_id
+
+
+def test_a_newer_request_for_another_outcome_does_not_hide_this_one(
+    session_factory,
+) -> None:
+    """The dedupe must survive two outcomes being askable for one month.
+
+    It used to take the newest row for the place and month and only then
+    check the outcome, returning nothing when it did not match. An under-five
+    request submitted after a low birth weight one therefore hid it, and the
+    next low birth weight ask queued a second Copernicus pull for a month
+    already being fetched.
+    """
+    lbw = submit_prediction(
+        _request(),
+        requested_by_user_id="planner-one",
+        session_factory=session_factory,
+        now=TEST_NOW,
+    )
+    # A different outcome for the same place and month, submitted later.
+    with session_factory() as session:
+        newer = session.get(PredictionRequestRecord, lbw.request_id)
+        session.add(
+            PredictionRequestRecord(
+                request_key="other-outcome",
+                location_slug=newer.location_slug,
+                timeframe_id=newer.timeframe_id,
+                admin_unit_id=newer.admin_unit_id,
+                planning_date=newer.planning_date,
+                model_release_id=newer.model_release_id,
+                request_payload={
+                    **newer.request_payload,
+                    "outcome": "under_5_mortality",
+                },
+                status="queued",
+            )
+        )
+        session.commit()
+
+    again = submit_prediction(
+        _request(),
+        requested_by_user_id="planner-two",
+        session_factory=session_factory,
+        now=TEST_NOW,
+    )
+    assert again.request_id == lbw.request_id

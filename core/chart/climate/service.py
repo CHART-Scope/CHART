@@ -8,6 +8,7 @@ from typing import Literal, cast
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from chart.shared.outcomes import DEFAULT_OUTCOME
 from chart.inference import InferenceError
 from chart.model_registry.service import (
     ActiveModelMapping,
@@ -52,7 +53,13 @@ from .schemas import (
     PreviewRequest,
     PreviewResponse,
 )
-from .model_scoring import score_lbw_model
+from .daily_windows import (
+    daily_contract,
+    read_daily_input_dates,
+    read_daily_input_values,
+    trailing_profiles,
+)
+from .model_scoring import score_association_model, score_lbw_model
 from .source_policy import resolve_month_source
 
 
@@ -206,6 +213,15 @@ def preview(
         return _build_preview(session, place, request.planning_date, now=now)
 
 
+@dataclass(frozen=True)
+class _ScoreIdentity:
+    """The three fields every scorer must echo back for verification."""
+
+    area: str
+    model_file: str
+    model_sha256: str | None
+
+
 def score_prepared_prediction(
     session_factory,
     *,
@@ -251,16 +267,38 @@ def score_prepared_prediction(
         stored_window = session.get(ClimateInputWindowRecord, climate_input_window_id)
         if stored_window is None or stored_window.admin_unit_id != admin_unit_id:
             raise ClimateServiceError("CLIMATE_INPUT_NOT_FOUND", 409)
-        rows = read_input_values(session, climate_input_window_id)
-        if len(rows) != 3:
-            raise ClimateServiceError("CLIMATE_DATA_NOT_READY", 409)
-        if any(row[0].admin_unit_id != admin_unit_id for row in rows):
-            raise ClimateServiceError("CLIMATE_INPUT_ADMIN_MISMATCH", 409)
-        temperatures = (
-            float(rows[0][0].value),
-            float(rows[1][0].value),
-            float(rows[2][0].value),
-        )
+        # The grain the release reads, decided in exactly one place so a
+        # window built at one grain can never be scored at the other.
+        daily = daily_contract(model.input_spec)
+        exposure_values: tuple[float, ...] = ()
+        exposure_profiles: tuple[tuple[float, ...], ...] = ()
+        exposure_dates: tuple[date, ...] = ()
+        temperatures: tuple[float, float, float] = (0.0, 0.0, 0.0)
+        if daily is not None:
+            length, _ = daily
+            if stored_window.grain != "day":
+                raise ClimateServiceError("CLIMATE_INPUT_GRAIN_MISMATCH", 409)
+            # The window holds the month's daily series with its lead-in, not
+            # a single profile: the model is scored once per day of the month
+            # and those scores are averaged. See `daily_windows`.
+            exposure_values = read_daily_input_values(session, stored_window)
+            exposure_profiles = trailing_profiles(exposure_values, length)
+            if not exposure_profiles:
+                raise ClimateServiceError("CLIMATE_DAILY_DATA_NOT_READY", 409)
+            exposure_dates = read_daily_input_dates(session, stored_window)
+        else:
+            if stored_window.grain not in (None, "month"):
+                raise ClimateServiceError("CLIMATE_INPUT_GRAIN_MISMATCH", 409)
+            rows = read_input_values(session, climate_input_window_id)
+            if len(rows) != 3:
+                raise ClimateServiceError("CLIMATE_DATA_NOT_READY", 409)
+            if any(row[0].admin_unit_id != admin_unit_id for row in rows):
+                raise ClimateServiceError("CLIMATE_INPUT_ADMIN_MISMATCH", 409)
+            temperatures = (
+                float(rows[0][0].value),
+                float(rows[1][0].value),
+                float(rows[2][0].value),
+            )
         preview_body = _build_preview(
             session,
             place,
@@ -275,13 +313,56 @@ def score_prepared_prediction(
         model_version = model.version
         model_sha256 = model.artifact_sha256
 
+    # The two model families return different shapes - an association model
+    # has an `estimate` over `exposure_values_c` and no pregnancy window - so
+    # each is normalised to the fields a stored prediction needs rather than
+    # one being cast to the other.
+    scored_window: PregnancyWindow | None
+    scored_dates: list[date] | None
     try:
-        score = score_lbw_model(
-            model,
-            pregnancy_window=pregnancy_window,
-            temperatures_c=temperatures,
-            service_url=lbw_service_url,
-        )
+        if daily is not None:
+            association = score_association_model(
+                model,
+                outcome=model.outcome,
+                exposure_profiles_c=exposure_profiles,
+                service_url=lbw_service_url,
+            )
+            checked = _ScoreIdentity(
+                association.area, association.model_file, association.model_sha256
+            )
+            # Store the series that was scored, not the profiles built from
+            # it: the profiles repeat every day `length` times, and the series
+            # is what a reader recognises as the month.
+            scored_values = list(exposure_values)
+            scored_dates = list(exposure_dates)
+            scored_window = None
+            geography_level = association.geography_level
+            reference_temperature_c = association.reference_temperature_c
+            estimate = association.estimate
+            ci95_low, ci95_high = association.ci95_low, association.ci95_high
+            on_training_support = association.on_training_support
+            model_file_used = association.model_file
+            model_sha256_used = association.model_sha256
+            warning = association.warning
+        else:
+            lbw = score_lbw_model(
+                model,
+                pregnancy_window=pregnancy_window,
+                temperatures_c=temperatures,
+                service_url=lbw_service_url,
+            )
+            checked = _ScoreIdentity(lbw.area, lbw.model_file, lbw.model_sha256)
+            scored_values = list(lbw.temperatures_c)
+            scored_dates = None
+            scored_window = lbw.pregnancy_window
+            geography_level = lbw.geography_level
+            reference_temperature_c = lbw.reference_temperature_c
+            estimate = lbw.odds_ratio
+            ci95_low, ci95_high = lbw.ci95_low, lbw.ci95_high
+            on_training_support = lbw.on_training_support
+            model_file_used = lbw.model_file
+            model_sha256_used = lbw.model_sha256
+            warning = lbw.warning
     except InferenceError as error:
         unavailable_errors = {
             "LBW_SERVICE_NOT_CONFIGURED",
@@ -295,26 +376,27 @@ def score_prepared_prediction(
         status = 503 if error.code in unavailable_errors else 502
         raise ClimateServiceError(error.code, status, error.detail) from error
 
-    if score.area != model_area_name:
+    if checked.area != model_area_name:
         raise ClimateServiceError("MODEL_AREA_RESPONSE_MISMATCH", 502)
-    if Path(score.model_file).name != Path(model_file).name:
+    if Path(checked.model_file).name != Path(model_file).name:
         raise ClimateServiceError("MODEL_FILE_RESPONSE_MISMATCH", 502)
-    if score.model_sha256 != model_sha256:
+    if checked.model_sha256 != model_sha256:
         raise ClimateServiceError("MODEL_CHECKSUM_RESPONSE_MISMATCH", 502)
     prediction = LbwPrediction(
-        area=score.area,
-        geography_level=score.geography_level,
-        pregnancy_window=score.pregnancy_window,
-        temperatures_c=list(score.temperatures_c),
-        reference_temperature_c=score.reference_temperature_c,
-        odds_ratio=score.odds_ratio,
-        ci95_low=score.ci95_low,
-        ci95_high=score.ci95_high,
-        on_training_support=score.on_training_support,
-        model_file=score.model_file,
+        area=checked.area,
+        geography_level=geography_level,
+        pregnancy_window=scored_window,
+        temperatures_c=scored_values,
+        exposure_dates=scored_dates,
+        reference_temperature_c=reference_temperature_c,
+        odds_ratio=estimate,
+        ci95_low=ci95_low,
+        ci95_high=ci95_high,
+        on_training_support=on_training_support,
+        model_file=model_file_used,
         model_version=model_version,
-        model_sha256=score.model_sha256,
-        warning=score.warning,
+        model_sha256=model_sha256_used,
+        warning=warning,
         explanation=None,
     )
     return PredictResponse(
@@ -332,9 +414,16 @@ def validate_prediction_request(
 ) -> ResolvedPlace:
     session_factory = session_factory or get_session_factory()
     with session_factory() as session:
-        place = _resolve_place(session, request.geography_id)
+        place = _resolve_place(session, request.geography_id, outcome=request.outcome)
         if place.model is None:
             raise ClimateServiceError("MODEL_NOT_AVAILABLE_FOR_PLACE", 409)
+        # A release can be fitted and registered but not cleared for the queued
+        # path - the under-5 artifact reads daily lags the monthly climate spine
+        # cannot supply. Refuse here with a reason rather than failing later
+        # inside the R runtime.
+        contract = (place.model.input_spec or {}).get("input_contract") or {}
+        if contract.get("batch_status") == "blocked_pending_modeller_confirmation":
+            raise ClimateServiceError("MODEL_BATCH_NOT_CONFIRMED", 409)
         return place
 
 
@@ -541,7 +630,7 @@ def _month_response(
 
 
 def _resolve_place(
-    session: Session, geography_id: str, *, outcome: str = "lbw"
+    session: Session, geography_id: str, *, outcome: str = DEFAULT_OUTCOME
 ) -> ResolvedPlace:
     geography = session.get(AppGeography, geography_id)
     if geography is None:
