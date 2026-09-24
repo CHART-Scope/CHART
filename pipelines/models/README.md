@@ -1,125 +1,53 @@
-# CHART model runtime
+# Model artifacts
 
-The R HTTP service that CHART calls to score every deployed model, plus the
-per-family manifest + artifact directories it serves from. Adapter dispatch on
-the manifest's `runtime.adapter` field lets one runtime host many model
-families.
-
-## Layout
+Fitted `.rds` artifacts live under `artifacts/`, laid out **exactly as they are
+in S3**:
 
 ```
-pipelines/models/
-├── Dockerfile                        # runtime container image
-├── run_registry_api.sh               # container entrypoint (launches api_registry.R)
-├── inference/
-│   ├── api_registry.R                # Plumber HTTP API: /health, /models, /models/load, /predict
-│   ├── serialization.R               # 15-decimal JSON serializer
-│   ├── adapters/
-│   │   ├── compact_score.R           # DLNM scoring — the compact_r_registry adapter
-│   │   └── score_core.R              # numerical helpers used by compact_score.R
-│   └── tests/
-│       ├── test_serialization.R      # baked into Dockerfile test stage
-│       └── test_compact_score.R
-├── lbw/                              # model family: low-birth-weight
-│   ├── model-release.*.json          # manifests
-│   └── model/*.rds                   # compact artifacts (gitignored)
-└── under_five_mortality/             # model family: MP under-five mortality
-    ├── model-release.*.json
-    └── ...
+pipelines/models/artifacts/<country>/<outcome>/<version>/<filename>.rds
+                           ^-------------------------^
+                           the key under s3://chart-predictive-models/
 ```
 
-## Adapter dispatch
+So a release's `base_uri` and its local path are the same string:
 
-The `runtime.adapter` field in each manifest names the scoring code that
-handles its artifacts. The current runtime bundles one adapter,
-`compact_r_registry`, which serves every family using compact DLNM artifacts
-(LBW and under-five mortality today). Adding a new model family with a
-different math means writing a new adapter under `inference/adapters/`,
-sourcing it from `api_registry.R`, and having the manifest declare its name.
+| manifest `base_uri`                                                                 | local path                                                                         |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `s3://chart-predictive-models/india/mp/lbw/1.0.1-compact-review`                    | `pipelines/models/artifacts/india/mp/lbw/1.0.1-compact-review/`                    |
+| `s3://chart-predictive-models/kenya/under-five-mortality/0.1.0-climate-zone-review` | `pipelines/models/artifacts/kenya/under-five-mortality/0.1.0-climate-zone-review/` |
 
-The Python side (`chart.model_registry.runtime.prepare_model_release`) mirrors
-this dispatch — a manifest whose adapter is unknown fails with
-`MODEL_RUNTIME_ADAPTER_UNSUPPORTED` rather than silently loading an unsupported
-artifact.
+Uploading a new artifact is then a copy rather than a lookup, and a manifest
+pointing at the wrong bucket or prefix is visible on sight. It was not always
+so: artifacts used to sit in `<outcome>/model/`, grouped differently from S3,
+and the mismatch hid a Kenya manifest that named a bucket the deploy never
+syncs. The file was absent from production for a day, and because
+`_auto_seed_deployed_models` aborts on one missing artifact, it took
+registration for all four models down with it.
 
-## Currently deployed manifests
+## What actually finds them
 
-| Family     | Manifest                                            | Model file                                   | Release id                         |
-| ---------- | --------------------------------------------------- | -------------------------------------------- | ---------------------------------- |
-| LBW        | `lbw/model-release.mp.compact.review.json`          | `IN_MP_LBW_tmax_v1.0.1-compact.rds`          | `lbw-mp-1.0.1-compact-review`      |
-| LBW        | `lbw/model-release.kenya.review.json`               | `KE_climate_zone_LBW_tmax_v0.2.1-review.rds` | `lbw-ke-climate-zone-0.2.1-review` |
-| Under-five | `under_five_mortality/model-release.mp.review.json` | (see manifest)                               | `under5-mortality-mp-0.1.0-review` |
+Nothing depends on this layout. The runtime resolves an artifact by
+**searching `MODEL_CACHE_DIR` recursively for the filename** and then checking
+its sha256 (`warm_model_artifact`). Two consequences:
 
-Review-only manifests are gated by `CHART_ENABLE_REVIEW_MODELS=true`. Add a new
-release by dropping a `model-release.<slug>.json` under
-`pipelines/models/<family>/`; the backend picks it up via
-`chart.setup.model_configs.deployed_models()`.
+- **Filenames must be unique across the whole tree.** Two files with the same
+  name anywhere under the root is `matches=2` and the release fails to load.
+  The version belongs in the _filename_, not only the directory - which is
+  what the modellers already do (`..._v0.1.0-review.rds`).
+- **Never rename what a modeller sends.** The manifest pins both the filename
+  and the sha256; a rename or a re-export breaks both.
 
-## Running the service
+The layout is therefore for people, not for code - which is exactly why it
+needs writing down.
 
-Prefer `make run` from the repo root — it starts R, Python API, Dagster, and
-the web app together with the shared `MODEL_CONTROL_TOKEN` pre-wired. See
-[Installation setup — Model registry control token](../../docs/installation-setup.md#model-registry-control-token)
-for why the token exists and how to override it.
+## In the image and on the server
 
-Standalone R (for debugging one process in isolation):
+`.dockerignore` excludes `**/*.rds`, so artifacts are never baked into an
+image. In production they arrive in the `/models` volume from
+`aws s3 sync s3://$MODEL_BUCKET/ /models/ --exclude "archive/*"`, which runs
+as the `chart-model-sync` service on deploy. Retire superseded artifacts to
+`archive/` in the bucket: the sync skips that prefix, so they stay for
+provenance without ever colliding in `/models`.
 
-```bash
-MODEL_CONTROL_TOKEN=local-only-secret \
-MODEL_CACHE_DIR="$(pwd)/pipelines/models" \
-PORT=8000 \
-bash pipelines/models/run_registry_api.sh
-```
-
-Environment variables:
-
-| Variable              | Default    | Purpose                                                                                                        |
-| --------------------- | ---------- | -------------------------------------------------------------------------------------------------------------- |
-| `HOST`                | `0.0.0.0`  | Bind address.                                                                                                  |
-| `PORT`                | `8000`     | Plumber port.                                                                                                  |
-| `MODEL_CACHE_DIR`     | `/models`  | Directory scanned recursively for RDS files.                                                                   |
-| `MODEL_CONTROL_TOKEN` | _required_ | Shared secret matched against `X-CHART-Model-Control-Token` on `/models/load`. Must equal the backend's value. |
-
-Docker build:
-
-```bash
-docker build --target runtime -t chart-lbw pipelines/models
-docker build --target test -t chart-lbw-test pipelines/models   # runs the R self-tests
-```
-
-## Loading models
-
-The CHART backend does this automatically at setup completion (via
-`chart.model_registry.runtime.prepare_model_release`). To reproduce by hand:
-
-```bash
-curl -X POST http://127.0.0.1:8000/models/load \
-  -H "X-CHART-Model-Control-Token: $MODEL_CONTROL_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "release_id": "lbw-ke-climate-zone-0.2.1-review",
-    "model_version": "0.2.1-review",
-    "model_file": "KE_climate_zone_LBW_tmax_v0.2.1-review.rds",
-    "model_sha256": "ffc9ed89723f...",
-    "local_path": "/models/lbw/model/KE_climate_zone_LBW_tmax_v0.2.1-review.rds"
-  }'
-```
-
-`/predict` requires the release identity in the request body and refuses any
-mismatch — enforced on the Python side too in
-`chart.inference.service.score_lbw`.
-
-## Constraints on compact artifacts
-
-Compact `.rds` files must contain only basis settings, coefficients, covariance
-matrices, reference temperatures, supported ranges, and aggregate training
-counts. They must **not** contain respondent rows, household identifiers,
-coordinates, fitted model frames, or any other restricted microdata.
-
-## Related documentation
-
-- [Model releases](../../docs/model-updates.md) — manifest schema, versioning,
-  and how the backend consumes releases.
-- [Add a geography and model](../../docs/add-geography-and-model.md) —
-  end-to-end steps for adding a new place or model family.
-- [Modeling](../../docs/modeling.md) — inputs, outputs, and interpretation.
+Locally the files here are gitignored working copies; the manifests beside
+them are the tracked source of truth.
