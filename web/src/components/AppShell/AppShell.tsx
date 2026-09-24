@@ -128,7 +128,7 @@ export function AppShell({
         <button
           type="button"
           className={styles.activityBtn}
-          aria-label="Open activity log"
+          aria-label="Open background work"
           onClick={() => setActivityOpen(true)}
         >
           <Icon name="dots" size={16} />

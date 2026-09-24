@@ -42,6 +42,53 @@ type Props = {
   canPrepare?: boolean;
 };
 
+// Dashboard query-string changes can remount this component even when the map
+// scope has not changed (for example, selecting another county). Keep the
+// expensive, parent-level map response outside the component so those
+// navigations reuse it. The token remains part of the key so data is never
+// shared between signed-in sessions; the small bound prevents an old session
+// from accumulating indefinitely in a long-lived tab.
+const mapCache = new Map<string, MapResponse>();
+const mapRequests = new Map<string, Promise<MapResponse>>();
+const MAX_CACHED_MAPS = 12;
+
+function rememberMap(key: string, data: MapResponse) {
+  mapCache.delete(key);
+  mapCache.set(key, data);
+  while (mapCache.size > MAX_CACHED_MAPS) {
+    const oldest = mapCache.keys().next().value;
+    if (oldest === undefined) break;
+    mapCache.delete(oldest);
+  }
+}
+
+function loadMap(
+  key: string,
+  geographyId: string,
+  accessToken: string,
+  month: string | null | undefined,
+  outcome: string | undefined,
+  force: boolean,
+): Promise<MapResponse> {
+  if (!force) {
+    const cached = mapCache.get(key);
+    if (cached) return Promise.resolve(cached);
+    const pending = mapRequests.get(key);
+    if (pending) return pending;
+  }
+
+  const request = fetchRiskMap(geographyId, accessToken, { month, outcome })
+    .then((response) => {
+      rememberMap(key, response);
+      return response;
+    })
+    .finally(() => {
+      if (mapRequests.get(key) === request) mapRequests.delete(key);
+    });
+  mapRequests.set(key, request);
+  return request;
+}
+
 export function SpatialRiskMap({
   embedded = false,
   dataRefreshKey = 0,
@@ -80,24 +127,29 @@ export function SpatialRiskMap({
       setResult(null);
       return;
     }
-    const controller = new AbortController();
+    let cancelled = false;
     setError(null);
     setHovered(null);
-    fetchRiskMap(geographyId, accessToken, {
+    loadMap(
+      requestKey,
+      geographyId,
+      accessToken,
       month,
       outcome,
-      signal: controller.signal,
-    })
+      refreshKey > 0 || dataRefreshKey > 0,
+    )
       .then((response) => {
-        if (!controller.signal.aborted) setResult({ key: requestKey, data: response });
+        if (!cancelled) setResult({ key: requestKey, data: response });
       })
       .catch((cause: unknown) => {
-        if (controller.signal.aborted) return;
+        if (cancelled) return;
         setError(
           cause instanceof Error ? cause.message : "The map could not be loaded.",
         );
       });
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+    };
   }, [
     geographyId,
     accessToken,
