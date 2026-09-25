@@ -165,6 +165,28 @@
   gap: var(--space-3);
   min-width: 0;
 }
+.mapColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.sampleSize {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+}
+.sampleSize strong {
+  color: var(--color-charcoal);
+  font-family: var(--font-display);
+  font-size: var(--fs-body-lg);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
 .summary {
   display: flex;
   flex-direction: column;

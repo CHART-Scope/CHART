@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { getStoredAuthSession } from "@/lib/authClient";
+import { getFreshAccessToken } from "@/lib/authClient";
 import { fetchIngestionJobs, type IngestionJob } from "@/lib/climateDataClient";
 
 import styles from "./ActivityDrawer.module.css";
@@ -21,7 +21,7 @@ export function ActivityDrawer({ open, onClose }: Props) {
   const [state, setState] = useState<PageState>({ status: "idle" });
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
-    const token = getStoredAuthSession()?.accessToken;
+    const token = await getFreshAccessToken();
     if (!token) {
       setState({ status: "error", message: "Sign in to see background work." });
       return;

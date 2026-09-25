@@ -49,21 +49,30 @@ type Props = {
 // shared between signed-in sessions; the small bound prevents an old session
 // from accumulating indefinitely in a long-lived tab.
 const mapCache = new Map<string, MapResponse>();
+const mapFrameCache = new Map<string, MapResponse>();
 const mapRequests = new Map<string, Promise<MapResponse>>();
 const MAX_CACHED_MAPS = 12;
 
-function rememberMap(key: string, data: MapResponse) {
+function rememberMap(key: string, frameKey: string, data: MapResponse) {
   mapCache.delete(key);
   mapCache.set(key, data);
+  mapFrameCache.delete(frameKey);
+  mapFrameCache.set(frameKey, data);
   while (mapCache.size > MAX_CACHED_MAPS) {
     const oldest = mapCache.keys().next().value;
     if (oldest === undefined) break;
     mapCache.delete(oldest);
   }
+  while (mapFrameCache.size > MAX_CACHED_MAPS) {
+    const oldest = mapFrameCache.keys().next().value;
+    if (oldest === undefined) break;
+    mapFrameCache.delete(oldest);
+  }
 }
 
 function loadMap(
   key: string,
+  frameKey: string,
   geographyId: string,
   accessToken: string,
   month: string | null | undefined,
@@ -79,7 +88,7 @@ function loadMap(
 
   const request = fetchRiskMap(geographyId, accessToken, { month, outcome })
     .then((response) => {
-      rememberMap(key, response);
+      rememberMap(key, frameKey, response);
       return response;
     })
     .finally(() => {
@@ -101,9 +110,31 @@ export function SpatialRiskMap({
   canPrepare = false,
 }: Props) {
   const id = useId();
-  const [result, setResult] = useState<{ key: string; data: MapResponse } | null>(null);
   const requestKey = `${geographyId}:${outcome}:${month}:${accessToken}`;
-  const data = result?.key === requestKey ? result.data : null;
+  // Values change with month and outcome, but the administrative frame does
+  // not. Seed a remount from the last response for this country/session so a
+  // URL change updates the colours in place rather than blanking the map and
+  // flashing its skeleton. A genuinely different country has no frame entry
+  // and still gets the honest first-load placeholder.
+  const frameKey = `${geographyId}:${accessToken}`;
+  const [result, setResult] = useState<{
+    key: string;
+    data: MapResponse;
+  } | null>(() => {
+    const exact = mapCache.get(requestKey);
+    if (exact) return { key: requestKey, data: exact };
+    // The frame seed is another month's or outcome's values, so it keeps a
+    // key that never matches and renders as updating until the fetch lands.
+    const frame = mapFrameCache.get(frameKey);
+    return frame ? { key: "", data: frame } : null;
+  });
+  // Keep the previous frame painted while a different geography arrives.
+  // The subdued treatment below makes the transition clear without replacing
+  // useful spatial context with a blank skeleton.
+  const data = result?.data ?? null;
+  // Any response for another month, outcome or place is stale: dim it and
+  // never offer to calculate areas picked from its values.
+  const isUpdating = result !== null && result.key !== requestKey;
   const [activeBand, setActiveBand] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Position travels with the hovered area so the tooltip can sit beside the
@@ -132,6 +163,7 @@ export function SpatialRiskMap({
     setHovered(null);
     loadMap(
       requestKey,
+      frameKey,
       geographyId,
       accessToken,
       month,
@@ -157,6 +189,7 @@ export function SpatialRiskMap({
     outcome,
     refreshKey,
     requestKey,
+    frameKey,
     dataRefreshKey,
   ]);
 
@@ -241,6 +274,8 @@ export function SpatialRiskMap({
       (shape.area.value_percent ?? 0) > (peak?.area.value_percent ?? -1) ? shape : peak,
     null as ProjectedArea | null,
   );
+  const areaLevel = pluralizeLevel(shapes[0]?.area.level);
+  const heading = `Risk across ${areaLevel} · area-level estimates`;
 
   if (error) {
     return (
@@ -249,7 +284,7 @@ export function SpatialRiskMap({
         aria-labelledby={`${id}-heading`}
       >
         {!embedded && <p className={styles.eyebrow}>Where the risk sits</p>}
-        <h2 id={`${id}-heading`}>Risk across areas · area-level estimates</h2>
+        <h2 id={`${id}-heading`}>{heading}</h2>
         <p className={styles.notice} role="alert">
           {error}
         </p>
@@ -273,7 +308,7 @@ export function SpatialRiskMap({
       aria-labelledby={`${id}-heading`}
     >
       {!embedded && <p className={styles.eyebrow}>Where the risk sits</p>}
-      <h2 id={`${id}-heading`}>Risk across areas · area-level estimates</h2>
+      <h2 id={`${id}-heading`}>{heading}</h2>
 
       {shapes.length === 0 ? (
         data ? (
@@ -303,9 +338,11 @@ export function SpatialRiskMap({
           <div className={styles.mapWrap}>
             <svg
               className={styles.map}
+              data-transitioning={isUpdating || undefined}
               viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
               role="group"
               aria-label={describe(shapes, highest)}
+              aria-busy={isUpdating}
             >
               <defs>
                 {/* Two different absences, drawn differently. "Not run yet" is
@@ -376,6 +413,11 @@ export function SpatialRiskMap({
                     fillRule="evenodd"
                     className={styles.area}
                     data-selected={selected || undefined}
+                    data-context-dim={
+                      selectedGeographyId !== geographyId && !selected
+                        ? true
+                        : undefined
+                    }
                     data-muted={
                       (activeBand !== null &&
                         activeBand !==
@@ -431,6 +473,12 @@ export function SpatialRiskMap({
               })}
             </svg>
 
+            {isUpdating ? (
+              <span className={styles.transitionStatus} role="status">
+                Updating map…
+              </span>
+            ) : null}
+
             {hovered ? (
               <div
                 className={styles.tooltip}
@@ -465,7 +513,7 @@ export function SpatialRiskMap({
             {/* The explicit route stays open however small the automatic
                 allowance is: a planner who wants the whole map now should not
                 have to reload the page repeatedly to get it. */}
-            {canPrepare && month && runnable.length > 0 ? (
+            {canPrepare && month && !isUpdating && runnable.length > 0 ? (
               <button
                 type="button"
                 className={styles.prepareAll}
@@ -600,6 +648,15 @@ export const RISK_BANDS = [
 
 function bandFor(percent: number) {
   return RISK_BANDS.find((band) => percent <= band.upper) ?? RISK_BANDS[0];
+}
+
+function pluralizeLevel(level?: string): string {
+  if (!level) return "areas";
+  const label = level.replaceAll("_", " ").toLowerCase();
+  if (label.startsWith("geo level")) return "areas";
+  if (label.endsWith("y")) return `${label.slice(0, -1)}ies`;
+  if (label.endsWith("s")) return label;
+  return `${label}s`;
 }
 
 function shadeFor(percent: number): string {

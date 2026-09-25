@@ -13,8 +13,9 @@
  * typecheck and build clean.
  *
  * It takes only values the caller already holds and adds no fetch, no shared
- * type, no prop change to any existing component and no backend field, so
- * removing it cannot affect anything around it.
+ * type and no prop change to any existing component, so removing it cannot
+ * affect anything around it. The model_* and n_* fields on the monthly
+ * prediction exist for this card and can go with it.
  */
 
 import { type AreaBoundingBox, type MonthlyRiskValues } from "@/lib/dashboardClient";
@@ -39,6 +40,19 @@ function degrees(value: number, positive: string, negative: string): string {
   return `${Math.abs(value).toFixed(4)}°${value >= 0 ? positive : negative}`;
 }
 
+function artifactHref(uri: string): string | null {
+  if (uri.startsWith("https://") || uri.startsWith("http://")) return uri;
+  if (uri.startsWith("s3://")) {
+    const [bucket, ...keyParts] = uri.slice("s3://".length).split("/");
+    if (!bucket || !/^[a-z0-9.-]+$/.test(bucket) || keyParts.length === 0) return null;
+    const encodedKey = keyParts.map(encodeURIComponent).join("/");
+    // The global endpoint routes to the bucket's own region, so no bucket
+    // name or region is hardcoded here.
+    return `https://${bucket}.s3.amazonaws.com/${encodedKey}`;
+  }
+  return null;
+}
+
 export function DemoProvenanceCard({
   month,
   entry,
@@ -54,10 +68,9 @@ export function DemoProvenanceCard({
   const prediction = entry?.prediction ?? null;
 
   return (
-    <section className={styles.card} aria-label="Data provenance (demo)">
+    <section className={styles.card} aria-label="Data and model provenance">
       <div className={styles.header}>
         <p className={styles.title}>Where this number comes from</p>
-        <span className={styles.badge}>demo</span>
       </div>
 
       {temperature === null && prediction == null ? (
@@ -143,6 +156,67 @@ export function DemoProvenanceCard({
             <>
               <dt>Model</dt>
               <dd>{prediction.model_version}</dd>
+              <dt>Release</dt>
+              <dd>
+                <code>{prediction.model_release_id}</code>
+              </dd>
+              <dt>Artifact</dt>
+              <dd>
+                <code>{prediction.model_file ?? "Not recorded"}</code>
+              </dd>
+              {/* The exact file that scored this month: the local copy when
+              the API runs in development, the published S3 object otherwise. */}
+              {prediction.model_runtime_path ? (
+                <>
+                  <dt>Model file used</dt>
+                  <dd>
+                    <code>{prediction.model_runtime_path}</code>
+                  </dd>
+                </>
+              ) : prediction.model_artifact_uri ? (
+                <>
+                  <dt>Model file used</dt>
+                  <dd>
+                    {artifactHref(prediction.model_artifact_uri) ? (
+                      <a
+                        href={artifactHref(prediction.model_artifact_uri) ?? undefined}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        {prediction.model_artifact_uri}
+                      </a>
+                    ) : (
+                      <code>{prediction.model_artifact_uri}</code>
+                    )}
+                  </dd>
+                </>
+              ) : null}
+              {prediction.model_artifact_sha256 ? (
+                <>
+                  <dt>SHA-256</dt>
+                  <dd>
+                    <code>{prediction.model_artifact_sha256}</code>
+                  </dd>
+                </>
+              ) : null}
+              {prediction.n_training ? (
+                <>
+                  <dt>Fitted sample</dt>
+                  <dd>{prediction.n_training.toLocaleString()} observations</dd>
+                </>
+              ) : null}
+              {prediction.n_subjects ? (
+                <>
+                  <dt>Subjects</dt>
+                  <dd>{prediction.n_subjects.toLocaleString()}</dd>
+                </>
+              ) : null}
+              {prediction.n_events != null ? (
+                <>
+                  <dt>Events</dt>
+                  <dd>{prediction.n_events.toLocaleString()}</dd>
+                </>
+              ) : null}
               <dt>Model reads</dt>
               <dd>{prediction.input_statistic}</dd>
               <dt>Reference</dt>

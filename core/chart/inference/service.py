@@ -153,10 +153,6 @@ def score_association(
         else None
     )
 
-    def optional_count(field: str) -> int | None:
-        value = payload.get(field)
-        return int(value) if isinstance(value, (int, float)) else None
-
     return AssociationScore(
         area=str(payload["area"]),
         geography_level=str(payload["geography_level"]),
@@ -172,10 +168,10 @@ def score_association(
         model_version=response_version,
         model_sha256=response_sha,
         warning=str(payload["warning"]) if payload.get("warning") else None,
-        n_model_rows=optional_count("n_model_rows"),
-        n_training=optional_count("n_training"),
-        n_events=optional_count("n_events"),
-        n_subjects=optional_count("n_subjects"),
+        n_model_rows=_optional_count(payload, "n_model_rows", minimum=0),
+        n_training=_optional_count(payload, "n_training"),
+        n_events=_optional_count(payload, "n_events", minimum=0),
+        n_subjects=_optional_count(payload, "n_subjects"),
         modelled_temperature_range_c=modelled_range,
     )
 
@@ -296,10 +292,7 @@ def score_lbw(
     if response_release_id is not None and str(response_release_id) != model_release_id:
         raise InferenceError("LBW_MODEL_RELEASE_MISMATCH")
 
-    n_training_raw = payload.get("n_training")
-    n_training = (
-        int(n_training_raw) if isinstance(n_training_raw, (int, float)) else None
-    )
+    n_training = _optional_count(payload, "n_training")
     range_raw = payload.get("modelled_temperature_range_c")
     modelled_range: tuple[float, float] | None = None
     if isinstance(range_raw, (list, tuple)) and len(range_raw) == 2:
@@ -325,3 +318,15 @@ def score_lbw(
         n_training=n_training,
         modelled_temperature_range_c=modelled_range,
     )
+
+
+def _optional_count(payload: dict, field: str, minimum: int = 1) -> int | None:
+    """A display-only count, or None when absent or implausible.
+
+    Dropping a bad count keeps it from failing a prediction that otherwise
+    scored.
+    """
+    value = payload.get(field)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return int(value) if math.isfinite(value) and value >= minimum else None

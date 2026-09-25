@@ -19,7 +19,8 @@ import pytest
 from chart.model_registry.schemas import ModelReleaseSpec
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MANIFESTS = sorted((REPO_ROOT / "pipelines" / "models").rglob("model-release*.json"))
+MODEL_ROOT = REPO_ROOT / "pipelines" / "models"
+MANIFESTS = sorted(MODEL_ROOT.rglob("model-release*.json"))
 
 READ_ARITY = r"""
 bundle <- readRDS(commandArgs(trailingOnly = TRUE)[1])
@@ -59,9 +60,19 @@ def test_declared_length_matches_the_fitted_artifact(manifest: Path) -> None:
     assert len(declared) == 1, f"{manifest.name} declares more than one variable"
 
     for model_file in spec.model_files:
-        artifact = manifest.parent / "model" / model_file.filename
-        if not artifact.exists():
+        # Located the way the runtime locates it - a recursive search by
+        # filename under the model root - rather than by a fixed subdirectory.
+        # Artifacts now sit under `artifacts/<country>/<outcome>/<version>/`,
+        # mirroring the S3 keys, and a hardcoded `model/` made every case here
+        # skip silently the moment they moved.
+        matches = list(MODEL_ROOT.rglob(model_file.filename))
+        if not matches:
             pytest.skip(f"{model_file.filename} not present")
+        assert len(matches) == 1, (
+            f"{model_file.filename} appears {len(matches)} times under "
+            f"{MODEL_ROOT}; the runtime requires exactly one match"
+        )
+        artifact = matches[0]
         arity = _artifact_arity(artifact)
         assert arity == {declared[0]}, (
             f"{manifest.name} declares length={declared[0]} but "

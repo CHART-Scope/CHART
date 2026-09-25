@@ -31,13 +31,32 @@
   /* Sized by its own aspect ratio rather than by leftover card height, so
      the drawing keeps its proportions whatever the neighbours do. */
   display: block;
+  transition:
+    opacity 180ms ease,
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.map[data-transitioning] {
+  opacity: 0.46;
+  transform: scale(0.985);
 }
 
 .area {
   stroke: var(--surface-card, #fff);
   stroke-width: 0.75;
   stroke-linejoin: round;
-  transition: opacity 120ms ease-out;
+  transform-box: fill-box;
+  transform-origin: center;
+  /* backwards, not both: a held end state would pin opacity at 1 and beat the
+     muted, dimmed and hover rules below, so highlighting did nothing. */
+  animation: areaEnter 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  transition:
+    fill 200ms ease,
+    opacity 160ms ease,
+    stroke 160ms ease,
+    stroke-width 160ms ease,
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 180ms ease;
 }
 
 .area[data-interactive] {
@@ -50,6 +69,12 @@
 .area[data-selected] {
   stroke: var(--color-charcoal, #2b2b26);
   stroke-width: 2.25;
+  transform: scale(1.018);
+  filter: drop-shadow(0 3px 4px rgb(43 43 38 / 20%));
+}
+
+.area[data-context-dim] {
+  opacity: 0.62;
 }
 
 .readout {
@@ -86,6 +111,21 @@
 }
 .mapWrap {
   position: relative;
+}
+
+.transitionStatus {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
+  color: var(--color-text-muted);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 8%);
+  font-size: var(--fs-caption);
+  pointer-events: none;
 }
 .tooltip {
   position: absolute;
@@ -227,6 +267,13 @@
 .area[data-muted] {
   opacity: 0.12;
 }
+/* Each range is a toggle. Without a hover state the legend read as a static
+   key and nobody found the highlight. */
+.legendItem:hover {
+  border-color: var(--color-border, #d8d5cc);
+  background: var(--surface-muted, #f4f3ee);
+  color: var(--color-charcoal);
+}
 .legendItem[aria-pressed="true"] {
   border-color: var(--color-charcoal);
   background: var(--surface-muted, #f4f3ee);
@@ -237,7 +284,18 @@
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
+  .map,
   .area {
     transition: none;
+    animation: none;
+  }
+}
+
+@keyframes areaEnter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

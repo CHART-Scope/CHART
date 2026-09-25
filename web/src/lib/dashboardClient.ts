@@ -74,6 +74,14 @@ export type CurrentObservationResponse = {
 export type MonthlyRiskValues = {
   prediction?: {
     request_id: number;
+    model_release_id: string;
+    model_file: string | null;
+    model_artifact_sha256: string | null;
+    model_artifact_uri: string | null;
+    model_runtime_path: string | null;
+    n_training: number | null;
+    n_events: number | null;
+    n_subjects: number | null;
     attributable_fraction_milli: number;
     odds_ratio: number;
     /** Nullable: a release need not declare a reference temperature. The API

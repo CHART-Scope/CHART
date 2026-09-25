@@ -273,46 +273,46 @@ def pull_country_climate(
     country-sized download serves every area inside it.
     """
     session_factory = get_session_factory()
-    months = [date.fromisoformat(f"{item}-01") for item in config.months]
-
-    with session_factory() as session:
-        job = claim_job(session, config.job_id, dagster_run_id=context.run_id)
-        if job is None:
-            context.log.info("Job %s is not ours to run", config.job_id)
-            return
-        units = areas_for_country(session, config.country_code)
-        if not units:
-            fail_job(session, config.job_id, error_code="CLIMATE_NO_AREAS")
-            session.commit()
-            raise ClimateServiceError("CLIMATE_NO_AREAS", 409)
-        envelope = country_envelope(units)
-        areas = [
-            AreaSpec(
-                id=unit.id,
-                code=unit.code,
-                name=unit.name,
-                geometry=_area_geometry(unit),
-            )
-            for unit in units
-        ]
-        geography = session.get(Geography, units[0].geography_id)
-        if geography is None:
-            raise ValueError(
-                f"admin unit {units[0].id} points at missing geography "
-                f"{units[0].geography_id}"
-            )
-        preset_slug = geography.slug
-        session.commit()
-
-    context.log.info(
-        "Pulling %s: one grid (N,W,S,E)=%s for %d months, %d areas",
-        config.country_code,
-        tuple(round(value, 2) for value in envelope),
-        len(months),
-        len(areas),
-    )
-
     try:
+        months = [date.fromisoformat(f"{item}-01") for item in config.months]
+
+        with session_factory() as session:
+            job = claim_job(session, config.job_id, dagster_run_id=context.run_id)
+            if job is None:
+                context.log.info("Job %s is not ours to run", config.job_id)
+                return
+            units = areas_for_country(session, config.country_code)
+            if not units:
+                fail_job(session, config.job_id, error_code="CLIMATE_NO_AREAS")
+                session.commit()
+                raise ClimateServiceError("CLIMATE_NO_AREAS", 409)
+            envelope = country_envelope(units)
+            areas = [
+                AreaSpec(
+                    id=unit.id,
+                    code=unit.code,
+                    name=unit.name,
+                    geometry=_area_geometry(unit),
+                )
+                for unit in units
+            ]
+            geography = session.get(Geography, units[0].geography_id)
+            if geography is None:
+                raise ValueError(
+                    f"admin unit {units[0].id} points at missing geography "
+                    f"{units[0].geography_id}"
+                )
+            preset_slug = geography.slug
+            session.commit()
+
+        context.log.info(
+            "Pulling %s: one grid (N,W,S,E)=%s for %d months, %d areas",
+            config.country_code,
+            tuple(round(value, 2) for value in envelope),
+            len(months),
+            len(areas),
+        )
+
         _ensure_climate_storage_capacity()
         if not _cds_credentials_available():
             raise ClimateServiceError("CLIMATE_INGEST_NOT_CONFIGURED", 503)
@@ -413,6 +413,18 @@ def pending_climate_ingestions_sensor(_context: dg.SensorEvaluationContext):
         yield dg.SkipReason("No queued climate pulls.")
         return
     for job_id, country_code, months in pending:
+        previous = _context.instance.get_runs(
+            filters=dg.RunsFilter(tags={"climate_ingestion_job_id": str(job_id)}),
+            limit=1,
+        )
+        if previous and previous[0].status in (
+            dg.DagsterRunStatus.FAILURE,
+            dg.DagsterRunStatus.CANCELED,
+        ):
+            with session_factory() as session:
+                fail_job(session, job_id, error_code="CLIMATE_PULL_INTERRUPTED")
+                session.commit()
+            continue
         yield dg.RunRequest(
             run_key=f"climate-ingestion:{job_id}",
             run_config={

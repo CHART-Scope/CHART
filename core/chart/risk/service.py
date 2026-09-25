@@ -537,9 +537,14 @@ def load_map_view(
         .join(AppGeography, AppGeography.id == AdminUnit.app_geography_id)
         .where(
             AppGeography.country_code == frame.country_code,
+            # One hierarchy step per map: country -> states, state ->
+            # divisions, country -> counties. Selecting a leaf still frames
+            # it on its siblings because ``frame`` is moved to its parent
+            # above. This keeps the rule generic as more countries and levels
+            # are installed instead of skipping straight to the finest shape.
             or_(
                 AppGeography.id == frame.id,
-                AppGeography.path.startswith(f"{frame.path}/"),
+                AppGeography.parent_id == frame.id,
             ),
         )
         .order_by(AppGeography.sort_order, AdminUnit.name)
