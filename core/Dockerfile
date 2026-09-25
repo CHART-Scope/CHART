@@ -33,6 +33,13 @@ COPY pipelines/boundaries/manifests pipelines/boundaries/manifests
 # the whole tree means a new manifest lands on the sandbox by just
 # committing it; no Dockerfile edit required.
 COPY pipelines/models pipelines/models
+# Place sets, which every model release now references by path. The manifests
+# moved from carrying their own `geography.places` list to naming a shared set
+# (`place_set.path`), and this COPY did not follow: the image shipped the
+# manifests without the files they point at, so `deployed_configs()` skipped
+# every release with MODEL_RELEASE_PLACE_SET_MISSING and the running API had
+# zero models - the dashboard's map and monthly endpoints both 500'd.
+COPY pipelines/places pipelines/places
 COPY orchestration/pyproject.toml orchestration/pyproject.toml
 COPY orchestration/src orchestration/src
 COPY orchestration/dagster.production.yaml /opt/dagster/dagster_home/dagster.yaml
