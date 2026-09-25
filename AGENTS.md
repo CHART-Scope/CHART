@@ -1,5 +1,13 @@
 # CHART Agent Guide
 
+## Testing Policy
+
+- Never write unit tests in this repository.
+- Every code change must include or update E2E coverage for the changed behavior.
+- Use E2E tests as the default test mechanism for feature verification.
+- Every E2E test run must produce a verifiable, repeatable artifact.
+- If isolated testing is required, first enumerate failure modes, then implement or extend E2E coverage.
+
 ## Purpose
 
 This guide keeps generated code consistent across the whole CHART repo.
@@ -183,6 +191,13 @@ Before finishing frontend work:
 ```bash
 make web-build
 make web-typecheck
+```
+
+For every change, run the E2E suites and keep their reports (written to
+`outputs/e2e/`):
+
+```bash
+make e2e
 ```
 
 Before finishing broad repo work:

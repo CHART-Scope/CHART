@@ -5014,6 +5014,42 @@
             ],
             "title": "Model Sha256"
           },
+          "n_training": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Training"
+          },
+          "n_events": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Events"
+          },
+          "n_subjects": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Subjects"
+          },
           "warning": {
             "anyOf": [
               {
@@ -5483,6 +5519,87 @@
             "type": "integer",
             "title": "Request Id"
           },
+          "model_release_id": {
+            "type": "string",
+            "title": "Model Release Id"
+          },
+          "model_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model File"
+          },
+          "model_artifact_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Artifact Sha256"
+          },
+          "model_artifact_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Artifact Uri"
+          },
+          "model_runtime_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Runtime Path"
+          },
+          "n_training": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Training"
+          },
+          "n_events": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Events"
+          },
+          "n_subjects": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Subjects"
+          },
           "attributable_fraction_milli": {
             "type": "integer",
             "title": "Attributable Fraction Milli"
@@ -5574,6 +5691,7 @@
         "type": "object",
         "required": [
           "request_id",
+          "model_release_id",
           "attributable_fraction_milli",
           "odds_ratio",
           "ci95_low",

@@ -76,6 +76,14 @@ function AuthorizedDashboard({
 }) {
   const router = useRouter();
   const [mapRefresh, setMapRefresh] = useState(0);
+  // Geography changes inside the current map frame (state ↔ division,
+  // country ↔ county) should feel like direct manipulation. The URL remains
+  // the durable source of truth, but waiting for a Next navigation before
+  // moving the outline made the map feel sluggish even though no new map data
+  // was needed.
+  const [optimisticAdminUnit, setOptimisticAdminUnit] = useState<
+    string | null | undefined
+  >(undefined);
   const refreshMap = useCallback(() => setMapRefresh((value) => value + 1), []);
   const [isPending, startTransition] = useTransition();
   const navigate = useCallback(
@@ -113,6 +121,13 @@ function AuthorizedDashboard({
       ? adminUnit
       : null;
   }, [adminUnit, geographies, geographyId, outcome]);
+
+  useEffect(() => {
+    setOptimisticAdminUnit(undefined);
+  }, [adminUnit, geographyId]);
+
+  const displayedAdminUnit =
+    optimisticAdminUnit === undefined ? effectiveAdminUnit : optimisticAdminUnit;
 
   useEffect(() => {
     if (!adminUnit || geographies.length === 0 || effectiveAdminUnit) return;
@@ -201,6 +216,7 @@ function AuthorizedDashboard({
       !selectedCatalog ||
       selectedModel ||
       effectiveAdminUnit ||
+      !currentGeography?.parentId ||
       districts.length === 0
     ) {
       return;
@@ -218,6 +234,7 @@ function AuthorizedDashboard({
     router,
     selectedCatalog,
     selectedModel,
+    currentGeography?.parentId,
   ]);
 
   const nav = appNavForRoles(session.user.roles);
@@ -231,6 +248,7 @@ function AuthorizedDashboard({
 
   const handleAdminUnitChange = useCallback(
     (code: string | null) => {
+      setOptimisticAdminUnit(code);
       const target =
         code === null
           ? `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(outcome)}`
@@ -271,7 +289,7 @@ function AuthorizedDashboard({
     <InlineSelect
       menu
       aria-label="Risk estimate area"
-      value={effectiveAdminUnit ?? ""}
+      value={displayedAdminUnit ?? ""}
       onChange={(value) => handleAdminUnitChange(value || null)}
       options={[
         { value: "", label: stateLabel },
@@ -309,6 +327,7 @@ function AuthorizedDashboard({
               adminUnit: nextAdmin,
               outcome: nextOutcome,
             }) => {
+              if (nextGeo === geographyId) setOptimisticAdminUnit(nextAdmin ?? null);
               const params = new URLSearchParams();
               if (nextAdmin) params.set("admin_unit", nextAdmin);
               if (nextOutcome) params.set("outcome", nextOutcome);
@@ -398,7 +417,7 @@ function AuthorizedDashboard({
                   // frames a leaf selection on its siblings, so without this
                   // nothing is picked out among them when you land on a
                   // division directly rather than choosing a sub-area.
-                  selectedGeographyId={effectiveAdminUnit ?? adminUnit ?? geographyId}
+                  selectedGeographyId={displayedAdminUnit ?? geographyId}
                   canPrepare={
                     selectedCatalog?.batch_status !==
                       "blocked_pending_modeller_confirmation" &&
@@ -413,6 +432,7 @@ function AuthorizedDashboard({
                     )
                   }
                   onSelect={(nextGeography: string) => {
+                    setOptimisticAdminUnit(nextGeography);
                     const params = new URLSearchParams();
                     params.set("admin_unit", nextGeography);
                     if (outcome) params.set("outcome", outcome);

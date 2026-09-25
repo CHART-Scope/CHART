@@ -1089,6 +1089,9 @@ class PredictionResult(Base):
 
     model_version: Mapped[str] = mapped_column(String(64), nullable=False)
     model_artifact_sha256: Mapped[str | None] = mapped_column(String(64))
+    n_training: Mapped[int | None] = mapped_column()
+    n_events: Mapped[int | None] = mapped_column()
+    n_subjects: Mapped[int | None] = mapped_column()
     # The exposure vector scored, lag 0 first - three months for low birth
     # weight, four days for under five - and the observed days behind it when
     # the model reads days.

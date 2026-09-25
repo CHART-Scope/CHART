@@ -44,6 +44,37 @@ def warm_model_release(
         )
 
 
+def model_cache_dir() -> Path:
+    return Path(
+        os.getenv(
+            "MODEL_CACHE_DIR",
+            Path(__file__).resolve().parents[3] / "pipelines/models",
+        )
+    ).resolve()
+
+
+def locate_model_artifact(
+    model_file: str, model_sha256: str, cache_dir: Path | None = None
+) -> Path:
+    """The one cached copy of an artifact, verified against its checksum."""
+
+    resolved_cache = (cache_dir or model_cache_dir()).resolve()
+    matches = [
+        candidate.resolve()
+        for candidate in resolved_cache.rglob(Path(model_file).name)
+        if candidate.is_file()
+    ]
+    if len(matches) != 1 or not matches[0].is_relative_to(resolved_cache):
+        raise ModelRegistryError(
+            "MODEL_RELEASE_FILE_MISSING",
+            f"{model_file}: matches={len(matches)}",
+        )
+    path = matches[0]
+    if hashlib.sha256(path.read_bytes()).hexdigest() != model_sha256:
+        raise ModelRegistryError("MODEL_RELEASE_CHECKSUM_MISMATCH", model_file)
+    return path
+
+
 def warm_model_artifact(
     *,
     release_id: str,
@@ -56,27 +87,12 @@ def warm_model_artifact(
 ) -> None:
     """Verify and reload one immutable artifact after a runtime restart."""
 
-    resolved_cache = cache_dir or Path(
-        os.getenv(
-            "MODEL_CACHE_DIR",
-            Path(__file__).resolve().parents[3] / "pipelines/models",
-        )
-    )
     resolved_url = resolve_lbw_service_url(service_url)
     resolved_token = control_token or os.getenv("MODEL_CONTROL_TOKEN", "")
     if not resolved_url or not resolved_token:
         raise ModelRegistryError("MODEL_RUNTIME_NOT_CONFIGURED")
 
-    matches = list(resolved_cache.rglob(model_file))
-    if len(matches) != 1:
-        raise ModelRegistryError(
-            "MODEL_RELEASE_FILE_MISSING",
-            f"{model_file}: matches={len(matches)}",
-        )
-    path = matches[0].resolve()
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    if digest != model_sha256:
-        raise ModelRegistryError("MODEL_RELEASE_CHECKSUM_MISMATCH", model_file)
+    path = locate_model_artifact(model_file, model_sha256, cache_dir)
     payload = json.dumps(
         {
             "release_id": release_id,

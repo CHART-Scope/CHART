@@ -319,6 +319,9 @@ def score_prepared_prediction(
     # one being cast to the other.
     scored_window: PregnancyWindow | None
     scored_dates: list[date] | None
+    n_training: int | None = None
+    n_events: int | None = None
+    n_subjects: int | None = None
     try:
         if daily is not None:
             association = score_association_model(
@@ -343,6 +346,9 @@ def score_prepared_prediction(
             on_training_support = association.on_training_support
             model_file_used = association.model_file
             model_sha256_used = association.model_sha256
+            n_training = association.n_training
+            n_events = association.n_events
+            n_subjects = association.n_subjects
             warning = association.warning
         else:
             lbw = score_lbw_model(
@@ -362,6 +368,7 @@ def score_prepared_prediction(
             on_training_support = lbw.on_training_support
             model_file_used = lbw.model_file
             model_sha256_used = lbw.model_sha256
+            n_training = lbw.n_training
             warning = lbw.warning
     except InferenceError as error:
         unavailable_errors = {
@@ -396,6 +403,9 @@ def score_prepared_prediction(
         model_file=model_file_used,
         model_version=model_version,
         model_sha256=model_sha256_used,
+        n_training=n_training,
+        n_events=n_events,
+        n_subjects=n_subjects,
         warning=warning,
         explanation=None,
     )

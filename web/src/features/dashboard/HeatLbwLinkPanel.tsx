@@ -231,6 +231,7 @@ export function HeatLbwLinkPanel({
   // on. It is recorded on every prediction and was never shown, so a month
   // scored outside the training range read exactly like one inside it.
   const offTrainingSupport = monthPrediction?.on_training_support === false;
+  const fittedSampleSize = monthPrediction?.n_training ?? null;
 
   const precisionLevel: PrecisionLevel | null =
     activePrediction &&
@@ -407,7 +408,18 @@ export function HeatLbwLinkPanel({
             ) : null}
           </div>
         </div>
-        {children}
+        {children ? (
+          <div className={styles.mapColumn}>
+            {fittedSampleSize ? (
+              <p className={styles.sampleSize} aria-label="Fitted model sample size">
+                <span>Fitted sample</span>
+                <strong>{fittedSampleSize.toLocaleString()}</strong>
+                <span>observations</span>
+              </p>
+            ) : null}
+            {children}
+          </div>
+        ) : null}
       </div>
 
       <details className={styles.details}>

@@ -69,3 +69,6 @@ new_design
 
 # Local Dagster instance state (run history, schedule DBs)
 .dagster_home/
+
+# e2e build output
+**/.next-e2e/

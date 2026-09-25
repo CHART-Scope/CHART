@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from collections.abc import Iterator
 from datetime import date, datetime, timezone
 
@@ -666,6 +668,7 @@ def _monthly_request(
             "on_training_support": True,
             "model_file": "review.rds",
             "model_version": "test-v1",
+            "n_training": 1234,
         },
         "request_id": 1,
         **overrides,
@@ -714,7 +717,7 @@ def _monthly_request(
 
 def _ensure_model_release(session, outcome: str) -> str:
     """A minimal release for the grain's foreign key."""
-    from chart.shared.db.models import ModelRelease
+    from chart.shared.db.models import ModelAreaMapping, ModelRelease
 
     release_id = f"test-release-{outcome}"
     if session.get(ModelRelease, release_id) is None:
@@ -725,8 +728,20 @@ def _ensure_model_release(session, outcome: str) -> str:
                 outcome=outcome,
                 version="test-v1",
                 status="active",
-                model_files=[],
+                model_files=[{"filename": "review.rds", "sha256": "a" * 64}],
                 input_spec={},
+                release_file_uri=(f"s3://chart-models/{release_id}/model-release.json"),
+            )
+        )
+        session.flush()
+        admin = session.scalar(select(AdminUnit))
+        session.add(
+            ModelAreaMapping(
+                model_release_id=release_id,
+                admin_unit_id=admin.id,
+                model_area_key=admin.name,
+                model_file="review.rds",
+                validated_pregnancy_windows=[1],
             )
         )
         session.flush()
@@ -754,11 +769,49 @@ def test_monthly_reads_current_prediction_without_legacy_erf(
     assert entry["prediction"]["request_id"] == request_id
     assert entry["prediction"]["attributable_fraction_milli"] == 200
     assert entry["prediction"]["input_statistic"] == "tmax_monthly_mean_c"
+    assert entry["prediction"]["model_release_id"] == "test-release-lbw"
+    assert entry["prediction"]["model_file"] == "review.rds"
+    assert entry["prediction"]["n_training"] == 1234
+    assert (
+        entry["prediction"]["model_artifact_uri"]
+        == "s3://chart-models/test-release-lbw/review.rds"
+    )
     assert (
         dashboard_client.get(f"/risk/{GEOGRAPHY_ID}/monthly?month=2026-07").json()[
             "months"
         ]
         == {}
+    )
+
+
+@pytest.mark.parametrize("show_local_path", [True, False])
+def test_monthly_names_the_local_artifact_only_in_local_development(
+    dashboard_client, isolated_session_factory, tmp_path, monkeypatch, show_local_path
+):
+    artifact = tmp_path / "india" / "mp" / "lbw" / "review.rds"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_bytes(b"fitted model bytes")
+    sha = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    monkeypatch.setenv("MODEL_CACHE_DIR", str(tmp_path))
+    if show_local_path:
+        monkeypatch.setenv("CHART_SHOW_LOCAL_MODEL_PATH", "1")
+    else:
+        monkeypatch.delenv("CHART_SHOW_LOCAL_MODEL_PATH", raising=False)
+    with isolated_session_factory() as session:
+        _monthly_request(session, prediction_overrides={"model_sha256": sha})
+        session.commit()
+
+    response = dashboard_client.get(f"/risk/{GEOGRAPHY_ID}/monthly?month=2026-08")
+
+    assert response.status_code == 200
+    prediction = response.json()["months"]["2026-08"]["prediction"]
+    assert prediction["model_artifact_sha256"] == sha
+    assert prediction["model_runtime_path"] == (
+        str(artifact.resolve()) if show_local_path else None
+    )
+    # The published copy is always named, for deployments to link.
+    assert prediction["model_artifact_uri"] == (
+        "s3://chart-models/test-release-lbw/review.rds"
     )
 
 

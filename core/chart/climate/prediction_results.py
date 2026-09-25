@@ -139,6 +139,9 @@ def upsert_prediction_result(
         "warning": prediction.warning,
         "model_version": prediction.model_version,
         "model_artifact_sha256": model_artifact_sha256 or prediction.model_sha256,
+        "n_training": prediction.n_training,
+        "n_events": prediction.n_events,
+        "n_subjects": prediction.n_subjects,
         "exposure_values_c": list(prediction.temperatures_c),
         "exposure_dates": [
             value.isoformat() for value in (prediction.exposure_dates or [])

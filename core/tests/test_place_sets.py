@@ -32,7 +32,7 @@ def _sha256(path: Path) -> str:
     ("path", "place_count", "shape_count"),
     [
         ("pipelines/places/ke-counties-v1/place-set.json", 47, 47),
-        ("pipelines/places/in-mp-v1/place-set.json", 11, 11),
+        ("pipelines/places/in-mp-v1/place-set.json", 46, 46),
     ],
 )
 def test_checked_in_place_sets_and_shapes_validate(
@@ -97,7 +97,7 @@ def test_v2_release_resolves_shared_mp_place_set() -> None:
 
     assert resolved.place_set_id == "in-mp-state-divisions"
     assert resolved.geography.country_code == "IN"
-    assert len(resolved.geography.places) == 11
+    assert len(resolved.geography.places) == 46
     assert resolved.shape_path == (
         REPO_ROOT / "pipelines/places/in-mp-v1/shapes.geojson"
     )
@@ -206,9 +206,9 @@ def test_v2_release_bootstraps_shared_places_and_only_covered_models(
             session, model_release_path=release_path, activate=True
         )
         session.flush()
-        assert result.areas_seeded == 11
+        assert result.areas_seeded == 46
         units = {unit.code: unit for unit in session.scalars(select(AdminUnit)).all()}
-        assert len(units) == 11
+        assert len(units) == 46
         assert units["madhya-pradesh"].bbox_north is not None
         assert (
             get_active_model_mapping(

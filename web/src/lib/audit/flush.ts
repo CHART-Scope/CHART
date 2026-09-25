@@ -5,7 +5,7 @@ const FLUSH_INTERVAL_MS = 30_000;
 const MAX_EVENTS_PER_FLUSH = 400;
 const BACKOFF_MS = [2_000, 8_000, 30_000];
 
-type TokenGetter = () => string | null;
+type TokenGetter = () => string | null | Promise<string | null>;
 
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 let visibilityHandler: (() => void) | null = null;
@@ -22,13 +22,13 @@ function newFlushId(): string {
 
 async function flushOnce(getToken: TokenGetter, opts: { keepalive?: boolean } = {}) {
   if (inFlight) return;
-  const token = getToken();
-  if (!token) return;
   const store = useAuditStore.getState();
   const events = store.takeBatch(MAX_EVENTS_PER_FLUSH);
   if (events.length === 0) return;
   inFlight = true;
   try {
+    const token = await getToken();
+    if (!token) return;
     await postAuditBatch(
       {
         session_id: store.sessionId,
@@ -41,8 +41,14 @@ async function flushOnce(getToken: TokenGetter, opts: { keepalive?: boolean } = 
     store.ackFlush(events[events.length - 1].client_seq);
     failureCount = 0;
   } catch (error) {
-    // 4xx: poison batch — drop so we don't spin. 5xx / network: back off.
-    if (error instanceof AuditFlushError && error.status >= 400 && error.status < 500) {
+    // 4xx: poison batch — drop so we don't spin. 401 is the token, not the
+    // batch, so it backs off like 5xx / network and is sent again later.
+    if (
+      error instanceof AuditFlushError &&
+      error.status >= 400 &&
+      error.status < 500 &&
+      error.status !== 401
+    ) {
       store.ackFlush(events[events.length - 1].client_seq);
       failureCount = 0;
     } else {
