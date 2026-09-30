@@ -20,8 +20,6 @@ type Props = {
    * "Madhya Pradesh (State)"). Rendered as static text in the question
    * header — the actual switching lives in DashboardContextBar. */
   placeLabel: string;
-  outcomeControl?: ReactNode;
-  placeControl?: ReactNode;
   children?: ReactNode;
   onPredictionReady?: () => void;
   modelAreaName?: string | null;
@@ -61,8 +59,6 @@ type Props = {
 
 export function HeatLbwLinkPanel({
   placeLabel,
-  outcomeControl,
-  placeControl,
   children,
   onPredictionReady,
   modelAreaName = null,
@@ -246,16 +242,9 @@ export function HeatLbwLinkPanel({
 
       <h2 id="heat-lbw-heading" className={styles.question}>
         What share of{" "}
-        <span className={styles.phrase}>
-          <span className={styles.inlineStatic}>
-            {outcomeControl ?? outcomeLabel.toLowerCase()}
-          </span>
-        </span>{" "}
-        cases in{" "}
-        <span className={styles.phrase}>
-          <span className={styles.inlineStatic}>{placeControl ?? placeLabel}</span>
-        </span>{" "}
-        may be attributable to heat exposure?
+        <strong className={styles.inlineStatic}>{outcomeLabel.toLowerCase()}</strong>{" "}
+        cases in <strong className={styles.inlineStatic}>{placeLabel}</strong> may be
+        attributable to heat exposure?
       </h2>
 
       {modelAreaName ? (

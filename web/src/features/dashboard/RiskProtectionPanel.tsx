@@ -1,7 +1,5 @@
 "use client";
 
-import { type ReactNode } from "react";
-
 import { Icon, type IconName } from "@/components/Icon";
 
 import styles from "./RiskProtectionPanel.module.css";
@@ -32,13 +30,11 @@ const COLUMNS: readonly Column[] = [
 
 export function RiskProtectionPanel({
   outcomeLabel = "Health outcome",
-  outcomeControl,
   contextFigure = "pregnant-woman",
   description,
 }: {
   outcomeLabel?: string;
   figure?: IconName;
-  outcomeControl?: ReactNode;
   contextFigure?: IconName;
   description?: string | null;
 }) {
@@ -59,8 +55,8 @@ export function RiskProtectionPanel({
       </header>
       <h2 id="risk-protection-heading" className={styles.question}>
         How does extreme heat increase the risk of{" "}
-        {outcomeControl ?? outcomeLabel.toLowerCase()} — and how can that risk be
-        reduced?
+        <strong className={styles.inlineStatic}>{outcomeLabel.toLowerCase()}</strong> —
+        and how can that risk be reduced?
       </h2>
       <div className={styles.figures}>
         {columns.map((column) => (
