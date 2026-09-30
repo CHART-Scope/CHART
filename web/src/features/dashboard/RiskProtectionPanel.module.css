@@ -104,6 +104,10 @@
   line-height: 1.7;
   font-weight: 400;
 }
+.inlineStatic {
+  font-weight: 600;
+  color: var(--color-nexus);
+}
 .heat {
   color: #df2860;
 }
