@@ -30,11 +30,6 @@ type PageProps = {
   searchParams: Promise<{ admin_unit?: string; outcome?: string; month?: string }>;
 };
 
-// Repository-native hazard label the /solutions taxonomy is keyed on. The
-// dashboard shows "Extreme heat" but the solution repository (and the
-// Airtable it mirrors) uses "Increased temperature".
-const DEPLOYED_HAZARD_REPOSITORY_KEY = "Increased temperature";
-
 export default function DashboardGeoPage(props: PageProps) {
   const params = use(props.params);
   const searchParams = use(props.searchParams);
@@ -396,8 +391,15 @@ function AuthorizedDashboard({
           )}
 
           <RecommendedActionsPanel
-            hazard={DEPLOYED_HAZARD_REPOSITORY_KEY}
+            geographyId={geographyId}
+            placeId={displayedAdminUnit ?? geographyId}
+            placeName={effectiveGeography?.name ?? stateLabel}
+            outcome={outcome}
+            outcomeLabel={outcomeLabel}
             hazardLabel={selectedCatalog?.climate_hazard_label ?? "Climate hazard"}
+            healthDomainLabel={
+              selectedCatalog?.health_domain_label ?? "Climate-sensitive health"
+            }
           />
         </main>
       </AppShell>
