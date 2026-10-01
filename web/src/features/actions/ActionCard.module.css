@@ -1,0 +1,102 @@
+.card {
+  display: flex;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-card);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+.card:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+.card:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.card[data-selected] {
+  border-color: var(--color-nexus);
+  box-shadow: 0 4px 14px rgba(56, 62, 233, 0.12);
+}
+.thumb {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-nexus-tint), var(--color-grey-light));
+  color: var(--color-nexus);
+}
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1;
+}
+.title {
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.tag,
+.status {
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+}
+.tag {
+  background: var(--color-grey-light);
+  color: var(--color-charcoal);
+}
+.status {
+  margin-left: auto;
+}
+.not-started {
+  background: var(--color-grey-light);
+  color: var(--color-text-muted);
+}
+.in-progress {
+  background: var(--color-amber-tint);
+  color: var(--color-amber);
+}
+.completed {
+  background: var(--color-success-tint);
+  color: var(--color-success);
+}
+.districts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-eyebrow);
+  color: var(--color-text-muted);
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+@media (max-width: 560px) {
+  .thumb {
+    display: none;
+  }
+}

@@ -27,19 +27,12 @@
   font-size: var(--fs-body-lg);
   font-weight: 400;
   color: var(--color-charcoal);
-  /* Extra line-height so the pill dropdowns get vertical breathing room
-   * as the question wraps across lines. */
   line-height: 1.7;
-  /* Prevent English-language leading-space collapse — the JSX inserts
-   * a real space around each inline select and we want it preserved. */
   word-spacing: 0.05em;
-}
-.phrase {
-  white-space: normal;
 }
 
 .inlineStatic {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-nexus);
 }
 

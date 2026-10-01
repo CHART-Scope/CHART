@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import { AppShell } from "@/components/AppShell";
-import { InlineSelect } from "@/components/InlineSelect";
 import { IconSprite } from "@/components/Icon";
 import { ScienceVideoPlaceholder } from "@/features/dashboard/ScienceVideoPlaceholder";
 import { RequireAuth } from "@/features/auth/RequireAuth";
@@ -30,11 +29,6 @@ type PageProps = {
   params: Promise<{ geo: string }>;
   searchParams: Promise<{ admin_unit?: string; outcome?: string; month?: string }>;
 };
-
-// Repository-native hazard label the /solutions taxonomy is keyed on. The
-// dashboard shows "Extreme heat" but the solution repository (and the
-// Airtable it mirrors) uses "Increased temperature".
-const DEPLOYED_HAZARD_REPOSITORY_KEY = "Increased temperature";
 
 export default function DashboardGeoPage(props: PageProps) {
   const params = use(props.params);
@@ -246,58 +240,6 @@ function AuthorizedDashboard({
     [navigate],
   );
 
-  const handleAdminUnitChange = useCallback(
-    (code: string | null) => {
-      setOptimisticAdminUnit(code);
-      const target =
-        code === null
-          ? `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(outcome)}`
-          : `/dashboard/${encodeURIComponent(geographyId)}?admin_unit=${encodeURIComponent(code)}&outcome=${encodeURIComponent(outcome)}`;
-      navigate(month ? `${target}&month=${encodeURIComponent(month)}` : target, {
-        scroll: false,
-      });
-    },
-    [geographyId, outcome, month, navigate],
-  );
-  const handleOutcomeChange = useCallback(
-    (nextOutcome: string) => {
-      navigate(
-        `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(nextOutcome)}${effectiveAdminUnit ? `&admin_unit=${encodeURIComponent(effectiveAdminUnit)}` : ""}${month ? `&month=${encodeURIComponent(month)}` : ""}`,
-        { scroll: false },
-      );
-    },
-    [geographyId, effectiveAdminUnit, month, navigate],
-  );
-
-  const outcomeControl = (
-    <InlineSelect
-      menu
-      aria-label="Health outcome"
-      value={outcome}
-      onChange={handleOutcomeChange}
-      options={
-        catalog.length === 0
-          ? [{ value: outcome, label: outcomeLabel }]
-          : catalog.map((entry) => ({
-              value: entry.outcome,
-              label: `${entry.outcome_label}${entry.batch_status === "blocked_pending_modeller_confirmation" ? " — not ready" : ""}`,
-            }))
-      }
-    />
-  );
-  const placeControl = (
-    <InlineSelect
-      menu
-      aria-label="Risk estimate area"
-      value={displayedAdminUnit ?? ""}
-      onChange={(value) => handleAdminUnitChange(value || null)}
-      options={[
-        { value: "", label: stateLabel },
-        ...districts.map((area) => ({ value: area.code, label: area.name })),
-      ]}
-    />
-  );
-
   if (!hasAccess) return null;
 
   return (
@@ -351,7 +293,6 @@ function AuthorizedDashboard({
                 <ScienceVideoPlaceholder />
                 <RiskProtectionPanel
                   outcomeLabel={outcomeLabel}
-                  outcomeControl={outcomeControl}
                   contextFigure={
                     selectedCatalog?.visualization_context_figure ?? "pregnant-woman"
                   }
@@ -364,8 +305,6 @@ function AuthorizedDashboard({
                 modelAreaName={selectedModel?.modelAreaName ?? null}
                 outcome={outcome}
                 outcomeLabel={outcomeLabel}
-                outcomeControl={outcomeControl}
-                placeControl={placeControl}
                 figure={
                   outcome === "lbw"
                     ? "newborn"
@@ -452,8 +391,15 @@ function AuthorizedDashboard({
           )}
 
           <RecommendedActionsPanel
-            hazard={DEPLOYED_HAZARD_REPOSITORY_KEY}
+            geographyId={geographyId}
+            placeId={displayedAdminUnit ?? geographyId}
+            placeName={effectiveGeography?.name ?? stateLabel}
+            outcome={outcome}
+            outcomeLabel={outcomeLabel}
             hazardLabel={selectedCatalog?.climate_hazard_label ?? "Climate hazard"}
+            healthDomainLabel={
+              selectedCatalog?.health_domain_label ?? "Climate-sensitive health"
+            }
           />
         </main>
       </AppShell>
