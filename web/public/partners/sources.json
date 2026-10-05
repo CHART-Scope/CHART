@@ -1,0 +1,23 @@
+{
+  "scope.png": {
+    "page": "https://scopeimpact.fi/",
+    "asset": "https://scopeimpact.fi/wp-content/themes/scopeimpact/img/logo-scope-impact-light.png",
+    "presentation": "Original transparent logo, displayed in black using CSS on the light landing page."
+  },
+  "ceew.png": {
+    "page": "https://www.ceew.in/",
+    "asset": "https://www.ceew.in/sites/default/files/CEEW%20-%20Transparent%20Logo%20in%20PNG%2017Apr18_0_0.png"
+  },
+  "path.png": {
+    "page": "https://www.path.org/",
+    "asset": "https://media.path.org/images/PATH_Logo_2018_PATH_Logo_Color.width-2880.png"
+  },
+  "ubs.png": {
+    "page": "https://www.ubs.com/global/en/sustainability-impact/social-impact-and-philanthropy/optimus-foundation.html",
+    "capture": "Logo cropped from the official page header; foundation name is a separate text label."
+  },
+  "gdi.svg": {
+    "page": "https://globaldevincubator.org/south-asia/",
+    "asset": "https://globaldevincubator.org/wp-content/themes/_gdi2023/img/logo.svg"
+  }
+}
