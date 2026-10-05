@@ -6,6 +6,7 @@ import { Button } from "@/components/Button";
 import { Icon, IconSprite } from "@/components/Icon";
 import { startKeycloakSignIn } from "@/lib/authClient";
 import { getSetupStatus } from "@/lib/setupClient";
+import { DashboardPreview } from "./DashboardPreview";
 import styles from "./Login.module.css";
 
 type SetupMode = "auto" | "configured" | "required";
@@ -61,123 +62,179 @@ export function Login({
   return (
     <>
       <IconSprite />
-      <main className={styles.page}>
-        <section className={styles.story} aria-labelledby="chart-landing-title">
-          <header className={styles.storyHeader}>
-            <a className={styles.brand} href="/" aria-label="CHART home">
+      <div className={styles.page}>
+        <header className={styles.header}>
+          <a className={styles.brand} href="/" aria-label="CHART home">
+            CHART
+          </a>
+          <nav className={styles.nav} aria-label="Main navigation">
+            <a href="/learning">Learning Hub</a>
+            <button type="button" disabled title="Coming soon">
+              Solutions Repository <span>Coming soon</span>
+            </button>
+            <Button onClick={continueToAccess} disabled={isChecking}>
+              {isChecking ? "Please wait…" : needsSetup ? "Set up CHART" : "Sign in"}
+            </Button>
+          </nav>
+        </header>
+        <main>
+          <section className={styles.hero} aria-labelledby="chart-landing-title">
+            <div className={styles.heroInner}>
+              <p className={styles.eyebrow}>Climate × health</p>
+              <h1 id="chart-landing-title">
+                Climate &amp; health adaptation and resilience Toolkit
+              </h1>
+              <p className={styles.lede}>
+                CHART helps local governments and health planners use evidence and work
+                together to build climate-resilient health systems.
+              </p>
+              <a className={styles.demoLink} href="mailto:info@scopeimpact.fi">
+                Request access <Icon name="arrow-right" size={16} />
+              </a>
+            </div>
+            <DashboardPreview />
+          </section>
+          <section className={styles.toolkit} aria-labelledby="toolkit-title">
+            <h2 id="toolkit-title">Explore the CHART toolkit</h2>
+            <div className={styles.cards}>
+              <article className={styles.card}>
+                <span className={styles.cardIcon}>
+                  <Icon name="book" size={24} />
+                </span>
+                <h3>Learning Hub</h3>
+                <p>Learn about climate and health, at your own pace.</p>
+                <a className={styles.toolLink} href="/learning">
+                  Explore Learning Hub <Icon name="arrow-right" size={15} />
+                </a>
+              </article>
+              <article className={styles.card}>
+                <span className={styles.cardIcon}>
+                  <Icon name="users" size={24} />
+                </span>
+                <h3>Solutions Repository</h3>
+                <p>Find practical actions for climate-resilient health systems.</p>
+                <div className={styles.comingSoon}>
+                  <Button variant="secondary" disabled>
+                    Explore solutions
+                  </Button>
+                  <span>Coming soon</span>
+                </div>
+              </article>
+            </div>
+          </section>
+          <section className={styles.partners} aria-labelledby="partners-title">
+            <h2 id="partners-title">Co-created with our partners</h2>
+            <ul aria-label="Partners">
+              <li>
+                <a
+                  href="https://scopeimpact.fi/"
+                  aria-label="SCOPE Impact"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img
+                    className={styles.scopeLogo}
+                    src="/partners/scope.png"
+                    alt="SCOPE Impact"
+                    width="152"
+                    height="101"
+                  />
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://www.ubs.com/global/en/sustainability-impact/social-impact-and-philanthropy/optimus-foundation.html"
+                  aria-label="UBS Optimus Foundation"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img src="/partners/ubs.png" alt="UBS" width="90" height="34" />
+                  <span>Optimus Foundation</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://www.ceew.in/"
+                  aria-label="CEEW"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img src="/partners/ceew.png" alt="CEEW" width="143" height="76" />
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://www.path.org/"
+                  aria-label="PATH"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img src="/partners/path.png" alt="PATH" width="140" height="54" />
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://globaldevincubator.org/south-asia/"
+                  aria-label="Global Development Incubator South Asia"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img
+                    src="/partners/gdi.svg"
+                    alt="Global Development Incubator"
+                    width="150"
+                    height="85"
+                  />
+                  <span>South Asia</span>
+                </a>
+              </li>
+            </ul>
+          </section>
+        </main>
+        <footer className={styles.footer}>
+          <div className={styles.footerBrand}>
+            <a href="/" className={styles.brand} aria-label="CHART home">
               CHART
             </a>
-            <span className={styles.productLabel}>Climate × health planning</span>
-          </header>
-
-          <div className={styles.storyBody}>
-            <p className={styles.eyebrow}>Shared evidence. Coordinated action.</p>
-            <h1 id="chart-landing-title">
-              Plan for climate risks with the people health depends on.
-            </h1>
-            <p className={styles.lede}>
-              CHART brings climate evidence, health priorities and cross-sector teams
-              into one planning workspace—so every decision has a shared view of risk.
+            <p>
+              Climate &amp; Health Adaptation
+              <br />
+              and Resilience Toolkit
             </p>
-
-            <div className={styles.signalGrid} aria-label="What CHART connects">
-              <article>
-                <span className={styles.signalIcon}>
-                  <Icon name="cloud-storm" size={18} />
-                </span>
-                <div>
-                  <strong>Climate evidence</strong>
-                  <span>Traceable inputs for the place and period you plan for.</span>
-                </div>
-              </article>
-              <article>
-                <span className={styles.signalIcon}>
-                  <Icon name="maternal-health" size={23} />
-                </span>
-                <div>
-                  <strong>Health outcomes</strong>
-                  <span>
-                    Turn changing exposure into planning-relevant health risk.
-                  </span>
-                </div>
-              </article>
-              <article>
-                <span className={styles.signalIcon}>
-                  <Icon name="users" size={18} />
-                </span>
-                <div>
-                  <strong>Joint decisions</strong>
-                  <span>
-                    Bring health, water, agriculture and planning teams together.
-                  </span>
-                </div>
-              </article>
-            </div>
           </div>
-
-          <footer className={styles.storyFooter}>
-            <span>Designed for public-sector planning teams</span>
-            <span>India · Kenya</span>
-          </footer>
-        </section>
-
-        <section className={styles.access} aria-labelledby="sign-in-title">
-          <div className={styles.accessInner}>
-            <div className={styles.mobileBrand}>CHART</div>
-            <span className={styles.secureLabel}>
-              <span aria-hidden="true" />
-              {needsSetup ? "Installation setup" : "Secure workspace"}
-            </span>
-            <h2 id="sign-in-title">
-              {needsSetup ? "Set up this CHART instance" : "Welcome to CHART"}
-            </h2>
-            <p className={styles.accessCopy}>
-              {needsSetup
-                ? "Choose this installation’s geography and create its first administrator. This is completed once on a new CHART deployment."
-                : "Continue with an account invited by your CHART administrator. Your role and planning area are already assigned before you sign in."}
-            </p>
-
-            <Button
-              className={styles.signInButton}
-              size="lg"
-              block
-              onClick={continueToAccess}
-              disabled={isChecking}
-              trailingIcon={<Icon name="arrow-right" size={15} />}
+          <nav className={styles.footerLinks} aria-label="Resources">
+            <h2>Resources</h2>
+            <a
+              href="https://chart-scope.github.io/CHART/docs/"
+              target="_blank"
+              rel="noreferrer"
             >
-              {isChecking
-                ? "Checking this installation…"
-                : needsSetup
-                  ? "Set up CHART"
-                  : "Continue to secure sign in"}
-            </Button>
-
-            <div className={styles.firstTime}>
-              <span className={styles.firstTimeNumber}>01</span>
-              <div>
-                <strong>
-                  {needsSetup ? "The first administrator" : "Need access?"}
-                </strong>
-                <p>
-                  {needsSetup
-                    ? "The person completing setup becomes the instance owner and can invite everyone else."
-                    : "Ask your CHART administrator to invite you. Invited people sign in directly—there is no personal geography setup."}
-                </p>
-              </div>
-            </div>
-
-            <p className={styles.support}>
-              {detectedMode === "unavailable"
-                ? "Setup status could not be checked, but invited accounts can still sign in."
-                : "Access is limited to invited organisational accounts."}{" "}
-              Trouble signing in? Contact your CHART programme coordinator.
-            </p>
-          </div>
-          <footer className={styles.accessFooter}>
-            <span>Climate &amp; Health Adaptation and Resilience Tool</span>
-          </footer>
-        </section>
-      </main>
+              Documentation <span aria-hidden="true">↗</span>
+            </a>
+            <a
+              href="https://chart-scope.github.io/CHART/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Brand Kit <span aria-hidden="true">↗</span>
+            </a>
+            <a
+              href="https://github.com/CHART-Scope/CHART"
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub <span aria-hidden="true">↗</span>
+            </a>
+            <a
+              href="https://github.com/CHART-Scope/CHART/blob/main/LICENSE"
+              target="_blank"
+              rel="noreferrer"
+            >
+              License <span aria-hidden="true">↗</span>
+            </a>
+          </nav>
+        </footer>
+      </div>
     </>
   );
 }
