@@ -1,207 +1,91 @@
-# CHART Agent Guide
+# CHART
 
-## Testing Policy
+Build simple, maintainable code and verify that it works end to end. Follow the
+current task and repository implementation; keep this guide focused on
+engineering practices, not a fixed product roadmap.
 
-- Never write unit tests in this repository.
-- Every code change must include or update E2E coverage for the changed behavior.
-- Use E2E tests as the default test mechanism for feature verification.
-- Every E2E test run must produce a verifiable, repeatable artifact.
-- If isolated testing is required, first enumerate failure modes, then implement or extend E2E coverage.
+## Allow The Product To Evolve
 
-## Purpose
+- Domains and features are open-ended. Add or reshape modules when the task
+  requires it; existing folders are conventions, not a closed list of allowed
+  capabilities.
+- Support new data sources and predictive modeling, including hydrological
+  data and vulnerability/resilience assessments, without forcing them into
+  unrelated modules.
+- Keep product scope, priorities, and detailed designs in the relevant
+  documentation. Do not infer a build order or product restriction from this
+  guide.
+- Prefer the smallest useful implementation. Introduce abstractions,
+  dependencies, or structural changes when they solve a concrete problem; avoid
+  speculative frameworks and unrelated refactors.
 
-This guide keeps generated code consistent across the whole CHART repo.
+## Architecture
 
-Generated code should be:
+CHART is a monorepo;
 
-- consistent
-- small
-- testable
-- easy to refactor
+| Path           | Responsibility                                                                        |
+| -------------- | ------------------------------------------------------------------------------------- |
+| web/           | Next/React UI and typed API clients                                                   |
+| core/          | Python/FastAPI API, business logic, analytical engine, database models and migrations |
+| orchestration/ | Dagster orchestration and background execution                                        |
+| pipelines/     | Data adapters, processing, model runtimes                                             |
+| infra/         | Development and deployment infrastructure                                             |
+| docs/          | Maintained project documentation                                                      |
+| e2e/           | End-to-end tests and shared test support                                              |
+| outputs/e2e/   | Generated test reports and evidence                                                   |
 
-## Project Shape
+- Keep routes thin and business logic in services. Next route handlers may
+  proxy browser/session requests; Python owns application workflows,
+  authorization, and database access.
+- Keep analytical computation independent of FastAPI and Dagster.
+  Orchestration should call services through thin wrappers.
+- Follow existing conventions where they fit. Create focused modules as
+  capabilities grow; avoid duplicate implementations and unnecessary services.
+- Use the current SQLAlchemy/Alembic and PostgreSQL/PostGIS setup. Commit
+  migrations with schema changes and protect data integrity.
+- Integrate external systems through explicit adapters and public contracts.
+  Keep their internal code, tables, and deployment assumptions outside CHART.
 
-CHART is a monorepo. Do not treat the root as a Next app.
+## Code And Behavior
 
-- `web`: CHART Next web app and current product UI.
-- `core`: Python/FastAPI application API and analytical engine; owner of auth, workspaces, users, geographies, predictions, and analytical reads.
-- `orchestration`: Dagster data plane importing the Python `chart` package.
-- `pipelines`: climate adapters, boundaries, and versioned model runtimes.
-- `infra`: local services, remote development dependencies, and AWS deployment handoff.
-- `docs/`: the published documentation site, built with MkDocs. Tracked.
-- `data/`: generated seed and import outputs, ignored by git.
+- Use clear names, focused functions, and small cohesive files. Keep business
+  logic out of UI components and validate inputs at system boundaries.
+- Follow language conventions: Python snake_case, TypeScript camelCase, and
+  React PascalCase components. Use existing formatting and linting tools.
+- Keep errors explicit and stable. Account for retries, partial failures, and
+  persisted state in background workflows.
+- Enforce applicable role, workspace, and geography permissions on protected
+  operations. Authentication alone is insufficient; keep intentionally public
+  content accessible.
+- Keep secrets and sensitive data out of source, client bundles, logs, and
+  test artifacts.
+- Keep deterministic analytical results independent of optional AI
+  explanations. Document relevant data provenance, units, assumptions, and
+  missing-data handling.
+- Update relevant documentation when behavior, architecture, setup, or commands
+  change.
 
-The Fastify/Drizzle API is gone. Python and Alembic own the application API and
-the database; there is no second service to keep in parity with.
+## Mandatory E2E Testing
 
-The published solution repository is a separate Payload CMS deployment, not part
-of this repo. Python reads its public snapshot or HTTP API through an adapter.
-
-Python or data-processing code belongs in `core`, `orchestration`, or a focused `pipelines` package, never inside `web`.
-
-Next route handlers may be thin browser/session proxies. They must not own business workflows, Keycloak authorization policy, or CHART database tables. Do not add a Next.js BFF.
-
-## Directory Boundaries
-
-Use this target structure while preserving current top-level names:
-
-```txt
-core/
-  alembic/versions/        one linear migration chain
-  chart/api/               app factory, router registration, OpenAPI catalog
-  chart/shared/db/         every SQLAlchemy model, in one models.py
-  chart/<domain>/          one package per domain, shape below
-
-orchestration/
-  src/chart_pipeline/
-
-pipelines/
-  <adapter-or-model>/
-
-web/
-  src/app/                 routes and layouts
-  src/components/          shared primitives
-  src/features/            feature UI
-  src/lib/                 typed clients for the Python API
-```
-
-Domain packages under `core/chart/` are: `audit`, `auth`, `climate`,
-`email`, `erf_registry`, `geographies`, `health_impact`, `identity`,
-`inference`, `learning`, `model_registry`, `risk`, `setup`, `solution_repository`,
-`users`, and `workspaces`. `api` and `shared` are infrastructure rather than
-domains, and `vra` is a placeholder.
-
-The chart repository and CHART core mean different things:
-
-- `core/chart/solution_repository`: CHART adapter for reading a public repository snapshot/API. It must not define repository-owned Payload tables.
-- the chart repository: a standalone Payload CMS service, deployed separately
-  and not present in this repo, owning editing, media, publishing workflow, and
-  repository auth.
-
-Dependency direction:
-
-```txt
-the chart repository publishes data
-        ↓
-Python core reads public snapshot/API responses
-        ↓
-web reads from Python core
-```
-
-Never vendor repository code into `core/` or `web/`. Read it over HTTP or
-from a public JSON snapshot.
-
-## Current Stack
-
-- Web: Next, React.
-- API + engine: Python, FastAPI, SQLAlchemy, Alembic.
-- Data plane: Dagster with Postgres-backed durable requests.
-- Database: PostgreSQL + PostGIS.
-- Formatting: Prettier.
-
-## Project Priorities
-
-Build in this order:
-
-1. `auth`
-2. `planning-workspace`
-3. `dashboard`
-4. `planning`
-5. `budget-justification`
-
-## General Rules
-
-- Prefer simple code over abstract code.
-- Prefer small files over large multi-purpose files.
-- Prefer named exports over default exports.
-- Keep functions focused on one job.
-- Keep route handlers thin.
-- Keep business logic out of UI components.
-- Do not add dependencies unless there is a clear reason.
-- Do not invent new folder patterns unless needed.
-- Refactor only when there is actual code pressure.
-
-## Python Backend Module Shape
-
-Start simple and keep routes thin:
-
-```txt
-module/
-  schemas.py
-  service.py
-  routes.py
-
-core/tests/
-  test_<module>_api.py
-```
-
-Use `routes.py` for HTTP endpoints and `service.py` for behavior. Engine compute must not import FastAPI or Dagster. Dagster definitions call backend services through thin wrappers.
-
-Every new Python API route should have a route-level test using FastAPI `TestClient`. Every protected route must test both authentication and role/geography denial.
-
-## Backend Route Rules
-
-- Route files define endpoints only.
-- Route handlers should read params/body, call service functions, and map results to HTTP responses.
-- Route handlers should not contain business workflows.
-- Keep error responses explicit and stable.
-- Prediction submission and status lookup must enforce geography scope, not merely bearer-token presence.
-- Postgres is the durable request/state store and Dagster executes background pipeline work; do not add Redis or another queue without demonstrated pressure.
-
-## Frontend Module Shape
-
-Keep current feature UI under `web/src/features/`.
-
-- Use `PascalCase.tsx` for React components.
-- Keep routes and shared layout code under `web/src/app/`.
-- Keep static copy and seed-like UI data close to the module using it.
-- Use simple props/state first; avoid state libraries until shared state is actually needed.
-
-## Naming
-
-- Folders: `kebab-case`.
-- Python core files: `schemas.py`, `service.py`, `routes.py`; route tests live under `core/tests/`.
-- React components: `PascalCase.tsx`.
-- Functions: `camelCase` with clear verbs, such as `getCurrentUser` or `listSources`.
-- Types: `PascalCase`.
-- Constants: `camelCase`, unless the value is a true cross-module constant.
-
-## Product Rules
-
-- Public content and the action repository stay accessible without login.
-- Authenticated features should be scoped to role and geography.
-- Build for the health planning lead and cross-sector planning lead flow first.
-- Prefer simple seeded data before adding real integrations.
-- Keep the first user flow understandable before making it comprehensive.
-- Do not make CHART core depend on Payload CMS. Python should consume the published solution repository through an adapter and public snapshots or a remote API, not repository-owned tables.
-- Deterministic prediction results must succeed without the optional Qwen explanation service.
-- Production infrastructure reuses the generic OpenTofu/k3s/RDS/Flux pattern from `halla-health-infra`, but CHART owns separate state, stores, compute, namespaces, images, and manifests.
-
-## Validation
-
-Before finishing Python core work:
-
-```bash
-python -m pytest core/tests -q
-python -m pytest orchestration/tests -q
-```
-
-Before finishing frontend work:
-
-```bash
-make web-build
-make web-typecheck
-```
-
-For every change, run the E2E suites and keep their reports (written to
-`outputs/e2e/`):
-
-```bash
-make e2e
-```
-
-Before finishing broad repo work:
-
-```bash
-make format-check
-```
+- Never write unit tests. Every code change must add or update E2E coverage for
+  the changed behavior.
+- Store E2E tests and shared support in root e2e/; connect them to make e2e.
+  Run make e2e for every change, including documentation and configuration
+  changes; use existing coverage when behavior is unchanged.
+- Exercise real application boundaries and assert observable outcomes,
+  including persisted results. Mocks, builds, typechecks, and route-level
+  integration tests do not replace E2E verification.
+- Cover relevant failure modes, denied access, scope isolation, retries, and
+  browser error states. Bug fixes need a regression scenario that fails before
+  the fix and passes afterward.
+- Use disposable test data. Never bypass authentication, modify production data,
+  or skip/weaken failing tests to obtain a pass.
+- Each run must save repeatable evidence in outputs/e2e/: command, source
+  revision and working-tree status, setup and fixtures, results, and relevant
+  failure logs or traces. Exclude secrets and sensitive data.
+- Run applicable build, typecheck, formatting, and existing integration checks
+  using repository scripts. Inspect the current Makefile and package
+  configuration rather than guessing commands.
+- Before finishing, report commands, results, artifact paths, and unverified
+  behavior. If E2E cannot run, state the blocker and mark verification
+  incomplete; never claim tests passed without evidence.

@@ -4,10 +4,6 @@ site_url: https://chart-scope.github.io/CHART/docs/
 repo_url: https://github.com/CHART-Scope/CHART
 repo_name: CHART-Scope/CHART
 
-exclude_docs: |
-  architecture.md
-  tdd.md
-
 theme:
   name: material
   palette:
