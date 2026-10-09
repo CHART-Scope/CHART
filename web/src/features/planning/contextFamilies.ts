@@ -30,8 +30,10 @@ export function computeFamilies(geos: GeographyRecord[], scopes: string[]): Fami
 
 /** Given a family, pick the geography a caller should navigate to when
  * the family is selected. Prefers the family root if it has its own
- * model (e.g. Madhya Pradesh state block); otherwise falls back to the
- * first prediction-supporting descendant. */
+ * model (e.g. Madhya Pradesh state block). Otherwise lands on the parent
+ * of the model-backed areas - Kenya rather than its alphabetically first
+ * county - so the reader starts with the whole picture and chooses an area
+ * on the dashboard. */
 export function defaultAreaForFamily(
   family: Family,
   geographies: GeographyRecord[],
@@ -44,7 +46,20 @@ export function defaultAreaForFamily(
     )
     .filter((geo) => (geo.models?.length ?? 0) > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
-  return descendants[0] ?? null;
+  return parentOfModelAreas(descendants[0], geographies) ?? descendants[0] ?? null;
+}
+
+/** The geography directly above a leaf model area: the place that groups
+ * such areas (Kenya over its counties, Madhya Pradesh over its divisions).
+ * An area with areas of its own beneath it is already that place - India is
+ * never chosen over Madhya Pradesh. */
+export function parentOfModelAreas(
+  area: GeographyRecord | undefined,
+  geographies: readonly GeographyRecord[],
+): GeographyRecord | null {
+  if (!area?.parentId) return null;
+  if (geographies.some((geo) => geo.parentId === area.id)) return null;
+  return geographies.find((geo) => geo.id === area.parentId) ?? null;
 }
 
 /** Match a geography id or family path against a family's subtree so

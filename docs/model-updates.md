@@ -204,13 +204,13 @@ verifies the SHA256 before POSTing the local path to the R scorer's
   but its SHA256 doesn't match. The wrong file was uploaded, or the
   manifest's hash is stale.
 
-On AWS the deploy pipeline pulls artifacts from S3 into a shared
-`chart-lbw-model` Docker volume before the R container starts. It walks
-every `pipelines/models/**/model-release.*.json`, extracts
-`(base_uri, filename)` pairs, and runs one scoped `aws s3 sync` per
-release. Locally, the `.rds` files live under
-`pipelines/models/<family>/model/` and the same discovery logic finds
+On AWS the `chart-model-sync` container copies the whole model bucket
+(except `archive/`) into the shared `chart-lbw-model` Docker volume before
+the R container starts, with a single `aws s3 sync`. Locally, the `.rds`
+files live under `pipelines/models/` and the same discovery logic finds
 them via `rglob(filename)`. See
+[From R output to the dashboard](model-integration.md#how-chart-model-sync-works)
+for how the sync runs, and
 [AWS sandbox → Model artifacts on S3](aws-sandbox.md#model-artifacts-on-s3)
 for the bucket layout, versioning policy, and how to add a new release.
 

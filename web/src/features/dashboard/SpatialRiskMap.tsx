@@ -40,6 +40,11 @@ type Props = {
   onSelect?: (geographyId: string) => void;
   /** Whether this user may queue a run for an area that has none. */
   canPrepare?: boolean;
+  /**
+   * Where the values come from when not the live risk map, e.g. the Kenya
+   * outlook tables. `key` must change whenever the selection changes.
+   */
+  source?: { key: string; load: (accessToken: string) => Promise<MapResponse> };
 };
 
 // Dashboard query-string changes can remount this component even when the map
@@ -78,6 +83,7 @@ function loadMap(
   month: string | null | undefined,
   outcome: string | undefined,
   force: boolean,
+  source?: Props["source"],
 ): Promise<MapResponse> {
   if (!force) {
     const cached = mapCache.get(key);
@@ -86,7 +92,11 @@ function loadMap(
     if (pending) return pending;
   }
 
-  const request = fetchRiskMap(geographyId, accessToken, { month, outcome })
+  const request = (
+    source
+      ? source.load(accessToken)
+      : fetchRiskMap(geographyId, accessToken, { month, outcome })
+  )
     .then((response) => {
       rememberMap(key, frameKey, response);
       return response;
@@ -108,9 +118,12 @@ export function SpatialRiskMap({
   selectedGeographyId,
   onSelect,
   canPrepare = false,
+  source,
 }: Props) {
   const id = useId();
-  const requestKey = `${geographyId}:${outcome}:${month}:${accessToken}`;
+  const requestKey = source
+    ? `${geographyId}:${source.key}:${accessToken}`
+    : `${geographyId}:${outcome}:${month}:${accessToken}`;
   // Values change with month and outcome, but the administrative frame does
   // not. Seed a remount from the last response for this country/session so a
   // URL change updates the colours in place rather than blanking the map and
@@ -169,6 +182,7 @@ export function SpatialRiskMap({
       month,
       outcome,
       refreshKey > 0 || dataRefreshKey > 0,
+      source,
     )
       .then((response) => {
         if (!cancelled) setResult({ key: requestKey, data: response });
@@ -191,6 +205,7 @@ export function SpatialRiskMap({
     requestKey,
     frameKey,
     dataRefreshKey,
+    source,
   ]);
 
   useEffect(() => {
@@ -420,10 +435,7 @@ export function SpatialRiskMap({
                     }
                     data-muted={
                       (activeBand !== null &&
-                        activeBand !==
-                          (shape.area.value_percent === null
-                            ? "Unavailable"
-                            : bandFor(shape.area.value_percent).label)) ||
+                        activeBand !== legendLabelFor(shape.area)) ||
                       undefined
                     }
                     role={onSelect && shape.area.geography_id ? "button" : undefined}
@@ -443,11 +455,14 @@ export function SpatialRiskMap({
                     fill={
                       shape.area.value_percent !== null
                         ? shadeFor(shape.area.value_percent)
-                        : shape.area.missing_reason === "no_model"
-                          ? `url(#${id}-unmodelled)`
-                          : shape.area.missing_reason === "running"
-                            ? `url(#${id}-running)`
-                            : `url(#${id}-pending)`
+                        : shape.area.missing_reason === "no_excess"
+                          ? NO_EXCESS_FILL
+                          : shape.area.missing_reason === "no_model" ||
+                              shape.area.missing_reason === "not_reported"
+                            ? `url(#${id}-unmodelled)`
+                            : shape.area.missing_reason === "running"
+                              ? `url(#${id}-running)`
+                              : `url(#${id}-pending)`
                     }
                     onMouseMove={(event) => {
                       const box =
@@ -530,7 +545,15 @@ export function SpatialRiskMap({
           </div>
 
           <div className={styles.legend} role="group" aria-label="Highlight risk range">
-            {[...RISK_BANDS, { label: "Unavailable", fill: "#dedbd4" }].map((band) => (
+            {[
+              ...RISK_BANDS,
+              // Only drawn when the map has such areas (the outlook's ratio
+              // below 1), so the near-white fill is never mistaken for low risk.
+              ...(data?.areas.some((area) => area.missing_reason === "no_excess")
+                ? [{ label: NO_EXCESS_LABEL, fill: NO_EXCESS_FILL }]
+                : []),
+              { label: "Unavailable", fill: "#dedbd4" },
+            ].map((band) => (
               <button
                 key={band.label}
                 type="button"
@@ -663,11 +686,25 @@ function shadeFor(percent: number): string {
   return bandFor(percent).fill;
 }
 
-function stateOf(area: MapArea): "value" | "running" | "pending" | "unmodelled" {
+type AbsentState = "running" | "pending" | "unmodelled" | "noExcess" | "notReported";
+
+function stateOf(area: MapArea): "value" | AbsentState {
   if (area.value_percent !== null) return "value";
   if (area.missing_reason === "running") return "running";
   if (area.missing_reason === "no_model") return "unmodelled";
+  if (area.missing_reason === "no_excess") return "noExcess";
+  if (area.missing_reason === "not_reported") return "notReported";
   return "pending";
+}
+
+/** A ratio below 1: no attributable share is shown, and none is implied. */
+const NO_EXCESS_FILL = "#fbfaf6";
+const NO_EXCESS_LABEL = "No heat excess";
+
+/** The legend entry an area belongs to, for highlighting by legend. */
+function legendLabelFor(area: MapArea): string {
+  if (area.value_percent !== null) return bandFor(area.value_percent).label;
+  return area.missing_reason === "no_excess" ? NO_EXCESS_LABEL : "Unavailable";
 }
 
 function valueLine(area: MapArea): string {
@@ -678,7 +715,9 @@ function valueLine(area: MapArea): string {
     running: "Loading data…",
     unmodelled: "Not integrated",
     pending: "Not calculated yet",
-  }[stateOf(area) as "running" | "unmodelled" | "pending"];
+    noExcess: NO_EXCESS_LABEL,
+    notReported: "Not reported",
+  }[stateOf(area) as AbsentState];
 }
 
 function hintFor(area: MapArea): string {
@@ -691,7 +730,9 @@ function hintFor(area: MapArea): string {
     running: "Fetching observations and scoring them",
     unmodelled: "No model has been fitted for this area",
     pending: "Select this area to run it",
-  }[stateOf(area) as "running" | "unmodelled" | "pending"];
+    noExcess: "Estimate below 1, so no attributable share",
+    notReported: "No summary is reported for this choice",
+  }[stateOf(area) as AbsentState];
 }
 
 function label(area: MapArea): string {
@@ -705,7 +746,10 @@ function label(area: MapArea): string {
 }
 
 function describe(shapes: ProjectedArea[], highest: ProjectedArea | null): string {
-  const shaded = shapes.filter((shape) => shape.area.value_percent !== null).length;
+  const shaded = shapes.filter(
+    (shape) =>
+      shape.area.value_percent !== null || shape.area.missing_reason === "no_excess",
+  ).length;
   if (shaded === 0) {
     return `No area has a result yet — ${shapes.length} areas shown, no estimates available.`;
   }

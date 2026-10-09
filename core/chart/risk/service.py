@@ -508,8 +508,12 @@ def load_map_view(
     month: str | None = None,
     *,
     outcome: str = DEFAULT_OUTCOME,
+    with_values: bool = True,
 ) -> MapResponse:
     """Areas beneath a geography, shaded by their attributable fraction.
+
+    ``with_values=False`` returns the shapes and framing only, for callers
+    that fill the values from elsewhere (the Kenya outlook).
 
     Every area under the selected geography is returned, including those with
     no fitted model and those whose month has not been computed. They carry a
@@ -586,7 +590,7 @@ def load_map_view(
         if not any(other.startswith(f"{row[-1]}/") for other in paths)
     ]
 
-    unit_ids = [row[0] for row in rows]
+    unit_ids = [row[0] for row in rows] if with_values else []
     covered = set(
         session.scalars(
             select(ActiveModelAssignment.admin_unit_id)
@@ -599,6 +603,8 @@ def load_map_view(
                 ModelRelease.outcome == outcome,
             )
         )
+        if unit_ids
+        else ()
     )
 
     # Areas with a job already in flight for this month, so the map can
@@ -660,7 +666,7 @@ def load_map_view(
         _path,
     ) in rows:
         stored = values.get(unit_id)
-        if stored is not None:
+        if stored is not None or not with_values:
             missing_reason = None
         elif unit_id not in covered:
             missing_reason = "no_model"

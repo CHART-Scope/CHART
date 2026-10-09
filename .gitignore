@@ -72,3 +72,6 @@ new_design
 
 # e2e build output
 **/.next-e2e/
+
+# Kenya outlook files published locally by chart-publish-kenya (mirrors the model bucket)
+pipelines/models/kenya

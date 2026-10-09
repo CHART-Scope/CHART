@@ -66,7 +66,7 @@ web/
 ```
 
 Domain packages under `core/chart/` are: `audit`, `auth`, `climate`,
-`email`, `erf_registry`, `geographies`, `health_impact`, `identity`,
+`email`, `erf_registry`, `geographies`, `health_impact`, `heat_outlook`, `identity`,
 `inference`, `learning`, `model_registry`, `risk`, `setup`, `solution_repository`,
 `users`, and `workspaces`. `api` and `shared` are infrastructure rather than
 domains, and `vra` is a placeholder.
