@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import secrets
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal, cast
@@ -51,6 +52,7 @@ from .schemas import (
     PredictionRequestSummaryResponse,
     PredictionStage,
     PredictionStatus,
+    PregnancyWindow,
 )
 from .service import (
     ClimateServiceError,
@@ -89,8 +91,12 @@ def submit_prediction(
     place = validate_prediction_request(request, session_factory=session_factory)
     assert place.model is not None
     unsupported_windows = sorted(
-        set(request.selected_pregnancy_windows())
-        - set(place.model.validated_pregnancy_windows)
+        window
+        for window in set(
+            scoring_windows(request, place.model.validated_pregnancy_windows)
+        )
+        - {None, *place.model.validated_pregnancy_windows}
+        if window is not None
     )
     if unsupported_windows:
         raise ClimateServiceError(
@@ -608,7 +614,9 @@ def complete_prediction_request(
             "projection_scenario": request.projection_scenario,
             "projection_period": request.projection_period,
         }
-        pregnancy_windows = request.selected_pregnancy_windows()
+        pregnancy_windows = scoring_windows(
+            request, _validated_windows_for_record(session, record)
+        )
 
     stage_results = [
         score_prepared_prediction(
@@ -1086,16 +1094,34 @@ def _public_result(
         return None
     result = PredictResponse.model_validate(payload)
     candidates = result.predictions or [result.prediction]
+    # The windows the model would score now, so a model fitted without
+    # pregnancy windows (window None) shows its result too.
+    allowed: set[int | None] = set(validated_windows) or {None}
     predictions = [
         prediction
         for prediction in candidates
-        if prediction.pregnancy_window in validated_windows
+        if prediction.pregnancy_window in allowed
     ]
     if not predictions:
         return None
     return result.model_copy(
         update={"prediction": predictions[0], "predictions": predictions}
     )
+
+
+def scoring_windows(
+    request: PredictRequest, validated: Sequence[int]
+) -> tuple[PregnancyWindow | None, ...]:
+    """The pregnancy windows to score a request on, decided by the model.
+
+    A model fitted without pregnancy windows (an association model such as
+    under-five mortality) is scored once with no window, whatever the client
+    sent: insisting on a window there rejected every request it received. A
+    model fitted per window scores the windows asked for.
+    """
+    if not validated:
+        return (None,)
+    return request.selected_pregnancy_windows()
 
 
 def _validated_windows_for_record(

@@ -6,11 +6,11 @@ to make later model releases routine.
 
 ## Verified source packages
 
-| Model | Fitted geography | Runtime input | Deployable coverage |
-| --- | --- | --- | --- |
-| Kenya low birth weight | Climate zone | Three monthly `tasmax` values, newest first | 46 counties mapped to five fitted zones |
-| Madhya Pradesh low birth weight | One MP-wide window-1 fit and division fits | Three monthly `tasmax` values, newest first | MP state for window 1; ten divisions for windows 1–3 |
-| Madhya Pradesh under-five mortality | Division | Four daily `tasmax` values, lag 0–3 | Ten divisions |
+| Model                               | Fitted geography                           | Runtime input                               | Deployable coverage                                  |
+| ----------------------------------- | ------------------------------------------ | ------------------------------------------- | ---------------------------------------------------- |
+| Kenya low birth weight              | Climate zone                               | Three monthly `tasmax` values, newest first | 46 counties mapped to five fitted zones              |
+| Madhya Pradesh low birth weight     | One MP-wide window-1 fit and division fits | Three monthly `tasmax` values, newest first | MP state for window 1; ten divisions for windows 1–3 |
+| Madhya Pradesh under-five mortality | Division                                   | Four daily `tasmax` values, lag 0–3         | Ten divisions                                        |
 
 The LBW models are binomial DLNMs. Kenya and the MP divisions contain three
 pregnancy-window fits; the separate MP-wide source contains only window 1. The

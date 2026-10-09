@@ -2,14 +2,14 @@
 
 ## Running services
 
-| Service | Job | Local port |
-|---|---|---:|
-| Next (`web`) | connected planning interface | 3100 |
-| FastAPI | all CHART API routes | 3210 |
-| Dagster | fetch data and run prediction jobs | 3002 |
-| R scorer | deterministic LBW calculation | 8000 |
-| Keycloak | login, role, and place access | 8080 |
-| Postgres + PostGIS | application and analytical data | 5434 |
+| Service            | Job                                | Local port |
+| ------------------ | ---------------------------------- | ---------: |
+| Next (`web`)       | connected planning interface       |       3100 |
+| FastAPI            | all CHART API routes               |       3210 |
+| Dagster            | fetch data and run prediction jobs |       3002 |
+| R scorer           | deterministic LBW calculation      |       8000 |
+| Keycloak           | login, role, and place access      |       8080 |
+| Postgres + PostGIS | application and analytical data    |       5434 |
 
 Fastify is retired from the runtime. The planning interface forwards browser
 credentials to FastAPI but owns no application rules or tables.

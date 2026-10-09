@@ -14,6 +14,7 @@ import logging
 import math
 
 from chart.shared.outcomes import DEFAULT_OUTCOME
+from chart.health_impact.derivation import attributable_fraction_milli
 from chart.inference import InferenceError
 from chart.shared.db.session import get_session_factory
 
@@ -105,7 +106,8 @@ def score_what_if(
         odds_ratio=score.odds_ratio,
         ci95_low=score.ci95_low,
         ci95_high=score.ci95_high,
-        attributable_fraction_percent=_odds_ratio_to_percent(score.odds_ratio),
+        attributable_fraction_percent=attributable_fraction_milli(score.odds_ratio)
+        / 10,
         relative_odds_change_percent=_relative_odds_change_percent(
             score.odds_ratio,
             place.model.input_spec,
@@ -192,7 +194,7 @@ def _score_association_what_if(
         odds_ratio=score.estimate,
         ci95_low=score.ci95_low,
         ci95_high=score.ci95_high,
-        attributable_fraction_percent=_odds_ratio_to_percent(score.estimate),
+        attributable_fraction_percent=attributable_fraction_milli(score.estimate) / 10,
         relative_odds_change_percent=_relative_odds_change_percent(
             score.estimate,
             model.input_spec,
@@ -224,15 +226,6 @@ def _presentation_fields(input_spec: dict | None) -> dict:
         "dashboard_title": presentation.get("dashboard_title"),
         "population_label": presentation.get("population_label"),
     }
-
-
-def _odds_ratio_to_percent(odds_ratio: float) -> float:
-    # Textbook OR -> AF for a rare outcome (matches health_impact/derivation.py).
-    # Rounded to 0.1% so a small slider nudge does not flicker the display.
-    if odds_ratio <= 1:
-        return 0.0
-    fraction = (odds_ratio - 1) / odds_ratio
-    return round(max(0.0, min(1.0, fraction)) * 1000) / 10
 
 
 def _relative_odds_change_percent(

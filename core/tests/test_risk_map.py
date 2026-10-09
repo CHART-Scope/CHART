@@ -253,6 +253,32 @@ def test_an_area_with_a_job_in_flight_reports_running(session) -> None:
     assert by_name["Indore"].missing_reason == "no_model"
 
 
+def test_another_outcomes_job_in_flight_does_not_read_as_running(session) -> None:
+    """An under-five run in flight says nothing about low birth weight."""
+    from chart.shared.db.models import PredictionRequestRecord
+
+    session.add(
+        PredictionRequestRecord(
+            request_key="u5-in-flight",
+            location_slug="geo-in-mp-rewa",
+            timeframe_id="month",
+            admin_unit_id=session.units["rewa"].id,
+            planning_date=date(2026, 8, 1),
+            status="running",
+            stage="preparing_climate",
+            request_payload={
+                "geography_id": "geo-in-mp-rewa",
+                "outcome": "under_5_mortality",
+            },
+        )
+    )
+    session.flush()
+
+    view = load_map_view(session, "geo-in-madhya-pradesh", "2026-08", outcome="lbw")
+    by_name = {area.name: area for area in view.areas}
+    assert by_name["Rewa"].missing_reason == "no_prediction"
+
+
 def test_a_leaf_selection_is_framed_on_its_siblings(session) -> None:
     """Drilling into one division must not collapse the map to one shape.
 

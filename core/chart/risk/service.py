@@ -609,7 +609,9 @@ def load_map_view(
 
     # Areas with a job already in flight for this month, so the map can
     # distinguish "on its way" from "nobody has asked for this".
-    in_flight_query = select(PredictionRequestRecord.admin_unit_id).where(
+    in_flight_query = select(
+        PredictionRequestRecord.admin_unit_id, PredictionRequestRecord.request_payload
+    ).where(
         PredictionRequestRecord.admin_unit_id.in_(unit_ids),
         PredictionRequestRecord.status.in_(("waiting", "queued", "running")),
     )
@@ -617,7 +619,18 @@ def load_map_view(
         in_flight_query = in_flight_query.where(
             PredictionRequestRecord.planning_date == _first_of_month(month)
         )
-    in_flight = set(session.scalars(in_flight_query)) if unit_ids else set()
+    # Only this outcome's: an LBW run in flight is not under-five's. The
+    # outcome lives in the request payload; a request is not tied to a
+    # release until it is reserved.
+    in_flight = (
+        {
+            unit_id
+            for unit_id, payload in session.execute(in_flight_query)
+            if (payload or {}).get("outcome", DEFAULT_OUTCOME) == outcome
+        }
+        if unit_ids
+        else set()
+    )
 
     values: dict[int, PredictionResult] = {}
     if unit_ids:

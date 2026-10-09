@@ -25,7 +25,7 @@ from __future__ import annotations
 MAX_MILLI = 100_000
 
 
-def _clamp_milli(value: float) -> int:
+def clamp_milli(value: float) -> int:
     if value < 0:
         return 0
     if value > MAX_MILLI:
@@ -42,7 +42,7 @@ def relative_risk_milli(odds_ratio: float) -> int:
 
     if odds_ratio <= 0:
         return 0
-    return _clamp_milli(odds_ratio * 1000)
+    return clamp_milli(odds_ratio * 1000)
 
 
 def attributable_fraction_milli(
@@ -58,7 +58,8 @@ def attributable_fraction_milli(
     docstring.
 
     Pass ``temperature_c`` and ``reference_temperature_c`` whenever the
-    caller knows them. Below the reference there is no heat to attribute
+    caller knows them; ``temperature_c`` is the warmest exposure the odds
+    ratio was computed over. Below the reference there is no heat to attribute
     anything to, so the fraction is zero regardless of what the fitted
     spline returns there - a division fit can come back with OR > 1 at a
     cooler-than-reference exposure, and reporting that as a heat-
@@ -78,7 +79,7 @@ def attributable_fraction_milli(
     ):
         return 0
     fraction = (odds_ratio - 1) / odds_ratio
-    return _clamp_milli(fraction * 1000)
+    return clamp_milli(fraction * 1000)
 
 
 def attributable_number(

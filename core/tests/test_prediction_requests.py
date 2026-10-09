@@ -20,7 +20,9 @@ from chart.climate.requests import (
     list_queued_prediction_requests,
     prepare_prediction_input,
     reconcile_expired_prediction_requests,
+    _public_result,
     reserve_queued_prediction_requests,
+    scoring_windows,
     submit_prediction,
 )
 from chart.climate.schemas import PredictRequest, PredictionAcceptedResponse
@@ -540,6 +542,72 @@ def test_state_mapping_rejects_unvalidated_pregnancy_windows(
         session_factory=session_factory,
     )
     assert isinstance(accepted, PredictionAcceptedResponse)
+
+
+def test_a_model_without_pregnancy_windows_accepts_any_request(
+    session_factory,
+) -> None:
+    # Under-five mortality is fitted without pregnancy windows, so its release
+    # lists none. Every request used to name window 1 and was refused.
+    with session_factory() as session:
+        mapping = session.scalar(select(ModelAreaMapping))
+        assert mapping is not None
+        mapping.validated_pregnancy_windows = []
+        session.commit()
+
+    for windows in (None, (1,), (3, 2, 1)):
+        request = _request().model_copy(update={"pregnancy_windows": windows})
+        accepted = submit_prediction(request, session_factory=session_factory)
+        assert isinstance(accepted, PredictionAcceptedResponse)
+        assert scoring_windows(request, []) == (None,)
+
+    assert scoring_windows(_request(), [1, 2, 3]) == (1,)
+
+
+def test_a_result_without_a_pregnancy_window_is_shown() -> None:
+    """Run history used to drop every under-five result: its prediction has no
+    window, and only validated windows were kept."""
+    prediction = {
+        "area": "Madhya Pradesh",
+        "geography_level": "state",
+        "pregnancy_window": None,
+        "temperatures_c": [31.0, 30.0, 29.0, 28.0],
+        "reference_temperature_c": 27.0,
+        "odds_ratio": 1.1,
+        "ci95_low": 0.9,
+        "ci95_high": 1.3,
+        "on_training_support": True,
+        "model_file": "u5.rds",
+        "model_version": "u5-v1",
+    }
+    payload = {
+        "place": {
+            "geography_id": "geo-in-madhya-pradesh",
+            "code": "madhya-pradesh",
+            "name": "Madhya Pradesh",
+            "level": "state",
+            "path": "/india/madhya-pradesh",
+            "supports_prediction": True,
+        },
+        "planning_date": "2026-07-01",
+        "availability": {
+            "status": "ready",
+            "months_found": 3,
+            "missing_months": [],
+            "message": "Ready",
+        },
+        "climate": [],
+        "prediction": prediction,
+        "predictions": [prediction],
+        "request_id": 1,
+    }
+
+    shown = _public_result(payload, ())
+
+    assert shown is not None
+    assert shown.prediction.odds_ratio == 1.1
+    # A windowed model still shows only the windows it validates.
+    assert _public_result(payload, (1, 2, 3)) is None
 
 
 def test_next_heat_season_waits_then_queues_when_forecast_can_cover_it(
