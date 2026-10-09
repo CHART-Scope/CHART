@@ -1925,6 +1925,224 @@
         "description": "Returns three overlaid RCP scenarios and their 5- / 15- / 25-year horizon rows for the requested admin_unit under an SSP2 population baseline. Missing scenarios are omitted, so the client renders the scenarios that are available today. Requires a bearer token and geography scope."
       }
     },
+    "/heat-outlook/{geography_id}": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read the pre-computed heat outlook for a Kenyan place",
+        "operationId": "read_heat_outlook_heat_outlook__geography_id__get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "scenario",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 16
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 16
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The filtered typical months and period summary, the available options, and the notes the dashboard must display.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeatOutlookResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns the modelling team's pre-computed heat outlook for a Kenyan county (geo-ke-<county>) or for Kenya as a whole (geo-ke): a typical month by calendar month, and a summary for each period with its 95% CI, climate-model range and change from the baseline. The outcome selects low birth weight (lbw) or under-five mortality (under_5_mortality); scenario, period and selector (the pregnancy window or the age group) filter the tables. Requires a risk reader role and access to the geography path. No model is evaluated at run time: the tables are read from the model bucket mirror. The guides' display rules are applied here, so suppressed values arrive as null with the message to show in their place."
+      }
+    },
+    "/heat-outlook/{geography_id}/map": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read Kenyan counties shaded by annual-average heat share",
+        "operationId": "read_heat_outlook_map_heat_outlook__geography_id__map_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "scenario",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 16
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scenario"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 16
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Kenyan counties with display geometry and each county's published annual-average share, or the reason it is absent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns the counties of Kenya with their display geometry and the modelling team's annual-average heat-attributable share for the chosen outcome, scenario, period and selector, in the same shape as the risk map so the dashboard draws it identically. Requires a risk reader role and access to the geography path. Counties whose share is suppressed by the display rules carry missing_reason no_excess; windows with no period summary carry not_reported; counties with no published file carry no_model. Nothing is computed on request."
+      }
+    },
     "/learning/resources": {
       "get": {
         "tags": [
@@ -4664,6 +4882,125 @@
         "type": "object",
         "title": "HealthResponse"
       },
+      "HeatOutlookResponse": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "place": {
+            "type": "string",
+            "title": "Place"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "county",
+              "country"
+            ],
+            "title": "Level"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "release": {
+            "type": "string",
+            "title": "Release"
+          },
+          "source_uri": {
+            "type": "string",
+            "title": "Source Uri"
+          },
+          "baseline_period": {
+            "type": "string",
+            "title": "Baseline Period"
+          },
+          "reference_note": {
+            "type": "string",
+            "title": "Reference Note"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/Option"
+            },
+            "type": "array",
+            "title": "Scenarios"
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/Option"
+            },
+            "type": "array",
+            "title": "Periods"
+          },
+          "selectors": {
+            "items": {
+              "$ref": "#/components/schemas/Option"
+            },
+            "type": "array",
+            "title": "Selectors"
+          },
+          "scenario": {
+            "type": "string",
+            "title": "Scenario"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "selector": {
+            "type": "string",
+            "title": "Selector"
+          },
+          "selector_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selector Note"
+          },
+          "months": {
+            "items": {
+              "$ref": "#/components/schemas/OutlookMonth"
+            },
+            "type": "array",
+            "title": "Months"
+          },
+          "period_summary": {
+            "items": {
+              "$ref": "#/components/schemas/OutlookPeriod"
+            },
+            "type": "array",
+            "title": "Period Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "place",
+          "level",
+          "outcome",
+          "release",
+          "source_uri",
+          "baseline_period",
+          "reference_note",
+          "scenarios",
+          "periods",
+          "selectors",
+          "scenario",
+          "period",
+          "selector",
+          "selector_note",
+          "months",
+          "period_summary"
+        ],
+        "title": "HeatOutlookResponse"
+      },
       "HeatSeasonOptionResponse": {
         "properties": {
           "label": {
@@ -5435,6 +5772,70 @@
         ],
         "title": "ModelSyncResponse"
       },
+      "MonthPart": {
+        "properties": {
+          "side": {
+            "type": "string",
+            "enum": [
+              "heat",
+              "cool"
+            ],
+            "title": "Side"
+          },
+          "value_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Percent"
+          },
+          "low_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Percent"
+          },
+          "high_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Percent"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "side",
+          "value_percent",
+          "low_percent",
+          "high_percent"
+        ],
+        "title": "MonthPart"
+      },
       "MonthlyHealthImpactPoint": {
         "properties": {
           "valid_month": {
@@ -5812,6 +6213,282 @@
         ],
         "title": "MonthlyTemperature",
         "description": "The month's maximum temperature, area-level, from ERA5.\n\nThe variable is maximum temperature; the monthly value is the mean of\nits daily values, which is what the model was fitted on and therefore\nwhat it consumes. The month's single hottest day is deliberately not\nused. The dashboard says \"maximum temperature\" rather than \"average\nmaximum temperature\", which reads as a contradiction - agreed on the\n17 Sep modelling call."
+      },
+      "OddsRatio": {
+        "properties": {
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "low": {
+            "type": "number",
+            "title": "Low"
+          },
+          "high": {
+            "type": "number",
+            "title": "High"
+          },
+          "at_tmax_c": {
+            "type": "number",
+            "title": "At Tmax C"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "low",
+          "high",
+          "at_tmax_c"
+        ],
+        "title": "OddsRatio"
+      },
+      "Option": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "exploratory": {
+            "type": "boolean",
+            "title": "Exploratory",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "Option"
+      },
+      "OutlookMonth": {
+        "properties": {
+          "month": {
+            "type": "integer",
+            "title": "Month"
+          },
+          "tmax_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tmax C"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/MonthPart"
+            },
+            "type": "array",
+            "title": "Parts"
+          },
+          "odds_ratio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OddsRatio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "tmax_c",
+          "parts"
+        ],
+        "title": "OutlookMonth"
+      },
+      "OutlookPeriod": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "is_baseline": {
+            "type": "boolean",
+            "title": "Is Baseline"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/PeriodPart"
+            },
+            "type": "array",
+            "title": "Parts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "label",
+          "is_baseline",
+          "parts"
+        ],
+        "title": "OutlookPeriod"
+      },
+      "PeriodPart": {
+        "properties": {
+          "side": {
+            "type": "string",
+            "enum": [
+              "heat",
+              "cool"
+            ],
+            "title": "Side"
+          },
+          "value_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Percent"
+          },
+          "low_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Percent"
+          },
+          "high_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Percent"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "gcm_min_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gcm Min Percent"
+          },
+          "gcm_max_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gcm Max Percent"
+          },
+          "change_pp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pp"
+          },
+          "change_low_pp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Low Pp"
+          },
+          "change_high_pp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change High Pp"
+          },
+          "share_above_p99_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Above P99 Percent"
+          },
+          "thin_data": {
+            "type": "boolean",
+            "title": "Thin Data"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ratio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "side",
+          "value_percent",
+          "low_percent",
+          "high_percent",
+          "gcm_min_percent",
+          "gcm_max_percent",
+          "change_pp",
+          "change_low_pp",
+          "change_high_pp",
+          "share_above_p99_percent",
+          "thin_data"
+        ],
+        "title": "PeriodPart"
       },
       "PersonalViewResponse": {
         "properties": {
@@ -6846,6 +7523,49 @@
           "description"
         ],
         "title": "ProjectionScenarioOptionResponse"
+      },
+      "Ratio": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "odds_ratio",
+              "risk_ratio"
+            ],
+            "title": "Kind"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "low": {
+            "type": "number",
+            "title": "Low"
+          },
+          "high": {
+            "type": "number",
+            "title": "High"
+          },
+          "precision": {
+            "type": "string",
+            "enum": [
+              "high",
+              "moderate",
+              "low"
+            ],
+            "title": "Precision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "value",
+          "low",
+          "high",
+          "precision"
+        ],
+        "title": "Ratio",
+        "description": "The ratio behind a period's attributable share, with its 95% CI.\n\nConverted from the modeller's share and its CI bounds (a monotonic\ntransform, so the bounds stay bounds): LBW reports an odds ratio, under-five\na risk ratio. Shown even when the share is suppressed, as the guides ask."
       },
       "Recommendation": {
         "properties": {
