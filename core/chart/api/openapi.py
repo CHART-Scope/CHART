@@ -412,6 +412,47 @@ OPERATION_DOCUMENTATION: dict[
             )
         },
     ),
+    ("get", "/heat-outlook/{geography_id}"): OperationDocumentation(
+        summary="Read the pre-computed heat outlook for a Kenyan place",
+        description=(
+            "Returns the modelling team's pre-computed heat outlook for a Kenyan "
+            "county (geo-ke-<county>) or for Kenya as a whole (geo-ke): a typical "
+            "month by calendar month, and a summary for each period with its 95% "
+            "CI, climate-model range and change from the baseline. The outcome "
+            "selects low birth weight (lbw) or under-five mortality "
+            "(under_5_mortality); scenario, period and selector (the pregnancy "
+            "window or the age group) filter the tables. Requires a risk reader "
+            "role and access to the geography path. No model is evaluated at run "
+            "time: the tables are read from the model bucket mirror. The guides' "
+            "display rules are applied here, so suppressed values arrive as null "
+            "with the message to show in their place."
+        ),
+        success_responses={
+            "200": (
+                "The filtered typical months and period summary, the available "
+                "options, and the notes the dashboard must display."
+            )
+        },
+    ),
+    ("get", "/heat-outlook/{geography_id}/map"): OperationDocumentation(
+        summary="Read Kenyan counties shaded by annual-average heat share",
+        description=(
+            "Returns the counties of Kenya with their display geometry and the "
+            "modelling team's annual-average heat-attributable share for the "
+            "chosen outcome, scenario, period and selector, in the same shape as "
+            "the risk map so the dashboard draws it identically. Requires a risk "
+            "reader role and access to the geography path. Counties whose share "
+            "is suppressed by the display rules carry missing_reason no_excess; "
+            "windows with no period summary carry not_reported; counties with no "
+            "published file carry no_model. Nothing is computed on request."
+        ),
+        success_responses={
+            "200": (
+                "Kenyan counties with display geometry and each county's published "
+                "annual-average share, or the reason it is absent."
+            )
+        },
+    ),
     ("get", "/risk/{geography_id}/monthly"): OperationDocumentation(
         summary="Read month-keyed ERA5 maximum temperature and attributable impacts",
         description=(

@@ -14,6 +14,7 @@ import {
 } from "@/lib/planningClient";
 import { rememberActiveGeography } from "@/lib/authClient";
 import { isInScope } from "@/lib/geographyScope";
+import { parentOfModelAreas } from "./contextFamilies";
 import { InlineContextSwitcher } from "./InlineContextSwitcher";
 import { PlanningSetup } from "./PlanningSetup";
 import { defaultPlanningSelection, type PlanningSelection } from "./planningWireframe";
@@ -49,16 +50,34 @@ export function PlanningApp({
     listGeographies()
       .then((records) => {
         if (cancelled) return;
-        const inScope = records.filter(
+        const modelled = records.filter(
           (area) => area.supportsPrediction && isInScope(area, geographyScopes),
         );
+        // The places that group model areas (Kenya over its counties) are
+        // choices too: the dashboard opens on them and the reader picks an
+        // area there, rather than being dropped on the first county.
+        const groups = records.filter(
+          (area) =>
+            !modelled.includes(area) &&
+            isInScope(area, geographyScopes) &&
+            modelled.some(
+              (child) => parentOfModelAreas(child, records)?.id === area.id,
+            ),
+        );
+        const inScope = [...groups, ...modelled];
         const active =
           inScope.find(
             (area) => area.id === activeGeographyId || area.path === activeGeographyId,
           ) ??
           // The Settings context picker stores the family root path (e.g. /kenya
-          // or /india/madhya-pradesh). When the root itself has no direct model,
-          // land on the first prediction-supporting descendant of that family.
+          // or /india/madhya-pradesh). When the root itself is not a choice, land
+          // on the place that groups its model areas, then on a model area.
+          inScope.find(
+            (area) =>
+              area.id ===
+              parentOfModelAreas(descendantOf(activeGeographyId, modelled), records)
+                ?.id,
+          ) ??
           descendantOf(activeGeographyId, inScope) ??
           inScope.find((area) => area.id === "geo-in-madhya-pradesh") ??
           inScope[0];

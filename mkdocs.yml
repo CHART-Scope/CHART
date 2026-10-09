@@ -79,6 +79,8 @@ nav:
       - Model releases: model-updates.md
       - Health input contract: health-input-contract.md
       - Survey exploration guide: health-survey-exploration-guide.md
+  - Model integration:
+      - From R output to the dashboard: model-integration.md
   - Data pipeline: data-pipeline.md
   - Dashboard: dashboard.md
   - Project:

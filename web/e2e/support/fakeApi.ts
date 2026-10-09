@@ -168,7 +168,7 @@ export function mapFor(url: URL, overrides: { value?: number | null } = {}) {
   };
 }
 
-function catalogEntry(outcome: string, label: string, releaseId: string) {
+export function catalogEntry(outcome: string, label: string, releaseId: string) {
   return {
     climate_hazard: "heat",
     climate_hazard_label: "Heat",

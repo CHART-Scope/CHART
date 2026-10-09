@@ -10,6 +10,7 @@ import { RequireAuth } from "@/features/auth/RequireAuth";
 import {
   DashboardHeader,
   HeatLbwLinkPanel,
+  HeatOutlookPanel,
   RecommendedActionsPanel,
   RiskProtectionPanel,
   SpatialRiskMap,
@@ -17,6 +18,7 @@ import {
   lastCompleteMonth,
 } from "@/features/dashboard";
 import { DashboardContextBar } from "@/features/dashboard";
+import { exposedPopulationFigure, iconArrayFigure } from "@/features/dashboard/figures";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
 import { useGeographies } from "@/lib/useGeographies";
@@ -162,6 +164,13 @@ function AuthorizedDashboard({
   const effectiveGeography =
     geographies.find((geo) => geo.id === effectiveAdminUnit) ?? currentGeography;
   const country = currentGeography ? countryFromPath(currentGeography.path) : "";
+  // Kenya reads published tables. Decided from the URL's geography id as
+  // well as the loaded path, so the live panel never flashes up for Kenya
+  // while the geography list is still loading.
+  const isKenya =
+    country === "Kenya" ||
+    geographyId === "geo-ke" ||
+    geographyId.startsWith("geo-ke-");
   // The place trail, broadest first, walked from the area actually selected
   // rather than from the page's geography. Built from the ancestry so it
   // follows the sub-area picker: choosing a division must move the
@@ -293,71 +302,60 @@ function AuthorizedDashboard({
                 <ScienceVideoPlaceholder />
                 <RiskProtectionPanel
                   outcomeLabel={outcomeLabel}
-                  contextFigure={
-                    selectedCatalog?.visualization_context_figure ?? "pregnant-woman"
-                  }
+                  contextFigure={exposedPopulationFigure(outcome)}
                   description={selectedCatalog?.risk_description}
                 />
               </aside>
-              <HeatLbwLinkPanel
-                onPredictionReady={refreshMap}
-                placeLabel={effectiveGeography?.name ?? stateLabel}
-                modelAreaName={selectedModel?.modelAreaName ?? null}
-                outcome={outcome}
-                outcomeLabel={outcomeLabel}
-                figure={
-                  outcome === "lbw"
-                    ? "newborn"
-                    : (selectedCatalog?.visualization_figure ?? "baby")
-                }
-                batchEnabled={
-                  selectedCatalog?.batch_status !==
-                  "blocked_pending_modeller_confirmation"
-                }
-                geographyId={effectiveAdminUnit ?? geographyId}
-                month={month}
-                onMonthChange={(nextMonth) => {
-                  const params = new URLSearchParams();
-                  if (adminUnit) params.set("admin_unit", adminUnit);
-                  if (outcome) params.set("outcome", outcome);
-                  if (nextMonth) params.set("month", nextMonth);
-                  // push, not replace: choosing a month is a step the reader
-                  // took, and replacing the entry meant Back left the
-                  // dashboard entirely instead of walking the months visited.
-                  navigate(
-                    `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
-                    { scroll: false },
-                  );
-                }}
-                accessToken={selectedModel ? session.accessToken : undefined}
-                canPrepare={
-                  Boolean(selectedModel) &&
-                  selectedCatalog?.batch_status !==
-                    "blocked_pending_modeller_confirmation" &&
-                  session.user.roles.some((role) =>
-                    [
-                      "chart_admin",
-                      "health_planning_lead",
-                      "cross_sector_planning_lead",
-                      "health_implementation_officer",
-                      "cross_sector_implementation_officer",
-                    ].includes(role),
-                  )
-                }
-              >
-                <SpatialRiskMap
-                  dataRefreshKey={mapRefresh}
-                  embedded
-                  geographyId={geographyId}
+              {isKenya ? (
+                // Kenya reads the modelling team's published tables: no
+                // scoring on request, so nothing to prepare or poll.
+                <HeatOutlookPanel
+                  geographyId={displayedAdminUnit ?? geographyId}
+                  mapGeographyId={geographyId}
                   accessToken={session.accessToken}
-                  month={month ?? lastCompleteMonth()}
                   outcome={outcome}
-                  // Falls back to the place the dashboard is on. The map now
-                  // frames a leaf selection on its siblings, so without this
-                  // nothing is picked out among them when you land on a
-                  // division directly rather than choosing a sub-area.
-                  selectedGeographyId={displayedAdminUnit ?? geographyId}
+                  outcomeLabel={outcomeLabel}
+                  figure={iconArrayFigure(outcome)}
+                  onSelectArea={(nextGeography: string) => {
+                    setOptimisticAdminUnit(nextGeography);
+                    const params = new URLSearchParams();
+                    params.set("admin_unit", nextGeography);
+                    if (outcome) params.set("outcome", outcome);
+                    navigate(
+                      `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
+                    );
+                  }}
+                />
+              ) : (
+                <HeatLbwLinkPanel
+                  onPredictionReady={refreshMap}
+                  placeLabel={effectiveGeography?.name ?? stateLabel}
+                  modelAreaName={selectedModel?.modelAreaName ?? null}
+                  outcome={outcome}
+                  outcomeLabel={outcomeLabel}
+                  figure={iconArrayFigure(outcome)}
+                  batchEnabled={
+                    selectedCatalog?.batch_status !==
+                    "blocked_pending_modeller_confirmation"
+                  }
+                  geographyId={effectiveAdminUnit ?? geographyId}
+                  month={month}
+                  onMonthChange={(nextMonth) => {
+                    const params = new URLSearchParams();
+                    if (adminUnit) params.set("admin_unit", adminUnit);
+                    if (outcome) params.set("outcome", outcome);
+                    if (nextMonth) params.set("month", nextMonth);
+                    // push, not replace: choosing a month is a step the reader
+                    // took, and replacing the entry meant Back left the
+                    // dashboard entirely instead of walking the months visited.
+                    navigate(
+                      `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
+                      { scroll: false },
+                    );
+                  }}
+                  accessToken={selectedModel ? session.accessToken : undefined}
                   canPrepare={
+                    Boolean(selectedModel) &&
                     selectedCatalog?.batch_status !==
                       "blocked_pending_modeller_confirmation" &&
                     session.user.roles.some((role) =>
@@ -370,18 +368,45 @@ function AuthorizedDashboard({
                       ].includes(role),
                     )
                   }
-                  onSelect={(nextGeography: string) => {
-                    setOptimisticAdminUnit(nextGeography);
-                    const params = new URLSearchParams();
-                    params.set("admin_unit", nextGeography);
-                    if (outcome) params.set("outcome", outcome);
-                    if (month) params.set("month", month);
-                    navigate(
-                      `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
-                    );
-                  }}
-                />
-              </HeatLbwLinkPanel>
+                >
+                  <SpatialRiskMap
+                    dataRefreshKey={mapRefresh}
+                    embedded
+                    geographyId={geographyId}
+                    accessToken={session.accessToken}
+                    month={month ?? lastCompleteMonth()}
+                    outcome={outcome}
+                    // Falls back to the place the dashboard is on. The map now
+                    // frames a leaf selection on its siblings, so without this
+                    // nothing is picked out among them when you land on a
+                    // division directly rather than choosing a sub-area.
+                    selectedGeographyId={displayedAdminUnit ?? geographyId}
+                    canPrepare={
+                      selectedCatalog?.batch_status !==
+                        "blocked_pending_modeller_confirmation" &&
+                      session.user.roles.some((role) =>
+                        [
+                          "chart_admin",
+                          "health_planning_lead",
+                          "cross_sector_planning_lead",
+                          "health_implementation_officer",
+                          "cross_sector_implementation_officer",
+                        ].includes(role),
+                      )
+                    }
+                    onSelect={(nextGeography: string) => {
+                      setOptimisticAdminUnit(nextGeography);
+                      const params = new URLSearchParams();
+                      params.set("admin_unit", nextGeography);
+                      if (outcome) params.set("outcome", outcome);
+                      if (month) params.set("month", month);
+                      navigate(
+                        `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
+                      );
+                    }}
+                  />
+                </HeatLbwLinkPanel>
+              )}
             </div>
           ) : (
             <section className={styles.unsupportedVisualization} role="status">

@@ -1,0 +1,123 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  min-width: 0;
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-eyebrow);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-body-lg);
+  font-weight: 400;
+  line-height: 1.7;
+  color: var(--color-charcoal);
+}
+
+.title strong {
+  font-weight: 600;
+  color: var(--color-nexus);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.baseline {
+  margin: 0;
+  font-size: var(--fs-body);
+}
+
+.note,
+.warning {
+  margin: 0;
+  font-size: var(--fs-caption);
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.warning {
+  padding: var(--space-1) var(--space-2);
+  border-left: 3px solid var(--color-amber);
+  background: var(--color-amber-tint);
+  color: var(--color-text);
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow-x: auto;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--fs-h3);
+  font-weight: 600;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-body-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+  border-bottom: 1px solid var(--border-hairline);
+  white-space: nowrap;
+}
+
+.table thead th {
+  font-family: var(--font-display);
+  font-size: var(--fs-eyebrow);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.table tbody th {
+  font-weight: 500;
+}
+
+.table tr[aria-current="true"] {
+  background: var(--color-nexus-tint);
+}
+
+.flag {
+  color: var(--color-amber);
+  font-size: var(--fs-micro);
+}
+
+.source {
+  margin: 0;
+  font-size: var(--fs-micro);
+  color: var(--color-text-faint);
+  overflow-wrap: anywhere;
+}
+
+.change {
+  margin: 0;
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
