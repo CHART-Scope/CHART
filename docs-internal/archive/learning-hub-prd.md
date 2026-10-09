@@ -20,12 +20,12 @@ and nobody in a county health office has time to find it.
 
 The same people the dashboard is for, in roughly this order:
 
-| User | What they need from it |
-| --- | --- |
-| District and county health officers | A short, credible explainer they can watch between meetings |
-| Planning leads | Enough grounding to defend a plan to a funder or a colleague |
-| Clinical staff | Outcome-specific material — heat illness management, heat in pregnancy |
-| Public visitors | The ability to read the subject without an account |
+| User                                | What they need from it                                                 |
+| ----------------------------------- | ---------------------------------------------------------------------- |
+| District and county health officers | A short, credible explainer they can watch between meetings            |
+| Planning leads                      | Enough grounding to defend a plan to a funder or a colleague           |
+| Clinical staff                      | Outcome-specific material — heat illness management, heat in pregnancy |
+| Public visitors                     | The ability to read the subject without an account                     |
 
 It is explicitly **not** a training platform. Nobody is assessed, nothing is
 certified, and no one's employer sees their progress.
@@ -85,7 +85,7 @@ of a course, cohort or completion certificate.
 
 - **R6.** The API's reads (`/learning/resources`, `/taxonomies`, `/tracks`)
   are unauthenticated; everything under `/learning/me` requires a session and
-  is scoped to the caller. The *page* is behind `RequireAuth` regardless, so
+  is scoped to the caller. The _page_ is behind `RequireAuth` regardless, so
   its chrome matches every other page — see R20.
 - **R20.** The Learning hub uses the same `AppShell` and the same
   `appNavForRoles` nav as every other page, with a guaranteed session. One
@@ -146,17 +146,17 @@ A build is acceptable when, in addition to the repository's standard gates:
 
 These are real and should not be discovered again from scratch:
 
-| Gap | Consequence |
-| --- | --- |
-| Only 8 of 96 resources are shown | Deliberate: the shortlist is what a human curated. The rest are one flag away. |
-| 76 of 96 resources have unconfirmed embed permission | They are played anyway; YouTube enforces the uploader's setting and the modal warns that a blocked video may need opening at source. |
-| 48 of 96 carry no health outcome | The primary filter reaches half the catalogue. |
-| 57 of 96 have no description text | Cards for those show a title and organisation only. |
-| No link-liveness checking | A dead URL stays in the catalogue until someone notices. |
-| Search happens client-side over the full fetch | Instant, but it duplicates the server's search; the two can drift. Acceptable at 96 rows, not at 1,000. |
-| `health_outcomes` is stored and filterable but unsurfaced | The API supports `?outcome=`; no control exposes it since the redesign. |
-| `/learning/me` recommendations are unused by the page | Progress is still recorded, but the ranked picks and "Continue watching" row have no home in the approved design. |
-| No editing UI | Content changes require re-running the ingest script and a deploy. |
+| Gap                                                       | Consequence                                                                                                                          |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Only 8 of 96 resources are shown                          | Deliberate: the shortlist is what a human curated. The rest are one flag away.                                                       |
+| 76 of 96 resources have unconfirmed embed permission      | They are played anyway; YouTube enforces the uploader's setting and the modal warns that a blocked video may need opening at source. |
+| 48 of 96 carry no health outcome                          | The primary filter reaches half the catalogue.                                                                                       |
+| 57 of 96 have no description text                         | Cards for those show a title and organisation only.                                                                                  |
+| No link-liveness checking                                 | A dead URL stays in the catalogue until someone notices.                                                                             |
+| Search happens client-side over the full fetch            | Instant, but it duplicates the server's search; the two can drift. Acceptable at 96 rows, not at 1,000.                              |
+| `health_outcomes` is stored and filterable but unsurfaced | The API supports `?outcome=`; no control exposes it since the redesign.                                                              |
+| `/learning/me` recommendations are unused by the page     | Progress is still recorded, but the ranked picks and "Continue watching" row have no home in the approved design.                    |
+| No editing UI                                             | Content changes require re-running the ingest script and a deploy.                                                                   |
 
 ## Open questions for product
 

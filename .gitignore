@@ -20,6 +20,7 @@ out/
 !web/src/app/api/build/route.ts
 **/coverage/
 **/.next/
+**/.next-validation/
 **/out/
 web/storybook-static/
 *.tsbuildinfo

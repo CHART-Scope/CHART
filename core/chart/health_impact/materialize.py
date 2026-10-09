@@ -29,6 +29,7 @@ from chart.shared.db.models import (
 
 from .derivation import (
     attributable_fraction_milli,
+    clamp_milli,
     attributable_number,
     relative_risk_milli,
 )
@@ -159,7 +160,7 @@ def materialize_health_impact(
     spread_milli = (
         None
         if spec.ensemble_spread is None
-        else _clamp_milli(spec.ensemble_spread * 1000)
+        else clamp_milli(spec.ensemble_spread * 1000)
     )
 
     existing = session.scalar(
@@ -202,12 +203,3 @@ def materialize_health_impact(
     session.add(row)
     session.flush()
     return HealthImpactWriteResult(row=row, created=True)
-
-
-def _clamp_milli(value: float) -> int:
-    """Local copy so materialize does not import a private helper."""
-    if value < 0:
-        return 0
-    if value > 100_000:
-        return 100_000
-    return round(value)

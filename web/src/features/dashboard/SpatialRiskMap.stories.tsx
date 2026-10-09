@@ -106,7 +106,6 @@ function withFixture(response: MapResponse, combined = false) {
             month={month}
             onMonthChange={setMonth}
             previewPrediction={{
-              percent: 27,
               oddsRatio: 1.37,
               ci95Low: 0.7,
               ci95High: 2.4,

@@ -7,7 +7,7 @@ and a refusal to store a result that disagrees with its own request.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -207,6 +207,20 @@ def test_the_stored_fraction_is_the_clamped_one_the_card_shows(session) -> None:
     assert above.attributable_fraction_milli == 248
 
 
+def test_a_cool_month_after_hot_ones_keeps_its_share(session) -> None:
+    """The odds ratio covers the month and the two before it.
+
+    So the reference is checked against the warmest of those months, not the
+    reported one alone: a cool August after a hot June and July still carries
+    the heat the model scored.
+    """
+    row = _store(
+        session,
+        _payload(odds_ratio=1.33, reference=27.0, temperatures=(25.0, 31.0, 32.0)),
+    )
+    assert row.attributable_fraction_milli == 248
+
+
 def test_the_data_label_describes_the_climate_actually_scored(session) -> None:
     """Not whether a projection scenario was asked for.
 
@@ -245,4 +259,52 @@ def test_a_result_that_disagrees_with_its_request_is_refused() -> None:
     sound = PredictResponse.model_validate(_payload())
     assert (
         integrity_problem(sound, geography_id=GEO, valid_month=date(2026, 8, 1)) is None
+    )
+
+
+def _daily_payload(day_temperatures: list[float], **overrides) -> dict:
+    """An under-five result: August scored day by day on 4-day windows, so the
+    series runs from 31 Aug back to 29 Jul, newest first."""
+    payload = _payload(pregnancy_window=None, **overrides)
+    dates = [date(2026, 8, 31) - timedelta(days=offset) for offset in range(34)]
+    payload["prediction"]["temperatures_c"] = day_temperatures
+    payload["prediction"]["exposure_dates"] = [value.isoformat() for value in dates]
+    return payload
+
+
+def test_a_daily_model_is_checked_against_the_days_it_scored(session) -> None:
+    """The reference is a daily maximum, so it is compared with the days.
+
+    August's monthly mean (24 C) sits below the 27 C reference, but the model
+    scored days that reached 31 C, so the share stands.
+    """
+    days = [31.0] * 5 + [23.0] * 29
+    row = _store(
+        session,
+        _daily_payload(days, odds_ratio=1.33, reference=27.0, temperatures=(24.0,) * 3),
+        outcome="under_5_mortality",
+    )
+    assert row.attributable_fraction_milli == 248
+
+    cool = _store(
+        session,
+        _daily_payload([23.0] * 34, odds_ratio=1.33, reference=27.0),
+        outcome="under_5_mortality",
+    )
+    assert cool.attributable_fraction_milli == 0
+
+
+def test_a_daily_series_with_a_gap_is_not_stored() -> None:
+    payload = _daily_payload([25.0] * 34)
+    payload["prediction"]["exposure_dates"].pop(10)
+    payload["prediction"]["temperatures_c"].pop(10)
+    result = PredictResponse.model_validate(payload)
+
+    assert integrity_problem(
+        result, geography_id=GEO, valid_month=date(2026, 8, 1)
+    ) == ("daily series has a gap")
+    complete = PredictResponse.model_validate(_daily_payload([25.0] * 34))
+    assert (
+        integrity_problem(complete, geography_id=GEO, valid_month=date(2026, 8, 1))
+        is None
     )

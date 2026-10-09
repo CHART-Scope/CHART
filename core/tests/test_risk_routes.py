@@ -845,6 +845,7 @@ def test_monthly_below_reference_month_reports_no_attributable_share(
                 "reference_temperature_c": 27.0,
                 "ci95_low": 0.984,
                 "ci95_high": 1.803,
+                "temperatures_c": [24.0, 24.0, 24.0],
             },
         )
         session.commit()

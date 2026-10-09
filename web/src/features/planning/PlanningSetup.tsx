@@ -214,8 +214,7 @@ export function PlanningSetup({
               descendantModelAreas[0]?.levelLabel,
               descendantModelAreas.length,
             )}{" "}
-            within {areaName}. The dashboard will open at a supported area, and you can
-            switch between the other model-backed areas there.
+            within {areaName}. Choose one on the dashboard to see its estimate.
           </div>
         ) : null}
         {activeArea && selectedOutcome && !selectedScopeSupportsOutcome ? (
@@ -225,9 +224,8 @@ export function PlanningSetup({
         ) : null}
         {modelUnavailable ? (
           <div className={styles.error} role="status">
-            No fitted model is available for {areaName}. You can keep this county in
-            your workspace, but predictions and model-based planning remain disabled
-            until a compatible model mapping is released.
+            No fitted model is available for {areaName} yet. Predictions and model-based
+            planning stay disabled until a model is released for it.
           </div>
         ) : null}
 

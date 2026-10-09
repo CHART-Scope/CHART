@@ -56,8 +56,16 @@ test("model details render when the API omits the event count", async ({ page })
 
   await expect(page.getByText("lbw-1.0.1").first()).toBeVisible();
   await expect(page.getByText("bhopal.rds")).toBeVisible();
-  await expect(page.getByText("Events", { exact: true })).toHaveCount(0);
+  // No counts from the model: the row is left out, never "not reported".
+  await expect(page.getByText("Sample", { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/not reported/i)).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test("a low-birth-weight sample is counted in births", async ({ page }) => {
+  await openDetails(page, { n_training: 4210, n_events: 412, n_subjects: 3980 });
+
+  await expect(page.getByText("4,210 births, 412 with low birth weight")).toBeVisible();
 });
 
 test("locally the model file used is the path on disk", async ({ page }) => {

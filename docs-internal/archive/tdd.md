@@ -10,20 +10,20 @@ the sections that follow describe the target.
 
 Checked against the repository on 15 September 2026.
 
-| Section | Status | Note |
-| --- | --- | --- |
-| 1. Product outcome | Built | Planning flow, saved results, and reload all work. |
-| 2. Running system | Built | Fastify retired; Python and Alembic own the API and schema. |
-| 3. Prediction flow | Built | Durable requests, idempotent keys, Dagster execution. |
-| 4. Climate data contract | Built | ERA5, seasonal, and projection adapters land with provenance. |
-| 5. Places, boundaries, models | Built | India and Kenya model releases; under-five model alongside LBW. |
-| 6. Saved data | Built | One linear Alembic chain; the head gates readiness. |
-| 7. Python API | Built | Every operation carries curated docs, enforced at schema build. |
-| 8. Inference | Partial | LBW served; the swappable provider gateway is still open (task_017). |
-| 9. User interface | Partial | Planning, dashboard, and settings ship; VRA does not. |
-| 10. Deployment | Built | EC2 runs published images via Compose; no source on the host. |
-| 11. Tests for release | Built | Full suite plus migration and OpenAPI checks run in CI. |
-| 12. Done and next | — | See the section itself. |
+| Section                       | Status  | Note                                                                 |
+| ----------------------------- | ------- | -------------------------------------------------------------------- |
+| 1. Product outcome            | Built   | Planning flow, saved results, and reload all work.                   |
+| 2. Running system             | Built   | Fastify retired; Python and Alembic own the API and schema.          |
+| 3. Prediction flow            | Built   | Durable requests, idempotent keys, Dagster execution.                |
+| 4. Climate data contract      | Built   | ERA5, seasonal, and projection adapters land with provenance.        |
+| 5. Places, boundaries, models | Built   | India and Kenya model releases; under-five model alongside LBW.      |
+| 6. Saved data                 | Built   | One linear Alembic chain; the head gates readiness.                  |
+| 7. Python API                 | Built   | Every operation carries curated docs, enforced at schema build.      |
+| 8. Inference                  | Partial | LBW served; the swappable provider gateway is still open (task_017). |
+| 9. User interface             | Partial | Planning, dashboard, and settings ship; VRA does not.                |
+| 10. Deployment                | Built   | EC2 runs published images via Compose; no source on the host.        |
+| 11. Tests for release         | Built   | Full suite plus migration and OpenAPI checks run in CI.              |
+| 12. Done and next             | —       | See the section itself.                                              |
 
 Update this table when a section's status changes, not on every commit.
 
@@ -63,15 +63,15 @@ flowchart LR
   db --> web
 ```
 
-| Part | Owner | Rule |
-|---|---|---|
-| Web | `web/` | current planning UI; display and browser/session forwarding only |
-| Application API | `core/chart/` | all routes, access checks, and application rules |
-| Database | SQLAlchemy + Alembic | only CHART schema owner |
-| Background work | `orchestration/` | thin Dagster calls into Python services |
-| Climate code | `pipelines/` | source-specific download and area calculation |
-| Statistical model | LBW R service | deterministic result; never fitted inside CHART |
-| Explanation | optional compatible API | may explain but cannot change or block the result |
+| Part              | Owner                   | Rule                                                             |
+| ----------------- | ----------------------- | ---------------------------------------------------------------- |
+| Web               | `web/`                  | current planning UI; display and browser/session forwarding only |
+| Application API   | `core/chart/`           | all routes, access checks, and application rules                 |
+| Database          | SQLAlchemy + Alembic    | only CHART schema owner                                          |
+| Background work   | `orchestration/`        | thin Dagster calls into Python services                          |
+| Climate code      | `pipelines/`            | source-specific download and area calculation                    |
+| Statistical model | LBW R service           | deterministic result; never fitted inside CHART                  |
+| Explanation       | optional compatible API | may explain but cannot change or block the result                |
 
 Fastify and Drizzle are retired. Their service, tests, build, package, runtime,
 deployment, and migration path have been removed. The bundled solution fallback
@@ -137,12 +137,12 @@ variable, and unit. A state value cannot be sent to a division model.
 
 ### Source status
 
-| Need | Source | Code status | Release requirement |
-|---|---|---|---|
-| Past and historical charts | ERA5 | working, including polygon and latitude-weighted calculation; exact-month live MP state pull passed | complete the pinned two-division check |
-| Current supported future planning months | official C3S seasonal monthly data, ECMWF system 51 | adapter, Dagster load, source trace, tests, and live MP state pull passed | policy proof request `7`, Dagster `e6bcd9e0-445e-4367-a3b5-2069c1fa8bef`, climate run `13` saved October–December from the July issue; raw SHA-256 `3299707ee2098cc8d1be73969d6902685d691a2e4983be3864350736768922b1` |
-| 0–15 day weather detail | ECMWF IFS ensemble on AWS Open Data | next; not enabled | implement full-month coverage and ensemble rules |
-| Long-term planning scenario | ISIMIP3b bias-adjusted daily `tasmax`, W5E5 v2.0 | working for MP March–May 2031–2040 with an explicit SSP1-2.6, SSP3-7.0, or SSP5-8.5 choice | live SSP3-7.0 request `13`, Dagster `641b6344-552c-447d-958f-7c76a18bdad1`, climate run `20`, raw manifest SHA-256 `89f1f18cc8faaf1555884c008538999f81a88454735fd52b5553fafe1e3f4dc5` |
+| Need                                     | Source                                              | Code status                                                                                         | Release requirement                                                                                                                                                                                                   |
+| ---------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Past and historical charts               | ERA5                                                | working, including polygon and latitude-weighted calculation; exact-month live MP state pull passed | complete the pinned two-division check                                                                                                                                                                                |
+| Current supported future planning months | official C3S seasonal monthly data, ECMWF system 51 | adapter, Dagster load, source trace, tests, and live MP state pull passed                           | policy proof request `7`, Dagster `e6bcd9e0-445e-4367-a3b5-2069c1fa8bef`, climate run `13` saved October–December from the July issue; raw SHA-256 `3299707ee2098cc8d1be73969d6902685d691a2e4983be3864350736768922b1` |
+| 0–15 day weather detail                  | ECMWF IFS ensemble on AWS Open Data                 | next; not enabled                                                                                   | implement full-month coverage and ensemble rules                                                                                                                                                                      |
+| Long-term planning scenario              | ISIMIP3b bias-adjusted daily `tasmax`, W5E5 v2.0    | working for MP March–May 2031–2040 with an explicit SSP1-2.6, SSP3-7.0, or SSP5-8.5 choice          | live SSP3-7.0 request `13`, Dagster `641b6344-552c-447d-958f-7c76a18bdad1`, climate run `20`, raw manifest SHA-256 `89f1f18cc8faaf1555884c008538999f81a88454735fd52b5553fafe1e3f4dc5`                                 |
 
 ERA5 is historical/reanalysis data, not a future forecast. C3S seasonal data is
 shown as a seasonal outlook, not precise weather. Long-term data must always be
@@ -245,28 +245,28 @@ boundary/data checks. The MP model must never be reused for Kenya.
 
 Important tables:
 
-| Table | Purpose |
-|---|---|
-| `geographies` | places shown to users |
-| `chart_geographies`, `admin_unit` | analytical areas and boundaries |
-| `data_source`, `provenance`, `climate_run` | source and immutable source snapshots for each download |
-| `district_climate` | one place, month, variable, and value per row |
-| `climate_input_window`, `climate_input_month` | the exact three rows sent to a model |
-| `model_release`, `model_area_mapping`, `active_model_assignment` | immutable model version, place mapping, and place-scoped activation |
-| `prediction_request` | request, progress, ownership lease, selected data/model hashes, and result |
-| `ingestion_lease` | single-flight ownership and recovery for provider acquisitions |
-| `users`, `user_roles`, `user_geography_scopes` | user access |
-| `workspaces`, `workspace_members`, `setup_state` | application setup and planning ownership |
+| Table                                                            | Purpose                                                                    |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `geographies`                                                    | places shown to users                                                      |
+| `chart_geographies`, `admin_unit`                                | analytical areas and boundaries                                            |
+| `data_source`, `provenance`, `climate_run`                       | source and immutable source snapshots for each download                    |
+| `district_climate`                                               | one place, month, variable, and value per row                              |
+| `climate_input_window`, `climate_input_month`                    | the exact three rows sent to a model                                       |
+| `model_release`, `model_area_mapping`, `active_model_assignment` | immutable model version, place mapping, and place-scoped activation        |
+| `prediction_request`                                             | request, progress, ownership lease, selected data/model hashes, and result |
+| `ingestion_lease`                                                | single-flight ownership and recovery for provider acquisitions             |
+| `users`, `user_roles`, `user_geography_scopes`                   | user access                                                                |
+| `workspaces`, `workspace_members`, `setup_state`                 | application setup and planning ownership                                   |
 
 Later revisions add the analytical and content tables:
 
-| Table | Purpose |
-| --- | --- |
-| `health_impact` | persisted model results keyed by admin unit, month, scenario |
-| `covariate`, `erf_parameters` | model inputs and exposure-response parameters |
-| `recommended_action` | reviewed interventions seeded from the solution repository |
-| `audit_event` | the caller's own recorded activity |
-| `country_geo_config` | per-country labels for the place hierarchy |
+| Table                         | Purpose                                                      |
+| ----------------------------- | ------------------------------------------------------------ |
+| `health_impact`               | persisted model results keyed by admin unit, month, scenario |
+| `covariate`, `erf_parameters` | model inputs and exposure-response parameters                |
+| `recommended_action`          | reviewed interventions seeded from the solution repository   |
+| `audit_event`                 | the caller's own recorded activity                           |
+| `country_geo_config`          | per-country labels for the place hierarchy                   |
 
 Alembic revisions from `001` onward create or adopt all of the above.
 Revision `007` adopts old application tables without deleting their data and
