@@ -12,7 +12,8 @@ export const FALLBACK_TRACKS: readonly LearningTrack[] = [
   {
     slug: "why-climate-and-health",
     title: "Why climate and health are connected",
-    summary: "The science linking climate hazards to health outcomes — in six minutes, or over a full certificate course.",
+    summary:
+      "The science linking climate hazards to health outcomes — in six minutes, or over a full certificate course.",
     position: 1,
     resource_count: 0,
     completed_count: 0,
@@ -20,7 +21,8 @@ export const FALLBACK_TRACKS: readonly LearningTrack[] = [
   {
     slug: "one-health",
     title: "How climate change impacts One Health",
-    summary: "Why the health, veterinary and environment departments are looking at the same problem.",
+    summary:
+      "Why the health, veterinary and environment departments are looking at the same problem.",
     position: 2,
     resource_count: 0,
     completed_count: 0,
@@ -28,7 +30,8 @@ export const FALLBACK_TRACKS: readonly LearningTrack[] = [
   {
     slug: "heat-and-pregnancy",
     title: "Extreme heat and climate stress on pregnancy",
-    summary: "What heat does to pregnant women, newborns and the midwives caring for them.",
+    summary:
+      "What heat does to pregnant women, newborns and the midwives caring for them.",
     position: 3,
     resource_count: 0,
     completed_count: 0,
@@ -52,7 +55,8 @@ export const FALLBACK_TRACKS: readonly LearningTrack[] = [
   {
     slug: "funding-case",
     title: "Building the funding case for anticipatory response",
-    summary: "Early action protocols that release funding before the flood, not after it.",
+    summary:
+      "Early action protocols that release funding before the flood, not after it.",
     position: 6,
     resource_count: 0,
     completed_count: 0,
@@ -60,7 +64,8 @@ export const FALLBACK_TRACKS: readonly LearningTrack[] = [
   {
     slug: "risk-map-to-action",
     title: "From risk map to recommended action",
-    summary: "How a heat forecast becomes school closures, water points and cool roofs.",
+    summary:
+      "How a heat forecast becomes school closures, water points and cool roofs.",
     position: 7,
     resource_count: 0,
     completed_count: 0,
@@ -84,8 +89,10 @@ export const FALLBACK_RESOURCES: readonly LearningResource[] = [
     kind: "video",
     title: "Why climate and health are connected",
     provider: "WHO",
-    objectives: "Short hosted Q&A establishing the basic exposure pathways between a warming climate and human health — heat, air quality, infectious disease shifts, food and water security — at an entry-level register suitable as a module opener.",
-    audience_summary: "District and county health officers, programme managers, general health workforce, community audiences",
+    objectives:
+      "Short hosted Q&A establishing the basic exposure pathways between a warming climate and human health — heat, air quality, infectious disease shifts, food and water security — at an entry-level register suitable as a module opener.",
+    audience_summary:
+      "District and county health officers, programme managers, general health workforce, community audiences",
     location_label: "Global",
     countries: [],
     languages: ["English"],
@@ -97,7 +104,11 @@ export const FALLBACK_RESOURCES: readonly LearningResource[] = [
     embed_status: "embeddable",
     tracks: ["why-climate-and-health"],
     tags: [],
-    health_outcomes: ["Infectious & zoonotic disease", "Respiratory & air quality", "Health system capacity"],
+    health_outcomes: [
+      "Infectious & zoonotic disease",
+      "Respiratory & air quality",
+      "Health system capacity",
+    ],
     is_featured: true,
   },
   {
@@ -108,7 +119,8 @@ export const FALLBACK_RESOURCES: readonly LearningResource[] = [
     kind: "video",
     title: "What is the One Health Approach?",
     provider: "Istituto Zooprofilattico Sperimentale delle Venezie (IZSVe) & FAO",
-    objectives: "Visualizes the interconnections between human welfare, domestic and wild animal reservoirs, and ecosystem integrity to prevent emerging zoonoses.",
+    objectives:
+      "Visualizes the interconnections between human welfare, domestic and wild animal reservoirs, and ecosystem integrity to prevent emerging zoonoses.",
     audience_summary: "Entry-level practitioners, interdisciplinary teams, community",
     location_label: "Legnaro (Padua), Italy / Rome, Italy",
     countries: ["Italy"],
@@ -132,8 +144,10 @@ export const FALLBACK_RESOURCES: readonly LearningResource[] = [
     kind: "video",
     title: "Anticipatory Action and Community Preparedness in Flood-Prone Counties",
     provider: "Kenya Red Cross Society (KRCS) & County Government of Homa Bay",
-    objectives: "Highlights how the Kenya Anticipatory Action Roadmap and local Early Action Protocols trigger early funding, community evacuations, and water sanitation supplies ahead of Lake Victoria basin flooding.",
-    audience_summary: "Disaster risk managers, county emergency planners, community health coordinators",
+    objectives:
+      "Highlights how the Kenya Anticipatory Action Roadmap and local Early Action Protocols trigger early funding, community evacuations, and water sanitation supplies ahead of Lake Victoria basin flooding.",
+    audience_summary:
+      "Disaster risk managers, county emergency planners, community health coordinators",
     location_label: "Homa Bay County, Kenya",
     countries: ["Kenya"],
     languages: ["English", "Swahili"],
@@ -156,7 +170,8 @@ export const FALLBACK_RESOURCES: readonly LearningResource[] = [
     kind: "video",
     title: "Too Hot to Thrive: Heat Impacts on Maternal and Neonatal Health",
     provider: "CHAMNHA Consortium & Aga Khan University",
-    objectives: "Documents direct physiological heat stress, dehydration, and increased labor burdens among pregnant and postpartum women and neonates in Kilifi, Kenya.",
+    objectives:
+      "Documents direct physiological heat stress, dehydration, and increased labor burdens among pregnant and postpartum women and neonates in Kilifi, Kenya.",
     audience_summary: "Midwives, maternal health clinicians, community nurses",
     location_label: "Kilifi & Nairobi, Kenya",
     countries: ["Kenya"],
@@ -180,8 +195,10 @@ export const FALLBACK_RESOURCES: readonly LearningResource[] = [
     kind: "video",
     title: "How Does Ahmedabad's Heat Action Plan Help Deal with Climate Change?",
     provider: "Carbon Brief & Indian Institute of Public Health Gandhinagar (IIPHG)",
-    objectives: "Dr. Abhiyant Tiwari explains the operational mechanics of converting heat forecasts into municipal response, including school schedule adjustments, drinking water points, and cool roofs.",
-    audience_summary: "Local adaptation managers, urban health officers, municipal planners",
+    objectives:
+      "Dr. Abhiyant Tiwari explains the operational mechanics of converting heat forecasts into municipal response, including school schedule adjustments, drinking water points, and cool roofs.",
+    audience_summary:
+      "Local adaptation managers, urban health officers, municipal planners",
     location_label: "Gandhinagar, Gujarat, India",
     countries: ["India"],
     languages: ["English"],
@@ -204,8 +221,10 @@ export const FALLBACK_RESOURCES: readonly LearningResource[] = [
     kind: "video",
     title: "Management of Heat Stroke (mockdrill) | लू तापघात प्रबंधन (पूर्वाभ्यास)",
     provider: "Rajasthan DMHFW",
-    objectives: "Hindi-language ward-level simulation of heat stroke response — recognition, rapid cooling, triage sequence and staff roles — usable as a rehearsal template before heat season rather than a lecture on heat illness.",
-    audience_summary: "PHC and CHC clinical staff, nursing and emergency room teams, district heat-season trainers",
+    objectives:
+      "Hindi-language ward-level simulation of heat stroke response — recognition, rapid cooling, triage sequence and staff roles — usable as a rehearsal template before heat season rather than a lecture on heat illness.",
+    audience_summary:
+      "PHC and CHC clinical staff, nursing and emergency room teams, district heat-season trainers",
     location_label: "India",
     countries: ["India"],
     languages: ["Hindi"],
@@ -228,8 +247,10 @@ export const FALLBACK_RESOURCES: readonly LearningResource[] = [
     kind: "video",
     title: "Heat-Related Illness and Death Surveillance training",
     provider: "NPCCHH, NCDC, MoHFW",
-    objectives: "Walks through NHRIDS reporting — case definitions for heat-related illness and death, daily summer reporting formats, and portal submission workflow during the declared heat season.",
-    audience_summary: "District surveillance officers, NPCCHH state and district nodal officers, epidemiologists, hospital records and IDSP staff",
+    objectives:
+      "Walks through NHRIDS reporting — case definitions for heat-related illness and death, daily summer reporting formats, and portal submission workflow during the declared heat season.",
+    audience_summary:
+      "District surveillance officers, NPCCHH state and district nodal officers, epidemiologists, hospital records and IDSP staff",
     location_label: "India",
     countries: ["India"],
     languages: ["English"],
@@ -237,7 +258,8 @@ export const FALLBACK_RESOURCES: readonly LearningResource[] = [
     duration_label: "80 min",
     format_label: "Video - training session",
     published_on: "2025-02-01",
-    access_label: "Open Access (NPCCHH / NCDC / MoHFW YouTube) — embed status unverified",
+    access_label:
+      "Open Access (NPCCHH / NCDC / MoHFW YouTube) — embed status unverified",
     embed_status: "open_unverified",
     tracks: [],
     tags: ["Heat: surveillance (NHRIDS)"],
@@ -247,13 +269,17 @@ export const FALLBACK_RESOURCES: readonly LearningResource[] = [
   {
     slug: "climate-change-health-equity-and-extreme-weather-across-africa",
     url: "https://www.publichealth.columbia.edu/africa-climate-health-responders-course",
-    canonical_url: "https://www.publichealth.columbia.edu/africa-climate-health-responders-course",
+    canonical_url:
+      "https://www.publichealth.columbia.edu/africa-climate-health-responders-course",
     youtube_id: null,
     kind: "toolkit",
     title: "Climate Change, Health Equity, and Extreme Weather across Africa",
-    provider: "Columbia University GCCHE & African Population and Health Research Center (APHRC)",
-    objectives: "Explores hydrometeorological extremes, inland flooding, drought-driven food insecurity, and particulate air pollution across East Africa, focusing on maternal-child vulnerability and public health leadership.",
-    audience_summary: "African health professionals, environmental health officers, climate negotiators",
+    provider:
+      "Columbia University GCCHE & African Population and Health Research Center (APHRC)",
+    objectives:
+      "Explores hydrometeorological extremes, inland flooding, drought-driven food insecurity, and particulate air pollution across East Africa, focusing on maternal-child vulnerability and public health leadership.",
+    audience_summary:
+      "African health professionals, environmental health officers, climate negotiators",
     location_label: "Nairobi, Kenya / New York, USA",
     countries: ["Kenya", "USA"],
     languages: ["English"],
@@ -265,7 +291,12 @@ export const FALLBACK_RESOURCES: readonly LearningResource[] = [
     embed_status: "embeddable",
     tracks: ["why-climate-and-health"],
     tags: [],
-    health_outcomes: ["Maternal & newborn health", "Nutrition & food security", "Respiratory & air quality", "Mental health"],
+    health_outcomes: [
+      "Maternal & newborn health",
+      "Nutrition & food security",
+      "Respiratory & air quality",
+      "Mental health",
+    ],
     is_featured: true,
   },
 ];

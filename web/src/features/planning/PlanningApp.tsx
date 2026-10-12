@@ -14,6 +14,11 @@ import {
 } from "@/lib/planningClient";
 import { rememberActiveGeography } from "@/lib/authClient";
 import { isInScope } from "@/lib/geographyScope";
+import {
+  computeFamilies,
+  defaultAreaForFamily,
+  familyContains,
+} from "./contextFamilies";
 import { InlineContextSwitcher } from "./InlineContextSwitcher";
 import { PlanningSetup } from "./PlanningSetup";
 import { defaultPlanningSelection, type PlanningSelection } from "./planningWireframe";
@@ -49,19 +54,16 @@ export function PlanningApp({
     listGeographies()
       .then((records) => {
         if (cancelled) return;
-        const inScope = records.filter(
-          (area) => area.supportsPrediction && isInScope(area, geographyScopes),
-        );
-        const active =
-          inScope.find(
-            (area) => area.id === activeGeographyId || area.path === activeGeographyId,
-          ) ??
-          // The Settings context picker stores the family root path (e.g. /kenya
-          // or /india/madhya-pradesh). When the root itself has no direct model,
-          // land on the first prediction-supporting descendant of that family.
-          descendantOf(activeGeographyId, inScope) ??
-          inScope.find((area) => area.id === "geo-in-madhya-pradesh") ??
-          inScope[0];
+        const inScope = records.filter((area) => isInScope(area, geographyScopes));
+        // Plan from the family the user last chose, at its broadest useful
+        // level (Kenya, Madhya Pradesh), not from the first county or division.
+        const families = computeFamilies(records, geographyScopes);
+        const family =
+          families.find(
+            (item) =>
+              activeGeographyId && familyContains(item, activeGeographyId, records),
+          ) ?? families[0];
+        const active = family ? defaultAreaForFamily(family, records) : null;
         setAreas(inScope);
         setSelection((current) => ({ ...current, area: active?.id ?? "" }));
         if (!active) {
@@ -161,14 +163,4 @@ export function PlanningApp({
       </AppShell>
     </>
   );
-}
-
-function descendantOf(
-  rootPath: string | undefined,
-  areas: GeographyRecord[],
-): GeographyRecord | undefined {
-  if (!rootPath) return undefined;
-  const root = rootPath.replace(/\/+$/, "");
-  if (!root) return undefined;
-  return areas.find((area) => area.path.startsWith(`${root}/`));
 }

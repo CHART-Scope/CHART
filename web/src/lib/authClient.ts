@@ -52,6 +52,24 @@ export async function ensureFreshAuthSession(session: AuthSession) {
   return refreshAuthSession();
 }
 
+/**
+ * An access token that is valid right now, or null when signed out.
+ *
+ * For background work (audit flushes, drawers polling) that reads the stored
+ * session outside RequireAuth's render cycle. A hidden tab throttles the
+ * refresh timer, so the stored token can already have expired when the tab
+ * wakes; sending it unrefreshed came back 401.
+ */
+export async function getFreshAccessToken(): Promise<string | null> {
+  const stored = getStoredAuthSession();
+  if (!stored) return null;
+  try {
+    return (await ensureFreshAuthSession(stored)).accessToken;
+  } catch {
+    return null;
+  }
+}
+
 export async function completeKeycloakSignIn(search: string) {
   const params = new URLSearchParams(search);
   const code = params.get("code");
@@ -65,9 +83,8 @@ export async function completeKeycloakSignIn(search: string) {
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) {
-    // AUTH_CALLBACK_INVALID means the PKCE cookie was already consumed, so
-    // this code has been exchanged once before; callers can recover from the
-    // session cookies that first exchange set.
+    // AUTH_CALLBACK_INVALID covers a consumed, expired or mismatched PKCE
+    // cookie, so it does not prove this browser tab signed in.
     const failure = new Error("CHART sign-in did not return a valid token.");
     failure.name = await readAuthErrorCode(response);
     throw failure;

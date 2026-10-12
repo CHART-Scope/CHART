@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
-import { getStoredAuthSession } from "@/lib/authClient";
+import { getFreshAccessToken } from "@/lib/authClient";
 
 import { recordAuditEvent } from "./store";
 import { startAuditFlush, stopAuditFlush } from "./flush";
@@ -19,7 +19,7 @@ export function AuditRuntime() {
   const previousPathname = useRef<string | null>(null);
 
   useEffect(() => {
-    startAuditFlush(() => getStoredAuthSession()?.accessToken ?? null);
+    startAuditFlush(getFreshAccessToken);
     return () => stopAuditFlush();
   }, []);
 

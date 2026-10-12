@@ -105,6 +105,14 @@ class MonthlyHealthImpactPoint(HealthImpactPoint):
 
 class MonthlyPrediction(BaseModel):
     request_id: int
+    model_release_id: str
+    model_file: str | None = None
+    model_artifact_sha256: str | None = None
+    model_artifact_uri: str | None = None
+    model_runtime_path: str | None = None
+    n_training: int | None = None
+    n_events: int | None = None
+    n_subjects: int | None = None
     attributable_fraction_milli: int
     odds_ratio: float
     # Nullable: a release need not declare a reference, and the dashboard

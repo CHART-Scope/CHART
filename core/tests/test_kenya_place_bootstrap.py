@@ -163,7 +163,7 @@ def test_mp_manifest_still_builds_state_and_division_hierarchy() -> None:
             activate=True,
         )
         session.flush()
-        assert result.areas_seeded == 11
+        assert result.areas_seeded == 46
         state = session.scalar(
             select(AdminUnit).where(AdminUnit.code == "madhya-pradesh")
         )
@@ -198,7 +198,7 @@ def test_mp_under_five_manifest_has_division_models_but_no_state_model() -> None
         )
         session.flush()
 
-        assert result.areas_seeded == 11
+        assert result.areas_seeded == 46
         state = session.scalar(
             select(AdminUnit).where(AdminUnit.code == "madhya-pradesh")
         )
@@ -437,7 +437,7 @@ def test_kenya_onboarding_warms_and_activates_kajiado(monkeypatch) -> None:
     # unsupported) — that path is used by internal analytics that need the
     # full picture.
     locations = list_locations(session_factory=factory)
-    assert len(locations.items) == 58
+    assert len(locations.items) == 93
     assert sum(item.supports_prediction for item in locations.items) == 57
     kajiado = next(
         item for item in locations.items if item.geography_id == "geo-ke-kajiado"

@@ -57,7 +57,7 @@
     "id": "in-mp-state-divisions",
     "version": "1",
     "path": "pipelines/places/in-mp-v1/place-set.json",
-    "sha256": "262eb29829a5e2f39f645be60850d6bced1e867fdfbc54629ceefb8d234ea392"
+    "sha256": "f044561dcdb2ce82556d5e5955ca253326f2b739b23ef81d3ec2a70a995701c6"
   },
   "coverage": [
     {

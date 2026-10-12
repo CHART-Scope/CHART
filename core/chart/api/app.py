@@ -25,6 +25,7 @@ from chart.climate.schemas import ErrorResponse, HealthResponse
 from chart.erf_registry.routes import router as erf_registry_router
 from chart.setup.bootstrap_routes import router as bootstrap_router
 from chart.geographies.routes import router as geographies_router
+from chart.heat_outlook.routes import router as heat_outlook_router
 from chart.model_registry.routes import (
     releases_router as model_releases_router,
     router as model_catalog_router,
@@ -122,6 +123,7 @@ app.include_router(solutions_router)
 app.include_router(users_router)
 app.include_router(workspaces_router)
 app.include_router(risk_router)
+app.include_router(heat_outlook_router)
 app.include_router(learning_router)
 app.include_router(erf_registry_router)
 app.include_router(model_catalog_router)

@@ -15,11 +15,11 @@ DLNM represents a non-linear temperature-response relationship while also
 representing effects across several preceding time intervals. The releases do
 not share one interchangeable input contract.
 
-| Release | Fitted geography | DLNM design | Runtime temperature input |
-|---|---|---|---|
-| Madhya Pradesh LBW | One supplied MP-wide block and 10 divisions | Binomial logistic DLNM; MP-wide block verified for window 1, divisions fitted for three windows | Three monthly means, newest first |
-| Kenya LBW | Five climate-zone blocks used by 46 mapped counties | Binomial logistic DLNM, fitted for three pregnancy windows | Three monthly means, newest first |
-| Madhya Pradesh under-five mortality | 10 divisions; no state block | Conditional-logistic case-crossover DLNM | Four daily values, lag 0–3 |
+| Release                             | Fitted geography                                    | DLNM design                                                                                     | Runtime temperature input         |
+| ----------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------- |
+| Madhya Pradesh LBW                  | One supplied MP-wide block and 10 divisions         | Binomial logistic DLNM; MP-wide block verified for window 1, divisions fitted for three windows | Three monthly means, newest first |
+| Kenya LBW                           | Five climate-zone blocks used by 46 mapped counties | Binomial logistic DLNM, fitted for three pregnancy windows                                      | Three monthly means, newest first |
+| Madhya Pradesh under-five mortality | 10 divisions; no state block                        | Conditional-logistic case-crossover DLNM                                                        | Four daily values, lag 0–3        |
 
 Each scorer returns an odds ratio, 95% confidence interval, training-support
 metadata, and immutable model provenance. Training occurred in upstream
@@ -37,21 +37,20 @@ mortality prediction.
 
 ### What is directly supported by the source files
 
-| Coverage | What the modeller supplied | What CHART may claim |
-|---|---|---|
-| MP LBW state | One fitted MP-wide `glm` object with 33,792 fitted observations, its DLNM basis, prediction object, and `MMt = 27` | A separate MP-wide fitted block for source window 1 only |
-| MP LBW divisions | Ten division-specific fitted blocks for each of three pregnancy windows | Direct division-level scoring for all three windows |
-| Kenya LBW | Five climate-zone-specific fitted blocks for each of three pregnancy windows | County climate input may use its explicitly mapped fitted zone block |
-| Kajiado | No county-specific model; manifest maps Kajiado to `South-eastern` | Kajiado boundary supplies climate input and the South-eastern fitted block supplies the response curve |
+| Coverage         | What the modeller supplied                                                                                         | What CHART may claim                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| MP LBW state     | One fitted MP-wide `glm` object with 33,792 fitted observations, its DLNM basis, prediction object, and `MMt = 27` | A separate MP-wide fitted block for source window 1 only                                               |
+| MP LBW divisions | Ten division-specific fitted blocks for each of three pregnancy windows                                            | Direct division-level scoring for all three windows                                                    |
+| Kenya LBW        | Five climate-zone-specific fitted blocks for each of three pregnancy windows                                       | County climate input may use its explicitly mapped fitted zone block                                   |
+| Kajiado          | No county-specific model; manifest maps Kajiado to `South-eastern`                                                 | Kajiado boundary supplies climate input and the South-eastern fitted block supplies the response curve |
 
 Both fitting scripts contain later meta-analysis/BLUP exploration. The compact
 CHART artifacts use the direct fitted `Model_*` blocks, not those BLUP curves.
 Kenya has no supplied Kenya-wide model and no Kajiado-specific fit.
 
 !!! note "MP state coverage follows the supplied fit"
-    The compact artifact physically contains only the supplied MP-wide window
-    1 block. The retired CHART refitting path cannot create state windows 2 or
-    3. Those windows can be added only through a new modeller-supplied release.
+The compact artifact physically contains only the supplied MP-wide window
+1 block. The retired CHART refitting path cannot create state windows 2 or 3. Those windows can be added only through a new modeller-supplied release.
 
 ## What the estimate means
 
@@ -62,15 +61,55 @@ temperature profile:
 - an odds ratio above `1` means higher conditional modeled odds;
 - an odds ratio below `1` means lower conditional modeled odds.
 
+### Which odds ratio each outcome reports
+
+The two outcomes are fitted on different exposure windows, so a month's
+figure means something different for each. Neither is "the selected month's
+temperature".
+
+| Outcome                  | Exposure the model reads                                | The month's odds ratio                                                                 |
+| ------------------------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Low birth weight         | Monthly mean of daily maximum, for the month and the two before it (lag 0–2) | **Cumulative over all three months**, against the reference held at all three lags. |
+| Under-five mortality     | Daily maximum, for each day and the three days before it (lag 0–3)           | One odds ratio per day of the month, each over its four days; the month reports **their mean**. |
+
+**Low birth weight uses the cumulative three-month odds ratio, never the
+current month alone.** This is settled. The model was fitted on the three-month
+exposure, and its lags only mean something together: a hot month after hot
+months can score lower than a cooler month, because the fitted response to the
+earlier months enters the same odds ratio. The dashboard therefore names all
+three months beside every figure ("Calculated from Nov–Jan: …").
+
+**Under-five mortality is scored day by day.** Every day of the month is scored
+on its own four-day window (the day and the three before it, so the first days
+draw on the end of the previous month), and the month's odds ratio is the mean
+of those daily odds ratios, with a delta-method interval on that mean. The
+dashboard says so beside the figure ("Calculated from each day of August …").
+
+### From odds ratio to "% of cases attributable to heat"
+
+The headline converts the month's odds ratio as `(OR − 1) / OR`, the
+attributable fraction among the exposed, with `RR ≈ OR`. It is zero when:
+
+- the odds ratio is 1 or lower (the model finds no extra risk); or
+- every temperature the model scored stayed below the block's reference
+  temperature (nothing to attribute to heat).
+
+!!! warning "Under statistical review"
+`RR ≈ OR` holds for rare outcomes; low birth weight is not rare (roughly
+10–20%), so the share may be overstated. Whether to convert the odds ratio
+through a baseline rate first, and which baseline, is with our statistician.
+The `p25` reference is the 25th percentile of the training **temperatures**,
+not a 25% baseline rate, and must not be used as one.
+
 The returned 95% confidence interval represents uncertainty in the fitted
 association. It does not include uncertainty from climate inputs, spatial
 aggregation, future climate scenarios, survey measurement, or unmeasured
 confounding.
 
 !!! warning "Association, not individual risk"
-    The output is not an individual probability, diagnosis, causal estimate,
-    or clinical decision rule. It is an association conditional on the fitted
-    observational model and its covariates.
+The output is not an individual probability, diagnosis, causal estimate,
+or clinical decision rule. It is an association conditional on the fitted
+observational model and its covariates.
 
 ## Training data and fitting
 
@@ -180,9 +219,7 @@ The example below shows one model-supported place. Real manifests repeat
     "root_id": "geo-in",
     "root_path": "/india",
     "analytics_slug": "madhya-pradesh",
-    "levels": [
-      { "key": "geo_level_1", "label": "State", "sort_order": 10 }
-    ],
+    "levels": [{ "key": "geo_level_1", "label": "State", "sort_order": 10 }],
     "places": [
       {
         "place_code": "madhya-pradesh",
@@ -213,17 +250,17 @@ The example below shows one model-supported place. Real manifests repeat
 
 ### Identity and scientific classification
 
-| Field | Meaning and expected value |
-|---|---|
-| `schema_version` | Manifest layout. Omitted means `1`. Version 1 uses `geography` and `areas`; version 2 uses `place_set` and `coverage`. |
-| `id` | Immutable release identifier stored in prediction history, for example `lbw-mp-1.0.1-compact-review`. Never reuse it for different fitted parameters or coverage. |
-| `version` | Human-readable release version. A value containing `review` is hidden unless `CHART_ENABLE_REVIEW_MODELS=true`. |
-| `module` | CHART analytical module. Current releases use `prediction`. |
-| `outcome` | Stable machine code such as `lbw` or `under_5_mortality`; it is not display copy. |
-| `climate_hazard` | Stable hazard code such as `extreme_heat`. |
-| `health_domain` | Stable grouping code such as `maternal_newborn_child_health` or `child_health`. |
-| `source_git_ref` | Source-model revision, tag, or approval reference used for provenance. |
-| `release_notes` | Scientific scope, caveats, approval status, and important differences from earlier releases. |
+| Field            | Meaning and expected value                                                                                                                                        |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema_version` | Manifest layout. Omitted means `1`. Version 1 uses `geography` and `areas`; version 2 uses `place_set` and `coverage`.                                            |
+| `id`             | Immutable release identifier stored in prediction history, for example `lbw-mp-1.0.1-compact-review`. Never reuse it for different fitted parameters or coverage. |
+| `version`        | Human-readable release version. A value containing `review` is hidden unless `CHART_ENABLE_REVIEW_MODELS=true`.                                                   |
+| `module`         | CHART analytical module. Current releases use `prediction`.                                                                                                       |
+| `outcome`        | Stable machine code such as `lbw` or `under_5_mortality`; it is not display copy.                                                                                 |
+| `climate_hazard` | Stable hazard code such as `extreme_heat`.                                                                                                                        |
+| `health_domain`  | Stable grouping code such as `maternal_newborn_child_health` or `child_health`.                                                                                   |
+| `source_git_ref` | Source-model revision, tag, or approval reference used for provenance.                                                                                            |
+| `release_notes`  | Scientific scope, caveats, approval status, and important differences from earlier releases.                                                                      |
 
 `id`, `outcome`, `climate_hazard`, and `health_domain` are machine-facing
 identifiers. Keep them stable and lowercase with underscores or hyphens as
@@ -232,22 +269,22 @@ belong under `presentation`.
 
 ### Runtime, input, output, and presentation
 
-| Field | Meaning and expected value |
-|---|---|
-| `runtime.adapter` | Code adapter that understands the artifact. Current R releases use `compact_r_registry`. A new artifact format needs a tested adapter. |
-| `runtime.artifact_type` | File/runtime type, currently `rds`. |
-| `input_contract.variables[]` | Inputs expected by the fitted model. Record the machine name, description, unit, interval where relevant, ordering, and exact length. |
-| `input_contract.supersedes_release_ids[]` | Older release IDs replaced by this release. It cannot contain the current `id`, empty values, or duplicates. |
-| `input_contract.batch_status` | Optional operational statement such as `blocked_pending_modeller_confirmation`; the model catalog uses it to prevent an unsupported batch path. |
-| `output_contract.effect_measure` | Statistical quantity returned by the scorer, currently `odds_ratio`. |
-| `output_contract.confidence_level` | Confidence interval level as a proportion, currently `0.95`. |
-| `output_contract.attributable_fraction` | Interpretation policy. `positive_excess_only` reports no heat-attributable excess when the odds ratio is at or below one. |
-| `presentation.*_label` | Reviewed display text for the dashboard and model catalog. Do not derive these labels from machine codes. |
-| `presentation.model_scope_label` | Honest fitted granularity, such as `division model` or `climate-zone model`. It describes the fitted block, not necessarily the selected administrative boundary. |
-| `presentation.visualization.kind` | Registered renderer. The current accepted value is `odds_ratio_icon_array`. |
-| `presentation.visualization.figure` | Main pictogram: `newborn`, `baby`, or `mother-baby`. |
-| `presentation.visualization.context_figure` | Context pictogram: `pregnant-woman` or `baby`. |
-| `presentation.editorial_reference_temperature_c` | Optional fixed Celsius anchor, allowed from -50 to 60. Omit it to retain each fitted block's bundled reference. |
+| Field                                            | Meaning and expected value                                                                                                                                        |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runtime.adapter`                                | Code adapter that understands the artifact. Current R releases use `compact_r_registry`. A new artifact format needs a tested adapter.                            |
+| `runtime.artifact_type`                          | File/runtime type, currently `rds`.                                                                                                                               |
+| `input_contract.variables[]`                     | Inputs expected by the fitted model. Record the machine name, description, unit, interval where relevant, ordering, and exact length.                             |
+| `input_contract.supersedes_release_ids[]`        | Older release IDs replaced by this release. It cannot contain the current `id`, empty values, or duplicates.                                                      |
+| `input_contract.batch_status`                    | Optional operational statement such as `blocked_pending_modeller_confirmation`; the model catalog uses it to prevent an unsupported batch path.                   |
+| `output_contract.effect_measure`                 | Statistical quantity returned by the scorer, currently `odds_ratio`.                                                                                              |
+| `output_contract.confidence_level`               | Confidence interval level as a proportion, currently `0.95`.                                                                                                      |
+| `output_contract.attributable_fraction`          | Interpretation policy. `positive_excess_only` reports no heat-attributable excess when the odds ratio is at or below one.                                         |
+| `presentation.*_label`                           | Reviewed display text for the dashboard and model catalog. Do not derive these labels from machine codes.                                                         |
+| `presentation.model_scope_label`                 | Honest fitted granularity, such as `division model` or `climate-zone model`. It describes the fitted block, not necessarily the selected administrative boundary. |
+| `presentation.visualization.kind`                | Registered renderer. The current accepted value is `odds_ratio_icon_array`.                                                                                       |
+| `presentation.visualization.figure`              | Main pictogram: `newborn`, `baby`, or `mother-baby`.                                                                                                              |
+| `presentation.visualization.context_figure`      | Context pictogram: `pregnant-woman` or `baby`.                                                                                                                    |
+| `presentation.editorial_reference_temperature_c` | Optional fixed Celsius anchor, allowed from -50 to 60. Omit it to retain each fitted block's bundled reference.                                                   |
 
 `input_contract` and `output_contract` are intentionally model-specific. Do
 not copy the LBW three-month contract into a daily-lag mortality model merely
@@ -255,11 +292,11 @@ because both return odds ratios.
 
 ### Artifact location and integrity
 
-| Field | Meaning and expected value |
-|---|---|
-| `base_uri` | Versioned artifact prefix, normally `s3://<bucket>/<country>/<model>/<version>`. |
+| Field                    | Meaning and expected value                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------- |
+| `base_uri`               | Versioned artifact prefix, normally `s3://<bucket>/<country>/<model>/<version>`.            |
 | `model_files[].filename` | Plain filename only: no directory components. Every filename must be unique in the release. |
-| `model_files[].sha256` | Exactly 64 lowercase hexadecimal characters calculated from the artifact bytes. |
+| `model_files[].sha256`   | Exactly 64 lowercase hexadecimal characters calculated from the artifact bytes.             |
 
 Every `areas[].model_file` must match one entry in `model_files[]`. During
 activation, CHART finds that filename below `MODEL_CACHE_DIR`, calculates its
@@ -272,16 +309,16 @@ The version 1 `geography` object tells setup which country, hierarchy, labels,
 paths, and boundary keys exist. It does not by itself claim that every listed
 place has a fitted model.
 
-| Field | Meaning and expected value |
-|---|---|
-| `country_code` | Uppercase ISO 3166-1 alpha-2 code such as `IN` or `KE`. Place records must use the same code. |
-| `country_name` | User-facing country name. |
-| `root_id` | Stable application ID for the country root, for example `geo-ke`. |
-| `root_path` | One-segment URL path such as `/kenya`. |
-| `analytics_slug` | Stable slug used by analytical adapters and stored data. |
-| `boundary_artifact` | Optional repository-relative boundary file used by this release. |
-| `levels[]` | Ordered application levels. Each `key` is stable; `label` is country-specific display text such as `State`, `Division`, or `County`. |
-| `places[]` | All navigation places, including parents or locations with no fitted model. |
+| Field               | Meaning and expected value                                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `country_code`      | Uppercase ISO 3166-1 alpha-2 code such as `IN` or `KE`. Place records must use the same code.                                        |
+| `country_name`      | User-facing country name.                                                                                                            |
+| `root_id`           | Stable application ID for the country root, for example `geo-ke`.                                                                    |
+| `root_path`         | One-segment URL path such as `/kenya`.                                                                                               |
+| `analytics_slug`    | Stable slug used by analytical adapters and stored data.                                                                             |
+| `boundary_artifact` | Optional repository-relative boundary file used by this release.                                                                     |
+| `levels[]`          | Ordered application levels. Each `key` is stable; `label` is country-specific display text such as `State`, `Division`, or `County`. |
+| `places[]`          | All navigation places, including parents or locations with no fitted model.                                                          |
 
 For each place:
 
@@ -304,13 +341,13 @@ must each be unique.
 
 `areas[]` is the bridge from a navigable place to a fitted block:
 
-| Field | Meaning and expected value |
-|---|---|
-| `place_code` | Must identify a place declared by `geography.places[]`. It is unique within the release. |
-| `model_file` | Selects one checksummed artifact from `model_files[]`. |
-| `model_area_name` | Exact fitted-block key expected by the scorer. This may differ from the administrative display name. |
+| Field                         | Meaning and expected value                                                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `place_code`                  | Must identify a place declared by `geography.places[]`. It is unique within the release.                                         |
+| `model_file`                  | Selects one checksummed artifact from `model_files[]`.                                                                           |
+| `model_area_name`             | Exact fitted-block key expected by the scorer. This may differ from the administrative display name.                             |
 | `validated_pregnancy_windows` | Optional unique subset of `[1, 2, 3]` proven valid for that fitted block. Omit it for models without pregnancy-window semantics. |
-| `country_code` and `level` | When supplied, they must agree with the matching geography place. |
+| `country_code` and `level`    | When supplied, they must agree with the matching geography place.                                                                |
 
 A place present only in `geography.places[]` can appear in navigation and
 supply a climate boundary, but it cannot be scored. A place becomes
@@ -351,11 +388,11 @@ place codes and the same model-file and fitted-block rules still apply to
 `coverage[]`.
 
 !!! warning "Review releases are opt-in"
-    Discovery treats any manifest whose `version` contains `review` as
-    review-only. Set `CHART_ENABLE_REVIEW_MODELS=true` only in an environment
-    approved to expose those releases. Without that flag, setup correctly
-    reports zero configured model countries when every installed manifest is
-    a review release.
+Discovery treats any manifest whose `version` contains `review` as
+review-only. Set `CHART_ENABLE_REVIEW_MODELS=true` only in an environment
+approved to expose those releases. Without that flag, setup correctly
+reports zero configured model countries when every installed manifest is
+a review release.
 
 The authoritative validation rules live in
 [`core/chart/model_registry/schemas.py`](https://github.com/CHART-Scope/CHART/blob/dev/core/chart/model_registry/schemas.py).
@@ -366,10 +403,10 @@ For the installation workflow and pre-activation checks, see
 
 The release-aware runtime uses respondent-free compact R artifacts:
 
-| Artifact | Contents |
-|---|---|
-| `IN_MP_LBW_tmax_v1.0.1-compact.rds` | One supplied MP-wide window 1 block plus 10 supplied divisions × 3 pregnancy windows (31 blocks total) |
-| `KE_climate_zone_LBW_tmax_v0.2.1-review.rds` | Five fitted climate zones × 3 pregnancy windows |
+| Artifact                                     | Contents                                                                                               |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `IN_MP_LBW_tmax_v1.0.1-compact.rds`          | One supplied MP-wide window 1 block plus 10 supplied divisions × 3 pregnancy windows (31 blocks total) |
+| `KE_climate_zone_LBW_tmax_v0.2.1-review.rds` | Five fitted climate zones × 3 pregnancy windows                                                        |
 
 The `.rds` files are deliberately ignored by Git. Local developers must obtain
 approved copies through the project model-artifact process. Deployed
@@ -392,23 +429,23 @@ The scorer requires exactly three Celsius values:
 
 The temperature order is:
 
-| Position | Meaning |
-|---|---|
-| `lag 0` | Latest month, closest to birth |
-| `lag 1` | One month earlier |
-| `lag 2` | Two months earlier |
+| Position | Meaning                        |
+| -------- | ------------------------------ |
+| `lag 0`  | Latest month, closest to birth |
+| `lag 1`  | One month earlier              |
+| `lag 2`  | Two months earlier             |
 
 The current API's `trimester` field is a model-window identifier:
 
-| Value | Pregnancy window |
-|---:|---|
-| `1` | Latest window, corresponding to T3 |
-| `2` | Middle window, corresponding to T2 |
-| `3` | Earliest window, corresponding to T1 |
+| Value | Pregnancy window                     |
+| ----: | ------------------------------------ |
+|   `1` | Latest window, corresponding to T3   |
+|   `2` | Middle window, corresponding to T2   |
+|   `3` | Earliest window, corresponding to T1 |
 
 !!! important "Counterintuitive numbering"
-    The API value `1` means the latest pregnancy window, not the first
-    trimester. Preserve this mapping when connecting prepared climate inputs.
+The API value `1` means the latest pregnancy window, not the first
+trimester. Preserve this mapping when connecting prepared climate inputs.
 
 ## Reference temperatures
 
@@ -421,14 +458,16 @@ The current API's `trimester` field is a model-window identifier:
 The response includes `modelled_temperature_range_c` and
 `on_training_support`. The range comes directly from the selected fitted
 block's DLNM `Boundary.knots`, so it can differ by location and pregnancy
-window. Treat any result outside that block-specific range as extrapolation.
+window. An input outside that range is scored at the nearest edge of it, as
+the modellers specified, rather than on the extrapolated spline; the flag still
+reports that the raw input fell outside.
 
 The interactive response exposes two distinct derived percentages:
 
 - `relative_odds_change_percent` is signed by default: `OR 0.62` becomes
   `-38%`, `OR 1.25` becomes `+25%`. When the release's
   `output_contract.attributable_fraction` is set to `"positive_excess_only"`
-  the *below-reference* tail (query temperature < reference) is collapsed
+  the _below-reference_ tail (query temperature < reference) is collapsed
   to `0.0` — the paper's editorial scope for that fit does not interpret
   cooler-than-reference temperatures. Above-reference readings are always
   reported at full precision, even when the block's fitted spline returns
@@ -438,13 +477,6 @@ The interactive response exposes two distinct derived percentages:
 - `attributable_fraction_percent` is always positive-excess-only and
   therefore returns zero when the odds ratio is one or lower. It must not
   be labelled as the signed change in odds.
-
-The dashboard mirrors the server-side policy: when the response reports
-`OR < 1` with `relative_odds_change_percent == 0`, the slider stat sentence
-renders "At or below the reference — no heat-attributable excess" rather
-than a signed number, and the slider itself clamps its lower bound to the
-release's reference temperature so the below-reference region is
-unreachable from the UI.
 
 ## Run the inference service locally
 
@@ -531,8 +563,7 @@ resolves to that division's name and picks the division bundle. Two callers
 sending different `geography_id`s therefore hit **genuinely different DLNM
 blocks with different boundary knots, reference temperatures, and
 `n_training`** — this is how the "Viewing for" dropdown on the dashboard
-switches models. See [`pipelines/models/inference/adapters/compact_score.R`](
-https://github.com/CHART-Scope/CHART/blob/main/pipelines/models/inference/adapters/compact_score.R)
+switches models. See [`pipelines/models/inference/adapters/compact_score.R`](https://github.com/CHART-Scope/CHART/blob/main/pipelines/models/inference/adapters/compact_score.R)
 for the block-selection logic and
 [Model artifacts](#model-artifacts) for the current bundle filenames.
 
@@ -544,11 +575,11 @@ the fitted blocks in each `.rds`. The table below lists the geographies
 currently shipped in this codebase, the artifact each release scores
 against, and the upstream source the modeller supplied.
 
-| Geography | Outcome | Fitted-block granularity | Compact artifact | Manifest | Source |
-|---|---|---|---|---|---|
-| 🇮🇳 India — Madhya Pradesh | Low birth weight | 1 MP-wide block (window 1) + 10 division blocks (windows 1–3) | `IN_MP_LBW_tmax_v1.0.1-compact.rds` | [`model-release.mp.compact.review.json`](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/lbw/model-release.mp.compact.review.json) | Zhu Z, Zhang T, Benmarhnia T, et al. *Lancet Planet Health* 2024 |
-| 🇮🇳 India — Madhya Pradesh | Under-five mortality | 10 division blocks (no state block) | `IN_MP_U5M_tmean_v0.1.0-compact.rds` | [`model-release.mp.review.json`](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/under_five_mortality/model-release.mp.review.json) | Case-crossover DLNM using NFHS-7 birth histories |
-| 🇰🇪 Kenya — 47 counties | Low birth weight | 5 climate-zone blocks (each window 1–3), county→zone map | `KE_climate_zone_LBW_tmax_v0.2.1-review.rds` | [`model-release.kenya.review.json`](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/lbw/model-release.kenya.review.json) | Climate-zone recomposition of Kenya DHS |
+| Geography                 | Outcome              | Fitted-block granularity                                      | Compact artifact                             | Manifest                                                                                                                                           | Source                                                           |
+| ------------------------- | -------------------- | ------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 🇮🇳 India — Madhya Pradesh | Low birth weight     | 1 MP-wide block (window 1) + 10 division blocks (windows 1–3) | `IN_MP_LBW_tmax_v1.0.1-compact.rds`          | [`model-release.mp.compact.review.json`](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/lbw/model-release.mp.compact.review.json)  | Zhu Z, Zhang T, Benmarhnia T, et al. _Lancet Planet Health_ 2024 |
+| 🇮🇳 India — Madhya Pradesh | Under-five mortality | 10 division blocks (no state block)                           | `IN_MP_U5M_tmean_v0.1.0-compact.rds`         | [`model-release.mp.review.json`](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/under_five_mortality/model-release.mp.review.json) | Case-crossover DLNM using NFHS-7 birth histories                 |
+| 🇰🇪 Kenya — 47 counties    | Low birth weight     | 5 climate-zone blocks (each window 1–3), county→zone map      | `KE_climate_zone_LBW_tmax_v0.2.1-review.rds` | [`model-release.kenya.review.json`](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/models/lbw/model-release.kenya.review.json)            | Climate-zone recomposition of Kenya DHS                          |
 
 Two learnings the release shape encodes:
 
@@ -568,12 +599,12 @@ Two learnings the release shape encodes:
   MMT — omit it to keep whatever the `.rds` was fit against.
 
 !!! note "Frontend contract"
-    Any UI panel that calls a per-place model endpoint must send the district
-    id when the user has picked one, not just the parent state id. On the
-    dashboard the two hooks that do this are `useAutoPrediction` and
-    `useWhatIfScore`, both computing `effectiveGeographyId = adminUnit ??
+Any UI panel that calls a per-place model endpoint must send the district
+id when the user has picked one, not just the parent state id. On the
+dashboard the two hooks that do this are `useAutoPrediction` and
+`useWhatIfScore`, both computing `effectiveGeographyId = adminUnit ??
     geographyId`. Panels that also read per-place history
-    (`listPredictionRequests`) apply the same rule.
+(`listPredictionRequests`) apply the same rule.
 
 ### Adding another model in the same release shape
 

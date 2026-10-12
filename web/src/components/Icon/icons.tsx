@@ -37,6 +37,7 @@ export const ICON_NAMES = [
   "baby",
   "pregnant-woman",
   "newborn",
+  "child",
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
@@ -601,6 +602,20 @@ export function IconSprite() {
           Baby: round head + small torso, faint arm bumps at the sides,
           feet visible at the base. Also single-color merged silhouette.
         */}
+        {/*
+          Child (under five): standing child, arms out, from the design
+          team's "Under 5 child" SVG. Single-color silhouette.
+        */}
+        <symbol id="ic-child" viewBox="0 0 100 100">
+          <path
+            fill="currentColor"
+            d="M50 35.4C57.0141 35.4 62.7001 29.714 62.7001 22.7C62.7001 15.686 57.0141 10 50 10C42.986 10 37.3 15.686 37.3 22.7C37.3 29.714 42.986 35.4 50 35.4Z"
+          />
+          <path
+            fill="currentColor"
+            d="M77.4001 51.9L66 40.4C63.9 38.3 61 37.1 58 37.1H42.1C39.1 37.1 36.2 38.3 34.1 40.4L22.5 51.9C20.4 54 20.4 57.6 22.5 59.6C24.6 61.9 28.1 61.8 30.3 59.6L37.3 52.6V84.5C37.3 87.5 39.7 90 42.8 90C45.8 90 48.3 87.5 48.3 84.5V72.5C48.3 71.6 49.1 70.8 50 70.8C50.9 70.8 51.7001 71.6 51.7001 72.5V84.5C51.7001 87.5 54.1001 90 57.2001 90C60.2001 90 62.7001 87.5 62.7001 84.5V52.7L69.7 59.7C71.8 61.8 75.3 61.9 77.5 59.7C79.6 57.6 79.6001 54 77.4001 51.9Z"
+          />
+        </symbol>
         <symbol id="ic-baby" viewBox="0 0 24 24">
           <circle cx="12" cy="6.5" r="3" fill="currentColor" />
           <path

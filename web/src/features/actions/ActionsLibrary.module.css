@@ -1,0 +1,40 @@
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-4) 0;
+  font-size: var(--fs-body-sm);
+}
+.filterLabel {
+  font-weight: 600;
+  color: var(--color-charcoal);
+}
+.clear {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-nexus);
+  cursor: pointer;
+}
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 820px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.empty {
+  max-width: 820px;
+  margin: 0;
+  padding: var(--space-6);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-xl);
+  font-size: var(--fs-body);
+  color: var(--color-text-muted);
+  text-align: center;
+}

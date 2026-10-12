@@ -2,6 +2,9 @@ import path from "node:path";
 
 /** @type {import("next").NextConfig} */
 const nextConfig = {
+  // E2E builds into their own directory so they never clobber a running
+  // `next dev`, which shares `.next` with `next build`.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   images: { disableStaticImages: true },
   output: "standalone",
   outputFileTracingRoot: path.join(import.meta.dirname, ".."),

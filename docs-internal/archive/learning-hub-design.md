@@ -49,15 +49,15 @@ setup.
 
 ## What the supplied file contains
 
-| Measure | Count |
-| --- | --- |
-| Rows carrying a URL | 109 |
-| Unique URLs | 100 |
-| Resources after cleaning | 99 |
-| Unique embeddable YouTube videos | 50 |
-| Rows with confirmed embed permission | 20 |
-| Rows with no access column at all | 62 |
-| Durations recorded as unknown or absent | 62 |
+| Measure                                 | Count |
+| --------------------------------------- | ----- |
+| Rows carrying a URL                     | 109   |
+| Unique URLs                             | 100   |
+| Resources after cleaning                | 99    |
+| Unique embeddable YouTube videos        | 50    |
+| Rows with confirmed embed permission    | 20    |
+| Rows with no access column at all       | 62    |
+| Durations recorded as unknown or absent | 62    |
 
 The workbook holds three sheets — a human shortlist (`Top Vids`) and two
 research sweeps (`Claude`, `Gemini`). The first and third share a twelve-column
@@ -154,8 +154,8 @@ It repairs:
 
 **Three rows describe a different product that shares the CHART name** — UW
 EarthLab's CHaRT tool, the UW CHanGE intervention study, and the Emory CHART
-Center's grants. The Gemini sheet files all three under *What CHART Does for
-Planning and Funding*, where they would mislead a planner; the Claude sheet
+Center's grants. The Gemini sheet files all three under _What CHART Does for
+Planning and Funding_, where they would mislead a planner; the Claude sheet
 flags one itself as a name collision. They are ingested with
 `is_published = false` and tagged, so an editor can see them without a reader
 finding them.

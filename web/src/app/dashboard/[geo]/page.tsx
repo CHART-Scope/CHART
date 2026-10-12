@@ -4,13 +4,13 @@ import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import { AppShell } from "@/components/AppShell";
-import { InlineSelect } from "@/components/InlineSelect";
 import { IconSprite } from "@/components/Icon";
 import { ScienceVideoPlaceholder } from "@/features/dashboard/ScienceVideoPlaceholder";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import {
   DashboardHeader,
   HeatLbwLinkPanel,
+  HeatOutlookPanel,
   RecommendedActionsPanel,
   RiskProtectionPanel,
   SpatialRiskMap,
@@ -18,6 +18,7 @@ import {
   lastCompleteMonth,
 } from "@/features/dashboard";
 import { DashboardContextBar } from "@/features/dashboard";
+import { exposedPopulationFigure, iconArrayFigure } from "@/features/dashboard/figures";
 import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
 import { useGeographies } from "@/lib/useGeographies";
@@ -30,11 +31,6 @@ type PageProps = {
   params: Promise<{ geo: string }>;
   searchParams: Promise<{ admin_unit?: string; outcome?: string; month?: string }>;
 };
-
-// Repository-native hazard label the /solutions taxonomy is keyed on. The
-// dashboard shows "Extreme heat" but the solution repository (and the
-// Airtable it mirrors) uses "Increased temperature".
-const DEPLOYED_HAZARD_REPOSITORY_KEY = "Increased temperature";
 
 export default function DashboardGeoPage(props: PageProps) {
   const params = use(props.params);
@@ -76,6 +72,14 @@ function AuthorizedDashboard({
 }) {
   const router = useRouter();
   const [mapRefresh, setMapRefresh] = useState(0);
+  // Geography changes inside the current map frame (state ↔ division,
+  // country ↔ county) should feel like direct manipulation. The URL remains
+  // the durable source of truth, but waiting for a Next navigation before
+  // moving the outline made the map feel sluggish even though no new map data
+  // was needed.
+  const [optimisticAdminUnit, setOptimisticAdminUnit] = useState<
+    string | null | undefined
+  >(undefined);
   const refreshMap = useCallback(() => setMapRefresh((value) => value + 1), []);
   const [isPending, startTransition] = useTransition();
   const navigate = useCallback(
@@ -113,6 +117,13 @@ function AuthorizedDashboard({
       ? adminUnit
       : null;
   }, [adminUnit, geographies, geographyId, outcome]);
+
+  useEffect(() => {
+    setOptimisticAdminUnit(undefined);
+  }, [adminUnit, geographyId]);
+
+  const displayedAdminUnit =
+    optimisticAdminUnit === undefined ? effectiveAdminUnit : optimisticAdminUnit;
 
   useEffect(() => {
     if (!adminUnit || geographies.length === 0 || effectiveAdminUnit) return;
@@ -153,6 +164,13 @@ function AuthorizedDashboard({
   const effectiveGeography =
     geographies.find((geo) => geo.id === effectiveAdminUnit) ?? currentGeography;
   const country = currentGeography ? countryFromPath(currentGeography.path) : "";
+  // Kenya reads published tables. Decided from the URL's geography id as
+  // well as the loaded path, so the live panel never flashes up for Kenya
+  // while the geography list is still loading.
+  const isKenya =
+    country === "Kenya" ||
+    geographyId === "geo-ke" ||
+    geographyId.startsWith("geo-ke-");
   // The place trail, broadest first, walked from the area actually selected
   // rather than from the page's geography. Built from the ancestry so it
   // follows the sub-area picker: choosing a division must move the
@@ -201,6 +219,7 @@ function AuthorizedDashboard({
       !selectedCatalog ||
       selectedModel ||
       effectiveAdminUnit ||
+      !currentGeography?.parentId ||
       districts.length === 0
     ) {
       return;
@@ -218,6 +237,7 @@ function AuthorizedDashboard({
     router,
     selectedCatalog,
     selectedModel,
+    currentGeography?.parentId,
   ]);
 
   const nav = appNavForRoles(session.user.roles);
@@ -227,57 +247,6 @@ function AuthorizedDashboard({
       if (target) navigate(target);
     },
     [navigate],
-  );
-
-  const handleAdminUnitChange = useCallback(
-    (code: string | null) => {
-      const target =
-        code === null
-          ? `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(outcome)}`
-          : `/dashboard/${encodeURIComponent(geographyId)}?admin_unit=${encodeURIComponent(code)}&outcome=${encodeURIComponent(outcome)}`;
-      navigate(month ? `${target}&month=${encodeURIComponent(month)}` : target, {
-        scroll: false,
-      });
-    },
-    [geographyId, outcome, month, navigate],
-  );
-  const handleOutcomeChange = useCallback(
-    (nextOutcome: string) => {
-      navigate(
-        `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(nextOutcome)}${effectiveAdminUnit ? `&admin_unit=${encodeURIComponent(effectiveAdminUnit)}` : ""}${month ? `&month=${encodeURIComponent(month)}` : ""}`,
-        { scroll: false },
-      );
-    },
-    [geographyId, effectiveAdminUnit, month, navigate],
-  );
-
-  const outcomeControl = (
-    <InlineSelect
-      menu
-      aria-label="Health outcome"
-      value={outcome}
-      onChange={handleOutcomeChange}
-      options={
-        catalog.length === 0
-          ? [{ value: outcome, label: outcomeLabel }]
-          : catalog.map((entry) => ({
-              value: entry.outcome,
-              label: `${entry.outcome_label}${entry.batch_status === "blocked_pending_modeller_confirmation" ? " — not ready" : ""}`,
-            }))
-      }
-    />
-  );
-  const placeControl = (
-    <InlineSelect
-      menu
-      aria-label="Risk estimate area"
-      value={effectiveAdminUnit ?? ""}
-      onChange={(value) => handleAdminUnitChange(value || null)}
-      options={[
-        { value: "", label: stateLabel },
-        ...districts.map((area) => ({ value: area.code, label: area.name })),
-      ]}
-    />
   );
 
   if (!hasAccess) return null;
@@ -309,6 +278,7 @@ function AuthorizedDashboard({
               adminUnit: nextAdmin,
               outcome: nextOutcome,
             }) => {
+              if (nextGeo === geographyId) setOptimisticAdminUnit(nextAdmin ?? null);
               const params = new URLSearchParams();
               if (nextAdmin) params.set("admin_unit", nextAdmin);
               if (nextOutcome) params.set("outcome", nextOutcome);
@@ -332,74 +302,60 @@ function AuthorizedDashboard({
                 <ScienceVideoPlaceholder />
                 <RiskProtectionPanel
                   outcomeLabel={outcomeLabel}
-                  outcomeControl={outcomeControl}
-                  contextFigure={
-                    selectedCatalog?.visualization_context_figure ?? "pregnant-woman"
-                  }
+                  contextFigure={exposedPopulationFigure(outcome)}
                   description={selectedCatalog?.risk_description}
                 />
               </aside>
-              <HeatLbwLinkPanel
-                onPredictionReady={refreshMap}
-                placeLabel={effectiveGeography?.name ?? stateLabel}
-                modelAreaName={selectedModel?.modelAreaName ?? null}
-                outcome={outcome}
-                outcomeLabel={outcomeLabel}
-                outcomeControl={outcomeControl}
-                placeControl={placeControl}
-                figure={
-                  outcome === "lbw"
-                    ? "newborn"
-                    : (selectedCatalog?.visualization_figure ?? "baby")
-                }
-                batchEnabled={
-                  selectedCatalog?.batch_status !==
-                  "blocked_pending_modeller_confirmation"
-                }
-                geographyId={effectiveAdminUnit ?? geographyId}
-                month={month}
-                onMonthChange={(nextMonth) => {
-                  const params = new URLSearchParams();
-                  if (adminUnit) params.set("admin_unit", adminUnit);
-                  if (outcome) params.set("outcome", outcome);
-                  if (nextMonth) params.set("month", nextMonth);
-                  // push, not replace: choosing a month is a step the reader
-                  // took, and replacing the entry meant Back left the
-                  // dashboard entirely instead of walking the months visited.
-                  navigate(
-                    `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
-                    { scroll: false },
-                  );
-                }}
-                accessToken={selectedModel ? session.accessToken : undefined}
-                canPrepare={
-                  Boolean(selectedModel) &&
-                  selectedCatalog?.batch_status !==
-                    "blocked_pending_modeller_confirmation" &&
-                  session.user.roles.some((role) =>
-                    [
-                      "chart_admin",
-                      "health_planning_lead",
-                      "cross_sector_planning_lead",
-                      "health_implementation_officer",
-                      "cross_sector_implementation_officer",
-                    ].includes(role),
-                  )
-                }
-              >
-                <SpatialRiskMap
-                  dataRefreshKey={mapRefresh}
-                  embedded
-                  geographyId={geographyId}
+              {isKenya ? (
+                // Kenya reads the modelling team's published tables: no
+                // scoring on request, so nothing to prepare or poll.
+                <HeatOutlookPanel
+                  geographyId={displayedAdminUnit ?? geographyId}
+                  mapGeographyId={geographyId}
                   accessToken={session.accessToken}
-                  month={month ?? lastCompleteMonth()}
                   outcome={outcome}
-                  // Falls back to the place the dashboard is on. The map now
-                  // frames a leaf selection on its siblings, so without this
-                  // nothing is picked out among them when you land on a
-                  // division directly rather than choosing a sub-area.
-                  selectedGeographyId={effectiveAdminUnit ?? adminUnit ?? geographyId}
+                  outcomeLabel={outcomeLabel}
+                  figure={iconArrayFigure(outcome)}
+                  onSelectArea={(nextGeography: string) => {
+                    setOptimisticAdminUnit(nextGeography);
+                    const params = new URLSearchParams();
+                    params.set("admin_unit", nextGeography);
+                    if (outcome) params.set("outcome", outcome);
+                    navigate(
+                      `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
+                    );
+                  }}
+                />
+              ) : (
+                <HeatLbwLinkPanel
+                  onPredictionReady={refreshMap}
+                  placeLabel={effectiveGeography?.name ?? stateLabel}
+                  modelAreaName={selectedModel?.modelAreaName ?? null}
+                  outcome={outcome}
+                  outcomeLabel={outcomeLabel}
+                  figure={iconArrayFigure(outcome)}
+                  batchEnabled={
+                    selectedCatalog?.batch_status !==
+                    "blocked_pending_modeller_confirmation"
+                  }
+                  geographyId={effectiveAdminUnit ?? geographyId}
+                  month={month}
+                  onMonthChange={(nextMonth) => {
+                    const params = new URLSearchParams();
+                    if (adminUnit) params.set("admin_unit", adminUnit);
+                    if (outcome) params.set("outcome", outcome);
+                    if (nextMonth) params.set("month", nextMonth);
+                    // push, not replace: choosing a month is a step the reader
+                    // took, and replacing the entry meant Back left the
+                    // dashboard entirely instead of walking the months visited.
+                    navigate(
+                      `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
+                      { scroll: false },
+                    );
+                  }}
+                  accessToken={selectedModel ? session.accessToken : undefined}
                   canPrepare={
+                    Boolean(selectedModel) &&
                     selectedCatalog?.batch_status !==
                       "blocked_pending_modeller_confirmation" &&
                     session.user.roles.some((role) =>
@@ -412,17 +368,45 @@ function AuthorizedDashboard({
                       ].includes(role),
                     )
                   }
-                  onSelect={(nextGeography: string) => {
-                    const params = new URLSearchParams();
-                    params.set("admin_unit", nextGeography);
-                    if (outcome) params.set("outcome", outcome);
-                    if (month) params.set("month", month);
-                    navigate(
-                      `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
-                    );
-                  }}
-                />
-              </HeatLbwLinkPanel>
+                >
+                  <SpatialRiskMap
+                    dataRefreshKey={mapRefresh}
+                    embedded
+                    geographyId={geographyId}
+                    accessToken={session.accessToken}
+                    month={month ?? lastCompleteMonth()}
+                    outcome={outcome}
+                    // Falls back to the place the dashboard is on. The map now
+                    // frames a leaf selection on its siblings, so without this
+                    // nothing is picked out among them when you land on a
+                    // division directly rather than choosing a sub-area.
+                    selectedGeographyId={displayedAdminUnit ?? geographyId}
+                    canPrepare={
+                      selectedCatalog?.batch_status !==
+                        "blocked_pending_modeller_confirmation" &&
+                      session.user.roles.some((role) =>
+                        [
+                          "chart_admin",
+                          "health_planning_lead",
+                          "cross_sector_planning_lead",
+                          "health_implementation_officer",
+                          "cross_sector_implementation_officer",
+                        ].includes(role),
+                      )
+                    }
+                    onSelect={(nextGeography: string) => {
+                      setOptimisticAdminUnit(nextGeography);
+                      const params = new URLSearchParams();
+                      params.set("admin_unit", nextGeography);
+                      if (outcome) params.set("outcome", outcome);
+                      if (month) params.set("month", month);
+                      navigate(
+                        `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
+                      );
+                    }}
+                  />
+                </HeatLbwLinkPanel>
+              )}
             </div>
           ) : (
             <section className={styles.unsupportedVisualization} role="status">
@@ -432,8 +416,15 @@ function AuthorizedDashboard({
           )}
 
           <RecommendedActionsPanel
-            hazard={DEPLOYED_HAZARD_REPOSITORY_KEY}
+            geographyId={geographyId}
+            placeId={displayedAdminUnit ?? geographyId}
+            placeName={effectiveGeography?.name ?? stateLabel}
+            outcome={outcome}
+            outcomeLabel={outcomeLabel}
             hazardLabel={selectedCatalog?.climate_hazard_label ?? "Climate hazard"}
+            healthDomainLabel={
+              selectedCatalog?.health_domain_label ?? "Climate-sensitive health"
+            }
           />
         </main>
       </AppShell>

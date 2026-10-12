@@ -147,11 +147,11 @@ def load_coverage(session: Session) -> list[CountryCoverage]:
         ).all()
     }
     for country in countries.values():
-        earliest = [area.earliest for area in country.areas if area.earliest]
-        latest = [area.latest for area in country.areas if area.latest]
-        if earliest and latest:
-            country.earliest = min(earliest)
-            country.latest = max(latest)
+        earliest_dates = [area.earliest for area in country.areas if area.earliest]
+        latest_dates = [area.latest for area in country.areas if area.latest]
+        if earliest_dates and latest_dates:
+            country.earliest = min(earliest_dates)
+            country.latest = max(latest_dates)
             country.months = month_totals.get(country.country_code, 0)
     return sorted(countries.values(), key=lambda item: item.country_code)
 

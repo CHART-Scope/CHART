@@ -20,6 +20,10 @@ x-python-environment: &python-environment
   INFERENCE_LBW_BASE_URL: http://chart-lbw:8000
   MODEL_CONTROL_TOKEN: ${MODEL_CONTROL_TOKEN:?set MODEL_CONTROL_TOKEN in .env.prod}
   MODEL_CACHE_DIR: /models
+  # A request the sensor reserved but no run picked up is requeued after this.
+  # The default hour read as "stuck" on the dashboard; a running job renews
+  # its lease every minute, so ten minutes only shortens the dead wait.
+  PREDICTION_LEASE_SECONDS: "600"
 
 x-dagster-environment: &dagster-environment
   <<: *python-environment

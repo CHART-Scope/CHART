@@ -7,7 +7,7 @@ import "../styles/tokens.css";
 import "../styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "CHART — Climate & Health Adaptation and Resilience Tool",
+  title: "CHART — Climate & health adaptation and resilience Toolkit",
   description: "CHART planning workspace for traceable climate and health predictions.",
 };
 

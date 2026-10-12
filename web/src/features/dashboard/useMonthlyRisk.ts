@@ -61,12 +61,12 @@ export function useMonthlyRisk({
   // amounts of time, so "preparing" alone tells a user almost nothing.
   const [stage, setStage] = useState<PredictionStage | null>(null);
   const [attempt, setAttempt] = useState(0);
-  // Months whose prediction is in flight or already landed, so re-selecting
-  // one does not queue a second run. A month is entered before its request is
-  // sent and removed again if that request fails - without the removal a
+  // Each month's submission, kept across month switches so re-selecting a
+  // month resumes polling its request instead of queueing a second run. A
+  // month is removed again if its request fails - without the removal a
   // single expired lease poisoned the month for the whole visit, and
   // reselecting it re-rendered the stale failure without sending anything.
-  const submitted = useRef<Set<string>>(new Set());
+  const submitted = useRef<Map<string, ReturnType<typeof submitPrediction>>>(new Map());
   // The prepare effect below polls, and polling refreshes `data`. Depending
   // on `data` therefore made the effect tear itself down mid-poll: the
   // cleanup aborted the controller the running poll was checking, so the
@@ -103,7 +103,7 @@ export function useMonthlyRisk({
       return;
     }
     const controller = new AbortController();
-    submitted.current = new Set();
+    submitted.current = new Map();
     // Forget the previous place's months. `data` itself is left alone so the
     // card keeps showing something while the new read lands, but judging
     // "does this month need preparing" against another geography's answers
@@ -139,8 +139,6 @@ export function useMonthlyRisk({
       setPhase("ready");
       return;
     }
-    if (submitted.current.has(month)) return;
-    submitted.current.add(month);
     setError(null);
     setLastChecked(null);
 
@@ -209,12 +207,17 @@ export function useMonthlyRisk({
       try {
         setPhase("preparing");
         setStage("queued");
-        const request = await submitPrediction(accessToken, {
-          geographyId,
-          planningMonth: month,
-          target: "month",
-          outcome,
-        });
+        let submission = submitted.current.get(month);
+        if (!submission) {
+          submission = submitPrediction(accessToken, {
+            geographyId,
+            planningMonth: month,
+            target: "month",
+            outcome,
+          });
+          submitted.current.set(month, submission);
+        }
+        const request = await submission;
         if (!active()) return;
         setRequestId(request.request_id);
         if ("request_status" in request) await finish();
@@ -227,7 +230,6 @@ export function useMonthlyRisk({
     return () => {
       controller.abort();
       if (timer) clearTimeout(timer);
-      submitted.current.delete(month);
     };
   }, [geographyId, accessToken, month, canPrepare, reads, fail, outcome, applyData]);
 

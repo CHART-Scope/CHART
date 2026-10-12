@@ -33,3 +33,6 @@ chart-repository/src/app/(payload)/admin/importMap.ts
 
 package-lock.json
 Makefile
+
+# Generated E2E fixtures (real API responses), kept minified
+web/e2e/fixtures/

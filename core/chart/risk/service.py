@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import date
 
 import json
+from typing import cast
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -133,7 +134,8 @@ def load_monthly_view(
         if entry.temperature is None:
             entry.temperature = MonthlyTemperature(
                 tmax_monthly_mean_c=row.value,
-                unit=row.unit,
+                # The loader's own default when a source names no unit.
+                unit=row.unit or "degC",
                 source_name=run.source_name,
                 climate_run_id=run.id,
                 data_label=run.data_label.value,
@@ -483,14 +485,35 @@ def _has_children(session: Session, geography_id: str) -> bool:
     ) > 0
 
 
+# The map query's columns, in select order. SQLAlchemy 2.1 types rows this wide
+# as ``object``, so the shape is stated once here instead of cast per field.
+_MapRow = tuple[
+    int,  # admin unit id
+    str,  # code
+    str,  # name
+    str,  # level
+    str | None,  # app geography id
+    float | None,  # bbox west
+    float | None,  # bbox south
+    float | None,  # bbox east
+    float | None,  # bbox north
+    str | None,  # simplified GeoJSON
+    str,  # geography path
+]
+
+
 def load_map_view(
     session: Session,
     geography_id: str,
     month: str | None = None,
     *,
     outcome: str = DEFAULT_OUTCOME,
+    with_values: bool = True,
 ) -> MapResponse:
     """Areas beneath a geography, shaded by their attributable fraction.
+
+    ``with_values=False`` returns the shapes and framing only, for callers
+    that fill the values from elsewhere (the Kenya outlook).
 
     Every area under the selected geography is returned, including those with
     no fitted model and those whose month has not been computed. They carry a
@@ -520,30 +543,38 @@ def load_map_view(
             AdminUnit.boundary, MAP_SIMPLIFY_TOLERANCE_DEGREES
         )
     )
-    rows = session.execute(
-        select(
-            AdminUnit.id,
-            AdminUnit.code,
-            AdminUnit.name,
-            AdminUnit.level,
-            AdminUnit.app_geography_id,
-            AdminUnit.bbox_west,
-            AdminUnit.bbox_south,
-            AdminUnit.bbox_east,
-            AdminUnit.bbox_north,
-            simplified,
-            AppGeography.path,
-        )
-        .join(AppGeography, AppGeography.id == AdminUnit.app_geography_id)
-        .where(
-            AppGeography.country_code == frame.country_code,
-            or_(
-                AppGeography.id == frame.id,
-                AppGeography.path.startswith(f"{frame.path}/"),
-            ),
-        )
-        .order_by(AppGeography.sort_order, AdminUnit.name)
-    ).all()
+    rows = cast(
+        list[_MapRow],
+        session.execute(
+            select(
+                AdminUnit.id,
+                AdminUnit.code,
+                AdminUnit.name,
+                AdminUnit.level,
+                AdminUnit.app_geography_id,
+                AdminUnit.bbox_west,
+                AdminUnit.bbox_south,
+                AdminUnit.bbox_east,
+                AdminUnit.bbox_north,
+                simplified,
+                AppGeography.path,
+            )
+            .join(AppGeography, AppGeography.id == AdminUnit.app_geography_id)
+            .where(
+                AppGeography.country_code == frame.country_code,
+                # One hierarchy step per map: country -> states, state ->
+                # divisions, country -> counties. Selecting a leaf still frames
+                # it on its siblings because ``frame`` is moved to its parent
+                # above. This keeps the rule generic as more countries and levels
+                # are installed instead of skipping straight to the finest shape.
+                or_(
+                    AppGeography.id == frame.id,
+                    AppGeography.parent_id == frame.id,
+                ),
+            )
+            .order_by(AppGeography.sort_order, AdminUnit.name)
+        ).all(),
+    )
 
     # Keep only the finest level available, dropping any area that contains
     # another area in the same result. A place can carry a boundary of its own
@@ -559,7 +590,7 @@ def load_map_view(
         if not any(other.startswith(f"{row[-1]}/") for other in paths)
     ]
 
-    unit_ids = [row[0] for row in rows]
+    unit_ids = [row[0] for row in rows] if with_values else []
     covered = set(
         session.scalars(
             select(ActiveModelAssignment.admin_unit_id)
@@ -572,11 +603,15 @@ def load_map_view(
                 ModelRelease.outcome == outcome,
             )
         )
+        if unit_ids
+        else ()
     )
 
     # Areas with a job already in flight for this month, so the map can
     # distinguish "on its way" from "nobody has asked for this".
-    in_flight_query = select(PredictionRequestRecord.admin_unit_id).where(
+    in_flight_query = select(
+        PredictionRequestRecord.admin_unit_id, PredictionRequestRecord.request_payload
+    ).where(
         PredictionRequestRecord.admin_unit_id.in_(unit_ids),
         PredictionRequestRecord.status.in_(("waiting", "queued", "running")),
     )
@@ -584,7 +619,21 @@ def load_map_view(
         in_flight_query = in_flight_query.where(
             PredictionRequestRecord.planning_date == _first_of_month(month)
         )
-    in_flight = set(session.scalars(in_flight_query)) if unit_ids else set()
+    # Only this outcome's: an LBW run in flight is not under-five's. The
+    # outcome lives in the request payload; a request is not tied to a
+    # release until it is reserved.
+    in_flight = (
+        {
+            unit_id
+            for unit_id, payload in session.execute(in_flight_query)
+            if (payload if isinstance(payload, dict) else {}).get(
+                "outcome", DEFAULT_OUTCOME
+            )
+            == outcome
+        }
+        if unit_ids
+        else set()
+    )
 
     values: dict[int, PredictionResult] = {}
     if unit_ids:
@@ -615,7 +664,10 @@ def load_map_view(
             values.setdefault(row.admin_unit_id, row)
 
     areas: list[MapArea] = []
-    west = south = east = north = None
+    west: float | None = None
+    south: float | None = None
+    east: float | None = None
+    north: float | None = None
     for (
         unit_id,
         code,
@@ -630,7 +682,7 @@ def load_map_view(
         _path,
     ) in rows:
         stored = values.get(unit_id)
-        if stored is not None:
+        if stored is not None or not with_values:
             missing_reason = None
         elif unit_id not in covered:
             missing_reason = "no_model"
@@ -656,7 +708,13 @@ def load_map_view(
                 geometry=json.loads(geometry_json) if geometry_json else None,
             )
         )
-        if None not in (bbox_west, bbox_south, bbox_east, bbox_north):
+        # Explicit checks: `None not in (...)` narrows none of the names.
+        if (
+            bbox_west is not None
+            and bbox_south is not None
+            and bbox_east is not None
+            and bbox_north is not None
+        ):
             west = bbox_west if west is None else min(west, bbox_west)
             south = bbox_south if south is None else min(south, bbox_south)
             east = bbox_east if east is None else max(east, bbox_east)

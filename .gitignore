@@ -20,6 +20,7 @@ out/
 !web/src/app/api/build/route.ts
 **/coverage/
 **/.next/
+**/.next-validation/
 **/out/
 web/storybook-static/
 *.tsbuildinfo
@@ -69,3 +70,9 @@ new_design
 
 # Local Dagster instance state (run history, schedule DBs)
 .dagster_home/
+
+# e2e build output
+**/.next-e2e/
+
+# Kenya outlook files published locally by chart-publish-kenya (mirrors the model bucket)
+pipelines/models/kenya

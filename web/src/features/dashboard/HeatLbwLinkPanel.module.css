@@ -27,20 +27,19 @@
   font-size: var(--fs-body-lg);
   font-weight: 400;
   color: var(--color-charcoal);
-  /* Extra line-height so the pill dropdowns get vertical breathing room
-   * as the question wraps across lines. */
   line-height: 1.7;
-  /* Prevent English-language leading-space collapse — the JSX inserts
-   * a real space around each inline select and we want it preserved. */
   word-spacing: 0.05em;
-}
-.phrase {
-  white-space: normal;
 }
 
 .inlineStatic {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-nexus);
+}
+
+.windowNote {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
 }
 
 .modelScopeNote {
@@ -164,6 +163,28 @@
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
+}
+.mapColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.sampleSize {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+}
+.sampleSize strong {
+  color: var(--color-charcoal);
+  font-family: var(--font-display);
+  font-size: var(--fs-body-lg);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 .summary {
   display: flex;

@@ -221,14 +221,20 @@ def test_job_can_refresh_a_sample_found_after_missing_months() -> None:
     assert climate_pull.call_count == 2
 
 
-def test_job_refreshes_all_three_months_after_grain_mismatch() -> None:
+@pytest.mark.parametrize(
+    "code",
+    # A daily gap is invisible to monthly selection, which would otherwise
+    # report nothing to pull and fail the under-five request after retries.
+    ["CLIMATE_WINDOW_GRAIN_MISMATCH", "CLIMATE_DAILY_DATA_NOT_READY"],
+)
+def test_job_refreshes_all_three_months_when_the_window_is_incomplete(code) -> None:
     prediction = SimpleNamespace(prediction=SimpleNamespace(odds_ratio=1.12))
     with (
         patch("chart_pipeline.definitions.claim_prediction_request", return_value=True),
         patch(
             "chart_pipeline.definitions.prepare_prediction_input",
             side_effect=[
-                ClimateServiceError("CLIMATE_WINDOW_GRAIN_MISMATCH", 409),
+                ClimateServiceError(code, 409),
                 9,
             ],
         ),

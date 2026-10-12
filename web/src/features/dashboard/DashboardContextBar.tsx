@@ -126,7 +126,12 @@ export function DashboardContextBar({
   // Sub-level select value: prefer the explicit ?admin_unit= override,
   // fall back to the URL's geographyId when the URL itself points at
   // a sub-level (division). Empty string == "Whole state".
-  const subLevelValue = adminUnit ?? (geographyId !== topLevelValue ? geographyId : "");
+  // A state shown in its country frame arrives as ?admin_unit=<state>, which
+  // is the "Whole state" option here, not one of its divisions.
+  const subLevelValue =
+    adminUnit === topLevelValue
+      ? ""
+      : (adminUnit ?? (geographyId !== topLevelValue ? geographyId : ""));
 
   const subLevelLabel = subAreas[0]?.levelLabel ?? "";
   const topLevelLabel =
@@ -206,15 +211,34 @@ export function DashboardContextBar({
   function handleTopLevelChange(nextGeographyId: string) {
     const selected = geographies?.find((geo) => geo.id === nextGeographyId);
     const hasChildren = geographies?.some((geo) => geo.parentId === nextGeographyId);
+    const countryRoot = activeFamily?.root.id;
+    // The page only keeps ?admin_unit= for a place with a model for this
+    // outcome. A state without one (MP under-five has only division models)
+    // opens as its own frame so the page can fall through to a division.
+    if (selected?.parentId && hasChildren && !hasOutcomeModel(selected, outcome)) {
+      onNavigate({ geographyId: nextGeographyId, adminUnit: null, outcome });
+      return;
+    }
     onNavigate({
       geographyId:
-        !hasChildren && selected?.parentId ? selected.parentId : nextGeographyId,
-      adminUnit: !hasChildren && selected?.parentId ? nextGeographyId : null,
+        selected?.parentId && countryRoot
+          ? countryRoot
+          : !hasChildren && selected?.parentId
+            ? selected.parentId
+            : nextGeographyId,
+      // A top-level state/county is shown in its country frame. Places with a
+      // deeper level reveal that next selector; choosing one of those children
+      // moves the frame down by exactly one step.
+      adminUnit: selected?.parentId ? nextGeographyId : null,
       outcome,
     });
   }
 
   function handleSubLevelChange(nextAdminUnit: string) {
+    if (nextAdminUnit === "") {
+      handleTopLevelChange(topLevelValue);
+      return;
+    }
     // Always anchor the URL geographyId on the resolved top-level so
     // the ?admin_unit override remains the source of truth for the
     // sub-level. Otherwise a URL that lands directly on a division
@@ -222,7 +246,7 @@ export function DashboardContextBar({
     // double-selecting the same place.
     onNavigate({
       geographyId: topLevelValue || geographyId,
-      adminUnit: nextAdminUnit === "" ? null : nextAdminUnit,
+      adminUnit: nextAdminUnit,
       outcome,
     });
   }
@@ -306,6 +330,13 @@ export function DashboardContextBar({
       />
     </div>
   );
+}
+
+function hasOutcomeModel(
+  geography: { models?: { outcome: string }[] },
+  outcome: string,
+) {
+  return geography.models?.some((model) => model.outcome === outcome) ?? false;
 }
 
 function dedupe<T>(items: T[], key: (item: T) => string): T[] {

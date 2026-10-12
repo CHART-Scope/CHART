@@ -99,6 +99,9 @@ flowchart LR
     modeler["Model team"] --> release["Model release manifest + artifacts"]
     release --> objects
     release --> api
+    modeler --> tables["Pre-computed model tables"]
+    tables --> objects
+    objects -. "chart-model-sync" .-> api
 ```
 
 The browser talks only to the public ingress. FastAPI owns access checks and
@@ -160,6 +163,25 @@ sequenceDiagram
 The database request and lease are the back-pressure boundary. User traffic can
 burst while provider calls and model jobs remain within configured concurrency
 and rate limits.
+
+## Pre-computed model tables
+
+Some models do not need CHART to evaluate them. Their model team already ships
+the final tables, such as a typical month by county and attributable fractions
+by period and scenario. Kenya's LBW and under-five temperature models
+(release v2_2026_10_06) work this way.
+
+1. `chart-publish-kenya` reshapes the team's CSVs into one JSON file per
+   county and outcome.
+2. The files are uploaded to the model bucket.
+3. `chart-model-sync` mirrors the bucket onto the API's `MODEL_CACHE_DIR`.
+4. `GET /heat-outlook/{geography}` filters a file and applies the model
+   team's display rules.
+
+This path has no request queue, worker or scorer, and no database table. A
+place either has a published file or does not. It runs alongside the
+on-request prediction path above, and neither depends on the other. See
+[From R output to the dashboard](model-integration.md).
 
 ## Geography, risk, and model resolution
 

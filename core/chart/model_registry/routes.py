@@ -9,7 +9,7 @@ from sqlalchemy import func, or_, select
 
 from chart.model_registry.runtime import prepare_model_release
 from chart.model_registry.schemas import ModelReleaseSpec
-from chart.model_registry.service import ModelRegistryError
+from chart.model_registry.service import ModelRegistryError, release_base_uri
 from chart.setup.model_configs import deployed_configs
 from chart.shared.db.models import (
     ActiveModelAssignment,
@@ -306,10 +306,7 @@ def list_releases() -> ReleasesResponse:
             for entry in (release.model_files or [])
             if isinstance(entry, dict)
         ]
-        base_uri = None
-        release_uri = release.release_file_uri or ""
-        if release_uri.endswith("/model-release.json"):
-            base_uri = release_uri[: -len("/model-release.json")]
+        base_uri = release_base_uri(release.release_file_uri)
         items.append(
             ReleaseInfo(
                 id=release.id,

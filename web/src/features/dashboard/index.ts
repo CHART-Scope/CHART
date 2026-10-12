@@ -1,6 +1,7 @@
 export { DashboardContextBar } from "./DashboardContextBar";
 export { DashboardHeader } from "./DashboardHeader";
 export { HeatLbwLinkPanel } from "./HeatLbwLinkPanel";
+export { HeatOutlookPanel } from "./HeatOutlookPanel";
 export { PredictionsPanel } from "./PredictionsPanel";
 export { RecommendedActionsPanel } from "./RecommendedActionsPanel";
 export { RiskProtectionPanel } from "./RiskProtectionPanel";

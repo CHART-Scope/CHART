@@ -42,14 +42,15 @@ the month's observed exposure is what the model scores.
 Two things on this card are easy to misread and are therefore stated
 explicitly:
 
-- **The model reads a window, not one month.** The card shows the selected
-  month's temperature, but a low-birth-weight model scores three months and an
-  under-five model scores four days. Two months can show the same temperature
-  and return different answers because their earlier months differ, so the
-  provenance panel lists the whole exposure vector.
-- **A zero is explained.** Below the model's reference temperature nothing is
-  attributed to heat, and an odds ratio under 1 means no excess. The card says
-  which applies rather than printing a bare "0%".
+- **The model reads a window, not one month.** A low-birth-weight model scores
+  the selected month and the two before it, and the card lists all three
+  temperatures beneath the headline. Two months can show the same temperature
+  and return different answers because their earlier months differ.
+- **A zero is explained, over the same window.** If none of the scored months
+  reached the model's reference temperature, nothing is attributed to heat. If
+  they did but the combined odds ratio is 1 or less, the card says the model
+  finds no extra risk, gives the odds ratio and its range, and says when that
+  range is too wide to tell either way. It never prints a bare "0%".
 
 ### Spatial risk map
 

@@ -35,9 +35,10 @@ def extension_owned_tables(connection: Connection) -> set[TableKey]:
     )
     tables: set[TableKey] = set()
     for schema_name, table_name, visible_without_schema in rows:
-        tables.add((schema_name, table_name))
+        # Raw SQL rows are untyped; pg_catalog names are always text.
+        tables.add((str(schema_name), str(table_name)))
         if visible_without_schema:
-            tables.add((None, table_name))
+            tables.add((None, str(table_name)))
     return tables
 
 

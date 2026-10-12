@@ -168,6 +168,9 @@ class LbwPrediction(BaseModel):
     model_file: str = Field(min_length=1)
     model_version: str = Field(min_length=1)
     model_sha256: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{64}$")
+    n_training: int | None = Field(default=None, ge=1)
+    n_events: int | None = Field(default=None, ge=0)
+    n_subjects: int | None = Field(default=None, ge=1)
     warning: str | None = None
     explanation: str | None = None
 

@@ -28,23 +28,31 @@ export function computeFamilies(geos: GeographyRecord[], scopes: string[]): Fami
   );
 }
 
-/** Given a family, pick the geography a caller should navigate to when
- * the family is selected. Prefers the family root if it has its own
- * model (e.g. Madhya Pradesh state block); otherwise falls back to the
- * first prediction-supporting descendant. */
+/** Where planning for a family starts: the broadest place that still says
+ * something, never a single county or division picked on the user's behalf.
+ * From the family root it steps down only while there is exactly one branch
+ * holding models, so India opens on Madhya Pradesh (its one modelled state)
+ * and Kenya opens on Kenya; the dashboard then offers the areas beneath. */
 export function defaultAreaForFamily(
   family: Family,
-  geographies: GeographyRecord[],
+  geographies: readonly GeographyRecord[],
 ): GeographyRecord | null {
-  if ((family.root.models?.length ?? 0) > 0) return family.root;
-  const rootPath = family.root.path.replace(/\/+$/, "");
-  const descendants = geographies
-    .filter(
-      (geo) => geo.path === family.root.path || geo.path.startsWith(`${rootPath}/`),
-    )
-    .filter((geo) => (geo.models?.length ?? 0) > 0)
-    .sort((a, b) => a.name.localeCompare(b.name));
-  return descendants[0] ?? null;
+  const hasModel = (geo: GeographyRecord) => (geo.models?.length ?? 0) > 0;
+  const within = (root: GeographyRecord, geo: GeographyRecord) => {
+    const rootPath = root.path.replace(/\/+$/, "");
+    return geo.path === root.path || geo.path.startsWith(`${rootPath}/`);
+  };
+  let place = family.root;
+  while (!hasModel(place)) {
+    const branches = geographies.filter(
+      (geo) =>
+        geo.parentId === place.id &&
+        geographies.some((inner) => hasModel(inner) && within(geo, inner)),
+    );
+    if (branches.length !== 1) break;
+    place = branches[0];
+  }
+  return place;
 }
 
 /** Match a geography id or family path against a family's subtree so

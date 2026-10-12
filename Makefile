@@ -9,7 +9,7 @@ ifeq ($(filter $(CHART_SERVICES),local remote),)
 $(error CHART_SERVICES must be local or remote)
 endif
 
-.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run wait-for-lbw bootstrap-token install-hooks
+.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build e2e e2e-orchestration e2e-web identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run wait-for-lbw bootstrap-token install-hooks
 
 help:
 	@printf "\nQuick start (climate pipeline)\n"
@@ -24,6 +24,7 @@ help:
 	@printf "  make run            Run Next, Python, Dagster, and the R prediction model\n"
 	@printf "  make web            Run the canonical CHART web app on :3100\n"
 	@printf "  make verify         Run API tests, typechecks, builds, and formatting check\n"
+	@printf "  make e2e            Run E2E suites; reports land in outputs/e2e/\n"
 	@printf "  make all            Provision local services and run verification checks\n"
 	@printf "  make local-setup    Start Docker services, migrate, seed, and sync identity\n"
 	@printf "  make services       Start local Postgres and Keycloak\n"
@@ -161,6 +162,17 @@ web-start:
 
 web-typecheck:
 	$(NPM) run typecheck:web
+
+# E2E suites. Each run leaves its evidence under outputs/e2e/: JUnit for both,
+# plus Playwright's HTML report and per-test trace, screenshot and video.
+e2e: e2e-orchestration e2e-web
+
+e2e-orchestration:
+	mkdir -p outputs/e2e/orchestration
+	$(VENV_PYTHON) -m pytest orchestration/tests/test_climate_pull_failures.py -q --junitxml=outputs/e2e/orchestration/junit.xml
+
+e2e-web:
+	$(NPM) run e2e:web
 
 web-storybook:
 	$(NPM) run storybook:web
@@ -394,6 +406,7 @@ climate-api-run: bootstrap-token wait-for-lbw
 	  INFERENCE_LBW_BASE_URL="$${INFERENCE_LBW_BASE_URL:-http://127.0.0.1:8000}" \
 	  MODEL_CACHE_DIR="$(CHART_MODEL_CACHE_DIR)" \
 	  MODEL_CONTROL_TOKEN="$(LBW_MODEL_CONTROL_TOKEN)" \
+	  CHART_SHOW_LOCAL_MODEL_PATH=1 \
 	  CHART_BOOTSTRAP_TOKEN="$$token" \
 	  $(VENV_PYTHON) -m chart
 

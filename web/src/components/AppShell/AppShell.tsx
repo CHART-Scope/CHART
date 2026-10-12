@@ -1,11 +1,10 @@
 "use client";
 
-import { Suspense, useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 
 import { ActivityDrawer } from "../ActivityDrawer/ActivityDrawer";
 import { Icon, type IconName } from "../Icon";
 import { Skeleton } from "../Skeleton";
-import { SidebarContext, SidebarPlanningContext } from "./SidebarContext";
 import styles from "./AppShell.module.css";
 
 export type NavItem = {
@@ -128,7 +127,7 @@ export function AppShell({
         <button
           type="button"
           className={styles.activityBtn}
-          aria-label="Open activity log"
+          aria-label="Open background work"
           onClick={() => setActivityOpen(true)}
         >
           <Icon name="dots" size={16} />
@@ -150,16 +149,6 @@ export function AppShell({
             .filter(Boolean)
             .join(" ")}
         >
-          {loading ? (
-            <SidebarContext loading />
-          ) : (
-            // `usePlanningContext` reads the search params, which Next only
-            // resolves on the client; without a boundary the whole page would
-            // be forced out of static rendering.
-            <Suspense fallback={<SidebarContext loading />}>
-              <SidebarPlanningContext />
-            </Suspense>
-          )}
           <ul className={styles.nav}>
             {loading
               ? [0, 1, 2].map((row) => (

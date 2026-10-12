@@ -57,6 +57,21 @@ stopifnot(
   identical(outside_support$on_training_support, FALSE),
   nzchar(outside_support$warning)
 )
+# Hotter than the hottest temperature studied scores as the hottest studied,
+# rather than wherever the extrapolated spline happens to bend.
+sloped_block <- block
+sloped_block$coefficients <- seq_len(coefficient_count) / 100
+above_max <- score_compact_profile(sloped_block, c(45, 30, 25))
+at_max <- score_compact_profile(sloped_block, c(40, 30, 25))
+stopifnot(
+  !identical(at_max$odds_ratio, 1),
+  identical(above_max$odds_ratio, at_max$odds_ratio),
+  identical(above_max$ci95_low, at_max$ci95_low),
+  identical(above_max$ci95_high, at_max$ci95_high),
+  identical(above_max$on_training_support, FALSE),
+  isTRUE(at_max$on_training_support),
+  identical(above_max$tmax_lag, c(45, 30, 25))
+)
 store <- list(path = "test.rds", bundle = bundle)
 area_result <- score_compact_area(store, "test", 1, c(25, 25, 25))
 stopifnot(identical(area_result$geography_level, "test_level"))

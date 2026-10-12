@@ -8,6 +8,7 @@
     "build": "next build --webpack",
     "start": "next start --hostname ${HOSTNAME:-127.0.0.1} --port ${PORT:-3100}",
     "typecheck": "tsc --noEmit",
+    "e2e": "playwright test",
     "storybook": "NODE_PATH=$PWD/node_modules:$PWD/../node_modules storybook dev --port 6006 --host 127.0.0.1",
     "build-storybook": "NODE_PATH=$PWD/node_modules:$PWD/../node_modules storybook build"
   },
@@ -18,6 +19,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@storybook/addon-a11y": "^9.1.20",
     "@storybook/addon-docs": "^9.1.20",
     "@storybook/nextjs-vite": "^9.1.20",

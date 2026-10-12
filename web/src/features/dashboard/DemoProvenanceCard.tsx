@@ -13,8 +13,9 @@
  * typecheck and build clean.
  *
  * It takes only values the caller already holds and adds no fetch, no shared
- * type, no prop change to any existing component and no backend field, so
- * removing it cannot affect anything around it.
+ * type and no prop change to any existing component, so removing it cannot
+ * affect anything around it. The model_* and n_* fields on the monthly
+ * prediction exist for this card and can go with it.
  */
 
 import { type AreaBoundingBox, type MonthlyRiskValues } from "@/lib/dashboardClient";
@@ -24,6 +25,28 @@ import styles from "./DemoProvenanceCard.module.css";
 /** Kept in step with pipelines/era5_heat/src/era5_heat/cds_client.py. */
 const CDS_DATASET = "reanalysis-era5-single-levels";
 const CDS_VARIABLE = "2m_temperature";
+
+/** The sample a fitted block stands on, in the outcome's own terms: births
+ * (and how many were low birth weight) for LBW, deaths for a mortality
+ * model, whose case-crossover design counts each death as its own case.
+ * Null when the model sent no count, so the row is left out rather than
+ * saying "not reported". */
+function sampleText(
+  outcome: string,
+  prediction: { n_training?: number | null; n_events?: number | null },
+): string | null {
+  const counted = (value: number | null | undefined) =>
+    typeof value === "number" && value > 0 ? value.toLocaleString() : null;
+  const births = counted(prediction.n_training);
+  const events = counted(prediction.n_events);
+  if (outcome === "lbw") {
+    if (!births) return null;
+    return events
+      ? `${births} births, ${events} with low birth weight`
+      : `${births} births`;
+  }
+  return events ? `${events} deaths` : null;
+}
 
 function formatMonth(month: string): string {
   if (!month) return "—";
@@ -39,12 +62,27 @@ function degrees(value: number, positive: string, negative: string): string {
   return `${Math.abs(value).toFixed(4)}°${value >= 0 ? positive : negative}`;
 }
 
+function artifactHref(uri: string): string | null {
+  if (uri.startsWith("https://") || uri.startsWith("http://")) return uri;
+  if (uri.startsWith("s3://")) {
+    const [bucket, ...keyParts] = uri.slice("s3://".length).split("/");
+    if (!bucket || !/^[a-z0-9.-]+$/.test(bucket) || keyParts.length === 0) return null;
+    const encodedKey = keyParts.map(encodeURIComponent).join("/");
+    // The global endpoint routes to the bucket's own region, so no bucket
+    // name or region is hardcoded here.
+    return `https://${bucket}.s3.amazonaws.com/${encodedKey}`;
+  }
+  return null;
+}
+
 export function DemoProvenanceCard({
   month,
+  outcome,
   entry,
   areaBbox = null,
 }: {
   month: string;
+  outcome: string;
   entry: MonthlyRiskValues | null;
   areaBbox?: AreaBoundingBox | null;
 }) {
@@ -54,10 +92,9 @@ export function DemoProvenanceCard({
   const prediction = entry?.prediction ?? null;
 
   return (
-    <section className={styles.card} aria-label="Data provenance (demo)">
+    <section className={styles.card} aria-label="Data and model provenance">
       <div className={styles.header}>
         <p className={styles.title}>Where this number comes from</p>
-        <span className={styles.badge}>demo</span>
       </div>
 
       {temperature === null && prediction == null ? (
@@ -84,12 +121,29 @@ export function DemoProvenanceCard({
                       return different answers because their earlier months
                       differ - without this row that looks like a bug. */}
                   <dd>
-                    {exposure.map((value) => `${value.toFixed(1)}°C`).join(" · ")}
-                    <span className={styles.hint}>
-                      {dates.length === exposure.length
-                        ? " (selected day and the days before)"
-                        : " (selected month and the two before)"}
-                    </span>
+                    {dates.length === exposure.length ? (
+                      // A daily model reads the whole month plus its lead-in,
+                      // ~34 values; the span and range say it, the list
+                      // would not fit.
+                      <>
+                        {exposure.length} daily maxima,{" "}
+                        {Math.min(...exposure).toFixed(1)}–
+                        {Math.max(...exposure).toFixed(1)}°C
+                        <span className={styles.hint}>
+                          {" "}
+                          ({dates.at(-1)} to {dates[0]}, each day scored on the days
+                          ending it)
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {exposure.map((value) => `${value.toFixed(1)}°C`).join(" · ")}
+                        <span className={styles.hint}>
+                          {" "}
+                          (selected month and the two before)
+                        </span>
+                      </>
+                    )}
                   </dd>
                 </>
               ) : null}
@@ -143,6 +197,57 @@ export function DemoProvenanceCard({
             <>
               <dt>Model</dt>
               <dd>{prediction.model_version}</dd>
+              <dt>Release</dt>
+              <dd>
+                <code>{prediction.model_release_id}</code>
+              </dd>
+              <dt>Artifact</dt>
+              <dd>
+                <code>{prediction.model_file ?? "Not recorded"}</code>
+              </dd>
+              {/* The exact file that scored this month: the local copy when
+              the API runs in development, the published S3 object otherwise. */}
+              {prediction.model_runtime_path ? (
+                <>
+                  <dt>Model file used</dt>
+                  <dd>
+                    <code>{prediction.model_runtime_path}</code>
+                  </dd>
+                </>
+              ) : prediction.model_artifact_uri ? (
+                <>
+                  <dt>Model file used</dt>
+                  <dd>
+                    {artifactHref(prediction.model_artifact_uri) ? (
+                      <a
+                        href={artifactHref(prediction.model_artifact_uri) ?? undefined}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        {prediction.model_artifact_uri}
+                      </a>
+                    ) : (
+                      <code>{prediction.model_artifact_uri}</code>
+                    )}
+                  </dd>
+                </>
+              ) : null}
+              {prediction.model_artifact_sha256 ? (
+                <>
+                  <dt>SHA-256</dt>
+                  <dd>
+                    <code>{prediction.model_artifact_sha256}</code>
+                  </dd>
+                </>
+              ) : null}
+              {/* The sample the estimate stands on: a wide interval reads
+                  very differently beside 40 deaths than 4,000 births. */}
+              {sampleText(outcome, prediction) ? (
+                <>
+                  <dt>Sample</dt>
+                  <dd>{sampleText(outcome, prediction)}</dd>
+                </>
+              ) : null}
               <dt>Model reads</dt>
               <dd>{prediction.input_statistic}</dd>
               <dt>Reference</dt>

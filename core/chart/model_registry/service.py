@@ -43,6 +43,14 @@ class ActiveModelMapping:
     input_spec: dict | None = None
 
 
+def release_base_uri(release_file_uri: str | None) -> str | None:
+    """Folder a release's files were published to, from its manifest URI."""
+    suffix = "/model-release.json"
+    if not release_file_uri or not release_file_uri.endswith(suffix):
+        return None
+    return release_file_uri[: -len(suffix)]
+
+
 def register_model_release(
     session: Session,
     spec: ModelReleaseSpec,

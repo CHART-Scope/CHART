@@ -16,12 +16,20 @@ that grain and a query against it.
 
 from __future__ import annotations
 
+import os
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
-from chart.shared.db.models import DataLabel, PredictionResult
+from chart.model_registry.runtime import locate_model_artifact, model_cache_dir
+from chart.model_registry.service import ModelRegistryError, release_base_uri
+from chart.shared.db.models import (
+    DataLabel,
+    ModelAreaMapping,
+    ModelRelease,
+    PredictionResult,
+)
 from chart.shared.outcomes import DEFAULT_OUTCOME
 
 from .schemas import MonthlyPrediction
@@ -51,16 +59,31 @@ def load_monthly_predictions(
     their tests need not change in the same step.
     """
 
-    query = select(PredictionResult).where(
-        PredictionResult.admin_unit_id == admin_unit_id,
-        PredictionResult.outcome == outcome,
-        PredictionResult.horizon == MONTHLY_HORIZON,
-        PredictionResult.scenario == OBSERVED_SCENARIO,
-        # Observed months only. A result built on seasonal forecast, a
-        # projection, or sample data is a real prediction, but it is not the
-        # observed month this card reports.
-        PredictionResult.data_label == DataLabel.reanalysis,
-        PredictionResult.pregnancy_window.in_(MONTHLY_PREGNANCY_WINDOWS),
+    query = (
+        select(
+            PredictionResult,
+            ModelAreaMapping.model_file,
+            ModelRelease.release_file_uri,
+        )
+        .join(ModelRelease, ModelRelease.id == PredictionResult.model_release_id)
+        .outerjoin(
+            ModelAreaMapping,
+            and_(
+                ModelAreaMapping.model_release_id == PredictionResult.model_release_id,
+                ModelAreaMapping.admin_unit_id == PredictionResult.admin_unit_id,
+            ),
+        )
+        .where(
+            PredictionResult.admin_unit_id == admin_unit_id,
+            PredictionResult.outcome == outcome,
+            PredictionResult.horizon == MONTHLY_HORIZON,
+            PredictionResult.scenario == OBSERVED_SCENARIO,
+            # Observed months only. A result built on seasonal forecast, a
+            # projection, or sample data is a real prediction, but it is not the
+            # observed month this card reports.
+            PredictionResult.data_label == DataLabel.reanalysis,
+            PredictionResult.pregnancy_window.in_(MONTHLY_PREGNANCY_WINDOWS),
+        )
     )
     if month is not None:
         query = query.where(
@@ -75,12 +98,23 @@ def load_monthly_predictions(
     )
 
     estimates: dict[str, MonthlyPrediction] = {}
-    for row in session.scalars(query):
+    for row, model_file, release_file_uri in session.execute(query):
         key = row.valid_month.strftime("%Y-%m")
         if key in estimates:
             continue
+        artifact_uri = _artifact_uri(release_file_uri, model_file)
         estimates[key] = MonthlyPrediction(
             request_id=row.prediction_request_id or 0,
+            model_release_id=row.model_release_id,
+            model_file=model_file,
+            model_artifact_sha256=row.model_artifact_sha256,
+            model_artifact_uri=artifact_uri,
+            model_runtime_path=_verified_runtime_path(
+                model_file, row.model_artifact_sha256
+            ),
+            n_training=row.n_training,
+            n_events=row.n_events,
+            n_subjects=row.n_subjects,
             attributable_fraction_milli=row.attributable_fraction_milli,
             odds_ratio=row.odds_ratio,
             reference_temperature_c=row.reference_temperature_c,
@@ -94,6 +128,41 @@ def load_monthly_predictions(
             exposure_dates=[_as_date(value) for value in (row.exposure_dates or [])],
         )
     return estimates
+
+
+def _artifact_uri(release_file_uri: str | None, model_file: str | None) -> str | None:
+    base_uri = release_base_uri(release_file_uri)
+    return f"{base_uri}/{model_file}" if base_uri and model_file else None
+
+
+# Successful checks only: a missing artifact may be synced later, and hashing a
+# multi-MB file on every dashboard read is what this cache avoids.
+_verified_paths: dict[tuple[str, str, str], str] = {}
+
+
+def _verified_runtime_path(
+    model_file: str | None, artifact_sha256: str | None
+) -> str | None:
+    """Absolute path of the local artifact that scored the prediction.
+
+    Only for local development (``CHART_SHOW_LOCAL_MODEL_PATH=1``), where the
+    file on disk is the thing to open. A deployment leaves it unset and the
+    dashboard links the published S3 artifact instead, so the server's
+    filesystem layout never reaches the browser.
+    """
+    if os.getenv("CHART_SHOW_LOCAL_MODEL_PATH") != "1":
+        return None
+    if not model_file or not artifact_sha256:
+        return None
+    cache_root = model_cache_dir()
+    key = (str(cache_root), model_file, artifact_sha256)
+    if key not in _verified_paths:
+        try:
+            path = locate_model_artifact(model_file, artifact_sha256, cache_root)
+        except ModelRegistryError:
+            return None
+        _verified_paths[key] = str(path)
+    return _verified_paths[key]
 
 
 def _first_of_month(month: str) -> date:

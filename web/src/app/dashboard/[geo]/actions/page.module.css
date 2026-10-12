@@ -1,0 +1,29 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.back {
+  align-self: flex-start;
+  font-size: var(--fs-body-sm);
+  font-weight: 600;
+  color: var(--color-nexus);
+  text-decoration: none;
+}
+.back:hover {
+  text-decoration: underline;
+}
+.intro {
+  max-width: 720px;
+}
+.title {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: var(--fs-section);
+}
+.lede {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--color-text-muted);
+}
