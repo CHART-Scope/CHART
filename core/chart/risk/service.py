@@ -626,7 +626,10 @@ def load_map_view(
         {
             unit_id
             for unit_id, payload in session.execute(in_flight_query)
-            if (payload or {}).get("outcome", DEFAULT_OUTCOME) == outcome
+            if (payload if isinstance(payload, dict) else {}).get(
+                "outcome", DEFAULT_OUTCOME
+            )
+            == outcome
         }
         if unit_ids
         else set()
