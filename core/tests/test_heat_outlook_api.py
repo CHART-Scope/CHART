@@ -198,7 +198,7 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
     publish(
         tmp_path / "lbw_source",
         tmp_path / "u5_source",
-        cache / "kenya" / "outlook" / RELEASE,
+        cache / "kenya" / RELEASE,
         RELEASE,
     )
     monkeypatch.setenv("MODEL_CACHE_DIR", str(cache))
@@ -226,7 +226,7 @@ def test_lbw_whole_pregnancy_reads_months_and_periods(client) -> None:
         "P",
     )
     assert body["baseline_period"] == "1981–2010"
-    assert body["source_uri"].endswith(f"/kenya/outlook/{RELEASE}/lbw/kajiado.json")
+    assert body["source_uri"].endswith(f"/kenya/{RELEASE}/lbw/kajiado.json")
     assert len(body["months"]) == 12
     assert body["months"][0]["parts"][0]["value_percent"] == 10.0
     baseline, future = body["period_summary"]

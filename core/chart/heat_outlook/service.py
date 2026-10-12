@@ -1,7 +1,7 @@
 """Read the published Kenya tables and apply the modeller's display rules.
 
 The files are produced by ``publish.py`` and mirrored from the model bucket
-into ``MODEL_CACHE_DIR/kenya/outlook/<release>/``. This module only filters
+into ``MODEL_CACHE_DIR/kenya/<release>/``. This module only filters
 them; no model is evaluated. The display rules come from the developer guides
 of the LBW and under-five packages and are applied here, not in the UI.
 """
@@ -84,7 +84,7 @@ def outlook_release() -> str:
 
 
 def outlook_dir(release: str | None = None) -> Path:
-    return model_cache_dir() / "kenya" / "outlook" / (release or outlook_release())
+    return model_cache_dir() / "kenya" / (release or outlook_release())
 
 
 def county_slug(name: str) -> str:
@@ -229,7 +229,7 @@ def load_outlook(
         level=document["level"],
         outcome=outcome,
         release=release,
-        source_uri=f"{MODEL_BUCKET_URI}/kenya/outlook/{release}/{outcome}/{slug}.json",
+        source_uri=f"{MODEL_BUCKET_URI}/kenya/{release}/{outcome}/{slug}.json",
         baseline_period=_period_label(baseline),
         reference_note=_reference_note(document, baseline),
         scenarios=[
