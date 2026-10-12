@@ -24,9 +24,7 @@ export const SECTION_COPY: Record<string, SectionCopy> = {
 };
 
 export function sectionCopy(label: string): SectionCopy {
-  return (
-    SECTION_COPY[label] ?? { kicker: label.toUpperCase(), note: "" }
-  );
+  return SECTION_COPY[label] ?? { kicker: label.toUpperCase(), note: "" };
 }
 
 /** Countries with their own section; everything else falls into Global. */

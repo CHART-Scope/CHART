@@ -169,7 +169,6 @@
 
 .temperaturePanel,
 .modelInput,
-.output,
 .record,
 .waiting,
 .running,
@@ -221,7 +220,6 @@
 .monthTopline small,
 .month > small,
 .month p,
-.resultDetails dt,
 .record dt {
   color: var(--color-text-muted);
   font-size: var(--fs-caption);
@@ -323,122 +321,6 @@
   color: rgba(255, 255, 255, 0.66);
   font-size: var(--fs-caption);
   line-height: 1.55;
-}
-
-.output {
-  margin-bottom: var(--space-4);
-  border-color: var(--color-charcoal);
-}
-
-.resultLayout {
-  display: grid;
-  grid-template-columns: minmax(230px, 0.75fr) minmax(0, 1.4fr);
-  overflow: hidden;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-}
-
-.signal {
-  display: grid;
-  align-content: center;
-  padding: var(--space-6);
-  background: var(--surface-inverse);
-}
-
-.signal span {
-  color: var(--color-lime);
-  font-size: var(--fs-caption);
-  font-weight: 500;
-}
-
-.signal strong {
-  margin: var(--space-2) 0;
-  color: var(--color-white);
-  font-family: var(--font-mono);
-  font-size: 38px;
-  font-weight: 500;
-}
-
-.signal p {
-  color: rgba(255, 255, 255, 0.68);
-  font-size: var(--fs-caption);
-  line-height: 1.5;
-}
-
-.resultDetails {
-  display: grid;
-}
-
-.resultDetails dl {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding: var(--space-5);
-}
-
-.resultDetails dl > div {
-  display: grid;
-  gap: var(--space-1);
-  padding: 0 var(--space-4);
-  border-right: 1px solid var(--color-grey-light);
-}
-
-.resultDetails dl > div:first-child {
-  padding-left: 0;
-}
-
-.resultDetails dl > div:last-child {
-  padding-right: 0;
-  border-right: 0;
-}
-
-.resultDetails dd {
-  color: var(--color-charcoal);
-  font-family: var(--font-mono);
-  font-size: var(--fs-body-lg);
-  font-weight: 500;
-}
-
-.resultDetails > p {
-  padding: var(--space-4) var(--space-5);
-  border-top: 1px solid var(--color-grey-light);
-  color: var(--color-success);
-  font-size: var(--fs-caption);
-  line-height: 1.55;
-}
-
-.resultDetails > p[data-uncertain="true"] {
-  color: var(--color-amber);
-}
-
-.guide {
-  display: flex;
-  gap: var(--space-4);
-  align-items: center;
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-grey-light);
-  color: var(--color-charcoal);
-  font-size: var(--fs-caption);
-  flex-wrap: wrap;
-}
-
-.guide strong {
-  font-weight: 500;
-}
-
-.guide small {
-  flex-basis: 100%;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-}
-
-.warning {
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-grey-light);
-  color: var(--color-amber);
-  font-size: var(--fs-caption);
-  line-height: 1.5;
 }
 
 .record dl {
@@ -607,38 +489,19 @@
 }
 
 @media (max-width: 900px) {
-  .inputGrid,
-  .resultLayout {
+  .inputGrid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 720px) {
   .months,
-  .resultDetails dl,
   .record dl {
     grid-template-columns: 1fr;
   }
 
   .month p {
     min-height: 0;
-  }
-
-  .resultDetails dl {
-    gap: var(--space-3);
-  }
-
-  .resultDetails dl > div,
-  .resultDetails dl > div:first-child,
-  .resultDetails dl > div:last-child {
-    padding: 0 0 var(--space-3);
-    border-right: 0;
-    border-bottom: 1px solid var(--color-grey-light);
-  }
-
-  .resultDetails dl > div:last-child {
-    padding-bottom: 0;
-    border-bottom: 0;
   }
 }
 

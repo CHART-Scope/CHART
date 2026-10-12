@@ -55,14 +55,20 @@ score_dlnm_parameters <- function(
 
   on_support <- all(profiles >= support[1] & profiles <= support[2]) &&
     ref_temp >= support[1] && ref_temp <= support[2]
+  # Beyond the temperatures a block was fitted on the spline is extrapolated
+  # and can bend either way. The modellers' rule is to hold the exposure at the
+  # edge of what was studied, so a month hotter than the hottest studied scores
+  # as the hottest studied. `on_support` above still reports the raw inputs.
+  scored <- pmin(pmax(profiles, support[1]), support[2])
+  ref_scored <- min(max(ref_temp, support[1]), support[2])
   cb_new <- suppressWarnings(dlnm::crossbasis(
-    profiles,
+    scored,
     lag = basis$lag,
     argvar = basis$argvar,
     arglag = basis$arglag
   ))
   cb_ref <- dlnm::crossbasis(
-    matrix(rep(ref_temp, expected_values), 1),
+    matrix(rep(ref_scored, expected_values), 1),
     lag = basis$lag,
     argvar = basis$argvar,
     arglag = basis$arglag
@@ -107,7 +113,7 @@ score_dlnm_parameters <- function(
     warning = if (on_support) "" else paste0(
       "At least one input or the reference temperature is outside this model block's ",
       sprintf(
-        "training range (%.2f to %.2f C). This is an extrapolated association.",
+        "training range (%.2f to %.2f C), so it was scored at the nearest edge of that range.",
         support[1], support[2]
       )
     ),

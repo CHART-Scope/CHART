@@ -9,7 +9,7 @@ import { PrecisionInfoModal } from "@/components/PrecisionInfoModal";
 import { precisionFromCi, type PrecisionLevel } from "@/lib/precision";
 
 import styles from "./HeatLbwLinkPanel.module.css";
-import { affectedPercentFromOddsRatio, relativeOddsChangePercent } from "./oddsRatio";
+import { affectedPercentFromOddsRatio } from "./oddsRatio";
 import { DemoProvenanceCard } from "./DemoProvenanceCard"; // DEMO-ONLY
 import { MonthYearPicker } from "./MonthYearPicker";
 import { PreparationProgress } from "./PreparationProgress";
@@ -46,7 +46,6 @@ type Props = {
    * what-if or batch prediction resolves.
    */
   previewPrediction?: {
-    percent: number;
     ci95Low: number;
     ci95High: number;
     /** Populate to exercise the OR-dependent branches of the stat sentence
@@ -133,7 +132,6 @@ export function HeatLbwLinkPanel({
   );
 
   const activePrediction: {
-    percent: number;
     /** AF (individual-level attributable fraction among the exposed) —
      * shown as a small optional line beneath the main odds sentence when
      * OR > 1. `null` if no OR is available (preview cards). */
@@ -144,11 +142,6 @@ export function HeatLbwLinkPanel({
     ci95High: number | null;
   } | null = monthPrediction
     ? {
-        percent: relativeOddsChangePercent(monthPrediction.odds_ratio, {
-          temperatureC: temperature,
-          referenceTemperatureC: monthPrediction.reference_temperature_c,
-          attributableFraction: monthPrediction.attributable_fraction_policy,
-        }),
         // The stored fraction is authoritative; it is what was persisted
         // alongside this odds ratio rather than re-derived here.
         afPercent: monthPrediction.attributable_fraction_milli / 10,
@@ -159,7 +152,6 @@ export function HeatLbwLinkPanel({
       }
     : previewPrediction
       ? {
-          percent: previewPrediction.percent,
           afPercent:
             typeof previewPrediction.oddsRatio === "number"
               ? affectedPercentFromOddsRatio(previewPrediction.oddsRatio)
@@ -193,34 +185,40 @@ export function HeatLbwLinkPanel({
   const attributedPercent = Math.round(activePrediction?.afPercent ?? 0);
   const hasAttributableCases = (activePrediction?.afPercent ?? 0) > 0;
 
+  // What the model actually scored: the month and the two before it, or every
+  // day of the month on its own trailing days. Showing only the month's mean
+  // left a hot month with no attributable cases looking like an error, when
+  // the odds ratio had been pulled down by the months before it.
+  const scored = scoredExposure(
+    selectedMonth,
+    monthPrediction?.exposure_temperatures_c,
+    monthPrediction?.exposure_dates,
+  );
+  const warmestC = scored?.warmestC ?? temperature;
+
   // Why a month attributes nothing. Without this the card stated "no
-  // attributable cases" directly above a provenance row reading "Odds ratio
-  // 1.332", which reads as a contradiction: an odds ratio above 1 plainly
-  // means elevated risk. Both statements are true - the elevated odds sit on
-  // the cool side of the fitted curve, and a heat measure does not attribute
-  // excess below its own reference - but the card has to say so.
+  // attributable cases" beside an odds ratio in the details, which reads as a
+  // contradiction. Judged on the whole window, as the stored figure is.
   const referenceC = asFiniteNumber(activePrediction?.referenceTemperatureC);
   const oddsRatio = asFiniteNumber(activePrediction?.oddsRatio);
+  const ciLow = asFiniteNumber(activePrediction?.ci95Low);
+  const ciHigh = asFiniteNumber(activePrediction?.ci95High);
+  const span = scored?.span ?? "this month";
   const zeroReason =
     hasAttributableCases || !showingRealResult
       ? null
-      : temperature !== null && referenceC !== null && temperature < referenceC
-        ? oddsRatio !== null && oddsRatio > 1
-          ? `: this month is cooler than the ${referenceC.toFixed(1)}°C reference, so its raised odds ratio of ${oddsRatio.toFixed(2)} sits on the cool side of the curve and is not attributed to heat`
-          : `: this month is cooler than the ${referenceC.toFixed(1)}°C reference`
+      : warmestC !== null && referenceC !== null && warmestC < referenceC
+        ? `: ${span} stayed below the ${referenceC.toFixed(1)}°C reference`
         : oddsRatio !== null && oddsRatio <= 1
-          ? temperature !== null &&
-            referenceC !== null &&
-            temperature > referenceC &&
-            oddsRatio < 1
-            ? /* A hot month scoring at or below 1 is not the model saying heat
-                 is harmless here. It is this block's fitted curve turning
-                 downward above its own reference, which is a property of the
-                 fit rather than a finding about the month, and several blocks
-                 do it well inside their training range. Saying "no excess
-                 risk" would report that artefact as reassurance. */
-              `: the fitted curve for this area turns downward above its ${referenceC.toFixed(1)}°C reference, so it attributes no excess at ${temperature.toFixed(1)}°C (odds ratio ${oddsRatio.toFixed(2)}) — the model cannot support a heat estimate for this month`
-            : `: at this temperature the model estimates no excess risk (odds ratio ${oddsRatio.toFixed(2)})`
+          ? `: over ${span} the model finds no extra risk (odds ratio ${oddsRatio.toFixed(2)}${
+              ciLow !== null && ciHigh !== null
+                ? `, range ${ciLow.toFixed(2)}–${ciHigh.toFixed(2)}`
+                : ""
+            })${
+              ciLow !== null && ciHigh !== null && ciLow < 1 && ciHigh > 1
+                ? ", and that range is too wide to tell either way"
+                : ""
+            }`
           : null;
 
   // Whether the stored result was extrapolated past what the block was fitted
@@ -341,6 +339,7 @@ export function HeatLbwLinkPanel({
                   )}
                   {zeroReason ?? (reference ? <>, {reference}</> : null)}.
                 </p>
+                {scored ? <p className={styles.windowNote}>{scored.note}</p> : null}
                 {offTrainingSupport ? (
                   <p className={styles.modelScopeNote} role="note">
                     This month sits outside the temperatures this area&rsquo;s model was
@@ -415,6 +414,7 @@ export function HeatLbwLinkPanel({
         <summary>Data and model details</summary>
         <DemoProvenanceCard
           month={selectedMonth}
+          outcome={outcome}
           entry={entry ?? null}
           areaBbox={monthly.data?.area_bbox ?? null}
         />
@@ -449,6 +449,43 @@ function referenceClause(referenceC: unknown, kind: string | null): string | nul
   return kind === "mmt"
     ? `given the minimum mortality temperature of ${value}`
     : `compared to a reference temperature of ${value}`;
+}
+
+/** What a prediction was scored on, in words. The API lists the values newest
+ * first: three monthly means for a monthly model, or the month's days plus
+ * their lead-in for a daily one (which also sends their dates). */
+function scoredExposure(
+  month: string,
+  temperatures: readonly number[] | undefined,
+  dates: readonly string[] | undefined,
+): { note: string; span: string; warmestC: number } | null {
+  if (!month || !temperatures?.length) return null;
+  if (!temperatures.every((value) => Number.isFinite(value))) return null;
+  const warmestC = Math.max(...temperatures);
+  const [year, monthIndex] = month.split("-").map(Number);
+  const monthName = (offset: number, style: "short" | "long") =>
+    new Intl.DateTimeFormat("en", { month: style, timeZone: "UTC" }).format(
+      new Date(Date.UTC(year, monthIndex - 1 - offset, 1)),
+    );
+
+  if (dates?.length === temperatures.length) {
+    const daysInMonth = new Date(Date.UTC(year, monthIndex, 0)).getUTCDate();
+    const lead = temperatures.length - daysInMonth + 1;
+    return {
+      note: `Calculated from each day of ${monthName(0, "long")}, each scored on the ${lead} days ending that day: daily maximum ${Math.min(...temperatures).toFixed(1)}–${warmestC.toFixed(1)}°C`,
+      span: "the days it was calculated from",
+      warmestC,
+    };
+  }
+  if (temperatures.length !== 3) return null;
+  const oldestFirst = [...temperatures].reverse();
+  return {
+    note: `Calculated from ${monthName(2, "short")}–${monthName(0, "short")}: ${oldestFirst
+      .map((value) => `${value.toFixed(1)}°C`)
+      .join(", ")}`,
+    span: "the months it was calculated from",
+    warmestC,
+  };
 }
 
 /** Narrow an untrusted payload value to a usable number. */

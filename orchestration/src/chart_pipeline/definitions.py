@@ -181,9 +181,15 @@ def ensure_climate_inputs(
                         planning_date=date.fromisoformat(config.planning_date),
                         source_as_of=source_as_of,
                         use_fixture=config.use_fixture,
-                        force_full_window=(
-                            error.code == "CLIMATE_WINDOW_GRAIN_MISMATCH"
-                        ),
+                        # Monthly selection cannot see a gap in the daily
+                        # series a daily model reads (monthly means can exist
+                        # without their days), so either case pulls the whole
+                        # window again rather than "nothing missing".
+                        force_full_window=error.code
+                        in {
+                            "CLIMATE_WINDOW_GRAIN_MISMATCH",
+                            "CLIMATE_DAILY_DATA_NOT_READY",
+                        },
                         projection_scenario=config.projection_scenario,
                         projection_period=config.projection_period,
                     )

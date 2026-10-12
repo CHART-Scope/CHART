@@ -26,6 +26,28 @@ import styles from "./DemoProvenanceCard.module.css";
 const CDS_DATASET = "reanalysis-era5-single-levels";
 const CDS_VARIABLE = "2m_temperature";
 
+/** The sample a fitted block stands on, in the outcome's own terms: births
+ * (and how many were low birth weight) for LBW, deaths for a mortality
+ * model, whose case-crossover design counts each death as its own case.
+ * Null when the model sent no count, so the row is left out rather than
+ * saying "not reported". */
+function sampleText(
+  outcome: string,
+  prediction: { n_training?: number | null; n_events?: number | null },
+): string | null {
+  const counted = (value: number | null | undefined) =>
+    typeof value === "number" && value > 0 ? value.toLocaleString() : null;
+  const births = counted(prediction.n_training);
+  const events = counted(prediction.n_events);
+  if (outcome === "lbw") {
+    if (!births) return null;
+    return events
+      ? `${births} births, ${events} with low birth weight`
+      : `${births} births`;
+  }
+  return events ? `${events} deaths` : null;
+}
+
 function formatMonth(month: string): string {
   if (!month) return "—";
   return new Intl.DateTimeFormat("en", {
@@ -55,10 +77,12 @@ function artifactHref(uri: string): string | null {
 
 export function DemoProvenanceCard({
   month,
+  outcome,
   entry,
   areaBbox = null,
 }: {
   month: string;
+  outcome: string;
   entry: MonthlyRiskValues | null;
   areaBbox?: AreaBoundingBox | null;
 }) {
@@ -97,12 +121,29 @@ export function DemoProvenanceCard({
                       return different answers because their earlier months
                       differ - without this row that looks like a bug. */}
                   <dd>
-                    {exposure.map((value) => `${value.toFixed(1)}°C`).join(" · ")}
-                    <span className={styles.hint}>
-                      {dates.length === exposure.length
-                        ? " (selected day and the days before)"
-                        : " (selected month and the two before)"}
-                    </span>
+                    {dates.length === exposure.length ? (
+                      // A daily model reads the whole month plus its lead-in,
+                      // ~34 values; the span and range say it, the list
+                      // would not fit.
+                      <>
+                        {exposure.length} daily maxima,{" "}
+                        {Math.min(...exposure).toFixed(1)}–
+                        {Math.max(...exposure).toFixed(1)}°C
+                        <span className={styles.hint}>
+                          {" "}
+                          ({dates.at(-1)} to {dates[0]}, each day scored on the days
+                          ending it)
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {exposure.map((value) => `${value.toFixed(1)}°C`).join(" · ")}
+                        <span className={styles.hint}>
+                          {" "}
+                          (selected month and the two before)
+                        </span>
+                      </>
+                    )}
                   </dd>
                 </>
               ) : null}
@@ -199,22 +240,12 @@ export function DemoProvenanceCard({
                   </dd>
                 </>
               ) : null}
-              {prediction.n_training ? (
+              {/* The sample the estimate stands on: a wide interval reads
+                  very differently beside 40 deaths than 4,000 births. */}
+              {sampleText(outcome, prediction) ? (
                 <>
-                  <dt>Fitted sample</dt>
-                  <dd>{prediction.n_training.toLocaleString()} observations</dd>
-                </>
-              ) : null}
-              {prediction.n_subjects ? (
-                <>
-                  <dt>Subjects</dt>
-                  <dd>{prediction.n_subjects.toLocaleString()}</dd>
-                </>
-              ) : null}
-              {prediction.n_events != null ? (
-                <>
-                  <dt>Events</dt>
-                  <dd>{prediction.n_events.toLocaleString()}</dd>
+                  <dt>Sample</dt>
+                  <dd>{sampleText(outcome, prediction)}</dd>
                 </>
               ) : null}
               <dt>Model reads</dt>

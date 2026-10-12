@@ -48,17 +48,13 @@ export function buildGeoData(
 ): Record<string, CountryGeo> {
   return Object.fromEntries(
     catalog.map((country) => {
-      const byCode = new Map(
-        country.places.map((place) => [place.placeCode, place]),
-      );
+      const byCode = new Map(country.places.map((place) => [place.placeCode, place]));
       const levels: CountryGeo = {};
       for (const level of [...country.levels].sort(
         (left, right) => left.sortOrder - right.sortOrder,
       )) {
         const places = country.places
-          .filter(
-            (place) => place.level === level.key && place.predictionSupported,
-          )
+          .filter((place) => place.level === level.key && place.predictionSupported)
           .sort((left, right) => left.sortOrder - right.sortOrder);
         if (places.length === 0) continue;
         const hasParents = places.some((place) => place.parentPlaceCode !== null);
@@ -79,7 +75,9 @@ export function buildGeoData(
         }
         const parentLevelKey = places
           .map((place) =>
-            place.parentPlaceCode ? byCode.get(place.parentPlaceCode)?.level : undefined,
+            place.parentPlaceCode
+              ? byCode.get(place.parentPlaceCode)?.level
+              : undefined,
           )
           .find(Boolean);
         levels[level.label] = {

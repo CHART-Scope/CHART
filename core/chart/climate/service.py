@@ -149,7 +149,7 @@ def get_planning_options(
             validated_pregnancy_windows=validated_windows,
             model_result_mode=(
                 "single_association"
-                if len(validated_windows) == 1
+                if len(validated_windows) <= 1
                 else "pregnancy_windows"
             ),
             custom_min_month=options.custom_min_month,
@@ -232,7 +232,7 @@ def score_prepared_prediction(
     climate_input_window_id: int,
     model_release_id: str,
     expected_model_sha256: str,
-    pregnancy_window: PregnancyWindow,
+    pregnancy_window: PregnancyWindow | None,
     source_as_of: datetime | None = None,
     lbw_service_url: str | None = None,
     planning_target: PlanningTarget = "month",
@@ -254,7 +254,11 @@ def score_prepared_prediction(
             raise ClimateServiceError("MODEL_RELEASE_NOT_AVAILABLE_FOR_PLACE", 409)
         if model.artifact_sha256 != expected_model_sha256:
             raise ClimateServiceError("MODEL_REQUEST_ARTIFACT_MISMATCH", 409)
-        if pregnancy_window not in model.validated_pregnancy_windows:
+        # A model fitted without pregnancy windows is scored with none.
+        if (pregnancy_window is None) != (not model.validated_pregnancy_windows) or (
+            pregnancy_window is not None
+            and pregnancy_window not in model.validated_pregnancy_windows
+        ):
             raise ClimateServiceError("MODEL_PREGNANCY_WINDOW_NOT_VALIDATED", 409)
         # A queued request is pinned to its submitted release even if a newer
         # release becomes active before scoring.
@@ -351,6 +355,9 @@ def score_prepared_prediction(
             n_subjects = association.n_subjects
             warning = association.warning
         else:
+            # The monthly three-lag runtime is fitted per pregnancy window.
+            if pregnancy_window is None:
+                raise ClimateServiceError("MODEL_PREGNANCY_WINDOW_NOT_VALIDATED", 409)
             lbw = score_lbw_model(
                 model,
                 pregnancy_window=pregnancy_window,
@@ -369,6 +376,7 @@ def score_prepared_prediction(
             model_file_used = lbw.model_file
             model_sha256_used = lbw.model_sha256
             n_training = lbw.n_training
+            n_events = lbw.n_events
             warning = lbw.warning
     except InferenceError as error:
         unavailable_errors = {

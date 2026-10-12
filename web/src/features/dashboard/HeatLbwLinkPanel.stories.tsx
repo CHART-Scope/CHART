@@ -31,7 +31,7 @@ export const Default: Story = {
         placeLabel="Madhya Pradesh"
         outcome="lbw"
         outcomeLabel="low birth weight"
-        previewPrediction={{ percent: 11, ci95Low: 0.5, ci95High: 1.5 }}
+        previewPrediction={{ ci95Low: 0.5, ci95High: 1.5 }}
       />
     </div>
   ),
@@ -47,7 +47,6 @@ export const AboveReference: Story = {
         outcome="lbw"
         outcomeLabel="low birth weight"
         previewPrediction={{
-          percent: 25,
           oddsRatio: 1.25,
           referenceTemperatureC: 27,
           ci95Low: 1.1,
@@ -70,7 +69,6 @@ export const AboveReferenceOddsBelowOne: Story = {
         outcome="lbw"
         outcomeLabel="low birth weight"
         previewPrediction={{
-          percent: -50,
           oddsRatio: 0.5,
           referenceTemperatureC: 27,
           ci95Low: 0.17,
@@ -91,7 +89,6 @@ export const BelowReference: Story = {
         outcome="lbw"
         outcomeLabel="low birth weight"
         previewPrediction={{
-          percent: 0,
           oddsRatio: 0.9,
           referenceTemperatureC: 27,
           ci95Low: 0.8,
@@ -115,7 +112,6 @@ export const NoAttributableCases: Story = {
         outcome="lbw"
         outcomeLabel="low birth weight"
         previewPrediction={{
-          percent: -44,
           oddsRatio: 0.56,
           referenceTemperatureC: 27,
           ci95Low: 0.22,
@@ -139,7 +135,6 @@ export const UnderFiveMortality: Story = {
         outcomeLabel="under-five mortality"
         figure="baby"
         previewPrediction={{
-          percent: 21,
           oddsRatio: 1.27,
           referenceTemperatureC: 28.73,
           ci95Low: 0.66,

@@ -35,6 +35,9 @@ class LbwScore:
     model_sha256: str
     warning: str | None
     n_training: int | None = None
+    # Low-birth-weight cases in the fitted block, so the card can show the
+    # sample the estimate stands on, not only its size.
+    n_events: int | None = None
     modelled_temperature_range_c: tuple[float, float] | None = None
 
 
@@ -293,6 +296,7 @@ def score_lbw(
         raise InferenceError("LBW_MODEL_RELEASE_MISMATCH")
 
     n_training = _optional_count(payload, "n_training")
+    n_events = _optional_count(payload, "n_lbw_events")
     range_raw = payload.get("modelled_temperature_range_c")
     modelled_range: tuple[float, float] | None = None
     if isinstance(range_raw, (list, tuple)) and len(range_raw) == 2:
@@ -316,6 +320,7 @@ def score_lbw(
         model_sha256=response_model_sha256.lower(),
         warning=str(payload["warning"]) if payload.get("warning") else None,
         n_training=n_training,
+        n_events=n_events,
         modelled_temperature_range_c=modelled_range,
     )
 

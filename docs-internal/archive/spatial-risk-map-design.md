@@ -15,12 +15,12 @@ percentages, temperatures, historical period, or spatial resolution.
 
 ## What the supplied files contain
 
-| File | Features | Meaning |
-| --- | ---: | --- |
-| gadm41_IND_1.json | 41 | India ADM1 features in this artifact |
-| gadm41_IND_2.json | 676 | India ADM2 features; 51 within MadhyaPradesh |
-| gadm41_KEN_1.json | 47 | Kenya counties |
-| gadm41_KEN_1 (1).json | 47 | Byte-identical copy of the other Kenya file |
+| File                  | Features | Meaning                                      |
+| --------------------- | -------: | -------------------------------------------- |
+| gadm41_IND_1.json     |       41 | India ADM1 features in this artifact         |
+| gadm41_IND_2.json     |      676 | India ADM2 features; 51 within MadhyaPradesh |
+| gadm41_KEN_1.json     |       47 | Kenya counties                               |
+| gadm41_KEN_1 (1).json |       47 | Byte-identical copy of the other Kenya file  |
 
 All four are GeoJSON FeatureCollections containing MultiPolygons, with a declared
 CRS84 coordinate system. Coordinates use longitude then latitude in degrees.
@@ -232,20 +232,24 @@ browser:
   "dataset_id": "mp-lbw-rr-2020-2100-gfdl-ssp126-monthly-v1",
   "country_code": "IN",
   "geography_id": "geo-in-madhya-pradesh",
-  "place_set": {"id": "in-mp-v1", "version": "1"},
+  "place_set": { "id": "in-mp-v1", "version": "1" },
   "outcome": "lbw",
   "metric": "relative_risk",
   "unit": "odds_ratio",
-  "period": {"start": "2020-01", "end": "2100-12", "frequency": "monthly"},
+  "period": { "start": "2020-01", "end": "2100-12", "frequency": "monthly" },
   "scenario": "ssp126",
   "climate_model": "gfdl-esm4",
   "pregnancy_window": 3,
-  "baseline": {"start": "1980", "end": "2010", "method": "same_cell_mean"},
+  "baseline": { "start": "1980", "end": "2010", "method": "same_cell_mean" },
   "model_release_id": "lbw-mp-1.0.1-compact-review",
-  "grid": {"crs": "EPSG:4326", "resolution_degrees": 0.5, "cell_id_scheme": "row_col"},
+  "grid": {
+    "crs": "EPSG:4326",
+    "resolution_degrees": 0.5,
+    "cell_id_scheme": "row_col"
+  },
   "values_uri": "...immutable artifact or API resource...",
   "values_sha256": "...",
-  "legend": {"type": "continuous", "domain": [0.7, 6.8]},
+  "legend": { "type": "continuous", "domain": [0.7, 6.8] },
   "status": "review"
 }
 ```

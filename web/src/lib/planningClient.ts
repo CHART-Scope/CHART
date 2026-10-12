@@ -315,53 +315,6 @@ function hostnameOf(url: string): string {
   }
 }
 
-export type WhatIfScore = {
-  geography_id: string;
-  temperature_c: number;
-  outcome: string;
-  area: string;
-  geography_level: string;
-  pregnancy_window: 1 | 2 | 3 | null;
-  exposure_values_c: number[];
-  tmax_lag: number[];
-  reference_temperature_c: number;
-  odds_ratio: number;
-  ci95_low: number;
-  ci95_high: number;
-  attributable_fraction_percent: number;
-  relative_odds_change_percent: number;
-  on_training_support: boolean;
-  warning: string | null;
-  n_model_rows: number | null;
-  n_training: number | null;
-  n_events: number | null;
-  n_subjects: number | null;
-  modelled_temperature_range_c: number[] | null;
-  model_version: string;
-  climate_hazard_label: string | null;
-  health_domain_label: string | null;
-  outcome_label: string | null;
-  dashboard_title: string | null;
-  population_label: string | null;
-};
-
-export async function submitWhatIfScore(
-  accessToken: string,
-  input: { geographyId: string; temperatureC: number; outcome?: string },
-  init: { signal?: AbortSignal } = {},
-) {
-  return request<WhatIfScore>("/api/chart/climate/what-if", accessToken, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      geography_id: input.geographyId,
-      temperature_c: input.temperatureC,
-      outcome: input.outcome ?? "lbw",
-    }),
-    signal: init.signal,
-  });
-}
-
 export async function submitPrediction(
   accessToken: string,
   input: {
@@ -386,12 +339,8 @@ export async function submitPrediction(
         // of the outcome the dashboard was showing, so under-five mortality
         // could never be prepared at all.
         outcome: input.outcome ?? "lbw",
-        // The state-level MP model release validates window 1 only.
-        // Divisions default to (1, 2, 3). Sending [1] keeps the state
-        // default working; when the dashboard lets the user pick a
-        // division and the API surfaces per-place validated windows,
-        // send the largest available.
-        pregnancy_windows: [1],
+        // No pregnancy window: the model decides. Under-five mortality has
+        // none, and naming one made every under-five request fail.
         planning_target: input.target,
         projection_scenario: input.scenario,
         projection_period: input.projectionPeriod,

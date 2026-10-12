@@ -17,7 +17,7 @@ form.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -29,6 +29,7 @@ from chart.health_impact.materialize import (
 )
 from chart.shared.db.models import DataLabel, PredictionResult
 
+from .daily_windows import month_days
 from .input_windows import target_months
 from .schemas import PredictResponse
 
@@ -79,20 +80,43 @@ def integrity_problem(
     actual = {item.month for item in result.climate}
     if actual != expected:
         return f"climate window {sorted(actual)} is not {sorted(expected)}"
+    return _daily_series_problem(result, valid_month)
+
+
+def _daily_series_problem(result: PredictResponse, valid_month: date) -> str | None:
+    """Why a daily model's scored series does not cover its month, if it doesn't.
+
+    The monthly check above only compares month labels, which a daily result
+    always passes. A daily result must have scored one unbroken run of days,
+    newest first, from the month's last day back past its first.
+    """
+    dates = result.prediction.exposure_dates
+    if not dates:
+        return None
+    if len(dates) != len(result.prediction.temperatures_c):
+        return "daily series has a different number of dates and values"
+    first, last = month_days(valid_month)
+    if dates[0] != last or dates[-1] > first:
+        return f"daily series {dates[-1]}..{dates[0]} does not cover {first}..{last}"
+    if any(
+        newer - older != timedelta(days=1) for newer, older in zip(dates, dates[1:])
+    ):
+        return "daily series has a gap"
     return None
 
 
-def selected_exposure_c(result: PredictResponse, valid_month: date) -> float | None:
-    """The exposure for the month being reported, at lag 0 of the model's window.
+def warmest_exposure_c(result: PredictResponse) -> float | None:
+    """The warmest temperature the model actually scored.
 
-    Needed so a cooler-than-reference month cannot report a heat-attributable
-    share. Matches how the dashboard's read path picks it.
+    The odds ratio is cumulative over everything scored - the month and the
+    two before it for a monthly model, every day of the month on its trailing
+    days for a daily one - so whether there is any heat to attribute is
+    decided over all of it. Checking only the reported month zeroed a cool
+    month that followed hot ones; checking monthly means for a daily model
+    compared them against a reference set on daily maxima.
     """
-    key = valid_month.strftime("%Y-%m")
-    return next(
-        (item.temperature_c for item in result.climate if item.month == key),
-        None,
-    )
+    scored = [value for value in result.prediction.temperatures_c if value is not None]
+    return max(scored, default=None)
 
 
 def upsert_prediction_result(
@@ -124,7 +148,7 @@ def upsert_prediction_result(
 
     fraction_milli = attributable_fraction_milli(
         prediction.odds_ratio,
-        temperature_c=selected_exposure_c(result, month_start),
+        temperature_c=warmest_exposure_c(result),
         reference_temperature_c=prediction.reference_temperature_c,
     )
 

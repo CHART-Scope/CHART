@@ -16,8 +16,10 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Why climate and health are connected",
     provider: "WHO",
-    objectives: "Short hosted Q&A establishing the basic exposure pathways between a warming climate and human health — heat, air quality, infectious disease shifts, food and water security — at an entry-level register suitable as a module opener.",
-    audience_summary: "District and county health officers, programme managers, general health workforce, community audiences",
+    objectives:
+      "Short hosted Q&A establishing the basic exposure pathways between a warming climate and human health — heat, air quality, infectious disease shifts, food and water security — at an entry-level register suitable as a module opener.",
+    audience_summary:
+      "District and county health officers, programme managers, general health workforce, community audiences",
     location_label: "Global",
     countries: [],
     languages: ["English"],
@@ -29,7 +31,11 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     embed_status: "embeddable",
     tracks: ["why-climate-and-health"],
     tags: [],
-    health_outcomes: ["Infectious & zoonotic disease", "Respiratory & air quality", "Health system capacity"],
+    health_outcomes: [
+      "Infectious & zoonotic disease",
+      "Respiratory & air quality",
+      "Health system capacity",
+    ],
     is_featured: true,
   },
   {
@@ -40,7 +46,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "What is the One Health Approach?",
     provider: "Istituto Zooprofilattico Sperimentale delle Venezie (IZSVe) & FAO",
-    objectives: "Visualizes the interconnections between human welfare, domestic and wild animal reservoirs, and ecosystem integrity to prevent emerging zoonoses.",
+    objectives:
+      "Visualizes the interconnections between human welfare, domestic and wild animal reservoirs, and ecosystem integrity to prevent emerging zoonoses.",
     audience_summary: "Entry-level practitioners, interdisciplinary teams, community",
     location_label: "Legnaro (Padua), Italy / Rome, Italy",
     countries: ["Italy"],
@@ -64,8 +71,10 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Anticipatory Action and Community Preparedness in Flood-Prone Counties",
     provider: "Kenya Red Cross Society (KRCS) & County Government of Homa Bay",
-    objectives: "Highlights how the Kenya Anticipatory Action Roadmap and local Early Action Protocols trigger early funding, community evacuations, and water sanitation supplies ahead of Lake Victoria basin flooding.",
-    audience_summary: "Disaster risk managers, county emergency planners, community health coordinators",
+    objectives:
+      "Highlights how the Kenya Anticipatory Action Roadmap and local Early Action Protocols trigger early funding, community evacuations, and water sanitation supplies ahead of Lake Victoria basin flooding.",
+    audience_summary:
+      "Disaster risk managers, county emergency planners, community health coordinators",
     location_label: "Homa Bay County, Kenya",
     countries: ["Kenya"],
     languages: ["English", "Swahili"],
@@ -88,7 +97,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Too Hot to Thrive: Heat Impacts on Maternal and Neonatal Health",
     provider: "CHAMNHA Consortium & Aga Khan University",
-    objectives: "Documents direct physiological heat stress, dehydration, and increased labor burdens among pregnant and postpartum women and neonates in Kilifi, Kenya.",
+    objectives:
+      "Documents direct physiological heat stress, dehydration, and increased labor burdens among pregnant and postpartum women and neonates in Kilifi, Kenya.",
     audience_summary: "Midwives, maternal health clinicians, community nurses",
     location_label: "Kilifi & Nairobi, Kenya",
     countries: ["Kenya"],
@@ -112,8 +122,10 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "How Does Ahmedabad's Heat Action Plan Help Deal with Climate Change?",
     provider: "Carbon Brief & Indian Institute of Public Health Gandhinagar (IIPHG)",
-    objectives: "Dr. Abhiyant Tiwari explains the operational mechanics of converting heat forecasts into municipal response, including school schedule adjustments, drinking water points, and cool roofs.",
-    audience_summary: "Local adaptation managers, urban health officers, municipal planners",
+    objectives:
+      "Dr. Abhiyant Tiwari explains the operational mechanics of converting heat forecasts into municipal response, including school schedule adjustments, drinking water points, and cool roofs.",
+    audience_summary:
+      "Local adaptation managers, urban health officers, municipal planners",
     location_label: "Gandhinagar, Gujarat, India",
     countries: ["India"],
     languages: ["English"],
@@ -136,8 +148,10 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Management of Heat Stroke (mockdrill) | लू तापघात प्रबंधन (पूर्वाभ्यास)",
     provider: "Rajasthan DMHFW",
-    objectives: "Hindi-language ward-level simulation of heat stroke response — recognition, rapid cooling, triage sequence and staff roles — usable as a rehearsal template before heat season rather than a lecture on heat illness.",
-    audience_summary: "PHC and CHC clinical staff, nursing and emergency room teams, district heat-season trainers",
+    objectives:
+      "Hindi-language ward-level simulation of heat stroke response — recognition, rapid cooling, triage sequence and staff roles — usable as a rehearsal template before heat season rather than a lecture on heat illness.",
+    audience_summary:
+      "PHC and CHC clinical staff, nursing and emergency room teams, district heat-season trainers",
     location_label: "India",
     countries: ["India"],
     languages: ["Hindi"],
@@ -160,8 +174,10 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Heat-Related Illness and Death Surveillance training",
     provider: "NPCCHH, NCDC, MoHFW",
-    objectives: "Walks through NHRIDS reporting — case definitions for heat-related illness and death, daily summer reporting formats, and portal submission workflow during the declared heat season.",
-    audience_summary: "District surveillance officers, NPCCHH state and district nodal officers, epidemiologists, hospital records and IDSP staff",
+    objectives:
+      "Walks through NHRIDS reporting — case definitions for heat-related illness and death, daily summer reporting formats, and portal submission workflow during the declared heat season.",
+    audience_summary:
+      "District surveillance officers, NPCCHH state and district nodal officers, epidemiologists, hospital records and IDSP staff",
     location_label: "India",
     countries: ["India"],
     languages: ["English"],
@@ -169,7 +185,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     duration_label: "80 min",
     format_label: "Video - training session",
     published_on: "2025-02-01",
-    access_label: "Open Access (NPCCHH / NCDC / MoHFW YouTube) — embed status unverified",
+    access_label:
+      "Open Access (NPCCHH / NCDC / MoHFW YouTube) — embed status unverified",
     embed_status: "open_unverified",
     tracks: [],
     tags: ["Heat: surveillance (NHRIDS)"],
@@ -179,13 +196,17 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "climate-change-health-equity-and-extreme-weather-across-africa",
     url: "https://www.publichealth.columbia.edu/africa-climate-health-responders-course",
-    canonical_url: "https://www.publichealth.columbia.edu/africa-climate-health-responders-course",
+    canonical_url:
+      "https://www.publichealth.columbia.edu/africa-climate-health-responders-course",
     youtube_id: null,
     kind: "toolkit",
     title: "Climate Change, Health Equity, and Extreme Weather across Africa",
-    provider: "Columbia University GCCHE & African Population and Health Research Center (APHRC)",
-    objectives: "Explores hydrometeorological extremes, inland flooding, drought-driven food insecurity, and particulate air pollution across East Africa, focusing on maternal-child vulnerability and public health leadership.",
-    audience_summary: "African health professionals, environmental health officers, climate negotiators",
+    provider:
+      "Columbia University GCCHE & African Population and Health Research Center (APHRC)",
+    objectives:
+      "Explores hydrometeorological extremes, inland flooding, drought-driven food insecurity, and particulate air pollution across East Africa, focusing on maternal-child vulnerability and public health leadership.",
+    audience_summary:
+      "African health professionals, environmental health officers, climate negotiators",
     location_label: "Nairobi, Kenya / New York, USA",
     countries: ["Kenya", "USA"],
     languages: ["English"],
@@ -197,7 +218,12 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     embed_status: "embeddable",
     tracks: ["why-climate-and-health"],
     tags: [],
-    health_outcomes: ["Maternal & newborn health", "Nutrition & food security", "Respiratory & air quality", "Mental health"],
+    health_outcomes: [
+      "Maternal & newborn health",
+      "Nutrition & food security",
+      "Respiratory & air quality",
+      "Mental health",
+    ],
     is_featured: true,
   },
   {
@@ -208,7 +234,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Climate Change and Health: An Overview of Global Threats and Responses",
     provider: "World Health Organization (WHO)",
-    objectives: "Synthesizes primary direct and indirect exposure pathways, climate-induced disease burdens, and health co-benefits generated through mitigation sectors.",
+    objectives:
+      "Synthesizes primary direct and indirect exposure pathways, climate-induced disease burdens, and health co-benefits generated through mitigation sectors.",
     audience_summary: "Public health workforce, municipal planners, students",
     location_label: "Geneva, Switzerland (Global)",
     countries: [],
@@ -232,7 +259,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Climate Change and Health: Clinical Implications and Systemic Stresses",
     provider: "JAMA Network & World Health Organization",
-    objectives: "Details clinical surges during extreme heat, facility power failures, and the imperative for redirecting climate adaptation finance toward health systems.",
+    objectives:
+      "Details clinical surges during extreme heat, facility power failures, and the imperative for redirecting climate adaptation finance toward health systems.",
     audience_summary: "Clinicians, hospital directors, health system planners",
     location_label: "Chicago, IL, USA / Global",
     countries: ["USA"],
@@ -256,7 +284,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "The Lancet Countdown on Health and Climate Change: Global Launch Debrief",
     provider: "The Lancet Countdown & Wellcome Trust",
-    objectives: "Longitudinal tracking of global heat-related mortality, food insecurity trajectories, fossil fuel health burdens, and health adaptation financing shortfalls.",
+    objectives:
+      "Longitudinal tracking of global heat-related mortality, food insecurity trajectories, fossil fuel health burdens, and health adaptation financing shortfalls.",
     audience_summary: "Academic researchers, epidemiologists, policy directors",
     location_label: "London, UK / Global",
     countries: [],
@@ -275,13 +304,16 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "health-and-climate-shaping-a-resilient-and-equitable-future",
     url: "https://www.who.int/europe/news-room/events/item/2025/02/28/default-calendar/climate-change-and-health-shaping-a-resilient-future",
-    canonical_url: "https://www.who.int/europe/news-room/events/item/2025/02/28/default-calendar/climate-change-and-health-shaping-a-resilient-future",
+    canonical_url:
+      "https://www.who.int/europe/news-room/events/item/2025/02/28/default-calendar/climate-change-and-health-shaping-a-resilient-future",
     youtube_id: null,
     kind: "toolkit",
     title: "Health and Climate: Shaping a Resilient and Equitable Future",
     provider: "WHO European Centre for Environment and Health",
-    objectives: "Outlines systemic adaptation, low-carbon healthcare operations, legislative reforms, and targeted protections for vulnerable demographics.",
-    audience_summary: "Environmental health officers, municipal authorities, health delegates",
+    objectives:
+      "Outlines systemic adaptation, low-carbon healthcare operations, legislative reforms, and targeted protections for vulnerable demographics.",
+    audience_summary:
+      "Environmental health officers, municipal authorities, health delegates",
     location_label: "Bonn, Germany / Copenhagen, Denmark",
     countries: [],
     languages: ["English"],
@@ -303,8 +335,10 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     youtube_id: "OM1i9Oo8l54",
     kind: "video",
     title: "Advancing Global Public Health through Planetary Health and One Health",
-    provider: "World Federation of Public Health Associations (WFPHA) & Planetary Health Alliance",
-    objectives: "Clarifies definitions and operational commonalities between One Health and Planetary Health paradigms across climate, biodiversity, and disease spillovers.",
+    provider:
+      "World Federation of Public Health Associations (WFPHA) & Planetary Health Alliance",
+    objectives:
+      "Clarifies definitions and operational commonalities between One Health and Planetary Health paradigms across climate, biodiversity, and disease spillovers.",
     audience_summary: "Public health faculty, environmental epidemiologists",
     location_label: "Geneva, Switzerland / Boston, MA, USA",
     countries: ["USA"],
@@ -323,13 +357,16 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "integrating-the-environment-into-one-health-the-quadripartite-vision",
     url: "https://www.who.int/news-room/events/detail/2022/11/18/default-calendar/cop27-joint-quadripartite-side-event-integrating-the-environment-into-one-health",
-    canonical_url: "https://www.who.int/news-room/events/detail/2022/11/18/default-calendar/cop27-joint-quadripartite-side-event-integrating-the-environment-into-one-health",
+    canonical_url:
+      "https://www.who.int/news-room/events/detail/2022/11/18/default-calendar/cop27-joint-quadripartite-side-event-integrating-the-environment-into-one-health",
     youtube_id: null,
     kind: "toolkit",
     title: "Integrating the Environment into One Health: The Quadripartite Vision",
     provider: "Quadripartite Alliance (UNEP, WHO, FAO, WOAH)",
-    objectives: "Focuses on Action Track 6 of the One Health Joint Plan of Action, identifying institutional mechanisms to embed ecosystem data into disease prevention.",
-    audience_summary: "Environmental regulators, veterinary authorities, public health leads",
+    objectives:
+      "Focuses on Action Track 6 of the One Health Joint Plan of Action, identifying institutional mechanisms to embed ecosystem data into disease prevention.",
+    audience_summary:
+      "Environmental regulators, veterinary authorities, public health leads",
     location_label: "Sharm El-Sheikh, Egypt (COP27)",
     countries: [],
     languages: ["English"],
@@ -352,7 +389,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "toolkit",
     title: "Cross-Sectoral Data Architecture for One Health Implementation",
     provider: "DHIS2 & Health Information Systems Programme (HISP Centre)",
-    objectives: "Demonstrates integrated digital pipelines combining event-based surveillance, livestock disease reporting, and climate variables to dissolve departmental silos.",
+    objectives:
+      "Demonstrates integrated digital pipelines combining event-based surveillance, livestock disease reporting, and climate variables to dissolve departmental silos.",
     audience_summary: "Health informaticians, surveillance officers, data architects",
     location_label: "Oslo, Norway / Global",
     countries: [],
@@ -376,7 +414,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Implementing Health in All Policies: Co-Benefits Across Sectors",
     provider: "European Observatory on Health Systems and Policies",
-    objectives: "Examines institutional alignment across healthcare, climate planning, housing, and civil infrastructure, demonstrating shared economic returns.",
+    objectives:
+      "Examines institutional alignment across healthcare, climate planning, housing, and civil infrastructure, demonstrating shared economic returns.",
     audience_summary: "Municipal executives, urban planners, budget directors",
     location_label: "Brussels, Belgium / London, UK",
     countries: [],
@@ -400,7 +439,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "toolkit",
     title: "Climate, Health, and Equity in All Policies: The California Framework",
     provider: "CivicWell & California Department of Public Health (CDPH)",
-    objectives: "Practical review of the CDPH Climate Change and Health Equity Branch collaborating with housing, transport, and energy agencies on general plan updates.",
+    objectives:
+      "Practical review of the CDPH Climate Change and Health Equity Branch collaborating with housing, transport, and energy agencies on general plan updates.",
     audience_summary: "State/local policymakers, regional planning councils",
     location_label: "Sacramento, CA, USA",
     countries: ["USA"],
@@ -424,7 +464,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "toolkit",
     title: "Operationalizing Intersectoral Public Health Strategies",
     provider: "National Collaborating Centre for Healthy Public Policy (NCCHPP Canada)",
-    objectives: "Features public health leaders detailing lessons learned in cross-departmental coalition building, communication strategies, and health advocacy.",
+    objectives:
+      "Features public health leaders detailing lessons learned in cross-departmental coalition building, communication strategies, and health advocacy.",
     audience_summary: "Local public health practitioners, municipal leads",
     location_label: "Montreal / Saskatoon, Canada",
     countries: [],
@@ -448,7 +489,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Health in All Policies: A Guide for State and Local Governments",
     provider: "American Public Health Association (APHA) & Public Health Institute",
-    objectives: "Translates published HiAP guidance into concrete institutional mechanisms, including health impact assessments, interagency agreements, and zoning reforms.",
+    objectives:
+      "Translates published HiAP guidance into concrete institutional mechanisms, including health impact assessments, interagency agreements, and zoning reforms.",
     audience_summary: "Agency heads, intersectoral task forces, policy analysts",
     location_label: "Washington, D.C. / Oakland, CA, USA",
     countries: ["USA"],
@@ -467,13 +509,16 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "from-vulnerability-indexing-to-evidence-based-heat-interventions",
     url: "https://sph.washington.edu/news-events/sph-blog/protecting-health-changing-climate",
-    canonical_url: "https://sph.washington.edu/news-events/sph-blog/protecting-health-changing-climate",
+    canonical_url:
+      "https://sph.washington.edu/news-events/sph-blog/protecting-health-changing-climate",
     youtube_id: null,
     kind: "toolkit",
     title: "From Vulnerability Indexing to Evidence-Based Heat Interventions",
     provider: "UW School of Public Health & Public Health – Seattle & King County",
-    objectives: "Reviews the Auburn, WA pilot showing how CHaRT vulnerability indicators (e.g., mobile homes, poverty) guided cooling resources and utility energy-burden relief.",
-    audience_summary: "Municipal resilience officers, electric utilities, program managers",
+    objectives:
+      "Reviews the Auburn, WA pilot showing how CHaRT vulnerability indicators (e.g., mobile homes, poverty) guided cooling resources and utility energy-burden relief.",
+    audience_summary:
+      "Municipal resilience officers, electric utilities, program managers",
     location_label: "Auburn & Seattle, WA, USA",
     countries: ["USA"],
     languages: ["English"],
@@ -496,7 +541,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Specialized Training Module: Anticipatory Action and Anticipatory Finance",
     provider: "United Nations Office for Disaster Risk Reduction (UNDRR)",
-    objectives: "Explains the shift from reactive disaster response to early intervention using impact-based forecasting, pre-agreed triggers, and pre-arranged financing pools.",
+    objectives:
+      "Explains the shift from reactive disaster response to early intervention using impact-based forecasting, pre-agreed triggers, and pre-arranged financing pools.",
     audience_summary: "Disaster risk coordinators, humanitarian finance officers",
     location_label: "Geneva, Switzerland / Global",
     countries: [],
@@ -520,8 +566,10 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "The Fundamentals of Anticipatory Action: Design, Triggers, and Timing",
     provider: "Anticipation Hub & German Red Cross",
-    objectives: "In-depth workshop covering trigger threshold calibration, standard operating procedures, early action design, and delineating response transitions.",
-    audience_summary: "Operational planners, national meteorological agencies, Red Cross delegates",
+    objectives:
+      "In-depth workshop covering trigger threshold calibration, standard operating procedures, early action design, and delineating response transitions.",
+    audience_summary:
+      "Operational planners, national meteorological agencies, Red Cross delegates",
     location_label: "Berlin, Germany / Geneva, Switzerland",
     countries: [],
     languages: ["English"],
@@ -544,7 +592,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Forecast-Based Financing: Mechanics of Early Action Protocols",
     provider: "IFRC & Red Cross Red Crescent Climate Centre",
-    objectives: "Visualizes how risk maps and weather forecasts trigger automated funding disbursements and Early Action Protocols prior to hazard impact.",
+    objectives:
+      "Visualizes how risk maps and weather forecasts trigger automated funding disbursements and Early Action Protocols prior to hazard impact.",
     audience_summary: "Field operatives, disaster management committees, public",
     location_label: "Geneva, Switzerland / The Hague, Netherlands",
     countries: [],
@@ -568,7 +617,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Anticipatory Action and the Grand Bargain: Unlocking Global Finance",
     provider: "Grand Bargain Secretariat & Anticipation Hub",
-    objectives: "Analyzes donor mechanisms, institutional funding bottlenecks, and strategies for scaling pre-arranged finance across national disaster frameworks.",
+    objectives:
+      "Analyzes donor mechanisms, institutional funding bottlenecks, and strategies for scaling pre-arranged finance across national disaster frameworks.",
     audience_summary: "Multilateral donors, budget analysts, policy advocates",
     location_label: "Geneva, Switzerland (HNPW)",
     countries: [],
@@ -592,7 +642,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Climate Disruption, Maternal Vulnerability, and Obstetric Care",
     provider: "International Federation of Gynecology and Obstetrics (FIGO)",
-    objectives: "Examines clinical evidence linking extreme heat and air pollution to preterm delivery, preeclampsia, and stillbirth, offering adaptive clinical care pathways.",
+    objectives:
+      "Examines clinical evidence linking extreme heat and air pollution to preterm delivery, preeclampsia, and stillbirth, offering adaptive clinical care pathways.",
     audience_summary: "Obstetricians, gynecologists, maternal-fetal medicine teams",
     location_label: "London, UK / Washington, D.C.",
     countries: [],
@@ -605,18 +656,24 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     embed_status: "embeddable",
     tracks: ["heat-and-pregnancy"],
     tags: [],
-    health_outcomes: ["Maternal & newborn health", "Heat-related illness", "Respiratory & air quality"],
+    health_outcomes: [
+      "Maternal & newborn health",
+      "Heat-related illness",
+      "Respiratory & air quality",
+    ],
     is_featured: false,
   },
   {
     slug: "public-health-practices-to-support-community-recovery-post-flooding",
     url: "https://ncceh.ca/resources/subject-guides/innovative-public-health-practices-reduce-impacts-flooding-community",
-    canonical_url: "https://ncceh.ca/resources/subject-guides/innovative-public-health-practices-reduce-impacts-flooding-community",
+    canonical_url:
+      "https://ncceh.ca/resources/subject-guides/innovative-public-health-practices-reduce-impacts-flooding-community",
     youtube_id: null,
     kind: "toolkit",
     title: "Public Health Practices to Support Community Recovery Post-Flooding",
     provider: "NCCEH Canada & PolicyWise for Children & Families",
-    objectives: "Focuses on community-level flood recovery, indoor mold remediation, private well disinfection, and managing long-term psychosocial trauma and anxiety.",
+    objectives:
+      "Focuses on community-level flood recovery, indoor mold remediation, private well disinfection, and managing long-term psychosocial trauma and anxiety.",
     audience_summary: "Environmental health officers, municipal recovery teams",
     location_label: "Vancouver & Edmonton, Canada",
     countries: [],
@@ -635,12 +692,14 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "public-health-impacts-of-compound-drought-and-heatwaves",
     url: "https://ww2.arb.ca.gov/resources/documents/climate-action-team-public-health-workgroup-meetings",
-    canonical_url: "https://ww2.arb.ca.gov/resources/documents/climate-action-team-public-health-workgroup-meetings",
+    canonical_url:
+      "https://ww2.arb.ca.gov/resources/documents/climate-action-team-public-health-workgroup-meetings",
     youtube_id: null,
     kind: "toolkit",
     title: "Public Health Impacts of Compound Drought and Heatwaves",
     provider: "California Department of Public Health (CDPH) & CARB",
-    objectives: "Evaluates public health hazards from concurrent drought and heat, such as elevated particulate dust ($PM_{10}$/$PM_{2.5}$), water scarcity, and interagency response plans.",
+    objectives:
+      "Evaluates public health hazards from concurrent drought and heat, such as elevated particulate dust ($PM_{10}$/$PM_{2.5}$), water scarcity, and interagency response plans.",
     audience_summary: "Epidemiologists, air quality specialists, water regulators",
     location_label: "Sacramento, CA, USA",
     countries: ["USA"],
@@ -664,7 +723,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Julia Gillard launches the Lancet Countdown 2025",
     provider: "The Lancet Countdown / Wellcome Trust",
-    objectives: "Short launch announcement framing the 2025 Lancet Countdown findings. Cited in the source doc (ref 8) as the basis for the Lancet Countdown row, but not the video actually linked in that row.",
+    objectives:
+      "Short launch announcement framing the 2025 Lancet Countdown findings. Cited in the source doc (ref 8) as the basis for the Lancet Countdown row, but not the video actually linked in that row.",
     audience_summary: "General audiences, advocacy",
     location_label: "Global",
     countries: [],
@@ -686,9 +746,11 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.youtube.com/watch?v=c7VYwFkLPSE",
     youtube_id: "c7VYwFkLPSE",
     kind: "video",
-    title: "The 2025 Global Report of the Lancet Countdown on Health and Climate Change",
+    title:
+      "The 2025 Global Report of the Lancet Countdown on Health and Climate Change",
     provider: "The Lancet Countdown",
-    objectives: "Full presentation of the 2025 global report indicators. Complements (and is more current than) the 2024 launch debrief already in the sheet.",
+    objectives:
+      "Full presentation of the 2025 global report indicators. Complements (and is more current than) the 2024 launch debrief already in the sheet.",
     audience_summary: "Academic researchers, epidemiologists, policy directors",
     location_label: "Global",
     countries: [],
@@ -712,7 +774,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "The role of the health sector in tackling climate change (SDG13)",
     provider: "unknown - needs verification",
-    objectives: "Positions the health sector's own mitigation and advocacy role within SDG13. Cited in the source doc (ref 24) but not mapped to any curriculum row.",
+    objectives:
+      "Positions the health sector's own mitigation and advocacy role within SDG13. Cited in the source doc (ref 24) but not mapped to any curriculum row.",
     audience_summary: "Health system leaders, policy analysts",
     location_label: "Global",
     countries: [],
@@ -736,7 +799,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Anticipatory action: an introduction",
     provider: "Anticipation Hub (to verify)",
-    objectives: "Entry-level introduction to anticipatory action. Likely the better short-form opener for this module than the 75-min workshop currently listed.",
+    objectives:
+      "Entry-level introduction to anticipatory action. Likely the better short-form opener for this module than the 75-min workshop currently listed.",
     audience_summary: "Disaster risk coordinators, humanitarian staff",
     location_label: "Global",
     countries: [],
@@ -760,7 +824,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Anticipatory action: How the Pacific stays one step ahead of disasters",
     provider: "unknown - needs verification",
-    objectives: "Regional case study of anticipatory action in practice - the only non-Global/non-Northern example available for this module.",
+    objectives:
+      "Regional case study of anticipatory action in practice - the only non-Global/non-Northern example available for this module.",
     audience_summary: "National disaster agencies, programme managers",
     location_label: "Pacific / LMIC context",
     countries: [],
@@ -782,9 +847,11 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.youtube.com/watch?v=3dC0UNlpkYs",
     youtube_id: "3dC0UNlpkYs",
     kind: "video",
-    title: "Professor Jane Hirst: Protecting pregnant women and babies from extreme heat",
+    title:
+      "Professor Jane Hirst: Protecting pregnant women and babies from extreme heat",
     provider: "unknown - needs verification",
-    objectives: "Clinical expert perspective on heat risk in pregnancy and protective care. Cited in the source doc (ref 49) but not mapped to a curriculum row.",
+    objectives:
+      "Clinical expert perspective on heat risk in pregnancy and protective care. Cited in the source doc (ref 49) but not mapped to a curriculum row.",
     audience_summary: "Obstetricians, midwives, maternal health programme staff",
     location_label: "Global",
     countries: [],
@@ -806,9 +873,11 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.youtube.com/watch?v=oU8B-oWCBZE",
     youtube_id: "oU8B-oWCBZE",
     kind: "video",
-    title: "Climate Heat Maternal and Neonatal Health Africa (CHAMNHA) - project overview",
+    title:
+      "Climate Heat Maternal and Neonatal Health Africa (CHAMNHA) - project overview",
     provider: "CHAMNHA Consortium / LSHTM",
-    objectives: "Consortium overview of the CHAMNHA evidence base. Sits behind the 'Too Hot to Thrive' documentary already in the sheet and gives the research framing.",
+    objectives:
+      "Consortium overview of the CHAMNHA evidence base. Sits behind the 'Too Hot to Thrive' documentary already in the sheet and gives the research framing.",
     audience_summary: "Researchers, maternal health clinicians, community nurses",
     location_label: "Africa (Kenya / Burkina Faso)",
     countries: ["Kenya"],
@@ -832,8 +901,10 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Ahmedabad’s Heat Action Plan: The First Early Warning System in South Asia",
     provider: "Natural Resources Defense Council (NRDC) & IIPHG",
-    objectives: "Documents South Asia's first municipal Heat Action Plan after the deadly 2010 heatwave, demonstrating color-coded warnings, cool roof rollouts, and hospital surge management.",
-    audience_summary: "Municipal commissioners, disaster management authorities, public health directors",
+    objectives:
+      "Documents South Asia's first municipal Heat Action Plan after the deadly 2010 heatwave, demonstrating color-coded warnings, cool roof rollouts, and hospital surge management.",
+    audience_summary:
+      "Municipal commissioners, disaster management authorities, public health directors",
     location_label: "Ahmedabad, Gujarat, India",
     countries: ["India"],
     languages: ["English", "Hindi"],
@@ -851,13 +922,17 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "protecting-workers-in-heat-action-plans-perspectives-from-ahmedabad-and-boston",
     url: "https://mittalsouthasiainstitute.harvard.edu/2025/09/from-boston-to-ahmedabad-experts-share-strategies-on-heat-work-and-resilience/",
-    canonical_url: "https://mittalsouthasiainstitute.harvard.edu/2025/09/from-boston-to-ahmedabad-experts-share-strategies-on-heat-work-and-resilience/",
+    canonical_url:
+      "https://mittalsouthasiainstitute.harvard.edu/2025/09/from-boston-to-ahmedabad-experts-share-strategies-on-heat-work-and-resilience/",
     youtube_id: null,
     kind: "toolkit",
-    title: "Protecting Workers in Heat Action Plans: Perspectives from Ahmedabad and Boston",
+    title:
+      "Protecting Workers in Heat Action Plans: Perspectives from Ahmedabad and Boston",
     provider: "Harvard Mittal South Asia Institute, IIPHG, & SEWA",
-    objectives: "Connects occupational health, urban planning, and labor rights; features Dr. Dileep Mavalankar (IIPHG) and SEWA leadership on protecting women street vendors and outdoor laborers under heat stress.",
-    audience_summary: "Labor inspectors, urban planners, public health officials, informal labor advocates",
+    objectives:
+      "Connects occupational health, urban planning, and labor rights; features Dr. Dileep Mavalankar (IIPHG) and SEWA leadership on protecting women street vendors and outdoor laborers under heat stress.",
+    audience_summary:
+      "Labor inspectors, urban planners, public health officials, informal labor advocates",
     location_label: "Ahmedabad, India / Cambridge, MA, USA",
     countries: ["India", "USA"],
     languages: ["English"],
@@ -879,9 +954,12 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     youtube_id: null,
     kind: "toolkit",
     title: "Rx Climate Prescriptions: Pathways for Climate Action by Indian Healthcare",
-    provider: "Public Health Foundation of India (PHFI) & Centre for Environmental Health",
-    objectives: "Details climate health vulnerabilities in India, from severe air pollution to thermal stress, and demonstrates decarbonization and climate-resilient hospital infrastructure.",
-    audience_summary: "Clinicians, hospital administrators, national health mission directors",
+    provider:
+      "Public Health Foundation of India (PHFI) & Centre for Environmental Health",
+    objectives:
+      "Details climate health vulnerabilities in India, from severe air pollution to thermal stress, and demonstrates decarbonization and climate-resilient hospital infrastructure.",
+    audience_summary:
+      "Clinicians, hospital administrators, national health mission directors",
     location_label: "New Delhi, India",
     countries: ["India"],
     languages: ["English", "Hindi"],
@@ -904,8 +982,10 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "toolkit",
     title: "Animal Health Under a Worsening Climate Crisis: One Health in Practice",
     provider: "International Livestock Research Institute (ILRI) & WorldFish",
-    objectives: "Evaluates pastoralist and agro-pastoralist communities in northern Kenya facing recurrent drought and erratic rainfall, focusing on livestock nutrition, vector shifts, and zoonotic disease control.",
-    audience_summary: "Veterinary scientists, epidemiologists, agricultural officers, One Health leads",
+    objectives:
+      "Evaluates pastoralist and agro-pastoralist communities in northern Kenya facing recurrent drought and erratic rainfall, focusing on livestock nutrition, vector shifts, and zoonotic disease control.",
+    audience_summary:
+      "Veterinary scientists, epidemiologists, agricultural officers, One Health leads",
     location_label: "Nairobi, Kenya / Global",
     countries: ["Kenya"],
     languages: ["English"],
@@ -928,8 +1008,10 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     kind: "video",
     title: "Integrated Drought Response and Climate-Smart Livelihoods in Arid Lands",
     provider: "Kenya Red Cross Society (KRCS) & IFRC",
-    objectives: "Demonstrates slow-onset drought mitigation in semi-arid Kenya, utilizing satellite forecasting for early seed distributions, water harvesting, and nutrition surveillance to prevent acute malnutrition.",
-    audience_summary: "Humanitarian officers, public health teams, rural development planners",
+    objectives:
+      "Demonstrates slow-onset drought mitigation in semi-arid Kenya, utilizing satellite forecasting for early seed distributions, water harvesting, and nutrition surveillance to prevent acute malnutrition.",
+    audience_summary:
+      "Humanitarian officers, public health teams, rural development planners",
     location_label: "Kwale / Tana River County, Kenya",
     countries: ["Kenya"],
     languages: ["English", "Swahili"],
@@ -1067,7 +1149,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "expert-answers-why-climate-change-and-health-is-a-hot-issue-tamer-rabie",
     url: "https://www.worldbank.org/en/news/video/2024/03/29/climate-change-human-health-expert-answers",
-    canonical_url: "https://www.worldbank.org/en/news/video/2024/03/29/climate-change-human-health-expert-answers",
+    canonical_url:
+      "https://www.worldbank.org/en/news/video/2024/03/29/climate-change-human-health-expert-answers",
     youtube_id: null,
     kind: "video",
     title: "Expert Answers: Why Climate Change and Health Is a Hot Issue (Tamer Rabie)",
@@ -1091,7 +1174,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "impact-of-climate-change-on-health-the-cost-of-inaction",
     url: "https://www.worldbank.org/en/news/video/2023/11/30/health-impacts-of-climate-change",
-    canonical_url: "https://www.worldbank.org/en/news/video/2023/11/30/health-impacts-of-climate-change",
+    canonical_url:
+      "https://www.worldbank.org/en/news/video/2023/11/30/health-impacts-of-climate-change",
     youtube_id: null,
     kind: "video",
     title: "Impact of Climate Change on Health: The Cost of Inaction",
@@ -1142,7 +1226,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.youtube.com/watch?v=OIEQsx_k1SE",
     youtube_id: "OIEQsx_k1SE",
     kind: "video",
-    title: "WHO Technical Webinar: GIS and risk mapping in CCH vulnerability & adaptation assessments",
+    title:
+      "WHO Technical Webinar: GIS and risk mapping in CCH vulnerability & adaptation assessments",
     provider: "WHO",
     objectives: "",
     audience_summary: "",
@@ -1166,7 +1251,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.youtube.com/watch?v=4MjwLE7UH74",
     youtube_id: "4MjwLE7UH74",
     kind: "video",
-    title: "WHO Technical Webinar: Getting started - CCH vulnerability & adaptation assessments",
+    title:
+      "WHO Technical Webinar: Getting started - CCH vulnerability & adaptation assessments",
     provider: "WHO",
     objectives: "",
     audience_summary: "",
@@ -1190,7 +1276,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.youtube.com/watch?v=vTd64mdrbEY",
     youtube_id: "vTd64mdrbEY",
     kind: "video",
-    title: "WHO Technical Webinar: Quantitative approaches for V&A - projecting future health risks",
+    title:
+      "WHO Technical Webinar: Quantitative approaches for V&A - projecting future health risks",
     provider: "WHO",
     objectives: "",
     audience_summary: "",
@@ -1214,7 +1301,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.youtube.com/watch?v=PO4bw9sOkCo",
     youtube_id: "PO4bw9sOkCo",
     kind: "video",
-    title: "WHO Technical Webinar: Accessing Adaptation Fund funding for climate change and health",
+    title:
+      "WHO Technical Webinar: Accessing Adaptation Fund funding for climate change and health",
     provider: "WHO",
     objectives: "",
     audience_summary: "",
@@ -1238,7 +1326,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.youtube.com/watch?v=BX62LK0suCI",
     youtube_id: "BX62LK0suCI",
     kind: "video",
-    title: "WHO Technical Webinar: GCF country-driven programming for the health sector, AFRO/EMRO",
+    title:
+      "WHO Technical Webinar: GCF country-driven programming for the health sector, AFRO/EMRO",
     provider: "WHO",
     objectives: "",
     audience_summary: "",
@@ -1262,7 +1351,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.youtube.com/watch?v=dxxTDdkuNSs",
     youtube_id: "dxxTDdkuNSs",
     kind: "video",
-    title: "WHO Technical Webinar: Developing a Health National Adaptation Plan - Introduction",
+    title:
+      "WHO Technical Webinar: Developing a Health National Adaptation Plan - Introduction",
     provider: "WHO",
     objectives: "",
     audience_summary: "",
@@ -1310,7 +1400,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.youtube.com/watch?v=f3ZPwsGVw6E",
     youtube_id: "f3ZPwsGVw6E",
     kind: "video",
-    title: "WHO Technical Webinar: Operational Framework for Climate Resilient and Low Carbon Health Systems",
+    title:
+      "WHO Technical Webinar: Operational Framework for Climate Resilient and Low Carbon Health Systems",
     provider: "WHO",
     objectives: "",
     audience_summary: "",
@@ -1382,7 +1473,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.youtube.com/watch?v=x6OKfa98CU4",
     youtube_id: "x6OKfa98CU4",
     kind: "video",
-    title: "WHO Technical Webinar: Climate resilient and environmentally sustainable health care facilities",
+    title:
+      "WHO Technical Webinar: Climate resilient and environmentally sustainable health care facilities",
     provider: "WHO",
     objectives: "",
     audience_summary: "",
@@ -1427,10 +1519,12 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "who-technical-webinar-series-index-slides-jamboards-timestamped-agendas",
     url: "https://www.who.int/teams/environment-climate-change-and-health/climate-change-and-health/country-support/webinars",
-    canonical_url: "https://www.who.int/teams/environment-climate-change-and-health/climate-change-and-health/country-support/webinars",
+    canonical_url:
+      "https://www.who.int/teams/environment-climate-change-and-health/climate-change-and-health/country-support/webinars",
     youtube_id: null,
     kind: "toolkit",
-    title: "WHO Technical Webinar Series index (slides, jamboards, timestamped agendas)",
+    title:
+      "WHO Technical Webinar Series index (slides, jamboards, timestamped agendas)",
     provider: "WHO",
     objectives: "",
     audience_summary: "",
@@ -1499,7 +1593,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "global-health-at-the-human-animal-ecosystem-interface",
     url: "https://www.coursera.org/learn/global-health-human-animal-ecosystem",
-    canonical_url: "https://www.coursera.org/learn/global-health-human-animal-ecosystem",
+    canonical_url:
+      "https://www.coursera.org/learn/global-health-human-animal-ecosystem",
     youtube_id: null,
     kind: "course",
     title: "Global Health at the Human-Animal-Ecosystem Interface",
@@ -1550,7 +1645,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.atachcommunity.com/resources/resource-repository/",
     youtube_id: null,
     kind: "toolkit",
-    title: "ATACH Community of Practice resource repository (incl. WHO climate information modules Pt1-5)",
+    title:
+      "ATACH Community of Practice resource repository (incl. WHO climate information modules Pt1-5)",
     provider: "WHO / ATACH",
     objectives: "",
     audience_summary: "",
@@ -1595,10 +1691,12 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "who-integrated-surveillance-and-climate-informed-health-early-warning-systems",
     url: "https://www.who.int/teams/environment-climate-change-and-health/climate-change-and-health/country-support/integrated-surveillance-and-climate-informed-health-early-warning-systems",
-    canonical_url: "https://www.who.int/teams/environment-climate-change-and-health/climate-change-and-health/country-support/integrated-surveillance-and-climate-informed-health-early-warning-systems",
+    canonical_url:
+      "https://www.who.int/teams/environment-climate-change-and-health/climate-change-and-health/country-support/integrated-surveillance-and-climate-informed-health-early-warning-systems",
     youtube_id: null,
     kind: "toolkit",
-    title: "WHO - Integrated surveillance and climate-informed health early warning systems",
+    title:
+      "WHO - Integrated surveillance and climate-informed health early warning systems",
     provider: "WHO",
     objectives: "",
     audience_summary: "",
@@ -1619,7 +1717,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "who-finance-for-health-and-climate-change",
     url: "https://www.who.int/teams/environment-climate-change-and-health/climate-change-and-health/country-support/finance-for-health-and-climate-change",
-    canonical_url: "https://www.who.int/teams/environment-climate-change-and-health/climate-change-and-health/country-support/finance-for-health-and-climate-change",
+    canonical_url:
+      "https://www.who.int/teams/environment-climate-change-and-health/climate-change-and-health/country-support/finance-for-health-and-climate-change",
     youtube_id: null,
     kind: "toolkit",
     title: "WHO - Finance for Health and Climate Change",
@@ -1691,7 +1790,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "ndma-kajiado-county-drought-early-warning-bulletin",
     url: "https://reliefweb.int/report/kenya/kajiado-county-drought-early-warning-bulletin-october-2024",
-    canonical_url: "https://reliefweb.int/report/kenya/kajiado-county-drought-early-warning-bulletin-october-2024",
+    canonical_url:
+      "https://reliefweb.int/report/kenya/kajiado-county-drought-early-warning-bulletin-october-2024",
     youtube_id: null,
     kind: "toolkit",
     title: "NDMA Kajiado County Drought Early Warning Bulletin",
@@ -1739,10 +1839,12 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "africa-climate-resilient-sustainable-health-systems-and-facilities-free-course-who-afro-africa-cdc-aphrc",
     url: "https://www.publichealth.columbia.edu/research/programs/global-consortium-climate-health-education/courses-trainings/africa-climate-resilient-sustainable-health-systems-facilities",
-    canonical_url: "https://www.publichealth.columbia.edu/research/programs/global-consortium-climate-health-education/courses-trainings/africa-climate-resilient-sustainable-health-systems-facilities",
+    canonical_url:
+      "https://www.publichealth.columbia.edu/research/programs/global-consortium-climate-health-education/courses-trainings/africa-climate-resilient-sustainable-health-systems-facilities",
     youtube_id: null,
     kind: "course",
-    title: "Africa: Climate Resilient & Sustainable Health Systems and Facilities (free course, WHO AFRO / Africa CDC / APHRC)",
+    title:
+      "Africa: Climate Resilient & Sustainable Health Systems and Facilities (free course, WHO AFRO / Africa CDC / APHRC)",
     provider: "GCCHE / Columbia",
     objectives: "",
     audience_summary: "",
@@ -1763,7 +1865,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "africa-course-weekly-slide-decks-and-recordings-index",
     url: "https://docs.google.com/document/d/1HPy5t-P9dTWn2daBE4ik-iczp2x0GslWV6lbd9tybCU",
-    canonical_url: "https://docs.google.com/document/d/1HPy5t-P9dTWn2daBE4ik-iczp2x0GslWV6lbd9tybCU",
+    canonical_url:
+      "https://docs.google.com/document/d/1HPy5t-P9dTWn2daBE4ik-iczp2x0GslWV6lbd9tybCU",
     youtube_id: null,
     kind: "toolkit",
     title: "Africa course - weekly slide decks and recordings index",
@@ -1787,10 +1890,12 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "strengthening-climate-resilience-sustainability-of-health-systems-western-pacific",
     url: "https://www.publichealth.columbia.edu/research/programs/global-consortium-climate-health-education/courses-trainings/strengthening-climate-resilience-sustainability-health-systems-western-pacific-region",
-    canonical_url: "https://www.publichealth.columbia.edu/research/programs/global-consortium-climate-health-education/courses-trainings/strengthening-climate-resilience-sustainability-health-systems-western-pacific-region",
+    canonical_url:
+      "https://www.publichealth.columbia.edu/research/programs/global-consortium-climate-health-education/courses-trainings/strengthening-climate-resilience-sustainability-health-systems-western-pacific-region",
     youtube_id: null,
     kind: "course",
-    title: "Strengthening Climate Resilience & Sustainability of Health Systems, Western Pacific",
+    title:
+      "Strengthening Climate Resilience & Sustainability of Health Systems, Western Pacific",
     provider: "GCCHE / Columbia",
     objectives: "",
     audience_summary: "",
@@ -1811,7 +1916,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "us-cdc-brace-framework-for-local-health-officials-playbook",
     url: "https://www.apha.org/topics-and-issues/climate-health-and-equity/brace",
-    canonical_url: "https://www.apha.org/topics-and-issues/climate-health-and-equity/brace",
+    canonical_url:
+      "https://www.apha.org/topics-and-issues/climate-health-and-equity/brace",
     youtube_id: null,
     kind: "toolkit",
     title: "US CDC BRACE framework for local health officials (+ playbook)",
@@ -1862,7 +1968,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.youtube.com/watch?v=WN-A2GCAsD8",
     youtube_id: "WN-A2GCAsD8",
     kind: "video",
-    title: "Sattva Consulting podcast with Dr Soumya Swaminathan on the climate-health crisis",
+    title:
+      "Sattva Consulting podcast with Dr Soumya Swaminathan on the climate-health crisis",
     provider: "Sattva Consulting",
     objectives: "",
     audience_summary: "",
@@ -1934,7 +2041,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.who.int/europe/publications/i/item/9789289062930",
     youtube_id: null,
     kind: "toolkit",
-    title: "WHO Europe - heat-health action planning, governance, EWS, surveillance, health system preparedness",
+    title:
+      "WHO Europe - heat-health action planning, governance, EWS, surveillance, health system preparedness",
     provider: "WHO Europe",
     objectives: "",
     audience_summary: "",
@@ -1955,10 +2063,12 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "hapie-tool-evaluating-implementation-and-effectiveness-of-heat-action-plans",
     url: "https://preparecenter.org/resource/evaluating-the-implementation-and-effectiveness-of-heat-action-plans/",
-    canonical_url: "https://preparecenter.org/resource/evaluating-the-implementation-and-effectiveness-of-heat-action-plans/",
+    canonical_url:
+      "https://preparecenter.org/resource/evaluating-the-implementation-and-effectiveness-of-heat-action-plans/",
     youtube_id: null,
     kind: "toolkit",
-    title: "HAPIE tool - evaluating implementation and effectiveness of heat action plans",
+    title:
+      "HAPIE tool - evaluating implementation and effectiveness of heat action plans",
     provider: "PrepareCenter / IFRC",
     objectives: "",
     audience_summary: "",
@@ -2003,7 +2113,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "a-fifth-of-her-income-what-extreme-heat-is-costing-pregnant-women",
     url: "https://www.high-horizons.eu/a-fifth-of-her-income-what-extreme-heat-is-costing-pregnant-women/",
-    canonical_url: "https://www.high-horizons.eu/a-fifth-of-her-income-what-extreme-heat-is-costing-pregnant-women/",
+    canonical_url:
+      "https://www.high-horizons.eu/a-fifth-of-her-income-what-extreme-heat-is-costing-pregnant-women/",
     youtube_id: null,
     kind: "toolkit",
     title: "A fifth of her income: what extreme heat is costing pregnant women",
@@ -2027,10 +2138,12 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "as-temperatures-rise-a-new-app-aims-to-protect-pregnant-women-from-the-heat",
     url: "https://www.gavi.org/vaccineswork/temperatures-rise-new-app-aims-protect-pregnant-women-heat",
-    canonical_url: "https://www.gavi.org/vaccineswork/temperatures-rise-new-app-aims-protect-pregnant-women-heat",
+    canonical_url:
+      "https://www.gavi.org/vaccineswork/temperatures-rise-new-app-aims-protect-pregnant-women-heat",
     youtube_id: null,
     kind: "toolkit",
-    title: "As temperatures rise, a new app aims to protect pregnant women from the heat",
+    title:
+      "As temperatures rise, a new app aims to protect pregnant women from the heat",
     provider: "Gavi VaccinesWork",
     objectives: "",
     audience_summary: "",
@@ -2051,10 +2164,12 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "surviving-heat-climate-change-and-maternal-and-infant-health-in-tamil-nadu",
     url: "https://www.hks.harvard.edu/centers/cid/voices/surviving-heat-impact-climate-change-maternal-and-infant-health-tamil-nadu",
-    canonical_url: "https://www.hks.harvard.edu/centers/cid/voices/surviving-heat-impact-climate-change-maternal-and-infant-health-tamil-nadu",
+    canonical_url:
+      "https://www.hks.harvard.edu/centers/cid/voices/surviving-heat-impact-climate-change-maternal-and-infant-health-tamil-nadu",
     youtube_id: null,
     kind: "toolkit",
-    title: "Surviving heat: climate change and maternal and infant health in Tamil Nadu",
+    title:
+      "Surviving heat: climate change and maternal and infant health in Tamil Nadu",
     provider: "Harvard Kennedy School CID",
     objectives: "",
     audience_summary: "",
@@ -2123,10 +2238,12 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "district-level-excess-mortality-from-extreme-heat-in-india-first-nationwide-estimates",
     url: "https://www.frontiersin.org/journals/environmental-health/articles/10.3389/fenvh.2026.1789071/full",
-    canonical_url: "https://www.frontiersin.org/journals/environmental-health/articles/10.3389/fenvh.2026.1789071/full",
+    canonical_url:
+      "https://www.frontiersin.org/journals/environmental-health/articles/10.3389/fenvh.2026.1789071/full",
     youtube_id: null,
     kind: "article",
-    title: "District-level excess mortality from extreme heat in India (first nationwide estimates)",
+    title:
+      "District-level excess mortality from extreme heat in India (first nationwide estimates)",
     provider: "Frontiers in Environmental Health",
     objectives: "",
     audience_summary: "",
@@ -2174,7 +2291,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://link.springer.com/article/10.1007/s44274-026-00816-y",
     youtube_id: null,
     kind: "article",
-    title: "Climate governance across Nigeria - governance, financing, locally-grounded response",
+    title:
+      "Climate governance across Nigeria - governance, financing, locally-grounded response",
     provider: "Springer",
     objectives: "",
     audience_summary: "",
@@ -2222,7 +2340,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
     canonical_url: "https://www.sciencedirect.com/special-issue/10CF751LX2G",
     youtube_id: null,
     kind: "article",
-    title: "SSM-Health Systems special issue: resilience in fragile and shock-prone settings",
+    title:
+      "SSM-Health Systems special issue: resilience in fragile and shock-prone settings",
     provider: "SSM-Health Systems",
     objectives: "",
     audience_summary: "",
@@ -2243,7 +2362,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "european-declaration-on-heat-and-health",
     url: "https://planetaryhealthalliance.org/wp-content/uploads/2026/08/European_Declaration_on_Heat_and_Health_final.pdf",
-    canonical_url: "https://planetaryhealthalliance.org/wp-content/uploads/2026/08/European_Declaration_on_Heat_and_Health_final.pdf",
+    canonical_url:
+      "https://planetaryhealthalliance.org/wp-content/uploads/2026/08/European_Declaration_on_Heat_and_Health_final.pdf",
     youtube_id: null,
     kind: "report",
     title: "European Declaration on Heat and Health",
@@ -2291,7 +2411,8 @@ export const CATALOGUE_FIXTURE: readonly LearningResource[] = [
   {
     slug: "what-health-agenda-for-climate-adaptation",
     url: "https://www.theindiaforum.in/climate-change/what-health-agenda-climate-adaptation",
-    canonical_url: "https://www.theindiaforum.in/climate-change/what-health-agenda-climate-adaptation",
+    canonical_url:
+      "https://www.theindiaforum.in/climate-change/what-health-agenda-climate-adaptation",
     youtube_id: null,
     kind: "article",
     title: "What health agenda for climate adaptation?",
