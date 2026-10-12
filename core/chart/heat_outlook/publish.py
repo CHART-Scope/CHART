@@ -278,7 +278,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     print(f"wrote {len(written)} files to {out_dir}")
     if args.upload:
-        target = f"s3://{args.bucket}/kenya/outlook/{args.release}/"
+        target = f"s3://{args.bucket}/kenya/{args.release}/"
         subprocess.run(
             ["aws", "s3", "sync", str(out_dir), target, "--delete"], check=True
         )

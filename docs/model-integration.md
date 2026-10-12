@@ -10,7 +10,7 @@ tables.
 flowchart LR
     r["Model team R scripts"] --> csv["CSV tables<br/>(typical month, PARP / PAF)"]
     csv --> publish["chart-publish-kenya<br/>one JSON per county"]
-    publish --> s3[("S3: chart-predictive-models<br/>kenya/outlook/&lt;release&gt;/")]
+    publish --> s3[("S3: chart-predictive-models<br/>kenya/&lt;release&gt;/")]
     s3 --> sync["chart-model-sync<br/>aws s3 sync"]
     sync --> volume[("/models volume<br/>MODEL_CACHE_DIR")]
     volume --> core["chart-core<br/>GET /heat-outlook/{geography}"]
@@ -59,13 +59,15 @@ bucket. `pipelines/models/kenya/` is git-ignored.
 ## Bucket layout for the outlook
 
 ```text
-s3://chart-predictive-models/kenya/outlook/<release>/
+s3://chart-predictive-models/kenya/<release>/
   lbw/<county>.json                 46 counties
   lbw/kenya.json                    national period summary
   under_5_mortality/<county>.json
   under_5_mortality/kenya.json
 ```
 
+The release folder sits beside `kenya/lbw/` and `kenya/under-five-mortality/`,
+which hold the live scorer's R model files; the `v…` name tells them apart.
 `<release>` is the modeller's version label, for example `v2_2026_10_06`. The
 API reads the release named by `CHART_KENYA_OUTLOOK_RELEASE`, which defaults to
 the current one in `chart/heat_outlook/service.py`. Publishing a new release
@@ -94,7 +96,7 @@ IDs.
    example, check the national whole-pregnancy PARP for 2041–2060 under
    SSP5-8.5.
 4. Upload with `--upload`, which runs
-   `aws s3 sync <out> s3://chart-predictive-models/kenya/outlook/<release>/`.
+   `aws s3 sync <out> s3://chart-predictive-models/kenya/<release>/`.
    This needs write credentials for the bucket.
 5. If the release label changed, set `CHART_KENYA_OUTLOOK_RELEASE` and
    redeploy, or rerun `chart-model-sync`.
