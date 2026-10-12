@@ -12,6 +12,11 @@ dependencies = [
   "dagster-postgres>=0.23",
   "dagster-webserver>=1.7",
   "psycopg2-binary>=2.9",
+  # SQLAlchemy 2.1 makes psycopg (v3) the default for postgresql:// URLs.
+  # dagster-postgres builds such a URL and sends NOTIFY with a bound
+  # parameter, which psycopg 3 rejects ("syntax error at or near $1"), so
+  # every Dagster run failed. Keep 2.0, whose default driver is psycopg2.
+  "sqlalchemy>=2.0,<2.1",
   "geoalchemy2>=0.15",
   "shapely>=2.0",
 ]

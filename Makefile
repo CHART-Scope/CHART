@@ -169,7 +169,7 @@ e2e: e2e-orchestration e2e-web
 
 e2e-orchestration:
 	mkdir -p outputs/e2e/orchestration
-	$(VENV_PYTHON) -m pytest orchestration/tests/test_climate_pull_failures.py -q --junitxml=outputs/e2e/orchestration/junit.xml
+	$(VENV_PYTHON) -m pytest orchestration/tests/test_climate_pull_failures.py orchestration/tests/test_dagster_postgres_driver.py -q --junitxml=outputs/e2e/orchestration/junit.xml
 
 e2e-web:
 	$(NPM) run e2e:web
