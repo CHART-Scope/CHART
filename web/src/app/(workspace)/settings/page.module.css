@@ -1,26 +1,124 @@
 .layout {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-6);
+  max-width: 1120px;
   container-type: inline-size;
 }
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) 0 var(--space-1);
+  animation: rise 0.4s ease-out both;
+}
+
+.kicker {
+  margin: 0;
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-maroon);
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2rem);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  color: var(--color-near-black);
+}
+
+.lede {
+  margin: 0;
+  max-width: 62ch;
+  font-size: var(--fs-body-lg);
+  line-height: 1.6;
+  color: var(--color-text-dim);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  animation: rise 0.45s ease-out both;
+}
+
+.section + .section {
+  animation-delay: 0.08s;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.sectionTitle::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border-subtle), transparent);
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--color-maroon-tint);
+  color: var(--color-maroon);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.06em;
+}
+
 .pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
   align-items: start;
 }
-.layout > section,
+
+.section > section,
 .pair > section {
   margin: 0;
 }
+
 .runs {
   min-width: 0;
 }
+
 .runs > section {
-  padding: 12px;
+  padding: var(--space-4);
 }
-@container (max-width: 640px) {
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header,
+  .section {
+    animation: none;
+  }
+}
+
+@container (max-width: 720px) {
   .pair {
     grid-template-columns: 1fr;
   }

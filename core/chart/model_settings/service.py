@@ -379,7 +379,7 @@ def _support(session: Session, country_code: str, outcome: str) -> _Support | No
     )
     if published is not None:
         for selector in published.selectors:
-            label = selector.label + (" (exploratory)" if selector.exploratory else "")
+            label = selector.label
             offer(selectors, selector.code, label, "outlook")
         for code in published.scenarios:
             offer(scenarios, code, scenario_label(code), "outlook")

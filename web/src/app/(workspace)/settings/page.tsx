@@ -39,17 +39,35 @@ export default function SettingsPage() {
 
   return (
     <div className={styles.layout}>
-      <div className={styles.pair}>
+      <header className={styles.header}>
+        <p className={styles.kicker}>Settings</p>
+        <h1 className={styles.heading}>Shape how CHART plans with you</h1>
+        <p className={styles.lede}>
+          Choose where you plan and which model options the dashboard offers.
+          {isAdmin ? " Installation tools for administrators follow below." : ""}
+        </p>
+      </header>
+
+      <section className={styles.section} aria-labelledby="settings-workspace">
+        <h2 id="settings-workspace" className={styles.sectionTitle}>
+          Your workspace
+        </h2>
         <GeographyContextCard
           geographyScopes={scopes}
           activeGeographyId={session.user.activeGeographyId}
         />
-        {isAdmin ? <ModelHubCard accessToken={session.accessToken} /> : null}
-      </div>
-      <ModelSettingsCard accessToken={session.accessToken} />
+        <ModelSettingsCard accessToken={session.accessToken} />
+      </section>
+
       {isAdmin ? (
-        <>
-          <ClimateDataCard accessToken={session.accessToken} />
+        <section className={styles.section} aria-labelledby="settings-installation">
+          <h2 id="settings-installation" className={styles.sectionTitle}>
+            Installation <span className={styles.badge}>Admin</span>
+          </h2>
+          <div className={styles.pair}>
+            <ModelHubCard accessToken={session.accessToken} />
+            <ClimateDataCard accessToken={session.accessToken} />
+          </div>
           <div className={styles.pair}>
             <UserManagement accessToken={session.accessToken} />
             {runsGeography ? (
@@ -66,7 +84,7 @@ export default function SettingsPage() {
             ) : null}
           </div>
           <ResetInstallationCard accessToken={session.accessToken} />
-        </>
+        </section>
       ) : null}
     </div>
   );

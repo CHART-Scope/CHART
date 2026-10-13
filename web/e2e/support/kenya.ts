@@ -67,7 +67,7 @@ function available(outcome: string) {
   const outlook = fixtures.outlook[`geo-ke|${outcome}|${defaultSelectorFor(outcome)}`];
   const view = (option: Option) => ({
     code: option.code,
-    label: option.label + (option.exploratory ? " (exploratory)" : ""),
+    label: option.label,
     views: ["outlook"],
   });
   return {

@@ -14,7 +14,7 @@ import {
 
 /** Retry delays while the identity provider or API is unreachable. */
 const UNAVAILABLE_RETRY_MS = [2_000, 5_000, 15_000, 30_000];
-import styles from "./AuthState.module.css";
+import { ChartLoader } from "@/components/BrandMark";
 
 export function RequireAuth({
   children,
@@ -87,24 +87,19 @@ export function RequireAuth({
     // card below is kept for the moment a redirect really is under way.
     if (unavailable) {
       return (
-        <main className={styles.page}>
-          <section className={styles.card} role="status">
-            <span>CHART secure workspace</span>
-            <h1>CHART is temporarily unavailable</h1>
-            <p>Your session is kept. Reconnecting automatically…</p>
-          </section>
-        </main>
+        <ChartLoader
+          tone="warning"
+          status="CHART is temporarily unavailable"
+          detail="Your session is kept. Reconnecting automatically…"
+        />
       );
     }
     if (fallback) return <>{fallback}</>;
     return (
-      <main className={styles.page}>
-        <section className={styles.card}>
-          <span>CHART secure workspace</span>
-          <h1>{redirected.current ? "Opening sign in" : "Loading"}</h1>
-          <p>Checking your role and planning area.</p>
-        </section>
-      </main>
+      <ChartLoader
+        status={redirected.current ? "Opening sign in" : "Loading your workspace"}
+        detail="Checking your role and planning area."
+      />
     );
   }
 

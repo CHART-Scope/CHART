@@ -12,6 +12,7 @@ import {
 import { ActivityDrawer } from "../ActivityDrawer/ActivityDrawer";
 import { Icon, type IconName } from "../Icon";
 import { Skeleton } from "../Skeleton";
+import { BrandMark } from "../BrandMark";
 import styles from "./AppShell.module.css";
 
 export type NavItem = {
@@ -124,10 +125,12 @@ export function AppShell({
         </button>
         {onLogoClick ? (
           <button type="button" className={styles.logo} onClick={onLogoClick}>
-            CHART
+            <BrandMark size={22} tone="light" wordmark />
           </button>
         ) : (
-          <span className={styles.logo}>CHART</span>
+          <span className={styles.logo}>
+            <BrandMark size={22} tone="light" wordmark />
+          </span>
         )}
         <span className={styles.sep} aria-hidden>
           |
