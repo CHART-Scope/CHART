@@ -18,13 +18,13 @@ export function ChartLoader({ status, detail, tone = "busy" }: Props) {
       <div className={styles.stage} role="status" aria-live="polite">
         <BrandMark size={72} animated={tone === "busy"} />
         <p className={styles.word}>CHART</p>
-        <p
+        <h1
           className={[styles.status, tone === "warning" ? styles.warning : ""].join(
             " ",
           )}
         >
           {status}
-        </p>
+        </h1>
         {detail ? <p className={styles.detail}>{detail}</p> : null}
       </div>
     </main>
