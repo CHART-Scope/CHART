@@ -25,7 +25,10 @@ export function RequireAuth({
    * that is coming; without one a generic card is used. */
   fallback?: ReactNode;
 }) {
-  const [session, setSession] = useState<AuthSession | null>(null);
+  // Seeded from the in-memory session, so a mount during client-side
+  // navigation renders its children on the first frame instead of flashing
+  // the fallback for a session it already has. Only a hard load starts empty.
+  const [session, setSession] = useState<AuthSession | null>(getStoredAuthSession);
   const [unavailable, setUnavailable] = useState(false);
   const redirected = useRef(false);
 

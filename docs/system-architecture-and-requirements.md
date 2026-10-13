@@ -109,6 +109,15 @@ business rules. Postgres owns durable request state. Dagster owns background
 execution. A model result remains available even when the optional explanation
 service is disabled or unavailable.
 
+In the Next web app, the signed-in routes (dashboard, plan, settings and the
+Learning hub) share the `web/src/app/(workspace)` route group. Its layout
+restores the session once and keeps one sidebar and top bar mounted across
+navigation; pages read the session through `useSession()`. The role and
+planning-area redirects for each route are declared beside the navigation in
+`web/src/features/chrome/appNav.ts`. These are display redirects only: FastAPI
+still enforces access on every request. The Learning hub stays public, so a
+visitor who is not signed in reads it under the public header.
+
 ## Functional requirements
 
 | ID | Requirement | Acceptance outcome |

@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use, useEffect, useMemo } from "react";
+import { use, useMemo } from "react";
 
-import { AppShell } from "@/components/AppShell";
-import { IconSprite } from "@/components/Icon";
 import {
   ActionsLibrary,
   heatHazardKey,
@@ -13,10 +11,7 @@ import {
   seasons,
   useActionProgress,
 } from "@/features/actions";
-import { RequireAuth } from "@/features/auth/RequireAuth";
-import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import { DashboardHeader } from "@/features/dashboard";
-import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
 import { useGeographies } from "@/lib/useGeographies";
 import { useModelCatalog } from "@/lib/useModelCatalog";
 
@@ -33,27 +28,11 @@ type PageProps = {
   searchParams: Promise<Query>;
 };
 
+/** Accounts without a planning area are sent to /access-pending by the
+ * workspace layout before this renders. */
 export default function RecommendedActionsPage(props: PageProps) {
-  const params = use(props.params);
+  const geographyId = use(props.params).geo;
   const query = use(props.searchParams);
-  return (
-    <RequireAuth>
-      {(session) => (
-        <AuthorizedActions session={session} geographyId={params.geo} query={query} />
-      )}
-    </RequireAuth>
-  );
-}
-
-function AuthorizedActions({
-  session,
-  geographyId,
-  query,
-}: {
-  session: AuthSession;
-  geographyId: string;
-  query: Query;
-}) {
   const router = useRouter();
   const placeId = query.admin_unit ?? geographyId;
   const outcome = query.outcome ?? "lbw";
@@ -66,12 +45,6 @@ function AuthorizedActions({
   const { catalog } = useModelCatalog(geographyId);
   const progress = useActionProgress(placeId);
   const actions = useMemo(() => listActions(heatHazardKey), []);
-
-  const hasAccess =
-    session.user.roles.length > 0 && session.user.geographyScopes.length > 0;
-  useEffect(() => {
-    if (!hasAccess) router.replace("/access-pending");
-  }, [hasAccess, router]);
 
   const trail = useMemo(() => {
     const byId = new Map((geographies ?? []).map((geo) => [geo.id, geo]));
@@ -104,54 +77,35 @@ function AuthorizedActions({
     });
   }
 
-  const nav = appNavForRoles(session.user.roles);
-  const handleNavigate = (id: string) => {
-    const target = NAV_ROUTE[id];
-    if (target) router.push(target);
-  };
-
-  if (!hasAccess) return null;
-
   return (
-    <>
-      <IconSprite />
-      <AppShell
-        nav={nav}
-        activeNav="planning"
-        onNavigate={handleNavigate}
-        onSignOut={signOutOfKeycloak}
-        userLabel={session.user.username}
-      >
-        <main className={styles.page}>
-          <Link href={dashboardHref} className={styles.back}>
-            ← Back to dashboard
-          </Link>
-          <DashboardHeader
-            trail={[...trail, "Recommended actions"]}
-            hazardLabel={hazardLabel}
-            healthDomainLabel={domainLabel}
-          />
-          <div className={styles.intro}>
-            <h1 className={styles.title}>Recommended actions</h1>
-            <p className={styles.lede}>
-              Actions recommended for {domainLabel.toLowerCase()} under{" "}
-              {hazardLabel.toLowerCase()}, with the context, steps and evidence behind
-              each one. Set a status or assign districts to track follow-up.
-            </p>
-          </div>
-          <ActionsLibrary
-            actions={actions}
-            progress={progress}
-            season={season}
-            onSeasonChange={(next) => setQuery({ season: next, action: null })}
-            selectedId={selectedId}
-            onSelect={(action) => setQuery({ action })}
-            contextLabel={`${hazardLabel} · ${domainLabel} · ${trail.at(-1)}`}
-            hazardLabel={hazardLabel}
-            outcomeLabel={outcomeLabel}
-          />
-        </main>
-      </AppShell>
-    </>
+    <main className={styles.page}>
+      <Link href={dashboardHref} className={styles.back}>
+        ← Back to dashboard
+      </Link>
+      <DashboardHeader
+        trail={[...trail, "Recommended actions"]}
+        hazardLabel={hazardLabel}
+        healthDomainLabel={domainLabel}
+      />
+      <div className={styles.intro}>
+        <h1 className={styles.title}>Recommended actions</h1>
+        <p className={styles.lede}>
+          Actions recommended for {domainLabel.toLowerCase()} under{" "}
+          {hazardLabel.toLowerCase()}, with the context, steps and evidence behind each
+          one. Set a status or assign districts to track follow-up.
+        </p>
+      </div>
+      <ActionsLibrary
+        actions={actions}
+        progress={progress}
+        season={season}
+        onSeasonChange={(next) => setQuery({ season: next, action: null })}
+        selectedId={selectedId}
+        onSelect={(action) => setQuery({ action })}
+        contextLabel={`${hazardLabel} · ${domainLabel} · ${trail.at(-1)}`}
+        hazardLabel={hazardLabel}
+        outcomeLabel={outcomeLabel}
+      />
+    </main>
   );
 }

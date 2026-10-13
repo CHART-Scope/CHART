@@ -1,14 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { AppShell } from "@/components/AppShell";
-import { IconSprite } from "@/components/Icon";
-import { RequireAuth } from "@/features/auth/RequireAuth";
-import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
-import { signOutOfKeycloak, type AuthSession } from "@/lib/authClient";
 import {
   listModelReleases,
   reloadModelRelease,
@@ -18,17 +12,10 @@ import {
 
 import styles from "./page.module.css";
 
-export default function ModelsPage() {
-  return (
-    <RequireAuth>{(session) => <AuthorizedModels session={session} />}</RequireAuth>
-  );
-}
-
 type Tab = "installed" | "library";
 
-function AuthorizedModels({ session }: { session: AuthSession }) {
-  const router = useRouter();
-  const isAdmin = session.user.roles.includes("chart_admin");
+/** Non-admins are sent to /plan by the workspace layout before this renders. */
+export default function ModelsPage() {
   const [releases, setReleases] = useState<ReleaseInfo[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -36,10 +23,6 @@ function AuthorizedModels({ session }: { session: AuthSession }) {
   const [status, setStatus] = useState<string | null>(null);
   const [statusIsError, setStatusIsError] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("installed");
-
-  useEffect(() => {
-    if (!isAdmin) router.replace("/plan");
-  }, [isAdmin, router]);
 
   const refresh = useCallback(async () => {
     try {
@@ -101,133 +84,105 @@ function AuthorizedModels({ session }: { session: AuthSession }) {
     [session.accessToken],
   );
 
-  const handleNavigate = useCallback(
-    (id: string) => {
-      const target = NAV_ROUTE[id];
-      if (target) router.push(target);
-    },
-    [router],
-  );
-
-  if (!isAdmin) return null;
-
   return (
-    <>
-      <IconSprite />
-      <AppShell
-        nav={appNavForRoles(session.user.roles)}
-        activeNav="settings"
-        onNavigate={handleNavigate}
-        onSignOut={signOutOfKeycloak}
-        userLabel={session.user.username}
-      >
-        <section className={styles.page}>
-          <header className={styles.header}>
-            <div>
-              <h1 className={styles.title}>Models</h1>
-              <p className={styles.subtitle}>
-                Every model release loaded into this installation.{" "}
-                <Link href="/settings">Back to settings</Link>
-              </p>
-            </div>
-            <div className={styles.actions}>
-              {activeTab === "installed" ? (
-                <button
-                  type="button"
-                  className={styles.syncButton}
-                  onClick={handleSync}
-                  disabled={syncing}
-                >
-                  {syncing ? "Pulling updates…" : "Pull updates"}
-                </button>
-              ) : null}
-            </div>
-          </header>
-
-          <div className={styles.tabs} role="tablist" aria-label="Model view">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "installed"}
-              className={
-                activeTab === "installed"
-                  ? `${styles.tab} ${styles.tabActive}`
-                  : styles.tab
-              }
-              onClick={() => setActiveTab("installed")}
-            >
-              Installed
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "library"}
-              className={
-                activeTab === "library"
-                  ? `${styles.tab} ${styles.tabActive}`
-                  : styles.tab
-              }
-              onClick={() => setActiveTab("library")}
-            >
-              Library
-            </button>
-          </div>
-
+    <section className={styles.page}>
+      <header className={styles.header}>
+        <div>
+          <h1 className={styles.title}>Models</h1>
+          <p className={styles.subtitle}>
+            Every model release loaded into this installation.{" "}
+            <Link href="/settings">Back to settings</Link>
+          </p>
+        </div>
+        <div className={styles.actions}>
           {activeTab === "installed" ? (
-            <>
-              <p
-                className={
-                  statusIsError
-                    ? `${styles.status} ${styles.statusError}`
-                    : styles.status
-                }
-                role="status"
-                aria-live="polite"
-              >
-                {status ?? ""}
-              </p>
+            <button
+              type="button"
+              className={styles.syncButton}
+              onClick={handleSync}
+              disabled={syncing}
+            >
+              {syncing ? "Pulling updates…" : "Pull updates"}
+            </button>
+          ) : null}
+        </div>
+      </header>
 
-              {loadError ? (
-                <p className={`${styles.status} ${styles.statusError}`}>
-                  Could not load releases: {loadError}
-                </p>
-              ) : releases === null ? (
-                <p className={styles.status}>Loading…</p>
-              ) : releases.length === 0 ? (
-                <p className={styles.empty}>
-                  No model releases registered yet. Drop a{" "}
-                  <code>model-release.*.json</code> under{" "}
-                  <code>pipelines/models/&lt;family&gt;/</code> and click Pull updates.
-                </p>
-              ) : (
-                <div className={styles.list}>
-                  {releases.map((release) => (
-                    <ReleaseCard
-                      key={release.id}
-                      release={release}
-                      onReload={handleReload}
-                      reloading={reloadingId === release.id}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
+      <div className={styles.tabs} role="tablist" aria-label="Model view">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "installed"}
+          className={
+            activeTab === "installed" ? `${styles.tab} ${styles.tabActive}` : styles.tab
+          }
+          onClick={() => setActiveTab("installed")}
+        >
+          Installed
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "library"}
+          className={
+            activeTab === "library" ? `${styles.tab} ${styles.tabActive}` : styles.tab
+          }
+          onClick={() => setActiveTab("library")}
+        >
+          Library
+        </button>
+      </div>
+
+      {activeTab === "installed" ? (
+        <>
+          <p
+            className={
+              statusIsError ? `${styles.status} ${styles.statusError}` : styles.status
+            }
+            role="status"
+            aria-live="polite"
+          >
+            {status ?? ""}
+          </p>
+
+          {loadError ? (
+            <p className={`${styles.status} ${styles.statusError}`}>
+              Could not load releases: {loadError}
+            </p>
+          ) : releases === null ? (
+            <p className={styles.status}>Loading…</p>
+          ) : releases.length === 0 ? (
+            <p className={styles.empty}>
+              No model releases registered yet. Drop a <code>model-release.*.json</code>{" "}
+              under <code>pipelines/models/&lt;family&gt;/</code> and click Pull
+              updates.
+            </p>
           ) : (
-            <div className={styles.libraryPlaceholder}>
-              <p className={styles.libraryTitle}>Public model library</p>
-              <p className={styles.libraryBody}>
-                This tab will list model releases available to install into this
-                environment — every model CHART supports, whether or not it&apos;s
-                already loaded here.
-              </p>
-              <p className={styles.libraryHint}>
-                Not wired up yet. Until it is, the Installed tab is the source of truth.
-              </p>
+            <div className={styles.list}>
+              {releases.map((release) => (
+                <ReleaseCard
+                  key={release.id}
+                  release={release}
+                  onReload={handleReload}
+                  reloading={reloadingId === release.id}
+                />
+              ))}
             </div>
           )}
-        </section>
-      </AppShell>
-    </>
+        </>
+      ) : (
+        <div className={styles.libraryPlaceholder}>
+          <p className={styles.libraryTitle}>Public model library</p>
+          <p className={styles.libraryBody}>
+            This tab will list model releases available to install into this environment
+            — every model CHART supports, whether or not it&apos;s already loaded here.
+          </p>
+          <p className={styles.libraryHint}>
+            Not wired up yet. Until it is, the Installed tab is the source of truth.
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 

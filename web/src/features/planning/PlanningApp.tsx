@@ -3,9 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { AppShell } from "@/components/AppShell";
-import { IconSprite } from "@/components/Icon";
-import { appNavForRoles, NAV_ROUTE } from "@/features/chrome/appNav";
 import {
   listGeographies,
   listModelCatalog,
@@ -24,20 +21,11 @@ import { PlanningSetup } from "./PlanningSetup";
 import { defaultPlanningSelection, type PlanningSelection } from "./planningWireframe";
 
 type Props = {
-  username: string;
-  roles: string[];
   geographyScopes: string[];
   activeGeographyId?: string;
-  onSignOut: () => void;
 };
 
-export function PlanningApp({
-  username,
-  roles,
-  geographyScopes,
-  activeGeographyId,
-  onSignOut,
-}: Props) {
+export function PlanningApp({ geographyScopes, activeGeographyId }: Props) {
   const router = useRouter();
   const [selection, setSelection] = useState<PlanningSelection>(
     defaultPlanningSelection,
@@ -47,7 +35,6 @@ export function PlanningApp({
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const nav = appNavForRoles(roles);
   // A stable key rather than the array: a parent re-render (a token refresh
   // used to cause one) hands over an equal but new array, and depending on
   // its identity reloaded the areas and reset the user's selection.
@@ -128,44 +115,30 @@ export function PlanningApp({
   }
 
   return (
-    <>
-      <IconSprite />
-      <AppShell
-        nav={nav}
-        activeNav="planning"
-        onNavigate={(id) => {
-          const target = NAV_ROUTE[id];
-          if (target) router.push(target);
-        }}
-        onSignOut={onSignOut}
-        userLabel={username}
-      >
-        <PlanningSetup
-          selection={selection}
-          areas={areas}
-          catalog={catalog}
-          isLoading={isLoading}
-          isSubmitting={isSubmitting}
-          error={error}
-          onChange={changeSelection}
-          onStart={openDashboard}
-          contextSwitcher={
-            <InlineContextSwitcher
-              geographyScopes={geographyScopes}
-              activeGeographyId={activeGeographyId ?? selection.area}
-              onFamilyChange={(_family, defaultArea) => {
-                // Instant switch — reset the sentence back to defaults for
-                // the new family so hazard / outcome / period are picked
-                // from that family's catalog rather than the previous one.
-                changeSelection({
-                  ...defaultPlanningSelection(),
-                  area: defaultArea.id,
-                });
-              }}
-            />
-          }
+    <PlanningSetup
+      selection={selection}
+      areas={areas}
+      catalog={catalog}
+      isLoading={isLoading}
+      isSubmitting={isSubmitting}
+      error={error}
+      onChange={changeSelection}
+      onStart={openDashboard}
+      contextSwitcher={
+        <InlineContextSwitcher
+          geographyScopes={geographyScopes}
+          activeGeographyId={activeGeographyId ?? selection.area}
+          onFamilyChange={(_family, defaultArea) => {
+            // Instant switch — reset the sentence back to defaults for
+            // the new family so hazard / outcome / period are picked
+            // from that family's catalog rather than the previous one.
+            changeSelection({
+              ...defaultPlanningSelection(),
+              area: defaultArea.id,
+            });
+          }}
         />
-      </AppShell>
-    </>
+      }
+    />
   );
 }
