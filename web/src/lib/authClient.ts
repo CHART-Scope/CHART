@@ -1,4 +1,5 @@
 import { recordAuditEvent } from "@/lib/audit";
+import { submitSignOut } from "@/lib/signOutRequest";
 
 export type CurrentUser = {
   userId: string;
@@ -108,7 +109,7 @@ export function startKeycloakSignIn() {
 export function signOutOfKeycloak() {
   recordAuditEvent({ event_type: "signout" });
   clearStoredAuthSession();
-  window.location.assign("/auth/signout?returnTo=/plan");
+  submitSignOut("/plan");
 }
 
 export function signedInHomePath(user: CurrentUser) {

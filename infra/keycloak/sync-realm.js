@@ -59,6 +59,9 @@ async function syncClientSettings(token, clients) {
       headers: jsonHeaders(token),
       body: JSON.stringify({
         ...client,
+        // Flow switches follow the seed so a realm created before a flow was
+        // turned off (e.g. the password grant on chart-web) loses it on deploy.
+        ...pickDefined(clientSeed, clientFlowSettings),
         redirectUris: clientSeed.redirectUris ?? client.redirectUris,
         webOrigins: clientSeed.webOrigins ?? client.webOrigins,
         attributes: {
@@ -68,6 +71,19 @@ async function syncClientSettings(token, clients) {
       }),
     });
   }
+}
+
+const clientFlowSettings = [
+  "standardFlowEnabled",
+  "implicitFlowEnabled",
+  "directAccessGrantsEnabled",
+  "serviceAccountsEnabled",
+];
+
+function pickDefined(source, keys) {
+  return Object.fromEntries(
+    keys.filter((key) => source[key] !== undefined).map((key) => [key, source[key]]),
+  );
 }
 
 async function syncRealmSettings(token, realmSeed, configuredOrigin) {

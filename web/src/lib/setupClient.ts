@@ -81,7 +81,10 @@ export async function bootstrapChartSetup(
 ) {
   const response = await fetch("/api/setup/bootstrap", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-chart-bootstrap-token": state.setupToken.trim(),
+    },
     body: JSON.stringify(toBootstrapInput(state, geographyCatalog)),
     signal: AbortSignal.timeout(30_000),
   });
@@ -107,7 +110,8 @@ function toBootstrapInput(
     !state.primarySectorId ||
     !state.adminName.trim() ||
     !state.adminEmail.trim() ||
-    state.adminPassword.length < 8
+    state.adminPassword.length < 8 ||
+    !state.setupToken.trim()
   ) {
     throw new Error("Complete every setup step before launching CHART.");
   }
@@ -214,6 +218,10 @@ function resetErrorMessage(code?: string) {
 
 function setupErrorMessage(code?: string) {
   switch (code) {
+    case "SETUP_BOOTSTRAP_FORBIDDEN":
+      return "The setup token is not correct. Ask whoever deployed CHART for its CHART_BOOTSTRAP_TOKEN.";
+    case "SETUP_BOOTSTRAP_DISABLED":
+      return "Installation setup is disabled because no CHART_BOOTSTRAP_TOKEN is configured on the server.";
     case "SETUP_BOOTSTRAP_LOCKED":
       return "This CHART installation has already been set up. Return to sign in.";
     case "SETUP_BOOTSTRAP_IN_PROGRESS":

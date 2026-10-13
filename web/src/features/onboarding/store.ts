@@ -10,6 +10,8 @@ export type OnboardingState = {
   adminName: string;
   adminEmail: string;
   adminPassword: string;
+  /** One-time installation secret (CHART_BOOTSTRAP_TOKEN); memory only. */
+  setupToken: string;
   currentStep: number;
 };
 
@@ -21,7 +23,7 @@ type Actions = {
   selectPrimarySector: (id: string) => void;
   toggleCollaboratingSector: (id: string) => void;
   setAdminField: (
-    field: "adminName" | "adminEmail" | "adminPassword",
+    field: "adminName" | "adminEmail" | "adminPassword" | "setupToken",
     value: string,
   ) => void;
   setStep: (step: number) => void;
@@ -39,10 +41,11 @@ const emptyState: OnboardingState = {
   adminName: "",
   adminEmail: "",
   adminPassword: "",
+  setupToken: "",
   currentStep: 0,
 };
 
-type Persisted = Omit<OnboardingState, "adminPassword">;
+type Persisted = Omit<OnboardingState, "adminPassword" | "setupToken">;
 
 export const useOnboardingStore = createPersistedStore<
   OnboardingState & Actions,

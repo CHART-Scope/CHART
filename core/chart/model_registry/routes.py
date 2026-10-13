@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 
+from chart.auth.schemas import CurrentUserContext
+from chart.auth.service import require_any_role, require_current_user
 from chart.model_registry.runtime import prepare_model_release
 from chart.model_registry.schemas import ModelReleaseSpec
 from chart.model_registry.service import ModelRegistryError, release_base_uri
@@ -266,8 +269,14 @@ class CircuitResetResponse(BaseModel):
 
 
 @releases_router.get("", response_model=ReleasesResponse)
-def list_releases() -> ReleasesResponse:
-    """Every registered model release, active-first."""
+def list_releases(
+    _user: Annotated[CurrentUserContext, Depends(require_current_user)],
+) -> ReleasesResponse:
+    """Every registered model release, active-first.
+
+    Requires a signed-in user: the listing exposes artifact checksums, storage
+    URIs and manifest paths that are internal to the deployment.
+    """
 
     source_paths: dict[str, str] = {}
     for config in deployed_configs():
@@ -354,12 +363,18 @@ def list_releases() -> ReleasesResponse:
 
 
 @releases_router.post("/{release_id}/reload", response_model=ReloadResponse)
-def reload_release(release_id: str) -> ReloadResponse:
+def reload_release(
+    release_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+) -> ReloadResponse:
     """Re-verify + re-warm one release into the R runtime.
 
     Useful after the R container restarts, or after a manifest edit that
     swaps the SHA-256 of an existing artifact. Does not touch the database.
+    Requires the chart_admin role.
     """
+
+    require_any_role(user, {"chart_admin"})
 
     matched_path = None
     for config in deployed_configs():
@@ -383,7 +398,9 @@ def reload_release(release_id: str) -> ReloadResponse:
 
 
 @releases_router.post("/circuit/reset", response_model=CircuitResetResponse)
-def reset_inference_circuit() -> CircuitResetResponse:
+def reset_inference_circuit(
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+) -> CircuitResetResponse:
     """Clear the LBW inference circuit breaker in this API process.
 
     The R adapter's circuit breaker opens after ``INFERENCE_LBW_CIRCUIT_FAILURES``
@@ -393,9 +410,10 @@ def reset_inference_circuit() -> CircuitResetResponse:
     operator investigating after an outage can call this endpoint to
     skip the wait entirely instead of restarting the API container.
     Only clears state in this process; other API replicas would need
-    their own reset.
+    their own reset. Requires the chart_admin role.
     """
 
+    require_any_role(user, {"chart_admin"})
     from chart.inference.providers.lbw_r import reset_circuit
 
     reset_circuit()

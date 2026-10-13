@@ -13,12 +13,12 @@ type State =
   | { kind: "loaded"; releases: ReleaseInfo[] }
   | { kind: "error"; message: string };
 
-export function ModelHubCard() {
+export function ModelHubCard({ accessToken }: { accessToken: string }) {
   const [state, setState] = useState<State>({ kind: "loading" });
 
   useEffect(() => {
     let cancelled = false;
-    listModelReleases()
+    listModelReleases(accessToken)
       .then((releases) => {
         if (!cancelled) setState({ kind: "loaded", releases });
       })
@@ -30,7 +30,7 @@ export function ModelHubCard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [accessToken]);
 
   const summary = (() => {
     if (state.kind !== "loaded") return null;

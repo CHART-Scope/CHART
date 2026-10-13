@@ -108,7 +108,8 @@ export function OnboardingWizard({
   const adminReady =
     state.adminName.trim().length >= 2 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.adminEmail) &&
-    state.adminPassword.length >= 8;
+    state.adminPassword.length >= 8 &&
+    state.setupToken.trim().length > 0;
 
   const canContinue = (() => {
     if (idx === 0) return !!state.country;
@@ -435,10 +436,21 @@ export function OnboardingWizard({
                 }
                 autoComplete="new-password"
               />
+              <TextInput
+                id="setup-token"
+                label="Setup token"
+                type="password"
+                value={state.setupToken}
+                onChange={(event) =>
+                  setAdminField("setupToken", event.currentTarget.value)
+                }
+                autoComplete="off"
+              />
             </div>
             <p className={styles.adminNote}>
               Use at least eight characters. After setup, sign in with the email address
-              above.
+              above. The setup token is the installation&apos;s CHART_BOOTSTRAP_TOKEN,
+              held by whoever deployed it.
             </p>
             {launchError ? (
               <p className={styles.dialogError} role="alert">
@@ -556,6 +568,7 @@ function snapshot(state: OnboardingState): OnboardingState {
     adminName: state.adminName,
     adminEmail: state.adminEmail,
     adminPassword: state.adminPassword,
+    setupToken: state.setupToken,
     currentStep: state.currentStep,
   };
 }

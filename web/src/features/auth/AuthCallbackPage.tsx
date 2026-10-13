@@ -3,10 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/Button";
 import {
   completeKeycloakSignIn,
   restoreAuthSession,
   signedInHomePath,
+  startKeycloakSignIn,
 } from "@/lib/authClient";
 import styles from "./AuthState.module.css";
 
@@ -73,6 +75,11 @@ export function AuthCallbackPage() {
         <span>CHART secure workspace</span>
         <h1>{error ? "Sign-in failed" : "Completing sign in"}</h1>
         <p>{error ?? "Verifying your role and planning area."}</p>
+        {error ? (
+          <div className={styles.actions}>
+            <Button onClick={startKeycloakSignIn}>Try signing in again</Button>
+          </div>
+        ) : null}
       </section>
     </main>
   );

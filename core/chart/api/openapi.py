@@ -605,8 +605,10 @@ OPERATION_DOCUMENTATION: dict[
             "Returns every ModelRelease row (active-first) with identity, "
             "version, model_files (filename + SHA-256), area count, the "
             "manifest source path discovered on disk, S3 base URI, git ref, and "
-            "activation timestamp. Powers the admin Models page under /settings, "
-            "where operators inspect what is loaded and trigger reloads."
+            "activation timestamp. Requires a signed-in user because those "
+            "fields are internal to the deployment. Powers the admin Models "
+            "page under /settings, where operators inspect what is loaded and "
+            "trigger reloads."
         ),
         success_responses={
             "200": (
@@ -621,8 +623,9 @@ OPERATION_DOCUMENTATION: dict[
             "Finds the manifest whose id matches the URL parameter, re-parses "
             "its ModelReleaseSpec, and calls prepare_model_release to re-POST "
             "/models/load to the R runtime. Does not touch the database or "
-            "reactivate the release. Useful after an R container restart or "
-            "after a manifest edit that swaps an artifact's SHA-256."
+            "reactivate the release. Requires the chart_admin role. Useful "
+            "after an R container restart or after a manifest edit that swaps "
+            "an artifact's SHA-256."
         ),
         success_responses={
             "200": (
@@ -639,7 +642,8 @@ OPERATION_DOCUMENTATION: dict[
             "and stays open for INFERENCE_LBW_CIRCUIT_SECONDS (default 30). "
             "The half-open probe closes it automatically once R recovers, but "
             "an operator investigating after an outage can call this endpoint "
-            "to skip the wait instead of restarting the API container. Only "
+            "to skip the wait instead of restarting the API container. "
+            "Requires the chart_admin role. Only "
             "clears state in the calling process; other API replicas keep "
             "their own counter until reset individually or until their next "
             "half-open probe succeeds."

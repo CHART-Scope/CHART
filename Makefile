@@ -32,7 +32,7 @@ help:
 	@printf "  make remote-check   Verify tunneled development dependencies\n"
 	@printf "  make remote-disconnect Close only the development SSH tunnel\n"
 	@printf "  make mail           Start local Mailpit (SMTP :1025, inbox :8025)\n"
-	@printf "  make bootstrap-token  Ensure CHART_BOOTSTRAP_TOKEN exists in web/.env.local\n"
+	@printf "  make bootstrap-token  Ensure CHART_BOOTSTRAP_TOKEN exists in web/.env.local (enter it in the setup wizard)\n"
 	@printf "  make install-hooks    Enable local pre-commit hooks (OpenAPI regen)\n"
 	@printf "  make identity-sync  Re-apply local Keycloak seed users and groups\n"
 	@printf "  make identity-test  Test Keycloak SSO and redirect configuration\n"

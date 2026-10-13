@@ -173,3 +173,28 @@ test("syncClientSettings creates a client the realm does not have yet", async ()
     `expected the client to be created, saw: ${calls.join(", ")}`,
   );
 });
+
+test("syncClientSettings applies the seed's flow switches to an existing client", async () => {
+  // chart-web shipped with the password grant enabled; turning it off in the
+  // seed must reach realms that already hold the client.
+  const puts = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (init.method === "PUT") puts.push(JSON.parse(init.body));
+    const body = url.includes("clients?clientId=")
+      ? [{ id: "web-id", clientId: "chart-web" }]
+      : { id: "web-id", clientId: "chart-web", directAccessGrantsEnabled: true };
+    return { ok: true, status: 200, text: async () => JSON.stringify(body) };
+  };
+
+  try {
+    await syncClientSettings("token", [
+      { clientId: "chart-web", directAccessGrantsEnabled: false },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(puts.length, 1);
+  assert.equal(puts[0].directAccessGrantsEnabled, false);
+});

@@ -42,17 +42,32 @@ async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function listModelReleases(): Promise<ReleaseInfo[]> {
-  const body = await request<{ items: ReleaseInfo[] }>("/api/chart/model-releases");
+export async function listModelReleases(accessToken: string): Promise<ReleaseInfo[]> {
+  const body = await request<{ items: ReleaseInfo[] }>("/api/chart/model-releases", {
+    headers: authHeaders(accessToken),
+  });
   return body.items;
 }
 
-export async function reloadModelRelease(releaseId: string): Promise<void> {
+export async function reloadModelRelease(
+  releaseId: string,
+  accessToken: string,
+): Promise<void> {
   await request(`/api/chart/model-releases/${encodeURIComponent(releaseId)}/reload`, {
     method: "POST",
+    headers: authHeaders(accessToken),
   });
 }
 
-export async function syncDeployedModels(): Promise<ModelSyncResponse> {
-  return request<ModelSyncResponse>("/api/setup/models/sync", { method: "POST" });
+export async function syncDeployedModels(
+  accessToken: string,
+): Promise<ModelSyncResponse> {
+  return request<ModelSyncResponse>("/api/setup/models/sync", {
+    method: "POST",
+    headers: authHeaders(accessToken),
+  });
+}
+
+function authHeaders(accessToken: string) {
+  return { authorization: `Bearer ${accessToken}` };
 }

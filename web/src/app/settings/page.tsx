@@ -83,7 +83,7 @@ function AuthorizedSettings({ session }: { session: AuthSession }) {
               geographyScopes={session.user.geographyScopes}
               activeGeographyId={session.user.activeGeographyId}
             />
-            <ModelHubCard />
+            <ModelHubCard accessToken={session.accessToken} />
           </div>
           <ClimateDataCard accessToken={session.accessToken} />
           <div className={styles.pair}>

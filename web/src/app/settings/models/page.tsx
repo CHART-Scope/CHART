@@ -43,14 +43,14 @@ function AuthorizedModels({ session }: { session: AuthSession }) {
 
   const refresh = useCallback(async () => {
     try {
-      const items = await listModelReleases();
+      const items = await listModelReleases(session.accessToken);
       setReleases(items);
       setLoadError(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setLoadError(message);
     }
-  }, []);
+  }, [session.accessToken]);
 
   useEffect(() => {
     void refresh();
@@ -61,8 +61,8 @@ function AuthorizedModels({ session }: { session: AuthSession }) {
     setStatus("Pulling manifests and warming artifacts…");
     setStatusIsError(false);
     try {
-      await syncDeployedModels();
-      const fresh = await listModelReleases();
+      await syncDeployedModels(session.accessToken);
+      const fresh = await listModelReleases(session.accessToken);
       setReleases(fresh);
       const active = fresh.filter((release) => release.is_active);
       const paths = active
@@ -80,23 +80,26 @@ function AuthorizedModels({ session }: { session: AuthSession }) {
     } finally {
       setSyncing(false);
     }
-  }, []);
+  }, [session.accessToken]);
 
-  const handleReload = useCallback(async (release: ReleaseInfo) => {
-    setReloadingId(release.id);
-    setStatus(`Reloading ${release.id} into R runtime…`);
-    setStatusIsError(false);
-    try {
-      await reloadModelRelease(release.id);
-      setStatus(`Reloaded ${release.id}.`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setStatus(`Reload failed for ${release.id}: ${message}`);
-      setStatusIsError(true);
-    } finally {
-      setReloadingId(null);
-    }
-  }, []);
+  const handleReload = useCallback(
+    async (release: ReleaseInfo) => {
+      setReloadingId(release.id);
+      setStatus(`Reloading ${release.id} into R runtime…`);
+      setStatusIsError(false);
+      try {
+        await reloadModelRelease(release.id, session.accessToken);
+        setStatus(`Reloaded ${release.id}.`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setStatus(`Reload failed for ${release.id}: ${message}`);
+        setStatusIsError(true);
+      } finally {
+        setReloadingId(null);
+      }
+    },
+    [session.accessToken],
+  );
 
   const handleNavigate = useCallback(
     (id: string) => {

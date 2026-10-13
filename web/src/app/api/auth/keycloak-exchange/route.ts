@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import {
   buildKeycloakTokenUrl,
   getKeycloakClientId,
+  isPkceState,
   pkceCookieName,
 } from "@/lib/keycloak";
 import { getRequestOrigin } from "@/lib/httpRequest";
@@ -16,8 +17,10 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   const body = await readBody(request);
-  const saved = readPkce(request.cookies.get(pkceCookieName)?.value);
-  if (!body || !saved || body.state !== saved.state) {
+  const cookieName =
+    body && isPkceState(body.state) ? pkceCookieName(body.state) : null;
+  const verifier = cookieName ? request.cookies.get(cookieName)?.value : undefined;
+  if (!body || !cookieName || !verifier) {
     return NextResponse.json({ error: "AUTH_CALLBACK_INVALID" }, { status: 400 });
   }
 
@@ -31,7 +34,7 @@ export async function POST(request: NextRequest) {
         client_id: getKeycloakClientId(),
         code: body.code,
         redirect_uri: `${getRequestOrigin(request)}/auth/callback`,
-        code_verifier: saved.verifier,
+        code_verifier: verifier,
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(keycloakTimeoutMilliseconds()),
@@ -40,7 +43,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "AUTH_PROVIDER_UNAVAILABLE" }, { status: 503 });
   }
   if (!tokenResponse.ok) {
-    return NextResponse.json(
+    const failure = NextResponse.json(
       {
         error:
           tokenResponse.status >= 500
@@ -49,6 +52,10 @@ export async function POST(request: NextRequest) {
       },
       { status: tokenResponse.status >= 500 ? 503 : 401 },
     );
+    // Keycloak rejected the code, which is single-use, so this attempt's
+    // verifier can never succeed again. A 5xx keeps it for a retry.
+    if (tokenResponse.status < 500) failure.cookies.delete(cookieName);
+    return failure;
   }
 
   const tokens = await readTokens(tokenResponse);
@@ -60,7 +67,7 @@ export async function POST(request: NextRequest) {
     headers: { "cache-control": "no-store" },
   });
   setSessionCookies(response, request, tokens);
-  response.cookies.delete(pkceCookieName);
+  response.cookies.delete(cookieName);
   return response;
 }
 
@@ -86,10 +93,4 @@ async function readBody(request: NextRequest) {
   } catch {
     return null;
   }
-}
-
-function readPkce(value?: string) {
-  if (!value) return null;
-  const [state, verifier] = value.split(".");
-  return state && verifier ? { state, verifier } : null;
 }

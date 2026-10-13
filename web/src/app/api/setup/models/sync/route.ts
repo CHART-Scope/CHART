@@ -8,5 +8,6 @@ export function POST(request: NextRequest) {
   return proxyPythonApiRequest(request, {
     path: "setup/models/sync",
     method: "POST",
+    authorization: request.headers.get("authorization"),
   });
 }

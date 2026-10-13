@@ -2643,7 +2643,7 @@
           "model-releases"
         ],
         "summary": "List every registered model release",
-        "description": "Returns every ModelRelease row (active-first) with identity, version, model_files (filename + SHA-256), area count, the manifest source path discovered on disk, S3 base URI, git ref, and activation timestamp. Powers the admin Models page under /settings, where operators inspect what is loaded and trigger reloads.",
+        "description": "Returns every ModelRelease row (active-first) with identity, version, model_files (filename + SHA-256), area count, the manifest source path discovered on disk, S3 base URI, git ref, and activation timestamp. Requires a signed-in user because those fields are internal to the deployment. Powers the admin Models page under /settings, where operators inspect what is loaded and trigger reloads.",
         "operationId": "list_releases_model_releases_get",
         "responses": {
           "200": {
@@ -2656,7 +2656,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/model-releases/{release_id}/reload": {
@@ -2665,8 +2670,13 @@
           "model-releases"
         ],
         "summary": "Re-verify and re-warm one release into the R runtime",
-        "description": "Finds the manifest whose id matches the URL parameter, re-parses its ModelReleaseSpec, and calls prepare_model_release to re-POST /models/load to the R runtime. Does not touch the database or reactivate the release. Useful after an R container restart or after a manifest edit that swaps an artifact's SHA-256.",
+        "description": "Finds the manifest whose id matches the URL parameter, re-parses its ModelReleaseSpec, and calls prepare_model_release to re-POST /models/load to the R runtime. Does not touch the database or reactivate the release. Requires the chart_admin role. Useful after an R container restart or after a manifest edit that swaps an artifact's SHA-256.",
         "operationId": "reload_release_model_releases__release_id__reload_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "release_id",
@@ -2708,7 +2718,7 @@
           "model-releases"
         ],
         "summary": "Clear the LBW inference circuit breaker in this API process",
-        "description": "The R adapter's circuit breaker opens after INFERENCE_LBW_CIRCUIT_FAILURES consecutive failures (default 5) and stays open for INFERENCE_LBW_CIRCUIT_SECONDS (default 30). The half-open probe closes it automatically once R recovers, but an operator investigating after an outage can call this endpoint to skip the wait instead of restarting the API container. Only clears state in the calling process; other API replicas keep their own counter until reset individually or until their next half-open probe succeeds.",
+        "description": "The R adapter's circuit breaker opens after INFERENCE_LBW_CIRCUIT_FAILURES consecutive failures (default 5) and stays open for INFERENCE_LBW_CIRCUIT_SECONDS (default 30). The half-open probe closes it automatically once R recovers, but an operator investigating after an outage can call this endpoint to skip the wait instead of restarting the API container. Requires the chart_admin role. Only clears state in the calling process; other API replicas keep their own counter until reset individually or until their next half-open probe succeeds.",
         "operationId": "reset_inference_circuit_model_releases_circuit_reset_post",
         "responses": {
           "200": {
@@ -2721,7 +2731,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/internal/bootstrap-place": {

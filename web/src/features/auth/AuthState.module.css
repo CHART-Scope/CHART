@@ -34,3 +34,9 @@
   color: var(--color-text-muted);
   line-height: var(--lh-body);
 }
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}

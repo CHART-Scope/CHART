@@ -59,6 +59,13 @@ prediction routes allow them.
 origins, and post-logout redirects. Use the canonical HTTPS origin in production;
 do not use the EC2 IP address when users browse CHART through a domain.
 
+`sync-realm.js` also applies each seeded client's flow switches
+(`standardFlowEnabled`, `implicitFlowEnabled`, `directAccessGrantsEnabled`,
+`serviceAccountsEnabled`) to an existing realm. `chart-web` is a public client
+and only allows the authorization-code flow with PKCE; the password grant
+(`directAccessGrantsEnabled`) is off, so nothing can trade a username and
+password for a `chart-web` token directly.
+
 ## Seed users
 
 None. The realm ships without any pre-seeded users. Create the first administrator by completing the CHART installation setup wizard at `/onboarding`.
