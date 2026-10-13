@@ -40,6 +40,10 @@ export default defineConfig({
       // see what was forwarded; nothing listens otherwise.
       CHART_PYTHON_API_INTERNAL_URL: `http://127.0.0.1:${upstreamPort}`,
       KEYCLOAK_SERVER_URL: `http://127.0.0.1:${upstreamPort}`,
+      // Browser redirects to Keycloak (sign-in, sign-out) land on the test
+      // server itself, so a spec never depends on a real Keycloak or the
+      // remote-dev tunnel on :8080. Specs stub these pages where they matter.
+      KEYCLOAK_BROWSER_URL: `http://127.0.0.1:${port}/__e2e-keycloak`,
       CHART_BOOTSTRAP_TOKEN: "e2e-server-side-bootstrap-token",
     },
     url: `http://127.0.0.1:${port}/`,
