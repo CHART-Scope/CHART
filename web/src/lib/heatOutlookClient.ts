@@ -1,3 +1,4 @@
+import { authFetch } from "./authFetch";
 import { type MapResponse } from "./dashboardClient";
 
 /**
@@ -80,7 +81,7 @@ export class OutlookNotPublished extends Error {}
 
 export async function fetchHeatOutlook(
   geographyId: string,
-  accessToken: string,
+  accessToken: string | null | undefined,
   selection: OutlookSelection,
   signal?: AbortSignal,
 ): Promise<HeatOutlook> {
@@ -88,13 +89,9 @@ export async function fetchHeatOutlook(
   if (selection.scenario) params.set("scenario", selection.scenario);
   if (selection.period) params.set("period", selection.period);
   if (selection.selector) params.set("selector", selection.selector);
-  const response = await fetch(
+  const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}?${params}`,
-    {
-      cache: "no-store",
-      headers: { authorization: `Bearer ${accessToken}` },
-      signal,
-    },
+    { accessToken, signal },
   );
   if (response.status === 404) throw new OutlookNotPublished(geographyId);
   if (!response.ok) throw new Error("The heat outlook could not load.");
@@ -104,16 +101,16 @@ export async function fetchHeatOutlook(
 /** Counties shaded by their annual-average share for one selection. */
 export async function fetchHeatOutlookMap(
   geographyId: string,
-  accessToken: string,
+  accessToken: string | null | undefined,
   selection: OutlookSelection,
 ): Promise<MapResponse> {
   const params = new URLSearchParams({ outcome: selection.outcome });
   if (selection.scenario) params.set("scenario", selection.scenario);
   if (selection.period) params.set("period", selection.period);
   if (selection.selector) params.set("selector", selection.selector);
-  const response = await fetch(
+  const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/map?${params}`,
-    { cache: "no-store", headers: { authorization: `Bearer ${accessToken}` } },
+    { accessToken },
   );
   if (!response.ok) throw new Error("The heat outlook map could not load.");
   return (await response.json()) as MapResponse;

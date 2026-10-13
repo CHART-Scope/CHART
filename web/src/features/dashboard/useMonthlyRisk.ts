@@ -46,7 +46,14 @@ export function useMonthlyRisk({
    * weight while the card said under-five mortality. */
   outcome?: string;
 }) {
-  const scopeKey = `${geographyId}:${outcome}:${accessToken}`;
+  // Keyed on what is being read, never on the token: a token rotates every
+  // few minutes and keying on it threw the data away and refetched. The
+  // token only gates the read (the dashboard withholds it until the model
+  // catalog resolves); the clients send the session's current one.
+  const scopeKey = `${geographyId}:${outcome}`;
+  const hasToken = Boolean(accessToken);
+  const tokenRef = useRef(accessToken);
+  tokenRef.current = accessToken;
   const [result, setResult] = useState<{
     key: string;
     data: MonthlyRiskResponse;
@@ -96,7 +103,7 @@ export function useMonthlyRisk({
     // rendered a failure for what was only a slow catalog. Staying in
     // "loading" is the truthful state: this effect re-runs with the token the
     // moment it arrives.
-    if (!geographyId || !accessToken) {
+    if (!geographyId || !hasToken) {
       setPhase("loading");
       setError(null);
       setRequestId(null);
@@ -114,7 +121,7 @@ export function useMonthlyRisk({
     setRequestId(null);
     setStage(null);
     setLastChecked(null);
-    fetchMonthlyRisk(geographyId, accessToken, controller.signal, outcome)
+    fetchMonthlyRisk(geographyId, tokenRef.current, controller.signal, outcome)
       .then((latest) => {
         if (controller.signal.aborted) return;
         applyData(latest);
@@ -126,7 +133,7 @@ export function useMonthlyRisk({
         fail(cause, "Monthly temperature and risk could not be loaded.");
       });
     return () => controller.abort();
-  }, [geographyId, accessToken, attempt, fail, outcome, applyData]);
+  }, [geographyId, hasToken, attempt, fail, outcome, applyData]);
 
   // Prepare: only when the selected month has no result yet.
   useEffect(() => {
@@ -156,7 +163,7 @@ export function useMonthlyRisk({
     const refresh = async () => {
       const latest = await fetchMonthlyRisk(
         geographyId,
-        accessToken,
+        tokenRef.current,
         controller.signal,
         outcome,
       );
@@ -175,7 +182,7 @@ export function useMonthlyRisk({
     };
     const poll = async (id: number, polls = 0) => {
       try {
-        const request = await getPredictionRequest(id, accessToken);
+        const request = await getPredictionRequest(id, tokenRef.current ?? null);
         if (!active()) return;
         setStage(request.stage ?? null);
         setLastChecked(Date.now());
@@ -209,7 +216,7 @@ export function useMonthlyRisk({
         setStage("queued");
         let submission = submitted.current.get(month);
         if (!submission) {
-          submission = submitPrediction(accessToken, {
+          submission = submitPrediction(tokenRef.current ?? null, {
             geographyId,
             planningMonth: month,
             target: "month",
@@ -231,7 +238,7 @@ export function useMonthlyRisk({
       controller.abort();
       if (timer) clearTimeout(timer);
     };
-  }, [geographyId, accessToken, month, canPrepare, reads, fail, outcome, applyData]);
+  }, [geographyId, month, canPrepare, reads, fail, outcome, applyData]);
 
   return {
     data,

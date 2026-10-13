@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/Button";
 import { Icon, IconSprite } from "@/components/Icon";
-import { startKeycloakSignIn } from "@/lib/authClient";
+import { startKeycloakSignIn, takeSignedOutReason } from "@/lib/authClient";
 import { getSetupStatus } from "@/lib/setupClient";
 import { DashboardPreview } from "./DashboardPreview";
 import styles from "./Login.module.css";
@@ -25,6 +25,18 @@ export function Login({
   const [detectedMode, setDetectedMode] = useState<
     "checking" | "configured" | "required" | "unavailable"
   >(setupMode === "auto" ? "checking" : setupMode);
+  const [signedOutNotice, setSignedOutNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const reason = takeSignedOutReason();
+    if (reason === "idle") {
+      setSignedOutNotice(
+        "You were signed out after 30 minutes without activity. Sign in to continue.",
+      );
+    } else if (reason === "other_tab") {
+      setSignedOutNotice("You signed out of CHART in another tab.");
+    }
+  }, []);
 
   useEffect(() => {
     if (setupMode !== "auto") {
@@ -78,6 +90,11 @@ export function Login({
           </nav>
         </header>
         <main>
+          {signedOutNotice ? (
+            <p className={styles.signedOutNotice} role="status">
+              {signedOutNotice}
+            </p>
+          ) : null}
           <section className={styles.hero} aria-labelledby="chart-landing-title">
             <div className={styles.heroInner}>
               <p className={styles.eyebrow}>Climate × health</p>

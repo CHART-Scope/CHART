@@ -171,7 +171,14 @@ for (const width of [1440, 390]) {
 }
 
 test("direct public Learning Hub survives unavailable services", async ({ page }) => {
-  await page.route("**/api/**", (route) => json(route, {}, 503));
+  await page.route("**/api/**", (route) =>
+    // A visitor has no refresh cookie, which the refresh route answers with
+    // 401 however the services behind it are doing. (A 503 there means the
+    // provider is down mid-session, which waits rather than signing in.)
+    route.request().url().endsWith("/api/auth/keycloak-refresh")
+      ? json(route, { error: "AUTH_SESSION_REQUIRED" }, 401)
+      : json(route, {}, 503),
+  );
   await page.goto("/learning");
   await expect(page.getByRole("searchbox")).toBeVisible();
   await expect(

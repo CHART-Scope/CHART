@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { onAuthSessionCleared } from "@/lib/authClient";
 import { listGeographies, type GeographyRecord } from "@/lib/planningClient";
 
 /**
@@ -25,21 +26,30 @@ let cache: GeographyRecord[] | null = null;
 let inFlight: Promise<GeographyRecord[]> | null = null;
 const subscribers = new Set<(records: GeographyRecord[]) => void>();
 
+// The list is filtered by who is asking; the next user must not see it.
+onAuthSessionCleared(() => {
+  cache = null;
+  inFlight = null;
+});
+
 function fetchOnce(): Promise<GeographyRecord[]> {
   if (cache) return Promise.resolve(cache);
   if (inFlight) return inFlight;
-  inFlight = listGeographies()
+  const request: Promise<GeographyRecord[]> = listGeographies()
     .then((records) => {
+      // Cleared by a sign-out meanwhile: answer this caller, cache nothing.
+      if (inFlight !== request) return records;
       cache = records;
       inFlight = null;
       for (const subscriber of subscribers) subscriber(records);
       return records;
     })
     .catch((error) => {
-      inFlight = null;
+      if (inFlight === request) inFlight = null;
       throw error;
     });
-  return inFlight;
+  inFlight = request;
+  return request;
 }
 
 export type UseGeographies = {

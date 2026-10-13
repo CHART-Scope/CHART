@@ -1,3 +1,5 @@
+import { authFetch } from "./authFetch";
+
 export type ModelFileInfo = {
   filename: string;
   sha256: string;
@@ -30,11 +32,9 @@ export type ModelSyncResponse = {
 };
 
 async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    cache: "no-store",
-    signal: init.signal ?? AbortSignal.timeout(60_000),
-  });
+  // Model administration is a protected operation: every call carries the
+  // session's token. Syncing verifies artifacts, so it gets a minute.
+  const response = await authFetch(url, { ...init, timeoutMs: 60_000 });
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(body?.error ?? `${response.status} ${response.statusText}`);

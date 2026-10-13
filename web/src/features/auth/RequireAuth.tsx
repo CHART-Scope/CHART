@@ -5,11 +5,15 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ensureFreshAuthSession,
   getStoredAuthSession,
-  refreshDelay,
+  isAuthSessionEnded,
   restoreAuthSession,
   startKeycloakSignIn,
+  subscribeAuthSession,
   type AuthSession,
 } from "@/lib/authClient";
+
+/** Retry delays while the identity provider or API is unreachable. */
+const UNAVAILABLE_RETRY_MS = [2_000, 5_000, 15_000, 30_000];
 import styles from "./AuthState.module.css";
 
 export function RequireAuth({
@@ -22,42 +26,48 @@ export function RequireAuth({
   fallback?: ReactNode;
 }) {
   const [session, setSession] = useState<AuthSession | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const redirected = useRef(false);
 
+  // authClient owns renewal. This component only restores the session once
+  // and then listens: listeners hear identity changes and sign-outs, never a
+  // token rotation, so the tree below does not re-render every few minutes.
+  // Only a session that has really ended goes to sign-in; an unreachable
+  // provider or API keeps retrying here instead.
   useEffect(() => {
     let cancelled = false;
-    const stored = getStoredAuthSession();
-    if (!stored) {
-      restoreAuthSession()
+    let attempt = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = subscribeAuthSession((next, reason) => {
+      if (cancelled) return;
+      if (next) setSession(next);
+      else if (reason === "expired") redirect();
+    });
+    const load = () => {
+      const stored = getStoredAuthSession();
+      (stored ? ensureFreshAuthSession(stored) : restoreAuthSession())
         .then((fresh) => {
-          if (!cancelled) setSession(fresh);
+          if (cancelled) return;
+          setUnavailable(false);
+          setSession(fresh);
         })
-        .catch(redirect);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    ensureFreshAuthSession(stored)
-      .then((fresh) => {
-        if (!cancelled) setSession(fresh);
-      })
-      .catch(redirect);
-
+        .catch((error: unknown) => {
+          if (cancelled) return;
+          if (isAuthSessionEnded(error)) return redirect();
+          setUnavailable(true);
+          const delay =
+            UNAVAILABLE_RETRY_MS[Math.min(attempt, UNAVAILABLE_RETRY_MS.length - 1)];
+          attempt += 1;
+          retryTimer = setTimeout(load, delay);
+        });
+    };
+    load();
     return () => {
       cancelled = true;
+      unsubscribe();
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, []);
-
-  useEffect(() => {
-    if (!session) return;
-    const delay = refreshDelay(session.accessToken);
-    if (delay === null) return;
-    const timeout = window.setTimeout(() => {
-      ensureFreshAuthSession(session).then(setSession).catch(redirect);
-    }, delay);
-    return () => window.clearTimeout(timeout);
-  }, [session]);
 
   function redirect() {
     if (redirected.current) return;
@@ -72,6 +82,17 @@ export function RequireAuth({
     // something untrue and made a fast path feel like an interruption. A
     // caller that knows its own layout passes a skeleton of it instead; the
     // card below is kept for the moment a redirect really is under way.
+    if (unavailable) {
+      return (
+        <main className={styles.page}>
+          <section className={styles.card} role="status">
+            <span>CHART secure workspace</span>
+            <h1>CHART is temporarily unavailable</h1>
+            <p>Your session is kept. Reconnecting automatically…</p>
+          </section>
+        </main>
+      );
+    }
     if (fallback) return <>{fallback}</>;
     return (
       <main className={styles.page}>

@@ -325,3 +325,13 @@
     margin-left: auto;
   }
 }
+
+/* Why the previous session ended (idle timeout, another tab). */
+.signedOutNotice {
+  margin: 0;
+  padding: 12px clamp(24px, 6vw, 96px);
+  background: var(--surface-app);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--color-charcoal);
+  font: var(--fs-body) / var(--lh-body) var(--font-body);
+}

@@ -189,6 +189,52 @@ export function catalogEntry(outcome: string, label: string, releaseId: string) 
   };
 }
 
+/**
+ * Answer `/api/auth/keycloak-refresh` with a new token on every call, valid
+ * for `lifetimeSeconds` of page time (the page clock, so `page.clock` drives
+ * expiry). `respond` may replace any answer, e.g. with a 503.
+ */
+export function rotateTokens(
+  page: Page,
+  api: FakeApi,
+  options: {
+    lifetimeSeconds?: number;
+    respond?: (call: number, route: Route) => Promise<void> | void | undefined;
+  } = {},
+) {
+  const issued: string[] = [];
+  let calls = 0;
+  api.on(/^\/api\/auth\/keycloak-refresh$/, async (route) => {
+    calls += 1;
+    const replaced = options.respond?.(calls, route);
+    if (replaced) return replaced;
+    const now = Math.floor((await page.evaluate(() => Date.now())) / 1000);
+    const token = fakeJwt({
+      sub: "e2e-user",
+      n: issued.length,
+      exp: now + (options.lifetimeSeconds ?? 300),
+    });
+    issued.push(token);
+    return json(route, { access_token: token });
+  });
+  return {
+    issued,
+    get calls() {
+      return calls;
+    },
+  };
+}
+
+/** The bearer token a request carried, or "" without one. */
+export function bearerOf(route: Route) {
+  return (
+    route
+      .request()
+      .headers()
+      .authorization?.replace(/^Bearer /, "") ?? ""
+  );
+}
+
 export function fakeJwt(payload: Record<string, unknown>) {
   const encode = (value: unknown) =>
     Buffer.from(JSON.stringify(value)).toString("base64url");

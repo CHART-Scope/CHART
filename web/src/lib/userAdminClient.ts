@@ -1,3 +1,5 @@
+import { authFetch } from "./authFetch";
+
 export type ChartRole =
   | "chart_admin"
   | "content_editor"
@@ -68,16 +70,12 @@ export async function inviteUser(input: InviteUserInput, accessToken: string) {
   return (await response.json()) as ManagedUser;
 }
 
-async function adminFetch(url: string, accessToken: string, init: RequestInit = {}) {
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      authorization: `Bearer ${accessToken}`,
-      ...init.headers,
-    },
-    cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
-  });
+async function adminFetch(
+  url: string,
+  accessToken: string | null | undefined,
+  init: RequestInit = {},
+) {
+  const response = await authFetch(url, { ...init, accessToken, timeoutMs: 20_000 });
 
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {

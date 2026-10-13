@@ -48,9 +48,14 @@ export function PlanningApp({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nav = appNavForRoles(roles);
+  // A stable key rather than the array: a parent re-render (a token refresh
+  // used to cause one) hands over an equal but new array, and depending on
+  // its identity reloaded the areas and reset the user's selection.
+  const scopesKey = geographyScopes.join("|");
 
   useEffect(() => {
     let cancelled = false;
+    const geographyScopes = scopesKey ? scopesKey.split("|") : [];
     listGeographies()
       .then((records) => {
         if (cancelled) return;
@@ -84,7 +89,7 @@ export function PlanningApp({
     return () => {
       cancelled = true;
     };
-  }, [activeGeographyId, geographyScopes]);
+  }, [activeGeographyId, scopesKey]);
 
   useEffect(() => {
     let cancelled = false;

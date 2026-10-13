@@ -35,6 +35,9 @@ export default defineConfig({
     // The bootstrap token is set only so a spec can prove the server never sends it.
     env: {
       CHART_WEB_ORIGIN: `http://127.0.0.1:${port}`,
+      // Server-side proxies (setup bootstrap, models sync, Keycloak token
+      // exchange) reach a stand-in a spec starts on this port when it needs to
+      // see what was forwarded; nothing listens otherwise.
       CHART_PYTHON_API_INTERNAL_URL: `http://127.0.0.1:${upstreamPort}`,
       KEYCLOAK_SERVER_URL: `http://127.0.0.1:${upstreamPort}`,
       CHART_BOOTSTRAP_TOKEN: "e2e-server-side-bootstrap-token",
