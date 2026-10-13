@@ -33,7 +33,9 @@ const NAV: readonly NavDefinition[] = [
     label: "Settings",
     icon: "settings",
     href: "/settings",
-    requiredRoles: ["chart_admin"],
+    // Model settings are editable by any signed-in user with a planning
+    // area; the installation cards on the page stay admin-only.
+    requiresGeographyScope: true,
   },
 ] as const;
 
@@ -100,6 +102,10 @@ export function redirectForPath(
 ): string | null {
   const entry = NAV.find((item) => item.id === activeNavForPath(pathname));
   if (!entry) return null;
+  // Model release management stays with installation administrators.
+  if (pathname?.startsWith("/settings/models") && !user.roles.includes("chart_admin")) {
+    return "/settings";
+  }
   if (
     entry.requiresGeographyScope &&
     (user.roles.length === 0 || user.geographyScopes.length === 0)

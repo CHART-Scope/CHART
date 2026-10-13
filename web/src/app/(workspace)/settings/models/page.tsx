@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { useSession } from "@/features/auth/WorkspaceSession";
 import {
   listModelReleases,
   reloadModelRelease,
@@ -14,8 +15,9 @@ import styles from "./page.module.css";
 
 type Tab = "installed" | "library";
 
-/** Non-admins are sent to /plan by the workspace layout before this renders. */
+/** Non-admins are sent to /settings by the workspace layout before this renders. */
 export default function ModelsPage() {
+  const session = useSession();
   const [releases, setReleases] = useState<ReleaseInfo[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);

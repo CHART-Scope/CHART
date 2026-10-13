@@ -1,3 +1,5 @@
+import { authFetch } from "@/lib/authFetch";
+
 /**
  * Typed client for per-country model settings.
  *
@@ -43,10 +45,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   GEOGRAPHY_OUT_OF_SCOPE: "You do not have access to this country.",
 };
 
-function headers(accessToken: string): Record<string, string> {
-  return { authorization: `Bearer ${accessToken}` };
-}
-
 async function errorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const body = (await response.json()) as { error?: string };
@@ -60,9 +58,9 @@ export async function fetchModelSettings(
   accessToken: string,
   signal?: AbortSignal,
 ): Promise<ModelSettings[]> {
-  const response = await fetch("/api/chart/model-settings", {
+  const response = await authFetch("/api/chart/model-settings", {
     cache: "no-store",
-    headers: headers(accessToken),
+    accessToken,
     signal,
   });
   if (!response.ok)
@@ -76,12 +74,13 @@ export async function saveModelSettings(
   outcome: string,
   values: ModelSettingsValues,
 ): Promise<ModelSettings> {
-  const response = await fetch(
+  const response = await authFetch(
     `/api/chart/model-settings/${encodeURIComponent(countryCode)}/${encodeURIComponent(outcome)}`,
     {
       method: "PUT",
       cache: "no-store",
-      headers: { ...headers(accessToken), "content-type": "application/json" },
+      accessToken,
+      headers: { "content-type": "application/json" },
       body: JSON.stringify(values),
     },
   );

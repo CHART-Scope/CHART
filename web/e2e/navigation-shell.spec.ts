@@ -196,14 +196,14 @@ test("signed-in Learning hub never shows the public Sign in header", async ({
 });
 
 test("route guards still apply inside the shared shell", async ({ page }) => {
-  // A planner without the admin role is sent from Settings to planning.
+  // A planner without the admin role may use Settings (model settings) but
+  // not model release management, which sends them back to Settings.
   await signInAs(page, {
     roles: ["health_planning_lead"],
     geographyScopes: ["/india"],
   });
   await page.goto("/settings/models");
-  await expect(page).toHaveURL(/\/plan$/);
-  await expect(page.getByText("in Madhya Pradesh.")).toBeVisible();
+  await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByRole("heading", { name: "Models" })).toHaveCount(0);
 });
 

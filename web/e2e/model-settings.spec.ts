@@ -153,3 +153,29 @@ test("countries outside the user's scope are not listed", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByRole("group", { name: /^Kenya ·/ })).toHaveCount(0);
 });
+
+test("any signed-in planner can change model settings, without the admin cards", async ({
+  page,
+}) => {
+  await installKenya(page, true, ["/kenya"], { roles: ["health_planning_lead"] });
+  await page.goto("/settings");
+
+  const lbw = settingsFor(page, "Kenya · Low birth weight");
+  await expect(lbw).toBeVisible();
+  // Installation administration stays with admins.
+  await expect(page.getByText("Administration", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Climate data", { exact: true })).toHaveCount(0);
+
+  const windows = lbw.getByRole("group", { name: "Pregnancy windows" });
+  await windows.getByRole("checkbox", { name: /1st trimester/ }).check();
+  const saved = page.waitForRequest(
+    (request) =>
+      request.method() === "PUT" && request.url().endsWith("/model-settings/KE/lbw"),
+  );
+  await lbw.getByRole("button", { name: "Save Kenya · Low birth weight" }).click();
+  expect((await saved).postDataJSON().selectors).toEqual(["P", "T1"]);
+  await page.screenshot({
+    path: "../outputs/e2e/web/model-settings-planner.png",
+    fullPage: true,
+  });
+});
