@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 from chart.shared.db.models import AppGeography
 from chart.shared.db.session import get_session_factory
+from chart.shared.outcomes import DEFAULT_OUTCOME
 
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import (
@@ -86,10 +87,11 @@ def get_locations() -> PlaceListResponse:
 def get_place_planning_options(
     geography_id: str,
     user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    outcome: Annotated[str, Query(min_length=1, max_length=64)] = DEFAULT_OUTCOME,
 ) -> PlanningOptionsResponse:
     try:
         _require_place_access(user, geography_id)
-        return get_planning_options(geography_id)
+        return get_planning_options(geography_id, outcome=outcome)
     except ClimateServiceError as error:
         raise _http_error(error) from error
 

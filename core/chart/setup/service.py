@@ -46,6 +46,7 @@ from chart.shared.db.models import (
     LearningResource,
     LearningTrack,
     ModelAreaMapping,
+    ModelDisplaySetting,
     ModelRelease,
     PredictionRequestRecord,
     PredictionResult,
@@ -852,6 +853,7 @@ def reset(user: CurrentUserContext) -> SetupStatus:
         session.execute(delete(HealthImpact))
         session.execute(delete(Covariate))
         session.execute(delete(AuditEventRecord))
+        session.execute(delete(ModelDisplaySetting))
         # Newer tables first: district_climate_day's foreign keys to
         # climate_run and admin_unit carry no ondelete, so they default to
         # RESTRICT and would block the deletes below once daily rows exist.

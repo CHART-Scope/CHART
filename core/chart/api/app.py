@@ -31,6 +31,7 @@ from chart.model_registry.routes import (
     router as model_catalog_router,
 )
 from chart.learning.routes import router as learning_router
+from chart.model_settings.routes import router as model_settings_router
 from chart.risk.routes import router as risk_router
 from chart.setup.routes import router as setup_router
 from chart.solution_repository.hazards import router as hazards_router
@@ -124,6 +125,7 @@ app.include_router(users_router)
 app.include_router(workspaces_router)
 app.include_router(risk_router)
 app.include_router(heat_outlook_router)
+app.include_router(model_settings_router)
 app.include_router(learning_router)
 app.include_router(erf_registry_router)
 app.include_router(model_catalog_router)

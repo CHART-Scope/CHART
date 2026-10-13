@@ -11,6 +11,7 @@ import {
   UserManagement,
 } from "@/features/planning";
 import { ResetInstallationCard } from "@/features/planning/ResetInstallationCard";
+import { ModelSettingsCard } from "@/features/settings/ModelSettingsCard";
 import { useGeographies } from "@/lib/useGeographies";
 
 import styles from "./page.module.css";
@@ -40,6 +41,7 @@ export default function SettingsPage() {
         />
         <ModelHubCard accessToken={session.accessToken} />
       </div>
+      <ModelSettingsCard accessToken={session.accessToken} />
       <ClimateDataCard accessToken={session.accessToken} />
       <div className={styles.pair}>
         <UserManagement accessToken={session.accessToken} />

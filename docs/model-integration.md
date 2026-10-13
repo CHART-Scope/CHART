@@ -17,8 +17,10 @@ flowchart LR
     core --> web["Dashboard: Heat outlook panel"]
 ```
 
-There is no database table, Dagster job or R process on this path. A county
-either has a published file or the API returns `404 OUTLOOK_NOT_PUBLISHED`.
+There is no Dagster job or R process on this path, and the tables are never
+copied into the database. A county either has a published file or the API
+returns `404 OUTLOOK_NOT_PUBLISHED`. The only database read is the country's
+[model settings](#model-settings), which narrow the options offered.
 
 ## How `chart-model-sync` works
 
@@ -129,10 +131,11 @@ period summaries carry a 95% CI:
 | Map | Every county shaded by the same share; `GET /heat-outlook/{geography}/map` |
 | Seasonal pattern | Typical month by calendar month (ensemble mean and range), and all periods |
 
-Controls: **pregnancy window** (LBW; whole pregnancy by default) or **age
-group** (under-five; post-neonatal by default, as agreed with the modeller on
-2026-10-08), **scenario** (default SSP5-8.5) and **period** (default
-2041–2060). The baseline is always shown: 1981–2010 for LBW, 1991–2020 for
+Controls: **pregnancy window** (LBW; whole pregnancy by default, and the only
+window offered until the trimesters are switched on in
+[model settings](#model-settings)) or **age group** (under-five; post-neonatal
+by default, as agreed with the modeller on 2026-10-08), **scenario** (default
+SSP5-8.5) and **period** (default 2041–2060). The baseline is always shown: 1981–2010 for LBW, 1991–2020 for
 under-five.
 
 **Ratio conversion.** Both guides define the share as AF = 1 − 1/RR. Under-five
@@ -163,6 +166,56 @@ odds ratio for the 3rd trimester. The seasonal pattern reads it from the
 modeller's national T3 exposure-response curve at the hottest of the three
 trimester months for that county, scenario and period: the worst case. Below
 the minimum-risk temperature it is 1.
+
+## Model settings
+
+Settings → **Model settings** chooses, per country and outcome (for example
+Kenya + LBW, Kenya + under-five, India + LBW), which options CHART offers:
+
+| Setting | Options come from | Default |
+| --- | --- | --- |
+| Pregnancy windows (LBW) or age groups (under-five) | The outlook file's selectors (`P`, `T1`–`T3`; the age groups), and each live release's validated windows (`window_1`–`window_3`) | LBW outlook: whole pregnancy only. Age groups and live windows: all on. Default selector: whole pregnancy / post-neonatal |
+| Scenarios, with one default | The outlook file's scenarios; SSP1-2.6, SSP3-7.0 and SSP5-8.5 for live places with a hot season | All on, SSP5-8.5 by default |
+| Data views | `observed` (Copernicus ERA5 months) and `seasonal` (C3S forecast, up to 6 months) wherever a live release is active; `projection` (long-term scenarios) for the outlook and live places with a hot season | All on |
+
+The rules are enforced by the API (`PUT /model-settings/{country}/{outcome}`),
+not by the page:
+
+- **Narrow only.** A setting can switch off an option, never add one. A code
+  the tables or releases do not offer is refused with
+  `422 MODEL_SETTINGS_OPTION_UNKNOWN`.
+- **Never empty.** Each view (outlook, live) keeps at least one option in each
+  list, and every live place keeps at least one of its validated windows
+  (`422 MODEL_SETTINGS_OPTION_REQUIRED`).
+- **The default is on.** The default window or age group and the default
+  scenario must be switched on, and where the outlook uses them they must be
+  outlook options (`422 MODEL_SETTINGS_DEFAULT_NOT_ENABLED` or
+  `MODEL_SETTINGS_DEFAULT_REQUIRED`).
+- **Applied server-side.** `GET /heat-outlook/...` lists only the options
+  switched on, opens on the configured defaults, and refuses a disabled one
+  with `422 OUTLOOK_SELECTION_INVALID`, like any other invalid selection.
+  `GET /climate/planning-options/{geography}` drops disabled windows and
+  scenarios, withdraws long-term projections when `projection` is off, and
+  marks the next-months choices `MODEL_DATA_MODE_DISABLED` when `seasonal` is
+  off. `POST /climate/predict` refuses a disabled data mode, scenario or
+  window with `409 MODEL_DATA_MODE_DISABLED`, `MODEL_SCENARIO_DISABLED` or
+  `MODEL_PREGNANCY_WINDOW_DISABLED`.
+- **No row, no change.** Without a saved row the defaults above apply, which
+  match the previous behaviour except that the LBW outlook hides the
+  trimesters. If a newer release stops offering a saved option, that option is
+  dropped; if what remains breaks a rule, the defaults apply until someone
+  saves again.
+- **Who may change them.** Any signed-in user who can read the country path
+  (for example `/kenya`) may read and change them; roles are intentionally not
+  restricted yet. The page sits on Settings, which is shown to administrators.
+- **Audit.** Every change writes an `audit_event` row of type
+  `model_settings_changed` with the country, the outcome and the values before
+  and after. It appears in the user's activity log.
+
+Settings live in `model_display_setting` (migration
+`027_model_display_settings`), one row per country and outcome. Resetting the
+installation deletes them. The live dashboard scores model window 1, so
+switching window 1 off stops monthly predictions for that country.
 
 ## Known gaps
 

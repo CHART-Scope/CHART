@@ -75,7 +75,9 @@ OPERATION_DOCUMENTATION: dict[
             "Builds the date choices supported for the selected geography, including "
             "the next three months, the configured hot season, and available long-term "
             "scenario periods. The response reflects current climate and model "
-            "availability rather than a hard-coded calendar."
+            "availability rather than a hard-coded calendar, narrowed by the "
+            "country's model settings for the outcome (windows, scenarios and data "
+            "modes switched off are withdrawn or marked MODEL_DATA_MODE_DISABLED)."
         ),
         success_responses={
             "200": "Planning modes, dates, and scenarios currently supported for the place."
@@ -450,6 +452,43 @@ OPERATION_DOCUMENTATION: dict[
             "200": (
                 "Kenyan counties with display geometry and each county's published "
                 "annual-average share, or the reason it is absent."
+            )
+        },
+    ),
+    ("get", "/model-settings"): OperationDocumentation(
+        summary="Read model settings for the countries a user can see",
+        description=(
+            "Without parameters, lists the model settings of every country whose "
+            "path the signed-in user can read, one item per outcome. With country "
+            "(ISO code, e.g. KE) and outcome (e.g. lbw), returns that one item. "
+            "Each item carries the options the published outlook tables and active "
+            "model releases support, tagged by the view that uses them, and the "
+            "effective settings: the stored ones, or the defaults when none are "
+            "saved. Any signed-in user may read them; roles are not restricted yet."
+        ),
+        success_responses={
+            "200": (
+                "Available pregnancy windows or age groups, scenarios and data "
+                "modes, with the options switched on and the defaults in use."
+            )
+        },
+    ),
+    ("put", "/model-settings/{country_code}/{outcome}"): OperationDocumentation(
+        summary="Narrow the model options offered for a country and outcome",
+        description=(
+            "Stores which pregnancy windows or age groups, scenarios and data modes "
+            "a country offers for an outcome. Settings may only narrow what the "
+            "tables and releases support: unknown codes are refused "
+            "(MODEL_SETTINGS_OPTION_UNKNOWN), every view keeps at least one option "
+            "(MODEL_SETTINGS_OPTION_REQUIRED) and each default must be switched on "
+            "(MODEL_SETTINGS_DEFAULT_NOT_ENABLED). Requires access to the country "
+            "path; any signed-in role may write for now. Every change records a "
+            "model_settings_changed audit event with the values before and after."
+        ),
+        success_responses={
+            "200": (
+                "The saved settings as they now apply, with the available options "
+                "and who last changed them."
             )
         },
     ),

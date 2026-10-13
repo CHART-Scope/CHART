@@ -1,111 +1,11 @@
-import { readFileSync } from "node:fs";
-
 import { expect, test, type Page } from "@playwright/test";
 
-import {
-  catalogEntry,
-  geographies,
-  installFakeApi,
-  json,
-  type FakeApi,
-} from "./support/fakeApi";
+import { installFakeApi } from "./support/fakeApi";
+import { installKenya } from "./support/kenya";
 
-// Responses produced by the real Python service from the modeller's published
-// Kenya tables (v2_2026_10_06) and the dev database's county shapes. The
-// browser sees his numbers and real geometry, not invented ones.
-type MapValues = Record<string, Record<string, Record<string, unknown>>>;
-const fixtures = JSON.parse(
-  readFileSync(new URL("./fixtures/heat-outlook-kenya.json", import.meta.url), "utf8"),
-) as {
-  outlook: Record<string, unknown>;
-  mapFrame: { areas: { geography_id: string }[] };
-  mapValues: MapValues;
-};
-
-const county = (slug: string, name: string) => ({
-  id: `geo-ke-${slug}`,
-  name,
-  path: `/kenya/${slug}`,
-  levelLabel: "County",
-  parentId: "geo-ke",
-  supportsPrediction: true,
-  models: [
-    { outcome: "lbw", modelAreaName: name, releaseId: "ke-lbw" },
-    { outcome: "under_5_mortality", modelAreaName: name, releaseId: "ke-u5" },
-  ],
-});
-
-const kenya = [
-  {
-    id: "geo-ke",
-    name: "Kenya",
-    path: "/kenya",
-    levelLabel: "Country",
-    parentId: null,
-    models: [],
-  },
-  county("kajiado", "Kajiado"),
-  county("garissa", "Garissa"),
-  county("narok", "Narok"),
-];
-
-const defaultSelector = (outcome: string) => (outcome === "lbw" ? "P" : "postneonatal");
-
-async function installKenya(
-  page: Page,
-  published = true,
-  geographyScopes = ["/kenya"],
-): Promise<FakeApi> {
-  const api = await installFakeApi(page);
-  api.on(/^\/api\/chart\/auth\/me$/, (route) =>
-    json(route, {
-      userId: "e2e-user",
-      username: "planner",
-      roles: ["health_planning_lead"],
-      geographyScopes,
-    }),
-  );
-  api.on(/^\/api\/chart\/geographies$/, (route) =>
-    json(route, [...geographies, ...kenya]),
-  );
-  api.on(/^\/api\/chart\/model-catalog$/, (route) =>
-    json(route, {
-      items: [
-        catalogEntry("lbw", "Low birth weight", "ke-lbw"),
-        catalogEntry("under_5_mortality", "Under-five mortality", "ke-u5"),
-      ],
-    }),
-  );
-  api.on(/^\/api\/chart\/heat-outlook\/[^/]+\/map$/, (route, url) => {
-    const outcome = url.searchParams.get("outcome") ?? "lbw";
-    const values =
-      fixtures.mapValues[
-        `${outcome}|${url.searchParams.get("selector") ?? defaultSelector(outcome)}`
-      ];
-    if (!published || !values)
-      return json(route, { error: "OUTLOOK_NOT_PUBLISHED" }, 404);
-    return json(route, {
-      ...fixtures.mapFrame,
-      outcome,
-      areas: fixtures.mapFrame.areas.map((area) => ({
-        ...area,
-        ...values[area.geography_id],
-      })),
-    });
-  });
-  api.on(/^\/api\/chart\/heat-outlook\/[^/]+$/, (route, url) => {
-    const geography = url.pathname.split("/").pop();
-    const outcome = url.searchParams.get("outcome") ?? "lbw";
-    const selector = url.searchParams.get("selector") ?? defaultSelector(outcome);
-    const body = published
-      ? fixtures.outlook[`${geography}|${outcome}|${selector}`]
-      : undefined;
-    return body
-      ? json(route, body)
-      : json(route, { error: "OUTLOOK_NOT_PUBLISHED" }, 404);
-  });
-  return api;
-}
+// The trimesters are off by default (whole pregnancy only); these tests
+// read the 3rd trimester, so the fake API starts with it switched on.
+const withThirdTrimester = { settings: { lbw: { selectors: ["P", "T3"] } } };
 
 const panel = (page: Page) =>
   page.getByRole("region", { name: /may be attributable to heat in an average year/ });
@@ -113,7 +13,7 @@ const panel = (page: Page) =>
 test("Kenya LBW: the map, icon array, odds ratio and precision follow the selected county", async ({
   page,
 }) => {
-  const api = await installKenya(page);
+  const api = await installKenya(page, true, ["/kenya"], withThirdTrimester);
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
 
   const outlook = panel(page);
@@ -250,7 +150,7 @@ test("switching country on the dashboard lands on Kenya, not its first county", 
 test("switching outcome never asks the map for the previous outcome's window", async ({
   page,
 }) => {
-  const api = await installKenya(page);
+  const api = await installKenya(page, true, ["/kenya"], withThirdTrimester);
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
   const outlook = panel(page);
   await outlook.getByRole("combobox", { name: "Pregnancy window" }).click();

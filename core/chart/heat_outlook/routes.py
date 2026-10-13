@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import require_current_user
+from chart.model_settings.service import outlook_restriction
 from chart.risk.routes import _require_read_access as require_read_access
 from chart.risk.schemas import MapResponse
 from chart.risk.service import NoAdminUnitForGeography
@@ -46,6 +47,7 @@ def read_heat_outlook(
             scenario=scenario,
             period=period,
             selector=selector,
+            restriction=outlook_restriction(outcome),
         )
     except OutlookNotAvailable as exc:
         raise HTTPException(status_code=404, detail="OUTLOOK_NOT_PUBLISHED") from exc
@@ -69,6 +71,7 @@ def read_heat_outlook_map(
     selector: Annotated[str | None, Query(max_length=32)] = None,
 ) -> MapResponse:
     require_read_access(user, geography_id)
+    restriction = outlook_restriction(outcome)
     try:
         with get_session_factory()() as session:
             return load_outlook_map(
@@ -78,6 +81,7 @@ def read_heat_outlook_map(
                 scenario=scenario,
                 period=period,
                 selector=selector,
+                restriction=restriction,
             )
     except (OutlookNotAvailable, NoAdminUnitForGeography) as exc:
         raise HTTPException(status_code=404, detail="OUTLOOK_NOT_PUBLISHED") from exc

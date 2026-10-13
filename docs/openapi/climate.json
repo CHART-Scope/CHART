@@ -293,6 +293,18 @@
               "type": "string",
               "title": "Geography Id"
             }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "default": "lbw",
+              "title": "Outcome"
+            }
           }
         ],
         "responses": {
@@ -337,7 +349,7 @@
             }
           }
         },
-        "description": "Builds the date choices supported for the selected geography, including the next three months, the configured hot season, and available long-term scenario periods. The response reflects current climate and model availability rather than a hard-coded calendar."
+        "description": "Builds the date choices supported for the selected geography, including the next three months, the configured hot season, and available long-term scenario periods. The response reflects current climate and model availability rather than a hard-coded calendar, narrowed by the country's model settings for the outcome (windows, scenarios and data modes switched off are withdrawn or marked MODEL_DATA_MODE_DISABLED)."
       }
     },
     "/climate/preview": {
@@ -2143,6 +2155,158 @@
         "description": "Returns the counties of Kenya with their display geometry and the modelling team's annual-average heat-attributable share for the chosen outcome, scenario, period and selector, in the same shape as the risk map so the dashboard draws it identically. Requires a risk reader role and access to the geography path. Counties whose share is suppressed by the display rules carry missing_reason no_excess; windows with no period summary carry not_reported; counties with no published file carry no_model. Nothing is computed on request."
       }
     },
+    "/model-settings": {
+      "get": {
+        "tags": [
+          "model-settings"
+        ],
+        "summary": "Read model settings for the countries a user can see",
+        "operationId": "read_model_settings_model_settings_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "country",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z]{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available pregnancy windows or age groups, scenarios and data modes, with the options switched on and the defaults in use.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ModelSettingsListResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ModelSettingsResponse"
+                    }
+                  ],
+                  "title": "Response Read Model Settings Model Settings Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Without parameters, lists the model settings of every country whose path the signed-in user can read, one item per outcome. With country (ISO code, e.g. KE) and outcome (e.g. lbw), returns that one item. Each item carries the options the published outlook tables and active model releases support, tagged by the view that uses them, and the effective settings: the stored ones, or the defaults when none are saved. Any signed-in user may read them; roles are not restricted yet."
+      }
+    },
+    "/model-settings/{country_code}/{outcome}": {
+      "put": {
+        "tags": [
+          "model-settings"
+        ],
+        "summary": "Narrow the model options offered for a country and outcome",
+        "operationId": "write_model_settings_model_settings__country_code___outcome__put",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "country_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z]{2}$",
+              "title": "Country Code"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "title": "Outcome"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelSettingsValues"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The saved settings as they now apply, with the available options and who last changed them.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Stores which pregnancy windows or age groups, scenarios and data modes a country offers for an outcome. Settings may only narrow what the tables and releases support: unknown codes are refused (MODEL_SETTINGS_OPTION_UNKNOWN), every view keeps at least one option (MODEL_SETTINGS_OPTION_REQUIRED) and each default must be switched on (MODEL_SETTINGS_DEFAULT_NOT_ENABLED). Requires access to the country path; any signed-in role may write for now. Every change records a model_settings_changed audit event with the values before and after."
+      }
+    },
     "/learning/resources": {
       "get": {
         "tags": [
@@ -3217,17 +3381,25 @@
             "title": "Client Seq"
           },
           "event_type": {
-            "type": "string",
-            "enum": [
-              "signin",
-              "signout",
-              "page_view",
-              "district_switch",
-              "whatif_tick",
-              "whatif_settled",
-              "prediction_submitted",
-              "prediction_completed",
-              "prediction_failed"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "signin",
+                  "signout",
+                  "page_view",
+                  "district_switch",
+                  "whatif_tick",
+                  "whatif_settled",
+                  "prediction_submitted",
+                  "prediction_completed",
+                  "prediction_failed"
+                ]
+              },
+              {
+                "type": "string",
+                "const": "model_settings_changed"
+              }
             ],
             "title": "Event Type"
           },
@@ -3449,6 +3621,44 @@
           "message"
         ],
         "title": "Availability"
+      },
+      "AvailableOptions": {
+        "properties": {
+          "selector_label": {
+            "type": "string",
+            "title": "Selector Label"
+          },
+          "selectors": {
+            "items": {
+              "$ref": "#/components/schemas/SettingOption"
+            },
+            "type": "array",
+            "title": "Selectors"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/SettingOption"
+            },
+            "type": "array",
+            "title": "Scenarios"
+          },
+          "data_modes": {
+            "items": {
+              "$ref": "#/components/schemas/SettingOption"
+            },
+            "type": "array",
+            "title": "Data Modes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "selector_label",
+          "selectors",
+          "scenarios",
+          "data_modes"
+        ],
+        "title": "AvailableOptions",
+        "description": "Everything the published tables and active model releases support."
       },
       "BootstrapAdminResponse": {
         "properties": {
@@ -5766,6 +5976,142 @@
         ],
         "title": "ModelFileInfo"
       },
+      "ModelSettingsListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelSettingsResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ModelSettingsListResponse"
+      },
+      "ModelSettingsResponse": {
+        "properties": {
+          "country_code": {
+            "type": "string",
+            "title": "Country Code"
+          },
+          "country_name": {
+            "type": "string",
+            "title": "Country Name"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "available": {
+            "$ref": "#/components/schemas/AvailableOptions"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/ModelSettingsValues"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default"
+          },
+          "updated_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By User Id"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "country_code",
+          "country_name",
+          "outcome",
+          "available",
+          "settings",
+          "is_default"
+        ],
+        "title": "ModelSettingsResponse"
+      },
+      "ModelSettingsValues": {
+        "properties": {
+          "selectors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Selectors"
+          },
+          "default_selector": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Selector"
+          },
+          "scenarios": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Scenarios"
+          },
+          "default_scenario": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Scenario"
+          },
+          "data_modes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Data Modes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "selectors",
+          "scenarios",
+          "data_modes"
+        ],
+        "title": "ModelSettingsValues",
+        "description": "The options left on. Codes must come from the available options."
+      },
       "ModelSyncResponse": {
         "properties": {
           "activeReleaseIds": {
@@ -8001,6 +8347,36 @@
           "label"
         ],
         "title": "SectorOption"
+      },
+      "SettingOption": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "views": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "outlook",
+                "live"
+              ]
+            },
+            "type": "array",
+            "title": "Views"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "label",
+          "views"
+        ],
+        "title": "SettingOption"
       },
       "SetupAdminInput": {
         "properties": {

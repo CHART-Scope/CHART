@@ -16,6 +16,8 @@ EventType = Literal[
     "prediction_completed",
     "prediction_failed",
 ]
+# Written by the API itself, never accepted from a client batch.
+ServerEventType = Literal["model_settings_changed"]
 
 MAX_EVENTS_PER_BATCH = 500
 
@@ -60,7 +62,7 @@ class AuditEventOut(BaseModel):
     session_id: str
     flush_id: str
     client_seq: int
-    event_type: EventType
+    event_type: EventType | ServerEventType
     occurred_at: datetime
     received_at: datetime
     geography_id: str | None = None
