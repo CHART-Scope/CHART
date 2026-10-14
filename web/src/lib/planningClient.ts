@@ -1,3 +1,5 @@
+import { authFetch, readErrorCode } from "./authFetch";
+
 export type GeographyRecord = {
   id: string;
   name: string;
@@ -178,14 +180,20 @@ export async function listModelCatalog(
   return response.items;
 }
 
-export async function getPlanningOptions(geographyId: string, accessToken: string) {
+export async function getPlanningOptions(
+  geographyId: string,
+  accessToken: string | null,
+) {
   return request<PlanningOptions>(
     `/api/chart/climate/planning-options/${encodeURIComponent(geographyId)}`,
     accessToken,
   );
 }
 
-export async function listPredictionRequests(geographyId: string, accessToken: string) {
+export async function listPredictionRequests(
+  geographyId: string,
+  accessToken: string | null,
+) {
   const query = new URLSearchParams({ geography_id: geographyId, limit: "10" });
   const response = await request<{ items: PredictionSummary[] }>(
     `/api/chart/climate/prediction-requests?${query}`,
@@ -194,7 +202,10 @@ export async function listPredictionRequests(geographyId: string, accessToken: s
   return response.items;
 }
 
-export async function getPredictionRequest(requestId: number, accessToken: string) {
+export async function getPredictionRequest(
+  requestId: number,
+  accessToken: string | null,
+) {
   return request<PredictionRequest>(
     `/api/chart/climate/prediction-requests/${requestId}`,
     accessToken,
@@ -316,7 +327,7 @@ function hostnameOf(url: string): string {
 }
 
 export async function submitPrediction(
-  accessToken: string,
+  accessToken: string | null,
   input: {
     geographyId: string;
     planningMonth: string;
@@ -370,28 +381,24 @@ export function predictionErrorMessage(code?: string | null) {
   }
 }
 
-async function request<T>(url: string, accessToken?: string, init: RequestInit = {}) {
-  const headers = new Headers(init.headers);
-  if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
-  const response = await fetch(url, {
-    // ``cache: "no-store"`` is the safe default for this client — most
-    // endpoints (prediction status polling, what-if scoring, live
-    // catalogs after a manifest change) must never come from a stale
-    // browser cache. Callers that hit near-static reference endpoints
-    // can override ``init.cache`` explicitly to opt into normal HTTP
-    // caching. Note: process-level caches (see ``useGeographies``)
-    // already dedupe within a session, so browser caching is mainly
-    // useful across hard refreshes.
-    cache: "no-store",
+async function request<T>(
+  url: string,
+  accessToken?: string | null,
+  init: RequestInit = {},
+) {
+  // ``cache: "no-store"`` (authFetch's default) is the safe default for this
+  // client: prediction status polling, what-if scoring and live catalogs
+  // after a manifest change must never come from a stale browser cache.
+  // Process-level caches (see ``useGeographies``) dedupe within a session.
+  // Only calls that name a token are authenticated; the public catalogue
+  // reads never carried one.
+  const response = await authFetch(url, {
     ...init,
-    headers,
-    signal: init.signal ?? AbortSignal.timeout(30_000),
+    accessToken,
+    auth: accessToken !== undefined,
   });
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      error?: string;
-    } | null;
-    throw new Error(predictionErrorMessage(body?.error));
+    throw new Error(predictionErrorMessage(await readErrorCode(response)));
   }
   return (await response.json()) as T;
 }

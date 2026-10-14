@@ -58,6 +58,7 @@ from .service import (
     ClimateServiceError,
     climate_for_request,
     score_prepared_prediction,
+    require_enabled_by_settings,
     validate_prediction_request,
 )
 
@@ -104,6 +105,7 @@ def submit_prediction(
             409,
             ",".join(str(window) for window in unsupported_windows),
         )
+    require_enabled_by_settings(request, session_factory=session_factory, now=now)
     session_factory = session_factory or get_session_factory()
     current_time = now or _now()
     source_as_of = current_time.date()

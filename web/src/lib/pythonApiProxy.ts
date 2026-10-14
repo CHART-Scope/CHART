@@ -8,11 +8,21 @@ type ProxyOptions = {
   body?: unknown;
   authorization?: string | null;
   headers?: HeadersInit;
+  /** Upstream budget. Defaults to the browser clients' 30 s so a slow read
+   * is not cut off here first. */
+  timeoutMs?: number;
 };
 
 export async function proxyPythonApiRequest(
   request: NextRequest,
-  { path, method = "GET", body, authorization, headers: extraHeaders }: ProxyOptions,
+  {
+    path,
+    method = "GET",
+    body,
+    authorization,
+    headers: extraHeaders,
+    timeoutMs = 30_000,
+  }: ProxyOptions,
 ) {
   const url = new URL(path, `${getPythonApiBaseUrl(request)}/`);
   if (method === "GET") {
@@ -32,7 +42,7 @@ export async function proxyPythonApiRequest(
       cache: "no-store",
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
     return NextResponse.json({ error: "CHART_API_UNAVAILABLE" }, { status: 502 });

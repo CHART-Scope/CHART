@@ -1399,3 +1399,34 @@ class LearningPreferenceRecord(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class ModelDisplaySetting(Base):
+    """Which model options one country offers for one outcome.
+
+    ``settings`` only narrows what the published tables and the active model
+    releases support (see ``chart.model_settings``); a missing row means the
+    agreed defaults. Every write is mirrored by a ``model_settings_changed``
+    audit event carrying the before and after values.
+    """
+
+    __tablename__ = "model_display_setting"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    country_code: Mapped[str] = mapped_column(String(8), nullable=False)
+    outcome: Mapped[str] = mapped_column(String(64), nullable=False)
+    settings: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False
+    )
+    updated_by_user_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "country_code", "outcome", name="uq_model_display_setting_country_outcome"
+        ),
+    )

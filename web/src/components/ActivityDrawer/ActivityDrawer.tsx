@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { getFreshAccessToken } from "@/lib/authClient";
+import { getStoredAuthSession } from "@/lib/authClient";
 import { fetchIngestionJobs, type IngestionJob } from "@/lib/climateDataClient";
+import { startPolling } from "@/lib/polling";
 
 import styles from "./ActivityDrawer.module.css";
 
@@ -15,21 +16,23 @@ type PageState =
   | { status: "error"; message: string };
 
 const POLL_INTERVAL_MS = 5_000;
+/** Ten minutes of checks while the drawer stays open on running work. */
+const MAX_POLLS = 120;
 
 /** Long-running server work, rather than a log of ordinary clicks and requests. */
 export function ActivityDrawer({ open, onClose }: Props) {
   const [state, setState] = useState<PageState>({ status: "idle" });
 
-  const refresh = useCallback(async (signal?: AbortSignal) => {
-    const token = await getFreshAccessToken();
-    if (!token) {
+  const refresh = useCallback(async (signal: AbortSignal) => {
+    if (!getStoredAuthSession()) {
       setState({ status: "error", message: "Sign in to see background work." });
       return;
     }
     try {
-      setState({ status: "ready", jobs: await fetchIngestionJobs(token, signal) });
+      const jobs = await fetchIngestionJobs(null, signal);
+      if (!signal.aborted) setState({ status: "ready", jobs });
     } catch (cause) {
-      if (signal?.aborted) return;
+      if (signal.aborted) return;
       const message = cause instanceof Error ? cause.message : "";
       setState({
         status: "error",
@@ -58,11 +61,20 @@ export function ActivityDrawer({ open, onClose }: Props) {
     [state],
   );
 
+  // One check at a time, capped, aborted on close, and paused while the tab
+  // is hidden; a setInterval here stacked requests behind a slow API.
+  const hasLiveWork = liveCount > 0;
   useEffect(() => {
-    if (!open || liveCount === 0) return;
-    const timer = window.setInterval(() => void refresh(), POLL_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [liveCount, open, refresh]);
+    if (!open || !hasLiveWork) return;
+    return startPolling({
+      intervalMs: POLL_INTERVAL_MS,
+      maxAttempts: MAX_POLLS,
+      tick: async (signal) => {
+        await refresh(signal);
+        return "continue";
+      },
+    });
+  }, [hasLiveWork, open, refresh]);
 
   return (
     <>

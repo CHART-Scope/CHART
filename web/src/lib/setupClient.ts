@@ -1,3 +1,4 @@
+import { authFetch } from "./authFetch";
 import type {
   OnboardingState,
   SetupSector,
@@ -41,10 +42,7 @@ export type BootstrapSetupResult = {
 };
 
 export async function getSetupStatus() {
-  const response = await fetch("/api/setup", {
-    cache: "no-store",
-    signal: AbortSignal.timeout(15_000),
-  });
+  const response = await authFetch("/api/setup", { auth: false, timeoutMs: 15_000 });
   if (!response.ok) {
     throw new Error("CHART installation status is unavailable.");
   }
@@ -52,9 +50,9 @@ export async function getSetupStatus() {
 }
 
 export async function getSetupOptions() {
-  const response = await fetch("/api/setup/options", {
-    cache: "no-store",
-    signal: AbortSignal.timeout(15_000),
+  const response = await authFetch("/api/setup/options", {
+    auth: false,
+    timeoutMs: 15_000,
   });
   if (!response.ok) {
     throw new Error("CHART setup choices are unavailable.");
@@ -63,9 +61,9 @@ export async function getSetupOptions() {
 }
 
 export async function loadActionRepository() {
-  const response = await fetch("/api/setup/action-repository", {
-    cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
+  const response = await authFetch("/api/setup/action-repository", {
+    auth: false,
+    timeoutMs: 20_000,
   });
   if (!response.ok) {
     throw new Error(
@@ -79,11 +77,15 @@ export async function bootstrapChartSetup(
   state: OnboardingState,
   geographyCatalog: SetupCountryOption[],
 ) {
-  const response = await fetch("/api/setup/bootstrap", {
+  const response = await authFetch("/api/setup/bootstrap", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-chart-bootstrap-token": state.setupToken.trim(),
+    },
     body: JSON.stringify(toBootstrapInput(state, geographyCatalog)),
-    signal: AbortSignal.timeout(30_000),
+    auth: false,
+    timeoutMs: 30_000,
   });
 
   if (!response.ok) {
@@ -107,7 +109,8 @@ function toBootstrapInput(
     !state.primarySectorId ||
     !state.adminName.trim() ||
     !state.adminEmail.trim() ||
-    state.adminPassword.length < 8
+    state.adminPassword.length < 8 ||
+    !state.setupToken.trim()
   ) {
     throw new Error("Complete every setup step before launching CHART.");
   }
@@ -160,12 +163,11 @@ function toBootstrapInput(
   };
 }
 
-export async function resetInstallation(accessToken: string) {
-  const response = await fetch("/api/setup/reset", {
+export async function resetInstallation(accessToken?: string | null) {
+  const response = await authFetch("/api/setup/reset", {
     method: "POST",
-    headers: { authorization: `Bearer ${accessToken}` },
-    cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
+    accessToken,
+    timeoutMs: 20_000,
   });
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {
@@ -176,12 +178,11 @@ export async function resetInstallation(accessToken: string) {
   return (await response.json()) as SetupStatus;
 }
 
-export async function syncInstalledModels(accessToken: string) {
-  const response = await fetch("/api/setup/models/sync", {
+export async function syncInstalledModels(accessToken?: string | null) {
+  const response = await authFetch("/api/setup/models/sync", {
     method: "POST",
-    headers: { authorization: `Bearer ${accessToken}` },
-    cache: "no-store",
-    signal: AbortSignal.timeout(45_000),
+    accessToken,
+    timeoutMs: 60_000,
   });
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {
@@ -214,6 +215,10 @@ function resetErrorMessage(code?: string) {
 
 function setupErrorMessage(code?: string) {
   switch (code) {
+    case "SETUP_BOOTSTRAP_FORBIDDEN":
+      return "The setup token is not correct. Ask whoever deployed CHART for its CHART_BOOTSTRAP_TOKEN.";
+    case "SETUP_BOOTSTRAP_DISABLED":
+      return "Installation setup is disabled because no CHART_BOOTSTRAP_TOKEN is configured on the server.";
     case "SETUP_BOOTSTRAP_LOCKED":
       return "This CHART installation has already been set up. Return to sign in.";
     case "SETUP_BOOTSTRAP_IN_PROGRESS":

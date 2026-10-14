@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { Skeleton } from "@/components/Skeleton";
+import {
+  getCurrentAccessToken,
+  getStoredAuthSession,
+  onAuthSessionCleared,
+} from "@/lib/authClient";
 import { fetchRiskMap, type MapArea, type MapResponse } from "@/lib/dashboardClient";
 import { submitPrediction } from "@/lib/planningClient";
 
@@ -50,13 +55,20 @@ type Props = {
 // Dashboard query-string changes can remount this component even when the map
 // scope has not changed (for example, selecting another county). Keep the
 // expensive, parent-level map response outside the component so those
-// navigations reuse it. The token remains part of the key so data is never
-// shared between signed-in sessions; the small bound prevents an old session
-// from accumulating indefinitely in a long-lived tab.
+// navigations reuse it. The signed-in user, not the token, is part of the
+// key: the token rotates every few minutes and keying on it refetched the
+// map each time. Sign-out clears the caches so the next user starts empty;
+// the small bound keeps a long-lived tab from accumulating entries.
 const mapCache = new Map<string, MapResponse>();
 const mapFrameCache = new Map<string, MapResponse>();
 const mapRequests = new Map<string, Promise<MapResponse>>();
 const MAX_CACHED_MAPS = 12;
+
+onAuthSessionCleared(() => {
+  mapCache.clear();
+  mapFrameCache.clear();
+  mapRequests.clear();
+});
 
 function rememberMap(key: string, frameKey: string, data: MapResponse) {
   mapCache.delete(key);
@@ -94,7 +106,7 @@ function loadMap(
 
   const request = (
     source
-      ? source.load(accessToken)
+      ? source.load(getCurrentAccessToken() ?? accessToken)
       : fetchRiskMap(geographyId, accessToken, { month, outcome })
   )
     .then((response) => {
@@ -121,15 +133,19 @@ export function SpatialRiskMap({
   source,
 }: Props) {
   const id = useId();
+  const hasToken = Boolean(accessToken);
+  const tokenRef = useRef(accessToken);
+  tokenRef.current = accessToken;
+  const userKey = getStoredAuthSession()?.user.userId ?? "";
   const requestKey = source
-    ? `${geographyId}:${source.key}:${accessToken}`
-    : `${geographyId}:${outcome}:${month}:${accessToken}`;
+    ? `${userKey}:${geographyId}:${source.key}`
+    : `${userKey}:${geographyId}:${outcome}:${month}`;
   // Values change with month and outcome, but the administrative frame does
   // not. Seed a remount from the last response for this country/session so a
   // URL change updates the colours in place rather than blanking the map and
   // flashing its skeleton. A genuinely different country has no frame entry
   // and still gets the honest first-load placeholder.
-  const frameKey = `${geographyId}:${accessToken}`;
+  const frameKey = `${userKey}:${geographyId}`;
   const [result, setResult] = useState<{
     key: string;
     data: MapResponse;
@@ -167,7 +183,8 @@ export function SpatialRiskMap({
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    if (!geographyId || !accessToken) {
+    const token = tokenRef.current;
+    if (!geographyId || !token) {
       setResult(null);
       return;
     }
@@ -178,7 +195,7 @@ export function SpatialRiskMap({
       requestKey,
       frameKey,
       geographyId,
-      accessToken,
+      token,
       month,
       outcome,
       refreshKey > 0 || dataRefreshKey > 0,
@@ -198,7 +215,7 @@ export function SpatialRiskMap({
     };
   }, [
     geographyId,
-    accessToken,
+    hasToken,
     month,
     outcome,
     refreshKey,
@@ -245,14 +262,14 @@ export function SpatialRiskMap({
 
   const prepare = useCallback(
     async (areas: MapArea[]) => {
-      if (!accessToken || !month || areas.length === 0) return;
+      if (!hasToken || !month || areas.length === 0) return;
       setPreparing(areas.length);
       setPrepareError(null);
       for (const area of areas) {
         if (!area.geography_id) continue;
         queued.current.add(area.geography_id);
         try {
-          await submitPrediction(accessToken, {
+          await submitPrediction(tokenRef.current ?? null, {
             geographyId: area.geography_id,
             planningMonth: month,
             target: "month",
@@ -269,7 +286,7 @@ export function SpatialRiskMap({
       // automatic allowance, so the refetch cannot start another batch.
       setRefreshKey((value) => value + 1);
     },
-    [accessToken, month, outcome],
+    [hasToken, month, outcome],
   );
 
   const shapes = useMemo(() => {

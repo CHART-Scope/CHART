@@ -1,5 +1,5 @@
 export { recordAuditEvent, resetAuditSession, useAuditStore } from "./store";
-export { startAuditFlush, stopAuditFlush } from "./flush";
+export { flushAuditNow, startAuditFlush, stopAuditFlush } from "./flush";
 export { getAuditEvents } from "./client";
 export type {
   AuditEvent,

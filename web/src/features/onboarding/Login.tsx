@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-import { Button } from "@/components/Button";
+import { BrandMark } from "@/components/BrandMark";
+import { Button, buttonClassName } from "@/components/Button";
 import { Icon, IconSprite } from "@/components/Icon";
-import { startKeycloakSignIn } from "@/lib/authClient";
+import { startKeycloakSignIn, takeSignedOutReason } from "@/lib/authClient";
 import { getSetupStatus } from "@/lib/setupClient";
 import { DashboardPreview } from "./DashboardPreview";
 import styles from "./Login.module.css";
@@ -25,6 +26,18 @@ export function Login({
   const [detectedMode, setDetectedMode] = useState<
     "checking" | "configured" | "required" | "unavailable"
   >(setupMode === "auto" ? "checking" : setupMode);
+  const [signedOutNotice, setSignedOutNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const reason = takeSignedOutReason();
+    if (reason === "idle") {
+      setSignedOutNotice(
+        "You were signed out after 30 minutes without activity. Sign in to continue.",
+      );
+    } else if (reason === "other_tab") {
+      setSignedOutNotice("You signed out of CHART in another tab.");
+    }
+  }, []);
 
   useEffect(() => {
     if (setupMode !== "auto") {
@@ -65,7 +78,7 @@ export function Login({
       <div className={styles.page}>
         <header className={styles.header}>
           <a className={styles.brand} href="/" aria-label="CHART home">
-            CHART
+            <BrandMark size={28} tone="light" wordmark />
           </a>
           <nav className={styles.nav} aria-label="Main navigation">
             <a href="/learning">Learning Hub</a>
@@ -78,6 +91,11 @@ export function Login({
           </nav>
         </header>
         <main>
+          {signedOutNotice ? (
+            <p className={styles.signedOutNotice} role="status">
+              {signedOutNotice}
+            </p>
+          ) : null}
           <section className={styles.hero} aria-labelledby="chart-landing-title">
             <div className={styles.heroInner}>
               <p className={styles.eyebrow}>Climate × health</p>
@@ -88,7 +106,10 @@ export function Login({
                 CHART helps local governments and health planners use evidence and work
                 together to build climate-resilient health systems.
               </p>
-              <a className={styles.demoLink} href="mailto:info@scopeimpact.fi">
+              <a
+                className={buttonClassName({ size: "lg" })}
+                href="mailto:info@scopeimpact.fi"
+              >
                 Request access <Icon name="arrow-right" size={16} />
               </a>
             </div>
@@ -127,6 +148,17 @@ export function Login({
             <ul aria-label="Partners">
               <li>
                 <a
+                  href="https://www.ubs.com/global/en/sustainability-impact/social-impact-and-philanthropy/optimus-foundation.html"
+                  aria-label="UBS Optimus Foundation"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img src="/partners/ubs.png" alt="UBS" width="90" height="34" />
+                  <span>Optimus Foundation</span>
+                </a>
+              </li>
+              <li>
+                <a
                   href="https://scopeimpact.fi/"
                   aria-label="SCOPE Impact"
                   target="_blank"
@@ -139,17 +171,6 @@ export function Login({
                     width="152"
                     height="101"
                   />
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://www.ubs.com/global/en/sustainability-impact/social-impact-and-philanthropy/optimus-foundation.html"
-                  aria-label="UBS Optimus Foundation"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <img src="/partners/ubs.png" alt="UBS" width="90" height="34" />
-                  <span>Optimus Foundation</span>
                 </a>
               </li>
               <li>
@@ -188,13 +209,43 @@ export function Login({
                   <span>South Asia</span>
                 </a>
               </li>
+              <li>
+                <a
+                  href="https://amphealth.org/"
+                  aria-label="AMP Health"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img
+                    src="/partners/amp-health.png"
+                    alt="AMP Health"
+                    width="160"
+                    height="36"
+                  />
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://amref.org/"
+                  aria-label="Amref Health Africa"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img
+                    src="/partners/amref.png"
+                    alt="Amref Health Africa"
+                    width="150"
+                    height="89"
+                  />
+                </a>
+              </li>
             </ul>
           </section>
         </main>
         <footer className={styles.footer}>
           <div className={styles.footerBrand}>
             <a href="/" className={styles.brand} aria-label="CHART home">
-              CHART
+              <BrandMark size={28} tone="light" wordmark />
             </a>
             <p>
               Climate &amp; Health Adaptation

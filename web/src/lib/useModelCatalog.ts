@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { onAuthSessionCleared } from "@/lib/authClient";
 import { listModelCatalog, type ModelCatalogEntry } from "@/lib/planningClient";
 
 /**
@@ -19,19 +20,28 @@ import { listModelCatalog, type ModelCatalogEntry } from "@/lib/planningClient";
 const cache = new Map<string, ModelCatalogEntry[]>();
 const inFlight = new Map<string, Promise<ModelCatalogEntry[]>>();
 
+onAuthSessionCleared(() => {
+  cache.clear();
+  inFlight.clear();
+});
+
 function fetchOnce(geographyId: string): Promise<ModelCatalogEntry[]> {
   const cached = cache.get(geographyId);
   if (cached) return Promise.resolve(cached);
   const pending = inFlight.get(geographyId);
   if (pending) return pending;
-  const request = listModelCatalog(geographyId, { includeDescendants: true })
+  const request: Promise<ModelCatalogEntry[]> = listModelCatalog(geographyId, {
+    includeDescendants: true,
+  })
     .then((items) => {
+      // Cleared by a sign-out meanwhile: answer this caller, cache nothing.
+      if (inFlight.get(geographyId) !== request) return items;
       cache.set(geographyId, items);
       inFlight.delete(geographyId);
       return items;
     })
     .catch((error: unknown) => {
-      inFlight.delete(geographyId);
+      if (inFlight.get(geographyId) === request) inFlight.delete(geographyId);
       throw error;
     });
   inFlight.set(geographyId, request);

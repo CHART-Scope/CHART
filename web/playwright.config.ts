@@ -5,6 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
 // checked and replayed after the fact.
 const outputRoot = "../outputs/e2e/web";
 const port = Number(process.env.E2E_PORT ?? 3300);
+const upstreamPort = Number(process.env.E2E_UPSTREAM_PORT ?? 3301);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -23,13 +24,35 @@ export default defineConfig({
     screenshot: "on",
     video: "on",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "chromium-public",
+      testDir: "../e2e",
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
   webServer: {
     // A production build in its own dist directory, so the suite runs beside
     // `make web` without touching its `.next`.
     // next build rewrites next-env.d.ts to point at its dist directory, so the
     // tracked copy is put back before the server starts.
     command: `cp next-env.d.ts .next-env.d.ts.bak && NEXT_DIST_DIR=.next-e2e npx next build --webpack; status=$?; mv .next-env.d.ts.bak next-env.d.ts; [ $status -eq 0 ] && NEXT_DIST_DIR=.next-e2e npx next start --hostname 127.0.0.1 --port ${port}`,
+    // Server-side calls go to the specs' fake upstream (e2e/support/fakeUpstream.ts).
+    // The bootstrap token is set only so a spec can prove the server never sends it.
+    env: {
+      CHART_WEB_ORIGIN: `http://127.0.0.1:${port}`,
+      // Server-side proxies (setup bootstrap, models sync, Keycloak token
+      // exchange) reach a stand-in a spec starts on this port when it needs to
+      // see what was forwarded; nothing listens otherwise.
+      CHART_PYTHON_API_INTERNAL_URL: `http://127.0.0.1:${upstreamPort}`,
+      KEYCLOAK_SERVER_URL: `http://127.0.0.1:${upstreamPort}`,
+      // Browser redirects to Keycloak (sign-in, sign-out) land on the test
+      // server itself, so a spec never depends on a real Keycloak or the
+      // remote-dev tunnel on :8080. Specs stub these pages where they matter.
+      KEYCLOAK_BROWSER_URL: `http://127.0.0.1:${port}/__e2e-keycloak`,
+      CHART_BOOTSTRAP_TOKEN: "e2e-server-side-bootstrap-token",
+    },
     url: `http://127.0.0.1:${port}/`,
     reuseExistingServer: false,
     timeout: 600_000,

@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
@@ -71,6 +72,27 @@ T3_NOTE = (
 THIN_DATA = "Estimate relies partly on temperatures rarely seen in the fitting data."
 
 
+@dataclass(frozen=True)
+class OutlookRestriction:
+    """The options a country's model settings leave on (``chart.model_settings``).
+
+    It only removes options: a code the file does not contain stays absent.
+    """
+
+    selectors: frozenset[str]
+    scenarios: frozenset[str]
+    default_selector: str | None = None
+    default_scenario: str | None = None
+
+
+@dataclass(frozen=True)
+class PublishedOptions:
+    """What the national file of one outcome offers, before any setting."""
+
+    selectors: list[Option]
+    scenarios: list[str]
+
+
 class OutlookNotAvailable(LookupError):
     """No published file covers this geography and outcome."""
 
@@ -113,20 +135,56 @@ def _document(geography_id: str, outcome: str) -> tuple[dict, str] | None:
     return _read(path, path.stat().st_mtime_ns), slug
 
 
+def published_options(outcome: str) -> PublishedOptions | None:
+    """The selectors and scenarios Kenya's national file publishes."""
+
+    found = _document("geo-ke", outcome)
+    if found is None:
+        return None
+    document = found[0]
+    return PublishedOptions(
+        selectors=[_selector_option(option) for option in document["selectors"]],
+        scenarios=sorted({row["scenario"] for row in document["periods"]}),
+    )
+
+
+def scenario_label(code: str) -> str:
+    return SCENARIO_LABELS.get(code, code)
+
+
+def _offered(
+    document: dict, restriction: OutlookRestriction | None
+) -> tuple[list[dict], list[str]]:
+    """The file's selectors and scenarios that the settings leave on."""
+
+    selectors = document["selectors"]
+    scenarios = sorted({row["scenario"] for row in document["periods"]})
+    if restriction is None:
+        return selectors, scenarios
+    return (
+        [option for option in selectors if option["code"] in restriction.selectors],
+        [code for code in scenarios if code in restriction.scenarios],
+    )
+
+
 def _resolve_selection(
     document: dict,
     outcome: str,
     scenario: str | None,
     period: str | None,
     selector: str | None,
+    restriction: OutlookRestriction | None = None,
 ) -> tuple[str, str, str]:
-    scenario = scenario or DEFAULT_SCENARIO
+    selectors, scenarios = _offered(document, restriction)
+    defaults = restriction or OutlookRestriction(frozenset(), frozenset())
+    scenario = scenario or defaults.default_scenario or DEFAULT_SCENARIO
     period = period or DEFAULT_PERIOD
-    selector = selector or DEFAULT_SELECTOR[outcome]
+    selector = selector or defaults.default_selector or DEFAULT_SELECTOR[outcome]
+    # A disabled option is refused exactly like one the file does not have.
     if (
-        scenario not in {row["scenario"] for row in document["periods"]}
+        scenario not in scenarios
         or period not in {row["period"] for row in document["periods"]}
-        or selector not in {option["code"] for option in document["selectors"]}
+        or selector not in {option["code"] for option in selectors}
     ):
         raise OutlookSelectionInvalid(f"{scenario}/{period}/{selector}")
     return scenario, period, selector
@@ -140,6 +198,7 @@ def load_outlook_map(
     scenario: str | None = None,
     period: str | None = None,
     selector: str | None = None,
+    restriction: OutlookRestriction | None = None,
 ) -> MapResponse:
     """The county map for one selection: each county's annual-average share.
 
@@ -151,7 +210,7 @@ def load_outlook_map(
     if national is None:
         raise OutlookNotAvailable(geography_id)
     scenario, period, selector = _resolve_selection(
-        national[0], outcome, scenario, period, selector
+        national[0], outcome, scenario, period, selector, restriction
     )
     frame = load_map_view(
         session, geography_id, None, outcome=outcome, with_values=False
@@ -209,6 +268,7 @@ def load_outlook(
     scenario: str | None = None,
     period: str | None = None,
     selector: str | None = None,
+    restriction: OutlookRestriction | None = None,
 ) -> HeatOutlookResponse:
     found = _document(geography_id, outcome)
     if found is None:
@@ -216,10 +276,10 @@ def load_outlook(
     document, slug = found
     release = outlook_release()
     periods = sorted({row["period"] for row in document["periods"]})
-    scenarios = sorted({row["scenario"] for row in document["periods"]})
-    selectors = [_selector_option(option) for option in document["selectors"]]
+    offered_selectors, scenarios = _offered(document, restriction)
+    selectors = [_selector_option(option) for option in offered_selectors]
     scenario, period, selector = _resolve_selection(
-        document, outcome, scenario, period, selector
+        document, outcome, scenario, period, selector, restriction
     )
 
     baseline = periods[0]
@@ -232,10 +292,7 @@ def load_outlook(
         source_uri=f"{MODEL_BUCKET_URI}/kenya/{release}/{outcome}/{slug}.json",
         baseline_period=_period_label(baseline),
         reference_note=_reference_note(document, baseline),
-        scenarios=[
-            Option(code=code, label=SCENARIO_LABELS.get(code, code))
-            for code in scenarios
-        ],
+        scenarios=[Option(code=code, label=scenario_label(code)) for code in scenarios],
         periods=[Option(code=code, label=_period_label(code)) for code in periods],
         selectors=selectors,
         scenario=scenario,

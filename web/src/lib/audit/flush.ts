@@ -3,15 +3,17 @@ import { useAuditStore } from "./store";
 
 const FLUSH_INTERVAL_MS = 30_000;
 const MAX_EVENTS_PER_FLUSH = 400;
-const BACKOFF_MS = [2_000, 8_000, 30_000];
+const BACKOFF_MS = [2_000, 8_000, 30_000, 120_000];
 
 type TokenGetter = () => string | null | Promise<string | null>;
 
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 let visibilityHandler: (() => void) | null = null;
 let pageHideHandler: (() => void) | null = null;
-let inFlight = false;
+let inFlight: Promise<void> | null = null;
 let failureCount = 0;
+/** No automatic flush before this time; an explicit flush ignores it. */
+let retryAfter = 0;
 
 function newFlushId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -20,26 +22,36 @@ function newFlushId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-async function flushOnce(getToken: TokenGetter, opts: { keepalive?: boolean } = {}) {
-  if (inFlight) return;
+function flushOnce(getToken: TokenGetter, opts: { keepalive?: boolean } = {}) {
+  inFlight ??= sendBatch(getToken, opts).finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+async function sendBatch(getToken: TokenGetter, opts: { keepalive?: boolean }) {
   const store = useAuditStore.getState();
   const events = store.takeBatch(MAX_EVENTS_PER_FLUSH);
   if (events.length === 0) return;
-  inFlight = true;
+  // Sign-out resets the session while a batch may be in flight; acking that
+  // batch's sequence numbers would then drop the next session's events.
+  const sessionId = store.sessionId;
+  const ack = () => {
+    const current = useAuditStore.getState();
+    if (current.sessionId === sessionId) {
+      current.ackFlush(events[events.length - 1].client_seq);
+    }
+  };
   try {
     const token = await getToken();
     if (!token) return;
     await postAuditBatch(
-      {
-        session_id: store.sessionId,
-        flush_id: newFlushId(),
-        events,
-      },
+      { session_id: sessionId, flush_id: newFlushId(), events },
       token,
       opts,
     );
-    store.ackFlush(events[events.length - 1].client_seq);
-    failureCount = 0;
+    ack();
+    succeeded();
   } catch (error) {
     // 4xx: poison batch — drop so we don't spin. 401 is the token, not the
     // batch, so it backs off like 5xx / network and is sent again later.
@@ -49,28 +61,37 @@ async function flushOnce(getToken: TokenGetter, opts: { keepalive?: boolean } = 
       error.status < 500 &&
       error.status !== 401
     ) {
-      store.ackFlush(events[events.length - 1].client_seq);
-      failureCount = 0;
+      ack();
+      succeeded();
     } else {
-      failureCount = Math.min(failureCount + 1, BACKOFF_MS.length);
+      failed();
     }
-  } finally {
-    inFlight = false;
   }
 }
 
+function succeeded() {
+  failureCount = 0;
+  retryAfter = 0;
+}
+
+function failed() {
+  failureCount += 1;
+  retryAfter = Date.now() + BACKOFF_MS[Math.min(failureCount, BACKOFF_MS.length) - 1];
+}
+
 /**
- * Start the background flush loop. Safe to call more than once — subsequent
- * calls tear the previous listeners down first so token refreshes replace
- * the getter cleanly.
+ * Start the background flush loop. Safe to call more than once — and after
+ * `stopAuditFlush` — since each call tears the previous listeners down first.
+ *
+ * Backoff is a point in time rather than a skipped tick, so the loop always
+ * recovers: once `retryAfter` passes, the next tick tries again.
  */
 export function startAuditFlush(getToken: TokenGetter): void {
   stopAuditFlush();
   if (typeof window === "undefined") return;
 
   intervalHandle = setInterval(() => {
-    const backoffSlot = failureCount > 0 ? BACKOFF_MS[failureCount - 1] : 0;
-    if (backoffSlot === 0) void flushOnce(getToken);
+    if (Date.now() >= retryAfter) void flushOnce(getToken);
   }, FLUSH_INTERVAL_MS);
 
   visibilityHandler = () => {
@@ -100,11 +121,11 @@ export function stopAuditFlush(): void {
     window.removeEventListener("pagehide", pageHideHandler);
     pageHideHandler = null;
   }
-  inFlight = false;
-  failureCount = 0;
+  succeeded();
 }
 
-/** Testing hook — force a synchronous flush attempt. */
+/** Flush now, ignoring backoff — e.g. before sign-out drops the token. */
 export async function flushAuditNow(getToken: TokenGetter): Promise<void> {
+  if (inFlight) await inFlight;
   await flushOnce(getToken);
 }

@@ -14,6 +14,27 @@ Backend endpoint: `POST /setup/bootstrap` (proxied through the web app at
 
 Handler: `bootstrap()` in `core/chart/setup/service.py`.
 
+### Setup token
+
+`POST /setup/bootstrap` requires the `X-CHART-Bootstrap-Token` header to match
+the API's `CHART_BOOTSTRAP_TOKEN` (`403 SETUP_BOOTSTRAP_FORBIDDEN` otherwise;
+`503 SETUP_BOOTSTRAP_DISABLED` when the API has no token configured). The web
+proxy only forwards the header the browser sent; it never adds the token
+itself, so a visitor who does not hold the token cannot bootstrap an
+installation.
+
+The person running the wizard enters the token in the **Setup token** field of
+the first-administrator dialog. It is kept in memory only, like the
+administrator password, and is never written to `localStorage`.
+
+- **Local development:** `make run` (through `make bootstrap-token`) generates
+  the token once and stores it in `web/.env.local`. Read it with
+  `sed -n 's/^CHART_BOOTSTRAP_TOKEN=//p' web/.env.local`.
+- **Production:** the token is the `CHART_BOOTSTRAP_TOKEN` value in
+  `~/chart-deploy/aws/.env.prod`, which only the API container receives. Share
+  it with the installation's first administrator out of band, and rotate it
+  after setup if it was shared widely.
+
 The saga in order:
 
 1. **Claim** — `_claim_bootstrap` acquires a lock on the `setup_state` row,

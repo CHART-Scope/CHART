@@ -114,6 +114,12 @@
 
   /* --- §1 Elevation — modal is the only elevated surface --- */
   --shadow-modal: 0 12px 32px rgba(0, 0, 0, 0.18);
+  /* Cards: one shape across the app and the landing page. */
+  --radius-card: 14px;
+  --shadow-card: 0 1px 2px rgb(30 31 33 / 5%), 0 8px 24px -12px rgb(30 31 33 / 12%);
+  --shadow-card-hover:
+    0 2px 4px rgb(30 31 33 / 6%), 0 16px 32px -14px rgb(30 31 33 / 18%);
+  --ease-out-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
   --shadow-thumb: 0 1px 4px rgba(0, 0, 0, 0.28);
 
   /* --- Focus --- */

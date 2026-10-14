@@ -82,13 +82,7 @@ def planning_options_for_place(
 ) -> PlanningOptions:
     current_time = now or datetime.now(timezone.utc)
     current_month = current_time.date().replace(day=1)
-    calendar = HEAT_SEASON_CALENDARS.get(admin_unit_code)
-    if (
-        calendar is None
-        and geography_path
-        and geography_path.startswith("/india/madhya-pradesh/")
-    ):
-        calendar = HEAT_SEASON_CALENDARS["madhya-pradesh"]
+    calendar = heat_season_calendar(admin_unit_code, geography_path)
     return PlanningOptions(
         source_as_of=current_time.date(),
         custom_min_month=current_month,
@@ -99,6 +93,21 @@ def planning_options_for_place(
         ),
         long_term_projection=(_long_term_projection() if calendar else None),
     )
+
+
+def heat_season_calendar(
+    admin_unit_code: str, geography_path: str | None
+) -> HeatSeasonCalendar | None:
+    """The hot season a place plans for; long-term projections need one."""
+
+    calendar = HEAT_SEASON_CALENDARS.get(admin_unit_code)
+    if (
+        calendar is None
+        and geography_path
+        and geography_path.startswith("/india/madhya-pradesh/")
+    ):
+        calendar = HEAT_SEASON_CALENDARS["madhya-pradesh"]
+    return calendar
 
 
 def _next_three_months(now: datetime) -> HeatSeasonOption:

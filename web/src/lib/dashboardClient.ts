@@ -7,6 +7,8 @@
  * to queue the work, then poll until the request record reports completed.
  */
 
+import { authFetch } from "./authFetch";
+
 export type DashboardScenario =
   "seas5_ensemble" | "rcp26" | "rcp45" | "rcp60" | "rcp85" | string;
 
@@ -134,7 +136,7 @@ export type MonthlyRiskResponse = {
 
 export async function fetchMonthlyRisk(
   geographyId: string,
-  accessToken: string,
+  accessToken: string | null | undefined,
   signal?: AbortSignal,
   outcome?: string,
 ): Promise<MonthlyRiskResponse> {
@@ -143,22 +145,12 @@ export async function fetchMonthlyRisk(
   // relabelled the card while still showing the LBW model's odds ratios and
   // reference - one model's numbers under another model's name.
   const query = outcome ? `?outcome=${encodeURIComponent(outcome)}` : "";
-  const response = await fetch(
+  const response = await authFetch(
     `/api/chart/risk/${encodeURIComponent(geographyId)}/monthly${query}`,
-    {
-      cache: "no-store",
-      headers: authHeaders(accessToken),
-      signal: signal
-        ? AbortSignal.any([signal, AbortSignal.timeout(30_000)])
-        : AbortSignal.timeout(30_000),
-    },
+    { accessToken, signal },
   );
   if (!response.ok) throw new Error(await readDashboardError(response));
   return (await response.json()) as MonthlyRiskResponse;
-}
-
-function authHeaders(accessToken?: string): Record<string, string> {
-  return accessToken ? { authorization: `Bearer ${accessToken}` } : {};
 }
 
 async function readDashboardError(response: Response): Promise<string> {
@@ -185,9 +177,8 @@ export async function fetchShortTermRisk(
   adminUnit: string | null,
   accessToken?: string,
 ): Promise<ShortTermRiskResponse> {
-  const response = await fetch(buildRiskUrl(geographyId, "short-term", adminUnit), {
-    cache: "no-store",
-    headers: authHeaders(accessToken),
+  const response = await authFetch(buildRiskUrl(geographyId, "short-term", adminUnit), {
+    accessToken,
   });
   if (!response.ok) {
     throw new Error(await readDashboardError(response));
@@ -200,9 +191,8 @@ export async function fetchLongTermRisk(
   adminUnit: string | null,
   accessToken?: string,
 ): Promise<LongTermRiskResponse> {
-  const response = await fetch(buildRiskUrl(geographyId, "long-term", adminUnit), {
-    cache: "no-store",
-    headers: authHeaders(accessToken),
+  const response = await authFetch(buildRiskUrl(geographyId, "long-term", adminUnit), {
+    accessToken,
   });
   if (!response.ok) {
     throw new Error(await readDashboardError(response));
@@ -219,10 +209,7 @@ export async function fetchCurrentObservation(
   const url = adminUnit
     ? `${base}?${new URLSearchParams({ admin_unit: adminUnit })}`
     : base;
-  const response = await fetch(url, {
-    cache: "no-store",
-    headers: authHeaders(accessToken),
-  });
+  const response = await authFetch(url, { accessToken });
   if (!response.ok) {
     throw new Error(await readDashboardError(response));
   }
@@ -258,22 +245,16 @@ export type MapResponse = {
 
 export async function fetchRiskMap(
   geographyId: string,
-  accessToken: string,
+  accessToken: string | null | undefined,
   options: { month?: string | null; outcome?: string; signal?: AbortSignal } = {},
 ): Promise<MapResponse> {
   const params = new URLSearchParams();
   if (options.month) params.set("month", options.month);
   if (options.outcome) params.set("outcome", options.outcome);
   const query = params.toString() ? `?${params.toString()}` : "";
-  const response = await fetch(
+  const response = await authFetch(
     `/api/chart/risk/${encodeURIComponent(geographyId)}/map${query}`,
-    {
-      cache: "no-store",
-      headers: authHeaders(accessToken),
-      signal: options.signal
-        ? AbortSignal.any([options.signal, AbortSignal.timeout(30_000)])
-        : AbortSignal.timeout(30_000),
-    },
+    { accessToken, signal: options.signal },
   );
   if (!response.ok) throw new Error(await readDashboardError(response));
   return (await response.json()) as MapResponse;

@@ -67,6 +67,7 @@ export const WorkspaceReview: Story = {
         adminName: "CHART Administrator",
         adminEmail: "admin@example.org",
         adminPassword: "example-password",
+        setupToken: "example-setup-token",
       }}
     />
   ),

@@ -1,7 +1,7 @@
 import type { NavItem } from "@/components/AppShell";
 
 /** The ids the shell knows about. A union rather than `string` so a typo in
- * `activeNav` or in a `NAV_ROUTE` lookup is a compile error instead of a
+ * `activeNav` or a route lookup is a compile error instead of a
  * silently dead nav item. */
 export type NavId = "learning" | "planning" | "settings";
 
@@ -33,7 +33,9 @@ const NAV: readonly NavDefinition[] = [
     label: "Settings",
     icon: "settings",
     href: "/settings",
-    requiredRoles: ["chart_admin"],
+    // Model settings are editable by any signed-in user with a planning
+    // area; the installation cards on the page stay admin-only.
+    requiresGeographyScope: true,
   },
 ] as const;
 
@@ -67,10 +69,6 @@ export function appNavForRoles(
   }).map(({ requiredRoles, requiresGeographyScope, ...item }) => item);
 }
 
-export const NAV_ROUTE: Record<string, string> = Object.fromEntries(
-  NAV.map((item) => [item.id, item.href]),
-);
-
 /**
  * Which nav entry a path belongs to. The dashboard and its run detail pages
  * live under /dashboard but are reached from "Start planning", so they have to
@@ -84,5 +82,41 @@ export function activeNavForPath(pathname: string | null): NavId | null {
   }
   if (pathname.startsWith("/learning")) return "learning";
   if (pathname.startsWith("/settings")) return "settings";
+  return null;
+}
+
+/** Workspace routes a visitor may read without signing in. */
+export function isPublicPath(pathname: string | null): boolean {
+  return activeNavForPath(pathname) === "learning";
+}
+
+/**
+ * Where a signed-in user who may not use `pathname` is sent instead, or null.
+ * Read from the same table as the nav, so a hidden entry and a guarded route
+ * cannot disagree: no planning area means /access-pending, a missing role
+ * falls back to planning.
+ */
+export function redirectForPath(
+  pathname: string | null,
+  user: { roles: readonly string[]; geographyScopes: readonly string[] },
+): string | null {
+  const entry = NAV.find((item) => item.id === activeNavForPath(pathname));
+  if (!entry) return null;
+  // Model release management stays with installation administrators.
+  if (pathname?.startsWith("/settings/models") && !user.roles.includes("chart_admin")) {
+    return "/settings";
+  }
+  if (
+    entry.requiresGeographyScope &&
+    (user.roles.length === 0 || user.geographyScopes.length === 0)
+  ) {
+    return "/access-pending";
+  }
+  if (
+    entry.requiredRoles &&
+    !entry.requiredRoles.some((role) => user.roles.includes(role))
+  ) {
+    return "/plan";
+  }
   return null;
 }

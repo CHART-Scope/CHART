@@ -16,6 +16,9 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from chart.api.app import app
 from chart.auth.schemas import CurrentUserContext
@@ -26,6 +29,9 @@ from chart.heat_outlook import service as outlook_service
 from chart.heat_outlook.publish import publish
 from chart.risk.schemas import MapArea, MapResponse
 from chart.heat_outlook.service import NO_EXCESS_LBW, NO_EXCESS_NEONATAL, THIN_DATA
+from chart.model_settings import service as settings_service
+from chart.shared.db.base import Base
+from chart.shared.db.models import AppGeography, CountryGeoConfig
 
 RELEASE = "v-test"
 KAJIADO = "geo-ke-kajiado"
@@ -191,7 +197,56 @@ def _user(**overrides) -> CurrentUserContext:
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
+def settings_db(monkeypatch):
+    """The model settings store, with Kenya as a country and no saved rows."""
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    with factory() as session:
+        session.add(
+            CountryGeoConfig(
+                country_code="KE", level_key="country", level_label="Country"
+            )
+        )
+        session.flush()
+        session.add(
+            AppGeography(
+                id="geo-ke",
+                country_code="KE",
+                level="country",
+                level_label="Country",
+                name="Kenya",
+                path="/kenya",
+            )
+        )
+        session.commit()
+    monkeypatch.setattr(settings_service, "get_session_factory", lambda: factory)
+    return factory
+
+
+def enable_every_window(client: TestClient) -> None:
+    """Turn the trimesters on, as a user would on the settings page."""
+
+    response = client.put(
+        "/model-settings/KE/lbw",
+        json={
+            "selectors": ["P", "T1", "T2", "T3"],
+            "default_selector": "P",
+            "scenarios": ["ssp585"],
+            "default_scenario": "ssp585",
+            "data_modes": ["projection"],
+        },
+    )
+    assert response.status_code == 200, response.text
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch, settings_db) -> Iterator[TestClient]:
     _lbw_tables(tmp_path / "lbw_source")
     _u5_tables(tmp_path / "u5_source")
     cache = tmp_path / "models"
@@ -245,6 +300,7 @@ def test_lbw_whole_pregnancy_reads_months_and_periods(client) -> None:
 def test_lbw_third_trimester_shows_odds_ratio_without_attributable_share(
     client,
 ) -> None:
+    enable_every_window(client)
     body = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw&selector=T3").json()
 
     month = body["months"][0]
@@ -259,6 +315,7 @@ def test_lbw_third_trimester_shows_odds_ratio_without_attributable_share(
 
 
 def test_lbw_negative_window_is_suppressed(client) -> None:
+    enable_every_window(client)
     body = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw&selector=T1").json()
 
     part = body["months"][0]["parts"][0]
@@ -373,6 +430,7 @@ def test_map_shades_counties_with_the_published_annual_share(
     # Only shapes are asked for: the live-prediction queries are skipped.
     assert all(call["with_values"] is False for call in calls)
 
+    enable_every_window(client)
     t3 = client.get("/heat-outlook/geo-ke/map?outcome=lbw&selector=T3").json()
     assert t3["areas"][0]["missing_reason"] == "not_reported"
     u5 = client.get(

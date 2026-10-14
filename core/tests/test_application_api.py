@@ -1,7 +1,9 @@
 from __future__ import annotations
+import json
 import logging
 
 from collections.abc import Iterator
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -295,6 +297,77 @@ def test_model_sync_returns_active_releases(admin_client: TestClient) -> None:
         "activeReleaseIds": ["lbw-mp-review", "under5-mp-review"],
         "assignmentCount": 21,
     }
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("get", "/model-releases"),
+        ("post", "/model-releases/any-release/reload"),
+        ("post", "/model-releases/circuit/reset"),
+    ],
+)
+def test_model_release_routes_require_sign_in(
+    client: TestClient, method: str, path: str
+) -> None:
+    response = getattr(client, method)(path)
+    assert response.status_code == 401
+    assert response.json() == {"error": "AUTH_TOKEN_REQUIRED"}
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/model-releases/any-release/reload", "/model-releases/circuit/reset"],
+)
+def test_model_release_controls_deny_non_admin(
+    planning_user_client: TestClient, path: str
+) -> None:
+    with (
+        patch("chart.model_registry.routes.prepare_model_release") as prepare,
+        patch("chart.inference.providers.lbw_r.reset_circuit") as reset,
+    ):
+        response = planning_user_client.post(path)
+    assert response.status_code == 403
+    assert response.json() == {"error": "ROLE_NOT_ALLOWED"}
+    prepare.assert_not_called()
+    reset.assert_not_called()
+
+
+def test_model_release_list_is_readable_when_signed_in(
+    planning_user_client: TestClient,
+) -> None:
+    with patch("chart.model_registry.routes.get_session_factory") as factory:
+        response = planning_user_client.get("/model-releases")
+    assert response.status_code == 200
+    assert response.json() == {"items": []}
+    factory.assert_called_once()
+
+
+def test_model_release_reload_runs_for_admin(
+    admin_client: TestClient, tmp_path
+) -> None:
+    manifest = tmp_path / "release.json"
+    manifest.write_text(json.dumps({"id": "lbw-test"}), encoding="utf-8")
+    with (
+        patch(
+            "chart.model_registry.routes.deployed_configs",
+            return_value=(SimpleNamespace(model_release=manifest),),
+        ),
+        patch("chart.model_registry.routes.ModelReleaseSpec") as spec,
+        patch("chart.model_registry.routes.prepare_model_release") as prepare,
+    ):
+        response = admin_client.post("/model-releases/lbw-test/reload")
+    assert response.status_code == 200
+    assert response.json() == {"release_id": "lbw-test", "status": "loaded"}
+    prepare.assert_called_once_with(spec.model_validate_json.return_value)
+
+
+def test_model_release_circuit_reset_runs_for_admin(admin_client: TestClient) -> None:
+    with patch("chart.inference.providers.lbw_r.reset_circuit") as reset:
+        response = admin_client.post("/model-releases/circuit/reset")
+    assert response.status_code == 200
+    assert response.json() == {"status": "cleared"}
+    reset.assert_called_once()
 
 
 def _bootstrap_request() -> dict:

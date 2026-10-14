@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 
 const ApiUrl = process.env.CHART_PYTHON_API_INTERNAL_URL || "http://127.0.0.1:3210";
+const bootstrapTokenHeader = "x-chart-bootstrap-token";
 
 export async function proxySetupRequest(
   request: Request,
   path: "" | "/options" | "/bootstrap",
 ) {
   const baseUrl = ApiUrl.replace(/\/$/, "");
-  const bootstrapToken = process.env.CHART_BOOTSTRAP_TOKEN?.trim();
+  // The bootstrap token is supplied by whoever runs setup, never added here:
+  // a token the web server injected would let any visitor bootstrap.
+  const bootstrapToken = request.headers.get(bootstrapTokenHeader)?.trim();
 
   try {
     const response = await fetch(`${baseUrl}/setup${path}`, {
@@ -18,7 +21,7 @@ export async function proxySetupRequest(
           : {
               "content-type": request.headers.get("content-type") ?? "application/json",
               ...(path === "/bootstrap" && bootstrapToken
-                ? { "x-chart-bootstrap-token": bootstrapToken }
+                ? { [bootstrapTokenHeader]: bootstrapToken }
                 : {}),
             },
       body: request.method === "GET" ? undefined : await request.text(),

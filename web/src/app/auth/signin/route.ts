@@ -18,7 +18,7 @@ export function GET(request: NextRequest) {
       state,
     }),
   );
-  response.cookies.set(pkceCookieName, `${state}.${verifier}`, {
+  response.cookies.set(pkceCookieName(state), verifier, {
     httpOnly: true,
     maxAge: 10 * 60,
     path: "/",

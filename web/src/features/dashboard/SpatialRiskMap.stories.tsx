@@ -9,7 +9,7 @@ import { SpatialRiskMap } from "./SpatialRiskMap";
 import { HeatLbwLinkPanel } from "./HeatLbwLinkPanel";
 import { RiskProtectionPanel } from "./RiskProtectionPanel";
 import { IconSprite } from "@/components/Icon";
-import layout from "@/app/dashboard/[geo]/page.module.css";
+import layout from "@/app/(workspace)/dashboard/[geo]/page.module.css";
 
 /**
  * The third dashboard card: where the risk sits.

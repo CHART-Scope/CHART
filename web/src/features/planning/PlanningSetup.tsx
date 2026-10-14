@@ -5,8 +5,11 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { Button } from "@/components/Button";
 import { InlineSelect } from "@/components/InlineSelect";
 import { Icon } from "@/components/Icon";
+import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import type { GeographyRecord, ModelCatalogEntry } from "@/lib/planningClient";
+
 import type { PlanningSelection } from "./planningWireframe";
+
 import styles from "./PlanningSetup.module.css";
 
 type Props = {
@@ -131,16 +134,12 @@ export function PlanningSetup({
 
   return (
     <div className={styles.wrap}>
-      {contextSwitcher ? (
-        <div className={styles.contextRow}>{contextSwitcher}</div>
-      ) : null}
-      <header className={styles.header}>
-        <h1>What would you like to plan for, together?</h1>
-        <p>
-          Build a sentence below. CHART will generate the shared risk picture,
-          recommended actions, and planning tools your departments can act on together.
-        </p>
-      </header>
+      <PageHeader
+        kicker="Start planning"
+        title="What would you like to plan for, together?"
+        lede="Build a sentence below. CHART will generate the shared risk picture, recommended actions, and planning tools your departments can act on together."
+        aside={contextSwitcher}
+      />
 
       <form
         className={styles.card}
@@ -243,11 +242,14 @@ export function PlanningSetup({
       </form>
 
       <section className={styles.saved} aria-labelledby="saved-scenarios">
-        <h2 id="saved-scenarios">Saved scenarios</h2>
-        <p>
-          No saved scenarios yet. Use the bookmark icon above to save a combination you
-          plan to revisit.
-        </p>
+        <SectionTitle id="saved-scenarios">Saved scenarios</SectionTitle>
+        <div className={styles.empty}>
+          <Icon name="bookmark" size={18} />
+          <p>
+            No saved scenarios yet. Use the bookmark icon above to save a combination
+            you plan to revisit.
+          </p>
+        </div>
       </section>
     </div>
   );

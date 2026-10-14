@@ -3,11 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/Button";
 import {
   completeKeycloakSignIn,
   restoreAuthSession,
   signedInHomePath,
+  startKeycloakSignIn,
 } from "@/lib/authClient";
+import { BrandMark, ChartLoader } from "@/components/BrandMark";
 import styles from "./AuthState.module.css";
 
 // An authorization code is single-use and a successful exchange clears the
@@ -67,12 +70,23 @@ export function AuthCallbackPage() {
       .catch(() => setError("The sign-in response could not be completed."));
   }, [router]);
 
+  if (!error) {
+    return (
+      <ChartLoader
+        status="Completing sign in"
+        detail="Verifying your role and planning area."
+      />
+    );
+  }
   return (
     <main className={styles.page}>
       <section className={styles.card}>
-        <span>CHART secure workspace</span>
-        <h1>{error ? "Sign-in failed" : "Completing sign in"}</h1>
-        <p>{error ?? "Verifying your role and planning area."}</p>
+        <BrandMark size={36} wordmark />
+        <h1>Sign-in failed</h1>
+        <p>{error}</p>
+        <div className={styles.actions}>
+          <Button onClick={startKeycloakSignIn}>Try signing in again</Button>
+        </div>
       </section>
     </main>
   );

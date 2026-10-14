@@ -1,10 +1,18 @@
 "use client";
 
-import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import Link from "next/link";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 
 import { ActivityDrawer } from "../ActivityDrawer/ActivityDrawer";
 import { Icon, type IconName } from "../Icon";
 import { Skeleton } from "../Skeleton";
+import { BrandMark } from "../BrandMark";
 import styles from "./AppShell.module.css";
 
 export type NavItem = {
@@ -20,7 +28,10 @@ export type NavItem = {
 type Props = {
   nav: NavItem[];
   activeNav: string;
-  onNavigate: (id: string) => void;
+  /** Called when an entry is chosen. Entries with an `href` navigate on their
+   * own (a prefetching `next/link`); this is for callers that also need to
+   * react, and for entries without a destination. */
+  onNavigate?: (id: string) => void;
   tagline?: string;
   bounded?: boolean;
   children: ReactNode;
@@ -76,7 +87,7 @@ export function AppShell({
     // A drawer that stays open over the page it just navigated hides the
     // result of the tap.
     if (isNarrow) setOverride(false);
-    onNavigate(id);
+    onNavigate?.(id);
   }
 
   return (
@@ -114,10 +125,12 @@ export function AppShell({
         </button>
         {onLogoClick ? (
           <button type="button" className={styles.logo} onClick={onLogoClick}>
-            CHART
+            <BrandMark size={22} tone="light" wordmark />
           </button>
         ) : (
-          <span className={styles.logo}>CHART</span>
+          <span className={styles.logo}>
+            <BrandMark size={22} tone="light" wordmark />
+          </span>
         )}
         <span className={styles.sep} aria-hidden>
           |
@@ -222,53 +235,50 @@ function NavEntry({
     );
   }
 
+  // A real link, so new-tab and copy work, and next/link so the destination
+  // is prefetched and a plain click is a client-side transition. Link leaves
+  // modified clicks to the browser; so does the activation hook.
   return (
-    <a
+    <Link
       href={item.href}
       className={className}
       aria-current={active ? "page" : undefined}
-      onClick={(event: MouseEvent<HTMLAnchorElement>) => {
-        // Let the browser win for "open in a new tab" and friends; only a
-        // plain left click is ours to turn into a client-side transition.
-        if (
-          event.defaultPrevented ||
+      onClick={(event) => {
+        const modified =
           event.button !== 0 ||
           event.metaKey ||
           event.ctrlKey ||
           event.shiftKey ||
-          event.altKey
-        ) {
-          return;
-        }
-        event.preventDefault();
-        onActivate();
+          event.altKey;
+        if (!modified) onActivate();
       }}
     >
       {body}
-    </a>
+    </Link>
   );
 }
 
 /**
  * Matches a media query as React state.
  *
- * Seeded from `matchMedia` on the first render rather than from an effect: the
- * shell only ever mounts on the client (behind `RequireAuth`), and seeding
- * from `false` would open the drawer over the page for a frame on every phone
- * load before the effect closed it again.
+ * Read from `matchMedia` on the first client render rather than from an
+ * effect: seeding from `false` would open the drawer over the page for a frame
+ * on every phone load. The shell is now server-rendered too (the workspace
+ * layout draws it while the session is restored), so the server snapshot is
+ * used only while hydrating, which keeps hydration consistent.
  */
 function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() =>
-    typeof window === "undefined" ? false : window.matchMedia(query).matches,
+  const subscribe = useCallback(
+    (notify: () => void) => {
+      const media = window.matchMedia(query);
+      media.addEventListener("change", notify);
+      return () => media.removeEventListener("change", notify);
+    },
+    [query],
   );
-
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const update = () => setMatches(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, [query]);
-
-  return matches;
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(query).matches,
+    () => false,
+  );
 }

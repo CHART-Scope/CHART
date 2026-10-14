@@ -46,7 +46,9 @@ export function LongTermView({
 }: Props) {
   const fetcher = useCallback(
     () => fetchLongTermRisk(geographyId, adminUnit, accessToken),
-    [geographyId, adminUnit, accessToken],
+    // The token gates the read; a rotated one must not refetch (the client
+    // sends the session's current token).
+    [geographyId, adminUnit, Boolean(accessToken)],
   );
 
   const { state, retry } = useHorizonView<LongTermRiskResponse>({

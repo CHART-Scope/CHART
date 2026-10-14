@@ -109,6 +109,15 @@ business rules. Postgres owns durable request state. Dagster owns background
 execution. A model result remains available even when the optional explanation
 service is disabled or unavailable.
 
+In the Next web app, the signed-in routes (dashboard, plan, settings and the
+Learning hub) share the `web/src/app/(workspace)` route group. Its layout
+restores the session once and keeps one sidebar and top bar mounted across
+navigation; pages read the session through `useSession()`. The role and
+planning-area redirects for each route are declared beside the navigation in
+`web/src/features/chrome/appNav.ts`. These are display redirects only: FastAPI
+still enforces access on every request. The Learning hub stays public, so a
+visitor who is not signed in reads it under the public header.
+
 ## Functional requirements
 
 | ID | Requirement | Acceptance outcome |
@@ -344,6 +353,40 @@ A stale worker cannot commit after losing its lease. Optional explanations,
 email, analytics, and the remote action repository must not block a completed
 deterministic result. When a provider is unavailable, saved results remain
 readable and new work stays queued or fails with a stable, actionable reason.
+
+### Browser session
+
+The web app keeps the Keycloak access token in memory only; the refresh and
+id tokens are httpOnly cookies read by the Next auth routes
+(`web/src/lib/authClient.ts`).
+
+- **Renewal.** One tab-wide timer renews the token 30 s before it expires,
+  and again when a tab becomes visible or focused near expiry. Renewal is
+  single-flight in a tab and serialised across tabs (Web Locks); a renewed
+  token is shared with other tabs over the `chart-auth` BroadcastChannel.
+  `/auth/me` is read when a session starts or is re-checked, not on every
+  renewal. A token rotation does not re-render pages, so nothing refetches
+  or resubmits because of it.
+- **API calls.** Every client goes through `authFetch`
+  (`web/src/lib/authFetch.ts`): it attaches the current token, applies a
+  30 s default timeout merged with the caller's signal, and on a 401 renews
+  once and retries the request a single time. The Next proxy to the Python
+  API also defaults to 30 s (`timeoutMs` per route).
+- **Failures.** A refresh answering 401 ends the session and sends the user
+  to sign in. A 503 or network failure keeps the current token and retries
+  with backoff (5 s, 15 s, 30 s, then every 60 s); the page stays usable and
+  never redirects. If the session cannot be restored at all because Keycloak
+  or the API is down, the page shows "temporarily unavailable" and retries.
+- **Idle timeout.** Thirty minutes without pointer, key, scroll or visibility
+  activity in any tab stops renewal and signs the user out; the landing page
+  says why. Signing out in one tab signs out the others.
+- **Sign-out.** Pending audit events are sent with the user's own token
+  first, then the session, the audit queue and per-user caches (geographies,
+  model catalog, risk maps) are cleared. Action progress kept in the browser
+  is stored per user.
+- **Polling.** Background polls (`web/src/lib/polling.ts`) run one request
+  at a time, stop after a fixed number of attempts, abort when their view
+  goes away and pause while the tab is hidden.
 
 ## Capacity validation and release gates
 

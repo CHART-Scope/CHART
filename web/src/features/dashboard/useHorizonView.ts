@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { startPolling } from "@/lib/polling";
+
+/** Empty-state re-polls before the view waits for an explicit "Check now". */
+const MAX_EMPTY_POLLS = 60;
+
 type FetchState<T> =
   | { status: "idle" }
   | { status: "loading"; retryCount: number }
@@ -35,7 +40,6 @@ export function useHorizonView<T>({
   refreshKey = null,
 }: Options<T>) {
   const [state, setState] = useState<FetchState<T>>({ status: "idle" });
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Callers routinely pass inline arrow-function isEmpty predicates. If we
   // let the predicate flow into `load`'s dep array, `load` becomes a new
   // reference on every render, the effect below re-fires, setState runs,
@@ -72,27 +76,24 @@ export function useHorizonView<T>({
 
   useEffect(() => {
     void load();
-    return () => {
-      if (timer.current !== null) {
-        clearTimeout(timer.current);
-        timer.current = null;
-      }
-    };
   }, [load, refreshKey]);
 
+  // Re-poll while the payload is empty: capped, one request at a time, and
+  // paused while the tab is hidden. Keyed on the status rather than the
+  // whole state so each silent re-poll does not restart the poller.
+  const isEmptyState = state.status === "empty";
   useEffect(() => {
-    if (pollIntervalMsRef.current <= 0) return;
-    if (state.status !== "empty") return;
-    timer.current = setTimeout(() => {
-      void load({ silent: true, retryCount: state.retryCount + 1 });
-    }, pollIntervalMsRef.current);
-    return () => {
-      if (timer.current !== null) {
-        clearTimeout(timer.current);
-        timer.current = null;
-      }
-    };
-  }, [load, state]);
+    const interval = pollIntervalMsRef.current;
+    if (interval <= 0 || !isEmptyState) return;
+    return startPolling({
+      intervalMs: interval,
+      maxAttempts: MAX_EMPTY_POLLS,
+      tick: async (_signal, attempt) => {
+        await load({ silent: true, retryCount: attempt });
+        return "continue";
+      },
+    });
+  }, [load, isEmptyState]);
 
   const retry = useCallback(() => {
     const nextRetry =

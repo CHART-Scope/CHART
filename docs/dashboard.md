@@ -18,6 +18,11 @@ They live in the URL rather than in component state so a reload, the back
 button and a shared link all land on the same view. Changing any of them
 re-reads every card.
 
+Which pregnancy windows or age groups, scenarios and data views the cards
+offer is set per country and outcome under Settings → Model settings. The API
+applies those settings, so the dashboard only lists what it is given. See
+[Model settings](model-integration.md#model-settings).
+
 The breadcrumb under the selectors is built by walking the geography ancestry
 of the selected area, broadest first — `Kenya › Garissa`, or
 `India › Madhya Pradesh › Bhopal Division`. It follows the sub-area picker, and

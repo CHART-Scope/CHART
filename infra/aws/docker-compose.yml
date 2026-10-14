@@ -258,7 +258,6 @@ services:
       CHART_API_INTERNAL_URL: http://chart-core:3210
       CHART_PYTHON_API_INTERNAL_URL: http://chart-core:3210
       CHART_WEB_ORIGIN: ${PUBLIC_ORIGIN}
-      CHART_BOOTSTRAP_TOKEN: ${CHART_BOOTSTRAP_TOKEN}
       KEYCLOAK_BROWSER_URL: ${PUBLIC_ORIGIN}/identity
       KEYCLOAK_SERVER_URL: http://chart-keycloak:8080/identity
       KEYCLOAK_REALM: chart

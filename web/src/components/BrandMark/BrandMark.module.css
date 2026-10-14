@@ -1,0 +1,147 @@
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55em;
+  line-height: 1;
+}
+
+.mark {
+  display: block;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.tile {
+  fill: var(--color-maroon);
+}
+
+.light .tile {
+  fill: rgb(255 255 255 / 6%);
+  stroke: rgb(190 242 116 / 35%);
+  stroke-width: 1;
+}
+
+.isotherm {
+  fill: none;
+  stroke: var(--color-lime);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.isothermOuter {
+  opacity: 0.35;
+}
+
+.isothermInner {
+  opacity: 0.6;
+}
+
+.pulse {
+  fill: none;
+  stroke: var(--color-lime);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dot {
+  fill: var(--color-lime);
+}
+
+.word {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  font-size: 0.95em;
+  color: var(--color-charcoal);
+}
+
+.light .word {
+  color: var(--color-lime);
+}
+
+/* Loader: the heartbeat draws, the dot lands, the isotherms ripple out. */
+.animated .pulse {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: draw 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.animated .dot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: land 1.8s ease-out infinite;
+}
+
+.animated .isotherm {
+  transform-box: view-box;
+  transform-origin: 24px 24px;
+  animation: ripple 1.8s ease-in-out infinite;
+}
+
+.animated .isothermOuter {
+  animation-delay: 0.15s;
+}
+
+@keyframes draw {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  55%,
+  80% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+
+@keyframes land {
+  0%,
+  45% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+  75%,
+  85% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes ripple {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated .pulse,
+  .animated .dot,
+  .animated .isotherm {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
+    transform: none;
+  }
+
+  .animated .isothermOuter {
+    opacity: 0.35;
+  }
+
+  .animated .isothermInner {
+    opacity: 0.6;
+  }
+}

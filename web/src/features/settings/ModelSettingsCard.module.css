@@ -1,0 +1,231 @@
+/* Rows only: the card shell owns the header, description, error and
+   loading states so every settings block shares them. */
+.empty {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-3);
+}
+
+/* One country and outcome: a quiet inner panel. */
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--surface-app), var(--surface-card) 70%);
+  min-width: 0;
+}
+
+/* Floated so the legend sits inside the panel instead of notching its top
+   border, as a fieldset legend does by default. */
+.itemTitle {
+  float: left;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  margin-bottom: var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--fs-body-lg);
+  font-weight: 500;
+  color: var(--color-charcoal);
+}
+
+.itemTitle::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-maroon);
+  box-shadow: 0 0 0 3px var(--color-maroon-tint);
+}
+
+.itemTitle + * {
+  clear: both;
+}
+
+.group {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.groupTitle {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 6px var(--space-2);
+  margin: 0 calc(-1 * var(--space-2));
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.option:hover {
+  background: rgb(0 0 0 / 3%);
+}
+
+.toggle,
+.default {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle {
+  gap: var(--space-3);
+  margin-right: auto;
+  font-size: var(--fs-body);
+  color: var(--color-charcoal);
+}
+
+/* Switch: the native checkbox restyled, so its role and label stay intact. */
+.toggle input {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 99px;
+  background: var(--color-grey-mid);
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.toggle input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-white);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+  transition: transform 0.18s cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+
+.toggle input:checked {
+  background: var(--color-env);
+}
+
+.toggle input:checked::after {
+  transform: translateX(14px);
+}
+
+.toggle input:focus-visible,
+.default input:focus-visible + span,
+.default:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Default: a small chip that lights up when chosen. */
+.default {
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 99px;
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+  background: var(--surface-card);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.default input {
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  margin: 0;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+}
+
+.default:has(input:checked) {
+  border-color: var(--color-maroon);
+  background: var(--color-maroon);
+  color: var(--color-white);
+}
+
+.default:has(input:checked) input {
+  background: var(--color-lime);
+  border-color: var(--color-lime);
+}
+
+.default:has(input:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.view {
+  font-size: var(--fs-micro);
+  color: var(--color-text-faint);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.saved,
+.error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-caption);
+  font-weight: 500;
+}
+
+.saved {
+  color: var(--color-success);
+}
+
+.saved::before {
+  content: "✓";
+  font-weight: 700;
+}
+
+.error {
+  color: var(--color-sem-low);
+}
