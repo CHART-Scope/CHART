@@ -24,7 +24,14 @@ export default defineConfig({
     screenshot: "on",
     video: "on",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "chromium-public",
+      testDir: "../e2e",
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
   webServer: {
     // A production build in its own dist directory, so the suite runs beside
     // `make web` without touching its `.next`.

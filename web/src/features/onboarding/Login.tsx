@@ -148,6 +148,17 @@ export function Login({
             <ul aria-label="Partners">
               <li>
                 <a
+                  href="https://www.ubs.com/global/en/sustainability-impact/social-impact-and-philanthropy/optimus-foundation.html"
+                  aria-label="UBS Optimus Foundation"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img src="/partners/ubs.png" alt="UBS" width="90" height="34" />
+                  <span>Optimus Foundation</span>
+                </a>
+              </li>
+              <li>
+                <a
                   href="https://scopeimpact.fi/"
                   aria-label="SCOPE Impact"
                   target="_blank"
@@ -160,17 +171,6 @@ export function Login({
                     width="152"
                     height="101"
                   />
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://www.ubs.com/global/en/sustainability-impact/social-impact-and-philanthropy/optimus-foundation.html"
-                  aria-label="UBS Optimus Foundation"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <img src="/partners/ubs.png" alt="UBS" width="90" height="34" />
-                  <span>Optimus Foundation</span>
                 </a>
               </li>
               <li>
@@ -207,6 +207,36 @@ export function Login({
                     height="85"
                   />
                   <span>South Asia</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://amphealth.org/"
+                  aria-label="AMP Health"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img
+                    src="/partners/amp-health.png"
+                    alt="AMP Health"
+                    width="160"
+                    height="36"
+                  />
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://amref.org/"
+                  aria-label="Amref Health Africa"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img
+                    src="/partners/amref.png"
+                    alt="Amref Health Africa"
+                    width="150"
+                    height="89"
+                  />
                 </a>
               </li>
             </ul>

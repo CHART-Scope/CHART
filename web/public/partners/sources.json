@@ -19,5 +19,13 @@
   "gdi.svg": {
     "page": "https://globaldevincubator.org/south-asia/",
     "asset": "https://globaldevincubator.org/wp-content/themes/_gdi2023/img/logo.svg"
+  },
+  "amp-health.png": {
+    "page": "https://amphealth.org/",
+    "asset": "https://images.squarespace-cdn.com/content/v1/615e93d4a3d17752eac865e6/7a3c89e9-6093-438a-8b72-6cd53af0b8ab/Amphealth-PrimaryLogo-4.png?format=500w"
+  },
+  "amref.png": {
+    "page": "https://amref.org/about-amref-health-africa/",
+    "asset": "https://i0.wp.com/amref.org/wp-content/uploads/2020/05/white.png?resize=500%2C295&ssl=1"
   }
 }
