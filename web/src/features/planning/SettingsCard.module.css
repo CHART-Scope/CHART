@@ -4,14 +4,10 @@
   gap: var(--space-3);
   padding: var(--space-5);
   border: 1px solid var(--border-card, var(--border-subtle));
-  border-radius: 14px;
+  border-radius: var(--radius-card);
   background: var(--surface-card);
   margin-bottom: var(--space-4);
-  /* Two soft layers: a contact shadow and a wide, faint ambient one, so cards
-     sit on the page rather than being outlined on it. */
-  box-shadow:
-    0 1px 2px rgb(30 31 33 / 5%),
-    0 8px 24px -12px rgb(30 31 33 / 12%);
+  box-shadow: var(--shadow-card);
 }
 
 .header {

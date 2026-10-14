@@ -4,16 +4,27 @@
   justify-content: center;
   gap: 6px;
   padding: 8px 20px;
-  border-radius: var(--radius-sm);
+  border-radius: 0.5rem;
   font-size: var(--fs-body);
   font-weight: 500;
+  line-height: 1.2;
   cursor: pointer;
   border: 1.5px solid transparent;
   font-family: var(--font-body);
+  text-decoration: none;
   transition:
     background 0.15s ease,
     color 0.15s ease,
-    border-color 0.15s ease;
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.08s ease;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 .btn:disabled {
   opacity: 0.32;
@@ -26,10 +37,16 @@
   color: var(--color-white);
   border-color: var(--color-nexus);
   padding: 9px 20px;
+  box-shadow:
+    0 1px 2px rgb(56 62 233 / 25%),
+    inset 0 1px 0 rgb(255 255 255 / 14%);
 }
 .primary:hover {
   background: var(--color-nexus-hover);
   border-color: var(--color-nexus-hover);
+  box-shadow:
+    0 4px 12px -4px rgb(56 62 233 / 45%),
+    inset 0 1px 0 rgb(255 255 255 / 14%);
 }
 
 .secondary {

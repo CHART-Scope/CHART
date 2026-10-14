@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 
+import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { useSession } from "@/features/auth/WorkspaceSession";
 import { RunsStrip } from "@/features/dashboard";
 import {
@@ -39,19 +40,16 @@ export default function SettingsPage() {
 
   return (
     <div className={styles.layout}>
-      <header className={styles.header}>
-        <p className={styles.kicker}>Settings</p>
-        <h1 className={styles.heading}>Shape how CHART plans with you</h1>
-        <p className={styles.lede}>
-          Choose where you plan and which model options the dashboard offers.
-          {isAdmin ? " Installation tools for administrators follow below." : ""}
-        </p>
-      </header>
+      <PageHeader
+        kicker="Settings"
+        title="Shape how CHART plans with you"
+        lede={`Choose where you plan and which model options the dashboard offers.${
+          isAdmin ? " Installation tools for administrators follow below." : ""
+        }`}
+      />
 
       <section className={styles.section} aria-labelledby="settings-workspace">
-        <h2 id="settings-workspace" className={styles.sectionTitle}>
-          Your workspace
-        </h2>
+        <SectionTitle id="settings-workspace">Your workspace</SectionTitle>
         <GeographyContextCard
           geographyScopes={scopes}
           activeGeographyId={session.user.activeGeographyId}
@@ -61,9 +59,9 @@ export default function SettingsPage() {
 
       {isAdmin ? (
         <section className={styles.section} aria-labelledby="settings-installation">
-          <h2 id="settings-installation" className={styles.sectionTitle}>
+          <SectionTitle id="settings-installation">
             Installation <span className={styles.badge}>Admin</span>
-          </h2>
+          </SectionTitle>
           <div className={styles.pair}>
             <ModelHubCard accessToken={session.accessToken} />
             <ClimateDataCard accessToken={session.accessToken} />

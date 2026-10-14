@@ -13,6 +13,17 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   trailingIcon?: ReactNode;
 };
 
+/** The button look for a link (`<a>`), so calls to action match buttons. */
+export function buttonClassName({
+  variant = "primary",
+  size = "md",
+  block = false,
+}: { variant?: Variant; size?: Size; block?: boolean } = {}) {
+  return [styles.btn, styles[variant], styles[size], block ? styles.block : ""]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export function Button({
   variant = "primary",
   size = "md",

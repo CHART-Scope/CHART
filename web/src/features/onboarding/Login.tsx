@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-import { Button } from "@/components/Button";
+import { BrandMark } from "@/components/BrandMark";
+import { Button, buttonClassName } from "@/components/Button";
 import { Icon, IconSprite } from "@/components/Icon";
 import { startKeycloakSignIn, takeSignedOutReason } from "@/lib/authClient";
 import { getSetupStatus } from "@/lib/setupClient";
@@ -77,7 +78,7 @@ export function Login({
       <div className={styles.page}>
         <header className={styles.header}>
           <a className={styles.brand} href="/" aria-label="CHART home">
-            CHART
+            <BrandMark size={28} tone="light" wordmark />
           </a>
           <nav className={styles.nav} aria-label="Main navigation">
             <a href="/learning">Learning Hub</a>
@@ -105,7 +106,10 @@ export function Login({
                 CHART helps local governments and health planners use evidence and work
                 together to build climate-resilient health systems.
               </p>
-              <a className={styles.demoLink} href="mailto:info@scopeimpact.fi">
+              <a
+                className={buttonClassName({ size: "lg" })}
+                href="mailto:info@scopeimpact.fi"
+              >
                 Request access <Icon name="arrow-right" size={16} />
               </a>
             </div>
@@ -211,7 +215,7 @@ export function Login({
         <footer className={styles.footer}>
           <div className={styles.footerBrand}>
             <a href="/" className={styles.brand} aria-label="CHART home">
-              CHART
+              <BrandMark size={28} tone="light" wordmark />
             </a>
             <p>
               Climate &amp; Health Adaptation

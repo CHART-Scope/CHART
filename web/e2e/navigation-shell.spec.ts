@@ -97,6 +97,13 @@ async function signInAs(
 
 const admin = { roles: ["chart_admin"], geographyScopes: ["/india"] };
 
+// Evidence screenshots wait for the entrance animations to finish.
+async function settle(page: Page) {
+  await page.evaluate(() =>
+    Promise.all(document.getAnimations().map((animation) => animation.finished)),
+  );
+}
+
 test("sidebar navigation keeps one shell mounted across workspace pages", async ({
   page,
 }) => {
@@ -118,7 +125,11 @@ test("sidebar navigation keeps one shell mounted across workspace pages", async 
   await expect(page).toHaveURL(/\/settings$/);
   await expect(entry("Settings")).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("Planning location")).toBeVisible();
-  await page.screenshot({ path: "../outputs/e2e/web/navigation-shell-2-settings.png" });
+  await settle(page);
+  await page.screenshot({
+    path: "../outputs/e2e/web/navigation-shell-2-settings.png",
+    animations: "disabled",
+  });
 
   await entry("Learning hub").click();
   await expect(page).toHaveURL(/\/learning$/);
@@ -129,7 +140,11 @@ test("sidebar navigation keeps one shell mounted across workspace pages", async 
   await entry("Start planning").click();
   await expect(page).toHaveURL(/\/plan$/);
   await expect(page.getByText("in Madhya Pradesh.")).toBeVisible();
-  await page.screenshot({ path: "../outputs/e2e/web/navigation-shell-4-plan.png" });
+  await settle(page);
+  await page.screenshot({
+    path: "../outputs/e2e/web/navigation-shell-4-plan.png",
+    animations: "disabled",
+  });
 
   expect(await shellWatch(page)).toEqual({
     tagged: true,
