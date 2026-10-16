@@ -44,7 +44,7 @@ needs writing down.
 
 `.dockerignore` excludes `**/*.rds`, so artifacts are never baked into an
 image. In production they arrive in the `/models` volume from
-`aws s3 sync s3://$MODEL_BUCKET/ /models/ --exclude "archive/*"`, which runs
+`aws s3 sync s3://$MODEL_BUCKET/ /models/ --exclude "archive/*" --exclude "media/*"`, which runs
 as the `chart-model-sync` service on deploy. Retire superseded artifacts to
 `archive/` in the bucket: the sync skips that prefix, so they stay for
 provenance without ever colliding in `/models`.

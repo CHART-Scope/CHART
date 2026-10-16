@@ -1,10 +1,15 @@
 # From R output to the dashboard
 
-This page explains how a model team's results reach the CHART dashboard
-without CHART running the model. The Kenya low birth weight (LBW) heat model
-and the under-five mortality temperature model use this path. The modelling
-team's R scripts compute everything, and CHART only filters and displays the
-tables.
+This page explains how a model team's results reach the CHART dashboard. The
+Kenya low birth weight (LBW) heat model and the under-five mortality
+temperature model use this path, in two views:
+
+- **Projected** reads the modelling team's pre-computed tables (typical months
+  and period summaries for 2021–2100). CHART only filters and displays them.
+- **Observed** scores a month that has already happened. CHART reads the ERA5
+  temperatures it ingests for every county, moves them onto the models' scale
+  and evaluates the modeller's DLNM in Python. No R runs; see
+  [Observed months](#observed-months).
 
 ```mermaid
 flowchart LR
@@ -14,12 +19,17 @@ flowchart LR
     s3 --> sync["chart-model-sync<br/>aws s3 sync"]
     sync --> volume[("/models volume<br/>MODEL_CACHE_DIR")]
     volume --> core["chart-core<br/>GET /heat-outlook/{geography}"]
-    core --> web["Dashboard: Heat outlook panel"]
+    r --> model["Coefficients + basis lookups<br/>(in core, per release)"]
+    era5[("ERA5 rows<br/>district_climate(_day)")] --> observed["chart-core<br/>GET /heat-outlook/{geography}/observed"]
+    model --> observed
+    core --> web["Dashboard: Projected tab"]
+    observed --> web2["Dashboard: Observed tab"]
 ```
 
-There is no Dagster job or R process on this path, and the tables are never
+There is no Dagster job or R process on either path, and the tables are never
 copied into the database. A county either has a published file or the API
-returns `404 OUTLOOK_NOT_PUBLISHED`. The only database read is the country's
+returns `404 OUTLOOK_NOT_PUBLISHED`. Besides the ERA5 rows the observed view
+reads, the only database read is the country's
 [model settings](#model-settings), which narrow the options offered.
 
 ## How `chart-model-sync` works
@@ -29,7 +39,7 @@ returns `404 OUTLOOK_NOT_PUBLISHED`. The only database read is the country's
 the model bucket onto a shared Docker volume:
 
 ```sh
-aws s3 sync "s3://$MODEL_BUCKET/" /models/ --exclude "archive/*" [--no-sign-request]
+aws s3 sync "s3://$MODEL_BUCKET/" /models/ --exclude "archive/*" --exclude "media/*" [--no-sign-request]
 ```
 
 | Setting | Default | Meaning |
@@ -38,9 +48,11 @@ aws s3 sync "s3://$MODEL_BUCKET/" /models/ --exclude "archive/*" [--no-sign-requ
 | `MODEL_BUCKET_PUBLIC` | `1` | `1` reads anonymously (`--no-sign-request`). `0` signs with the EC2 instance role, which needs `s3:ListBucket` and `s3:GetObject`. |
 | `AWS_REGION` | `eu-west-2` | Region of the bucket. |
 
-- **What it copies.** The whole bucket except `archive/`. Both the `.rds`
-  artifacts used by the live scorer and the outlook JSON files arrive this
-  way.
+- **What it copies.** The whole bucket except `archive/` and `media/`. Both
+  the `.rds` artifacts used by the live scorer and the outlook JSON files
+  arrive this way. `media/` holds public web assets, such as the explainer
+  video at `media/chart-explainer-16x9.mp4`, which browsers read straight
+  from the bucket.
 - **Where it lands.** The `chart-lbw-model` volume is mounted at `/models` in
   both `chart-lbw` (the R scorer) and `chart-core` (the API). Both containers
   set `MODEL_CACHE_DIR=/models`.
@@ -112,31 +124,50 @@ The script uses only these input files:
 
 ## What the dashboard shows
 
-On Kenyan places the dashboard's risk panel reads the published tables; there
-is no month picker and nothing is prepared or polled. Planning for Kenya opens
-on Kenya as a whole, and the reader picks a county on the map or in the
-context bar.
+On Kenyan places the dashboard's risk panel has two tabs, **Observed** and
+**Projected**, under one question: what share of cases may be attributable to
+heat exposure. It opens on Observed when the place has a month to show, and on
+Projected otherwise. Planning for Kenya opens on Kenya as a whole, and the
+reader picks a county on the map or in the context bar. While a new month,
+county or choice loads, the previous figures stay on screen, dimmed.
 
-The headline figure is the **annual-average share** for the chosen period and
-scenario (the modeller's PARP for LBW, PAF for under-five), because only the
-period summaries carry a 95% CI:
+Both tabs show the same elements:
 
 | Element | Source |
 | --- | --- |
 | Icon array | The share, rounded, as filled figures out of 100 |
-| Sentence | Share with its 95% CI, period, place |
-| Change | Change from the baseline in points, with its 95% CI |
+| Sentence | Share with its 95% CI (or climate-model range), when, place |
 | Ratio | Odds ratio (LBW) or risk ratio (under-five) with 95% CI, converted from the share and its bounds (below) |
 | Precision badge | The ratio's CI, on the health team's thresholds (high ≤ 2.5, moderate ≤ 5, low above) |
-| Map | Every county shaded by the same share; `GET /heat-outlook/{geography}/map` |
-| Seasonal pattern | Typical month by calendar month (ensemble mean and range), and all periods |
+| Map | Every county shaded by the same figure |
 
-Controls: **pregnancy window** (LBW; whole pregnancy by default, and the only
-window offered until the trimesters are switched on in
-[model settings](#model-settings)) or **age group** (under-five; post-neonatal
-by default, as agreed with the modeller on 2026-10-08), **scenario** (default
-SSP5-8.5) and **period** (default 2041–2060). The baseline is always shown: 1981–2010 for LBW, 1991–2020 for
-under-five.
+Controls shared by both tabs: **pregnancy window** (LBW; whole pregnancy by
+default, and the only window offered until the trimesters are switched on in
+[model settings](#model-settings)) or **age group** (under-five;
+post-neonatal by default, as agreed with the modeller on 2026-10-08).
+
+**Observed** adds a **month** grid with a year picker. Only months that can be
+scored are enabled, and each is tinted by its share, so the riskiest months
+stand out. The figures are described in [Observed months](#observed-months);
+"Temperatures behind this estimate" lists the inputs on both scales.
+
+**Projected** adds:
+
+| Control | Options | Default |
+| --- | --- | --- |
+| Scenario | The file's scenarios | SSP5-8.5 |
+| Time horizon | The file's 20-year periods; the first is the baseline (1981–2010 for LBW, 1991–2020 for under-five) | 2041–2060 |
+| Reference period | **Annual average**: the period summary (PARP for LBW, PAF for under-five) with its 95% CI and the change from the baseline. **Peak heat season**: the three consecutive months with the highest heat share in the typical-month table, with the climate-model range (the table has no CI per month) | Annual average |
+
+The peak season is ranked by share, not by temperature. An LBW month is the
+births of that month, exposed over the pregnancy before it, so the births heat
+affects most are not born in the hottest months: in Kajiado they are born in
+July to September, after the January–March heat. For under-five, with four-day
+lags, the two orders agree. Kenya as a whole has no typical-month table, so
+the peak season is not offered there.
+
+One-, five- and ten-year horizons need monthly projections from the modelling
+team, which are not in this release; the panel says so under the controls.
 
 **Ratio conversion.** Both guides define the share as AF = 1 − 1/RR. Under-five
 is a case-crossover design, so the odds ratio is the risk ratio:
@@ -167,6 +198,73 @@ modeller's national T3 exposure-response curve at the hottest of the three
 trimester months for that county, scenario and period: the worst case. Below
 the minimum-risk temperature it is 1.
 
+## Observed months
+
+`GET /heat-outlook/{geography}/observed?outcome=&month=YYYY-MM&selector=`
+scores one month for a county (`geo-ke-<county>`) or for Kenya (`geo-ke`, the
+mean over its counties); `.../observed/map` returns every county for the same
+month.
+
+**Models.** The coefficients, covariance and cross-basis lookups of the
+2026-10-06 hand-over ship with `chart-core`, in
+`core/chart/heat_outlook/releases/<release>/` (`lbw_model.json`,
+`lbw_basis_lookup.csv`, `u5_models.json`, `u5_basis_lookup.csv`).
+`chart/heat_outlook/dlnm.py` is a plain-Python port of the modeller's
+reference scorers; `core/tests/test_kenya_observed_api.py` holds it to his
+validation cases from R (within 1e-3; in practice 3e-5 for LBW and 6e-5 for
+under-five).
+
+**Inputs.**
+
+| Outcome | A month M is scored on | Shown when |
+| --- | --- | --- |
+| LBW | The monthly mean daily Tmax of M and the eight months before it (lag 0 is the birth month), heat only: months below the national minimum-risk temperature (24.3 °C) count as it | All nine months are complete ERA5 months (`observed_days == expected_days`) |
+| Under-five | Every day of M on that day and the three before it, against the county's 1991–2020 mean daily Tmax; the month is the mean of its days' shares, as on India's day-grain path (`trailing_window_mean`) | Every day of M and the three days before it are present |
+
+Only ERA5 rows (`data_label` observed or reanalysis) are used, the newest run
+for each month or day. The 95% CI comes from the model's covariance; for
+under-five it is the mean of the days' bounds.
+
+**Scale (calibration).** The models were fitted on a 0.1° daily Tmax product
+(`Kenya_Combined_rasters`; the guide says "most likely ERA5-Land, to be
+confirmed"), not on ERA5. Over the same years, 2011–2020, CHART's ERA5 county
+means run warmer than the model's temperatures: by about 1 °C on average, by
+2–2.6 °C in Baringo, Embu, Kitui and Samburu, and by up to 4 °C in some months.
+Scored as they are, they would overstate heat risk. Each ERA5 value is therefore shifted by a fixed offset per county
+and calendar month:
+
+```text
+offset(county, month) = model-scale mean Tmax 2011–2020 (typical-month table, mean of its scenarios)
+                      − ERA5 mean Tmax 2011–2020 (same pipeline and county averaging as the live pulls)
+```
+
+This keeps ERA5's departure from its own climate, which is what an anomaly
+method uses. The hand-over's ISIMIP offsets do not fit ERA5 (correlation −0.15
+with the gap), so they are not used. The offsets are in `calibration.json`
+next to the models, with the ERA5 history they came from
+(`era5_tmax_monthly_2011_2020.csv`, 45 counties × 120 months; Mombasa and
+Vihiga are too small to hold an ERA5 grid point and have no live ERA5 either, and Narok is not
+in the modeller's tables). Regenerate them for a
+new release with:
+
+```sh
+DATABASE_URL=... python core/scripts/kenya_era5_climatology.py era5_2011_2020.csv
+chart-publish-kenya --lbw-dir .../LBW_.../model_files --u5-dir .../U5_.../model_files \
+  --release <release> --era5-climatology era5_2011_2020.csv
+```
+
+Without `calibration.json` the observed view is not offered.
+
+**Which months.** A county offers every month it can score. Kenya offers a
+month only when at least half its counties can score it: the newest ERA5 pull
+often reaches a few counties first, and the national figure would otherwise
+stand on a handful. A county opens on the newest month Kenya can show, if it
+has it, so the map beside it is full; its own newer months stay selectable.
+The map accepts any month a county can score and shows the others as
+unavailable.
+
+The display rules below apply to observed months as to projected ones.
+
 ## Model settings
 
 Settings → **Model settings** chooses, per country and outcome (for example
@@ -176,7 +274,7 @@ Kenya + LBW, Kenya + under-five, India + LBW), which options CHART offers:
 | --- | --- | --- |
 | Pregnancy windows (LBW) or age groups (under-five) | The outlook file's selectors (`P`, `T1`–`T3`; the age groups), and each live release's validated windows (`window_1`–`window_3`) | LBW outlook: whole pregnancy only. Age groups and live windows: all on. Default selector: whole pregnancy / post-neonatal |
 | Scenarios, with one default | The outlook file's scenarios; SSP1-2.6, SSP3-7.0 and SSP5-8.5 for live places with a hot season | All on, SSP5-8.5 by default |
-| Data views | `observed` (Copernicus ERA5 months) and `seasonal` (C3S forecast, up to 6 months) wherever a live release is active; `projection` (long-term scenarios) for the outlook and live places with a hot season | All on |
+| Data views | `observed` (Copernicus ERA5 months) for the Kenya outlook when its release has a calibration, and wherever a live release is active; `seasonal` (C3S forecast, up to 6 months) for live releases; `projection` (long-term scenarios) for the outlook and live places with a hot season | All on |
 
 The rules are enforced by the API (`PUT /model-settings/{country}/{outcome}`),
 not by the page:
@@ -193,7 +291,9 @@ not by the page:
   `MODEL_SETTINGS_DEFAULT_REQUIRED`).
 - **Applied server-side.** `GET /heat-outlook/...` lists only the options
   switched on, opens on the configured defaults, and refuses a disabled one
-  with `422 OUTLOOK_SELECTION_INVALID`, like any other invalid selection.
+  with `422 OUTLOOK_SELECTION_INVALID`, like any other invalid selection. A
+  view switched off (`observed` or `projection` on the outlook) answers
+  `404 VIEW_TURNED_OFF`, and the dashboard disables its tab.
   `GET /climate/planning-options/{geography}` drops disabled windows and
   scenarios, withdraws long-term projections when `projection` is off, and
   marks the next-months choices `MODEL_DATA_MODE_DISABLED` when `seasonal` is
@@ -224,7 +324,13 @@ switching window 1 off stops monthly predictions for that country.
 - **Sub-counties.** The constituency-level tables exist but are not
   published. CHART does not yet have the 290 constituency boundaries.
 - **Counts.** There are no births or deaths counts, so only percentages are
-  shown, never attributable numbers.
+  shown, never attributable numbers. Kenya's observed figure is the plain mean
+  of its counties for the same reason.
+- **Temperature product.** The calibration stands in for scoring on the
+  fitting product itself. Once the modeller confirms it (ERA5-Land or other),
+  pulling that product would remove the offset.
+- **Short horizons.** One-, five- and ten-year projections wait for the
+  modeller's monthly projection outputs.
 
 ## Relation to the live scorer
 

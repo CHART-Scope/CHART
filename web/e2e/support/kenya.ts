@@ -25,6 +25,14 @@ export const fixtures = JSON.parse(
   mapValues: MapValues;
 };
 
+// Observed months scored by the real Python service from the dev database's
+// ERA5 rows, keyed "<geography>|<outcome>|<selector>|<month>" ("latest" for
+// the request without a month); map values keyed "<outcome>|<selector>|<month>".
+type Observed = Record<string, unknown> & { selectors: Option[]; month: string | null };
+export const observedFixtures = JSON.parse(
+  readFileSync(new URL("../fixtures/observed-kenya.json", import.meta.url), "utf8"),
+) as { observed: Record<string, Observed>; mapValues: MapValues };
+
 const county = (slug: string, name: string) => ({
   id: `geo-ke-${slug}`,
   name,
@@ -76,6 +84,11 @@ function available(outcome: string) {
     scenarios: outlook.scenarios.map(view),
     data_modes: [
       {
+        code: "observed",
+        label: "Observed months (Copernicus ERA5)",
+        views: ["outlook"],
+      },
+      {
         code: "projection",
         label: "Long-term projections (climate scenarios)",
         views: ["outlook"],
@@ -97,7 +110,7 @@ function defaults(outcome: string): Values {
     default_selector: defaultSelectorFor(outcome),
     scenarios: options.scenarios.map((option) => option.code),
     default_scenario: "ssp585",
-    data_modes: ["projection"],
+    data_modes: ["observed", "projection"],
   };
 }
 
@@ -122,6 +135,8 @@ export type KenyaApi = FakeApi & {
 
 export type KenyaOptions = {
   roles?: string[];
+  /** HTTP status the observed endpoints answer with instead of a body. */
+  observedStatus?: number;
   /** Saved settings to start from, per outcome; the defaults otherwise. */
   settings?: Partial<Record<(typeof OUTCOMES)[number], Partial<Values>>>;
 };
@@ -203,9 +218,52 @@ export async function installKenya(
       enabled: settings.selectors.includes(selector),
     };
   };
+  const views = (settings: Values) =>
+    ["observed", "projection"].filter((view) => settings.data_modes.includes(view));
+  api.on(/^\/api\/chart\/heat-outlook\/[^/]+\/observed\/map$/, (route, url) => {
+    const { outcome, settings, selector, enabled } = selection(url);
+    // Without a month the API maps Kenya's newest month, as captured.
+    const national = observedFixtures.observed[`geo-ke|${outcome}|${selector}|latest`];
+    const month = url.searchParams.get("month") ?? national?.month;
+    const values = observedFixtures.mapValues[`${outcome}|${selector}|${month}`];
+    if (options.observedStatus)
+      return json(route, { error: "E2E_FAILURE" }, options.observedStatus);
+    if (!settings.data_modes.includes("observed"))
+      return json(route, { error: "VIEW_TURNED_OFF" }, 404);
+    if (!values) return json(route, { error: "OBSERVED_NOT_AVAILABLE" }, 404);
+    if (!enabled) return json(route, { error: "OUTLOOK_SELECTION_INVALID" }, 422);
+    return json(route, {
+      ...fixtures.mapFrame,
+      outcome,
+      metric: "heat_attributable_share_observed_month",
+      areas: fixtures.mapFrame.areas.map((area) => ({
+        ...area,
+        ...values[area.geography_id],
+      })),
+    });
+  });
+  api.on(/^\/api\/chart\/heat-outlook\/[^/]+\/observed$/, (route, url) => {
+    const geography = url.pathname.split("/").slice(-2)[0];
+    const { outcome, settings, selector, enabled } = selection(url);
+    const month = url.searchParams.get("month") ?? "latest";
+    if (options.observedStatus)
+      return json(route, { error: "E2E_FAILURE" }, options.observedStatus);
+    if (!settings.data_modes.includes("observed"))
+      return json(route, { error: "VIEW_TURNED_OFF" }, 404);
+    const body =
+      observedFixtures.observed[`${geography}|${outcome}|${selector}|${month}`];
+    if (!body) return json(route, { error: "OBSERVED_NOT_AVAILABLE" }, 404);
+    if (!enabled) return json(route, { error: "OUTLOOK_SELECTION_INVALID" }, 422);
+    return json(route, {
+      ...body,
+      selectors: body.selectors.filter((o) => settings.selectors.includes(o.code)),
+      data_modes: views(settings),
+    });
+  });
   api.on(/^\/api\/chart\/heat-outlook\/[^/]+\/map$/, (route, url) => {
     const { outcome, selector, enabled } = selection(url);
-    const values = fixtures.mapValues[`${outcome}|${selector}`];
+    const peak = url.searchParams.get("reference") === "peak" ? "|peak" : "";
+    const values = fixtures.mapValues[`${outcome}|${selector}${peak}`];
     if (!published || !values)
       return json(route, { error: "OUTLOOK_NOT_PUBLISHED" }, 404);
     if (!enabled) return json(route, { error: "OUTLOOK_SELECTION_INVALID" }, 422);
@@ -226,10 +284,13 @@ export async function installKenya(
       : undefined;
     if (!body) return json(route, { error: "OUTLOOK_NOT_PUBLISHED" }, 404);
     if (!enabled) return json(route, { error: "OUTLOOK_SELECTION_INVALID" }, 422);
+    if (!settings.data_modes.includes("projection"))
+      return json(route, { error: "VIEW_TURNED_OFF" }, 404);
     return json(route, {
       ...body,
       selectors: body.selectors.filter((o) => settings.selectors.includes(o.code)),
       scenarios: body.scenarios.filter((o) => settings.scenarios.includes(o.code)),
+      data_modes: views(settings),
     });
   });
   return api;

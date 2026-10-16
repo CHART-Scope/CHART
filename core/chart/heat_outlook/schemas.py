@@ -68,6 +68,21 @@ class OutlookPeriod(BaseModel):
     parts: list[PeriodPart]
 
 
+class PeakSeason(BaseModel):
+    """The three consecutive months of the period with the highest heat share.
+
+    For LBW the months are birth months. The share is the mean of the three
+    months' typical-month shares; the range is the spread of the climate
+    models, not a confidence interval.
+    """
+
+    months: list[int]
+    label: str
+    part: MonthPart
+    gcm_min_percent: float | None
+    gcm_max_percent: float | None
+
+
 class HeatOutlookResponse(BaseModel):
     geography_id: str
     place: str
@@ -86,3 +101,45 @@ class HeatOutlookResponse(BaseModel):
     selector_note: str | None
     months: list[OutlookMonth]
     period_summary: list[OutlookPeriod]
+    peak_season: PeakSeason | None = None
+    data_modes: list[str] = ["observed", "projection"]
+
+
+class ObservedInput(BaseModel):
+    """One temperature behind an observed estimate, before and after calibration."""
+
+    label: str
+    era5_c: float | None
+    model_scale_c: float
+    counted: bool
+
+
+class ObservedEstimate(MonthPart):
+    side: Literal["heat", "cool"] = "heat"
+    ratio: Ratio | None = None
+    thin_data: bool
+    counties: int
+
+
+class ObservedMonth(BaseModel):
+    month: str
+    value_percent: float | None
+
+
+class ObservedResponse(BaseModel):
+    geography_id: str
+    place: str
+    level: Literal["county", "country"]
+    outcome: str
+    release: str
+    selectors: list[Option]
+    selector: str
+    selector_note: str | None
+    month: str | None
+    available_months: list[str]
+    estimate: ObservedEstimate | None
+    inputs: list[ObservedInput]
+    history: list[ObservedMonth]
+    reference_note: str
+    calibration_note: str
+    data_modes: list[str]

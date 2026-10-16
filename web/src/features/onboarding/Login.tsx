@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { BrandMark } from "@/components/BrandMark";
 import { Button, buttonClassName } from "@/components/Button";
+import { ExplainerVideo } from "@/components/ExplainerVideo";
 import { Icon, IconSprite } from "@/components/Icon";
 import { startKeycloakSignIn, takeSignedOutReason } from "@/lib/authClient";
 import { getSetupStatus } from "@/lib/setupClient";
@@ -114,6 +115,17 @@ export function Login({
               </a>
             </div>
             <DashboardPreview />
+          </section>
+          <section className={styles.explainer} aria-labelledby="explainer-title">
+            <div>
+              <p className={styles.eyebrow}>Watch</p>
+              <h2 id="explainer-title">CHART in 80 seconds</h2>
+              <p className={styles.lede}>
+                Why heat puts mothers and young children at risk, why that risk depends
+                on place, and how CHART turns evidence into action.
+              </p>
+            </div>
+            <ExplainerVideo className={styles.explainerVideo} />
           </section>
           <section className={styles.toolkit} aria-labelledby="toolkit-title">
             <h2 id="toolkit-title">Explore the CHART toolkit</h2>

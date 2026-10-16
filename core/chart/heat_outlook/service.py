@@ -22,6 +22,7 @@ from chart.risk.precision import precision_for_ci
 from chart.risk.schemas import MapResponse
 from chart.risk.service import load_map_view
 
+from . import dlnm
 from .schemas import (
     HeatOutlookResponse,
     MonthPart,
@@ -29,6 +30,7 @@ from .schemas import (
     Option,
     OutlookMonth,
     OutlookPeriod,
+    PeakSeason,
     PeriodPart,
     Ratio,
 )
@@ -83,6 +85,11 @@ class OutlookRestriction:
     scenarios: frozenset[str]
     default_selector: str | None = None
     default_scenario: str | None = None
+    # The outlook views left on ("observed", "projection"); None leaves all on.
+    data_modes: frozenset[str] | None = None
+
+    def allows(self, view: str) -> bool:
+        return self.data_modes is None or view in self.data_modes
 
 
 @dataclass(frozen=True)
@@ -91,6 +98,11 @@ class PublishedOptions:
 
     selectors: list[Option]
     scenarios: list[str]
+    observed: bool
+
+
+class ViewTurnedOff(LookupError):
+    """The country's model settings switch this view (observed or projection) off."""
 
 
 class OutlookNotAvailable(LookupError):
@@ -136,16 +148,54 @@ def _document(geography_id: str, outcome: str) -> tuple[dict, str] | None:
 
 
 def published_options(outcome: str) -> PublishedOptions | None:
-    """The selectors and scenarios Kenya's national file publishes."""
+    """The selectors and scenarios Kenya's national file publishes.
 
+    Without the tables, the shipped models still score observed months, so
+    their drop-down is offered with no scenarios.
+    """
+
+    if outcome not in OUTCOMES:
+        return None
     found = _document("geo-ke", outcome)
     if found is None:
-        return None
+        try:
+            selectors = model_selector_options(outcome, outlook_release())
+        except FileNotFoundError:
+            return None
+        return PublishedOptions(
+            selectors=selectors, scenarios=[], observed=_calibrated()
+        )
     document = found[0]
     return PublishedOptions(
         selectors=[_selector_option(option) for option in document["selectors"]],
         scenarios=sorted({row["scenario"] for row in document["periods"]}),
+        observed=_calibrated(),
     )
+
+
+def _calibrated() -> bool:
+    """Whether the release can score observed months (``observed.py``)."""
+
+    return (dlnm.release_dir(outlook_release()) / "calibration.json").is_file()
+
+
+def model_selector_options(outcome: str, release: str) -> list[Option]:
+    """The drop-down of the shipped models, labelled as in the model files."""
+
+    if outcome == LBW_OUTCOME:
+        meta = dlnm.lbw_model(release).meta
+        return [
+            Option(code=code, label=meta["window_labels"][code])
+            for code in meta["windows"]
+        ]
+    return [
+        Option(
+            code=code,
+            label=spec["label"],
+            exploratory=str(spec.get("status", "")).startswith("exploratory"),
+        )
+        for code, spec in dlnm.u5_models(release).meta["models"].items()
+    ]
 
 
 def scenario_label(code: str) -> str:
@@ -199,13 +249,17 @@ def load_outlook_map(
     period: str | None = None,
     selector: str | None = None,
     restriction: OutlookRestriction | None = None,
+    reference: str = "annual",
 ) -> MapResponse:
-    """The county map for one selection: each county's annual-average share.
+    """The county map for one selection: each county's annual-average share,
+    or with ``reference="peak"`` its peak-heat-season share.
 
     Shapes and framing come from the risk map, so this map draws exactly like
     the existing one; only the values are replaced with the published ones.
     """
 
+    if restriction is not None and not restriction.allows("projection"):
+        raise ViewTurnedOff("projection")
     national = _document("geo-ke", outcome)
     if national is None:
         raise OutlookNotAvailable(geography_id)
@@ -236,6 +290,16 @@ def load_outlook_map(
         area.value_percent = None
         area.odds_ratio = None
         area.on_training_support = None
+        if found is not None and reference == "peak":
+            peak = _peak_season(found[0], outcome, scenario, period, selector)
+            value = peak.part.value_percent if peak else None
+            area.value_percent = value
+            area.missing_reason = (
+                "not_reported"
+                if peak is None
+                else None if value is not None else "no_excess"
+            )
+            continue
         if found is None or row is None:
             # T3 has no period summary; an unpublished county (Narok) has no file.
             area.missing_reason = "no_model" if found is None else "not_reported"
@@ -257,7 +321,11 @@ def load_outlook_map(
         area.on_training_support = (
             row["share_above_p99_pct"] or 0
         ) <= THIN_DATA_SHARE_PERCENT
-    frame.metric = "heat_attributable_share_annual_average"
+    frame.metric = (
+        "heat_attributable_share_peak_season"
+        if reference == "peak"
+        else "heat_attributable_share_annual_average"
+    )
     return frame
 
 
@@ -270,6 +338,8 @@ def load_outlook(
     selector: str | None = None,
     restriction: OutlookRestriction | None = None,
 ) -> HeatOutlookResponse:
+    if restriction is not None and not restriction.allows("projection"):
+        raise ViewTurnedOff("projection")
     found = _document(geography_id, outcome)
     if found is None:
         raise OutlookNotAvailable(geography_id)
@@ -301,7 +371,19 @@ def load_outlook(
         selector_note=_selector_note(outcome, selector, selectors),
         months=_months(document, outcome, scenario, period, selector),
         period_summary=_period_summary(document, outcome, scenario, selector, baseline),
+        peak_season=_peak_season(document, outcome, scenario, period, selector),
+        data_modes=enabled_views(restriction),
     )
+
+
+def enabled_views(restriction: OutlookRestriction | None) -> list[str]:
+    """The outlook views a reader may switch to, in display order."""
+
+    return [
+        view
+        for view in ("observed", "projection")
+        if restriction is None or restriction.allows(view)
+    ]
 
 
 @lru_cache(maxsize=256)
@@ -342,6 +424,66 @@ def _months(document, outcome, scenario, period, selector) -> list[OutlookMonth]
     for month in by_month.values():
         month.parts.sort(key=lambda part: part.side != "heat")
     return [by_month[key] for key in sorted(by_month)]
+
+
+MONTH_NAMES = (
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
+PEAK_SEASON_MONTHS = 3
+
+
+def _peak_season(document, outcome, scenario, period, selector) -> PeakSeason | None:
+    """The three consecutive months with the highest heat share.
+
+    Ranked by share, not temperature: an LBW month is the births of that
+    month, exposed over the pregnancy before it, so the hottest calendar
+    months are not the births heat affects most. For under-five (four-day
+    lags) the two orders agree.
+    """
+
+    rows = {
+        row["month"]: row
+        for row in document["months"]
+        if (row["scenario"], row["period"], row["selector"], row["side"])
+        == (scenario, period, selector, "heat")
+    }
+    if len(rows) < 12 or any(row["mean"] is None for row in rows.values()):
+        return None
+
+    def block(start: int) -> list[int]:
+        return [(start + offset - 1) % 12 + 1 for offset in range(PEAK_SEASON_MONTHS)]
+
+    hottest = max(
+        range(1, 13), key=lambda start: sum(rows[m]["mean"] for m in block(start))
+    )
+    chosen = block(hottest)
+
+    def mean(key: str) -> float | None:
+        values = [rows[month][key] for month in chosen]
+        if any(value is None for value in values):
+            return None
+        return _percent(sum(values) / len(values))
+
+    shown = _shown(outcome, selector, "heat", mean("mean"), None, None)
+    visible = shown["value_percent"] is not None
+    return PeakSeason(
+        months=chosen,
+        label=f"{MONTH_NAMES[chosen[0] - 1]}–{MONTH_NAMES[chosen[-1] - 1]}",
+        part=MonthPart(side="heat", **shown),
+        gcm_min_percent=mean("min") if visible else None,
+        gcm_max_percent=mean("max") if visible else None,
+    )
 
 
 def _period_summary(

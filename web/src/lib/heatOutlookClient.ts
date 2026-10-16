@@ -45,6 +45,17 @@ export type OutlookPeriodPart = OutlookPart & {
   thin_data: boolean;
 };
 
+export type PeakSeason = {
+  months: number[];
+  label: string;
+  part: OutlookPart;
+  gcm_min_percent: number | null;
+  gcm_max_percent: number | null;
+};
+
+/** The outlook views a country's model settings leave on. */
+export type OutlookView = "observed" | "projection";
+
 export type HeatOutlook = {
   geography_id: string;
   place: string;
@@ -68,7 +79,47 @@ export type HeatOutlook = {
     is_baseline: boolean;
     parts: OutlookPeriodPart[];
   }[];
+  peak_season: PeakSeason | null;
+  data_modes: OutlookView[];
 };
+
+export type ObservedInput = {
+  label: string;
+  era5_c: number | null;
+  model_scale_c: number;
+  /** Whether the chosen window reads this month. */
+  counted: boolean;
+};
+
+export type ObservedEstimate = OutlookPart & {
+  ratio: OutlookRatio | null;
+  thin_data: boolean;
+  counties: number;
+};
+
+/** An observed month scored from ERA5 with the modeller's DLNM. */
+export type ObservedRisk = {
+  geography_id: string;
+  place: string;
+  level: "county" | "country";
+  outcome: string;
+  release: string;
+  selectors: OutlookOption[];
+  selector: string;
+  selector_note: string | null;
+  month: string | null;
+  available_months: string[];
+  estimate: ObservedEstimate | null;
+  inputs: ObservedInput[];
+  history: { month: string; value_percent: number | null }[];
+  reference_note: string;
+  calibration_note: string;
+  data_modes: OutlookView[];
+};
+
+export type ObservedSelection = { outcome: string; month?: string; selector?: string };
+
+export type OutlookReference = "annual" | "peak";
 
 export type OutlookSelection = {
   outcome: string;
@@ -98,20 +149,58 @@ export async function fetchHeatOutlook(
   return (await response.json()) as HeatOutlook;
 }
 
-/** Counties shaded by their annual-average share for one selection. */
+/** Counties shaded by their annual-average (or peak-season) share. */
 export async function fetchHeatOutlookMap(
   geographyId: string,
   accessToken: string | null | undefined,
-  selection: OutlookSelection,
+  selection: OutlookSelection & { reference?: OutlookReference },
 ): Promise<MapResponse> {
   const params = new URLSearchParams({ outcome: selection.outcome });
   if (selection.scenario) params.set("scenario", selection.scenario);
   if (selection.period) params.set("period", selection.period);
   if (selection.selector) params.set("selector", selection.selector);
+  if (selection.reference) params.set("reference", selection.reference);
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/map?${params}`,
     { accessToken },
   );
   if (!response.ok) throw new Error("The heat outlook map could not load.");
+  return (await response.json()) as MapResponse;
+}
+
+function observedParams(selection: ObservedSelection): URLSearchParams {
+  const params = new URLSearchParams({ outcome: selection.outcome });
+  if (selection.month) params.set("month", selection.month);
+  if (selection.selector) params.set("selector", selection.selector);
+  return params;
+}
+
+/** One observed month, scored on request from the ERA5 the dashboard holds. */
+export async function fetchObservedRisk(
+  geographyId: string,
+  accessToken: string | null | undefined,
+  selection: ObservedSelection,
+  signal?: AbortSignal,
+): Promise<ObservedRisk> {
+  const response = await authFetch(
+    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/observed?${observedParams(selection)}`,
+    { accessToken, signal },
+  );
+  if (response.status === 404) throw new OutlookNotPublished(geographyId);
+  if (!response.ok) throw new Error("The observed estimate could not load.");
+  return (await response.json()) as ObservedRisk;
+}
+
+/** Counties shaded by their share for one observed month. */
+export async function fetchObservedRiskMap(
+  geographyId: string,
+  accessToken: string | null | undefined,
+  selection: ObservedSelection,
+): Promise<MapResponse> {
+  const response = await authFetch(
+    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/observed/map?${observedParams(selection)}`,
+    { accessToken },
+  );
+  if (!response.ok) throw new Error("The observed map could not load.");
   return (await response.json()) as MapResponse;
 }

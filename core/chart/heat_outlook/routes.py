@@ -14,11 +14,13 @@ from chart.risk.schemas import MapResponse
 from chart.risk.service import NoAdminUnitForGeography
 from chart.shared.db.session import get_session_factory
 
-from .schemas import HeatOutlookResponse
+from .observed import ObservedNotCalibrated, load_observed, load_observed_map
+from .schemas import HeatOutlookResponse, ObservedResponse
 from .service import (
     LBW_OUTCOME,
     OutlookNotAvailable,
     OutlookSelectionInvalid,
+    ViewTurnedOff,
     load_outlook,
     load_outlook_map,
 )
@@ -49,6 +51,8 @@ def read_heat_outlook(
             selector=selector,
             restriction=outlook_restriction(outcome),
         )
+    except ViewTurnedOff as exc:
+        raise HTTPException(status_code=404, detail="VIEW_TURNED_OFF") from exc
     except OutlookNotAvailable as exc:
         raise HTTPException(status_code=404, detail="OUTLOOK_NOT_PUBLISHED") from exc
     except OutlookSelectionInvalid as exc:
@@ -69,6 +73,7 @@ def read_heat_outlook_map(
     scenario: Annotated[str | None, Query(max_length=16)] = None,
     period: Annotated[str | None, Query(max_length=16)] = None,
     selector: Annotated[str | None, Query(max_length=32)] = None,
+    reference: Annotated[str, Query(pattern="^(annual|peak)$")] = "annual",
 ) -> MapResponse:
     require_read_access(user, geography_id)
     restriction = outlook_restriction(outcome)
@@ -82,9 +87,84 @@ def read_heat_outlook_map(
                 period=period,
                 selector=selector,
                 restriction=restriction,
+                reference=reference,
             )
+    except ViewTurnedOff as exc:
+        raise HTTPException(status_code=404, detail="VIEW_TURNED_OFF") from exc
     except (OutlookNotAvailable, NoAdminUnitForGeography) as exc:
         raise HTTPException(status_code=404, detail="OUTLOOK_NOT_PUBLISHED") from exc
+    except OutlookSelectionInvalid as exc:
+        raise HTTPException(
+            status_code=422, detail="OUTLOOK_SELECTION_INVALID"
+        ) from exc
+
+
+@router.get(
+    "/{geography_id}/observed",
+    response_model=ObservedResponse,
+    summary="Score an observed month for a Kenyan place from ERA5",
+)
+def read_observed(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    outcome: str = LBW_OUTCOME,
+    month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+    selector: Annotated[str | None, Query(max_length=32)] = None,
+) -> ObservedResponse:
+    require_read_access(user, geography_id)
+    restriction = outlook_restriction(outcome)
+    try:
+        with get_session_factory()() as session:
+            return load_observed(
+                session,
+                geography_id,
+                outcome,
+                month=month,
+                selector=selector,
+                restriction=restriction,
+            )
+    except ViewTurnedOff as exc:
+        raise HTTPException(status_code=404, detail="VIEW_TURNED_OFF") from exc
+    except (OutlookNotAvailable, ObservedNotCalibrated) as exc:
+        raise HTTPException(status_code=404, detail="OBSERVED_NOT_AVAILABLE") from exc
+    except OutlookSelectionInvalid as exc:
+        raise HTTPException(
+            status_code=422, detail="OUTLOOK_SELECTION_INVALID"
+        ) from exc
+
+
+@router.get(
+    "/{geography_id}/observed/map",
+    response_model=MapResponse,
+    summary="Read Kenyan counties shaded by an observed month's heat share",
+)
+def read_observed_map(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    outcome: str = LBW_OUTCOME,
+    month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+    selector: Annotated[str | None, Query(max_length=32)] = None,
+) -> MapResponse:
+    require_read_access(user, geography_id)
+    restriction = outlook_restriction(outcome)
+    try:
+        with get_session_factory()() as session:
+            return load_observed_map(
+                session,
+                geography_id,
+                outcome,
+                month=month,
+                selector=selector,
+                restriction=restriction,
+            )
+    except ViewTurnedOff as exc:
+        raise HTTPException(status_code=404, detail="VIEW_TURNED_OFF") from exc
+    except (
+        OutlookNotAvailable,
+        ObservedNotCalibrated,
+        NoAdminUnitForGeography,
+    ) as exc:
+        raise HTTPException(status_code=404, detail="OBSERVED_NOT_AVAILABLE") from exc
     except OutlookSelectionInvalid as exc:
         raise HTTPException(
             status_code=422, detail="OUTLOOK_SELECTION_INVALID"

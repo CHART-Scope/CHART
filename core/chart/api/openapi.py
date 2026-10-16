@@ -446,12 +446,54 @@ OPERATION_DOCUMENTATION: dict[
             "reader role and access to the geography path. Counties whose share "
             "is suppressed by the display rules carry missing_reason no_excess; "
             "windows with no period summary carry not_reported; counties with no "
-            "published file carry no_model. Nothing is computed on request."
+            "published file carry no_model. With reference=peak, each county is "
+            "shaded by its peak-season share instead: the three consecutive "
+            "months with the highest heat share. Nothing is computed on request."
         ),
         success_responses={
             "200": (
                 "Kenyan counties with display geometry and each county's published "
-                "annual-average share, or the reason it is absent."
+                "annual-average (or peak-season) share, or the reason it is absent."
+            )
+        },
+    ),
+    ("get", "/heat-outlook/{geography_id}/observed"): OperationDocumentation(
+        summary="Score an observed month for a Kenyan place from ERA5",
+        description=(
+            "Scores one observed month for a Kenyan county (geo-ke-<county>), or "
+            "the mean over Kenya's counties (geo-ke), with the modelling team's "
+            "DLNM models, using the Copernicus ERA5 temperatures CHART has "
+            "ingested. ERA5 is first moved onto the scale the models were fitted "
+            "on by a fixed offset per county and calendar month. Low birth weight "
+            "reads the birth month and the eight before it; under-five scores each "
+            "day of the month on that day and the three before it and averages "
+            "them. month (YYYY-MM) defaults to the newest month with complete "
+            "inputs; selector is the pregnancy window or the age group. Requires a "
+            "risk reader role and access to the geography path. The guides' "
+            "display rules apply, so suppressed values arrive as null with the "
+            "message to show in their place."
+        ),
+        success_responses={
+            "200": (
+                "The estimate with its 95% CI and ratio, the months that can be "
+                "scored, the share for each of them, the temperatures used on both "
+                "scales, and the notes the dashboard must display."
+            )
+        },
+    ),
+    ("get", "/heat-outlook/{geography_id}/observed/map"): OperationDocumentation(
+        summary="Read Kenyan counties shaded by an observed month's heat share",
+        description=(
+            "Returns the counties of Kenya with their display geometry and each "
+            "county's heat-attributable share for one observed month, scored as "
+            "in the observed estimate. Requires a risk reader role and access to "
+            "the geography path. Counties without complete ERA5 inputs carry "
+            "missing_reason not_reported; suppressed shares carry no_excess."
+        ),
+        success_responses={
+            "200": (
+                "Kenyan counties with display geometry and each county's share for "
+                "the observed month, or the reason it is absent."
             )
         },
     ),

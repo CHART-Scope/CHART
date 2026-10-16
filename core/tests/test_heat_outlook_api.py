@@ -95,7 +95,10 @@ def _lbw_tables(directory: Path) -> None:
                 "month": month,
                 "tmax": 25 + month * 0.5,
             }
-            for window, af in (("P", 0.1), ("T1", -0.02), ("T2", 0.05), ("T3", -0.1)):
+            # Births in Jul-Sep carry the most heat (the hot months fall in
+            # their pregnancies), so they are the peak, not the hottest months.
+            peak = 0.2 if period == "2041-2060" and month in (7, 8, 9) else 0.1
+            for window, af in (("P", peak), ("T1", -0.02), ("T2", 0.05), ("T3", -0.1)):
                 row |= {
                     f"af_heat_{window}_mean": af,
                     f"af_heat_{window}_min": af - 0.01,
@@ -295,6 +298,70 @@ def test_lbw_whole_pregnancy_reads_months_and_periods(client) -> None:
     assert ratio["value"] == pytest.approx(1.1349, abs=1e-3)
     assert ratio["low"] < ratio["value"] < ratio["high"]
     assert ratio["precision"] == "high"
+
+
+def test_peak_season_is_the_three_months_with_the_highest_share(client) -> None:
+    body = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw").json()
+
+    peak = body["peak_season"]
+    # December is the hottest birth month in the table; the share decides.
+    assert peak["months"] == [7, 8, 9] and peak["label"] == "Jul–Sep"
+    assert peak["part"]["value_percent"] == 20.0
+    assert (peak["gcm_min_percent"], peak["gcm_max_percent"]) == (19.0, 21.0)
+    # This release has no ERA5 calibration, so only projections are offered.
+    assert body["data_modes"] == ["projection"]
+
+
+def test_peak_season_map_and_suppressed_window(client, monkeypatch) -> None:
+    enable_every_window(client)
+    t3 = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw&selector=T3").json()
+    assert t3["peak_season"]["part"]["value_percent"] is None
+    assert t3["peak_season"]["part"]["message"] == NO_EXCESS_LBW
+    assert t3["peak_season"]["gcm_min_percent"] is None
+
+    frame = MapResponse(
+        geography_id="geo-ke",
+        outcome="lbw",
+        areas=[
+            MapArea(
+                geography_id=KAJIADO,
+                admin_unit_id=1,
+                code="kajiado",
+                name="Kajiado",
+                level="county",
+            )
+        ],
+    )
+    monkeypatch.setattr(outlook_routes, "get_session_factory", lambda: nullcontext)
+    monkeypatch.setattr(
+        outlook_service, "load_map_view", lambda *_a, **_k: frame.model_copy(deep=True)
+    )
+    body = client.get("/heat-outlook/geo-ke/map?outcome=lbw&reference=peak").json()
+    assert body["metric"] == "heat_attributable_share_peak_season"
+    assert body["areas"][0]["value_percent"] == 20.0
+    bad = client.get("/heat-outlook/geo-ke/map?outcome=lbw&reference=summer")
+    assert bad.status_code == 422
+
+
+def test_projection_view_can_be_switched_off(client, monkeypatch) -> None:
+    monkeypatch.setattr(outlook_service, "_calibrated", lambda: True)
+    monkeypatch.setattr(outlook_routes, "get_session_factory", lambda: nullcontext)
+    response = client.put(
+        "/model-settings/KE/lbw",
+        json={
+            "selectors": ["P"],
+            "default_selector": "P",
+            "scenarios": ["ssp585"],
+            "default_scenario": "ssp585",
+            "data_modes": ["observed"],
+        },
+    )
+    assert response.status_code == 200, response.text
+
+    off = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw")
+    assert off.status_code == 404
+    assert off.json()["error"] == "VIEW_TURNED_OFF"
+    assert client.get("/heat-outlook/geo-ke/map?outcome=lbw").status_code == 404
 
 
 def test_lbw_third_trimester_shows_odds_ratio_without_attributable_share(

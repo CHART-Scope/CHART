@@ -456,7 +456,11 @@ def pending_climate_ingestions_sensor(_context: dg.SensorEvaluationContext):
     description=(
         "Persist the exact climate inputs a request will be scored on, then "
         "run the model on them."
-    )
+    ),
+    # Both steps take about a second. The default multiprocess executor
+    # started a fresh Python for each and re-imported the pipeline, which
+    # cost 10-12 s per step on the server: most of a planner's wait.
+    executor_def=dg.in_process_executor,
 )
 def prediction_request_job():
     score_prediction(ensure_climate_inputs())

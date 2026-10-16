@@ -36,3 +36,6 @@ Makefile
 
 # Generated E2E fixtures (real API responses), kept minified
 web/e2e/fixtures/
+
+# Model files exactly as the modelling team delivered them, and data derived for them.
+core/chart/heat_outlook/releases/

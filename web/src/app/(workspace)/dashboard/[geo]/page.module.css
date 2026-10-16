@@ -57,3 +57,10 @@
   box-shadow: 0 4px 16px rgb(0 0 0 / 8%);
   font-size: var(--fs-caption);
 }
+
+.panelPlaceholder {
+  min-height: 34rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}

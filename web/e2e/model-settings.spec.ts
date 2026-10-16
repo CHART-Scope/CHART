@@ -10,8 +10,7 @@ const admin = { roles: ["chart_admin", "health_planning_lead"] };
 const settingsFor = (page: Page, title: string) =>
   page.getByRole("group", { name: title, exact: true });
 
-const outlookPanel = (page: Page) =>
-  page.getByRole("region", { name: /may be attributable to heat in an average year/ });
+const outlookPanel = (page: Page) => page.getByTestId("heat-outlook");
 
 async function optionsOf(page: Page, combobox: string): Promise<string[]> {
   await outlookPanel(page).getByRole("combobox", { name: combobox }).click();
@@ -58,7 +57,7 @@ test("turning on a pregnancy window saves it and the dashboard offers it", async
     default_selector: "P",
     scenarios: ["ssp126", "ssp370", "ssp585"],
     default_scenario: "ssp585",
-    data_modes: ["projection"],
+    data_modes: ["observed", "projection"],
   });
   await expect(lbw.getByRole("status")).toHaveText("Saved.");
   await page.screenshot({

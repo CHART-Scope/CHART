@@ -127,7 +127,7 @@ services:
         else
           public_flag="";
         fi;
-        aws s3 sync "s3://$$MODEL_BUCKET/" /models/ --exclude "archive/*" $$public_flag
+        aws s3 sync "s3://$$MODEL_BUCKET/" /models/ --exclude "archive/*" --exclude "media/*" $$public_flag
 
   chart-lbw:
     image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-lbw:${IMAGE_TAG:-dev}
@@ -288,15 +288,52 @@ services:
       <<: *dagster-environment
     command: ["dagster", "instance", "migrate"]
 
-  chart-dagster-webserver:
+  # One long-lived code server for the daemon and the webserver. Given `-m`,
+  # each of them spawned its own and the daemon replaced its copy every one to
+  # two minutes, re-importing the pipeline each time: 90-180% of the server's
+  # two CPUs with nothing queued (measured 2026-10-16). Runs are launched from
+  # here, so it carries the daemon's environment and volumes.
+  chart-dagster-code:
     image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}
-    container_name: chart-dagster-webserver
+    container_name: chart-dagster-code
     restart: unless-stopped
     depends_on:
       chart-dagster-migrate:
         condition: service_completed_successfully
       chart-migrate:
         condition: service_completed_successfully
+    environment:
+      <<: *dagster-environment
+    volumes:
+      - chart-dagster-storage:/opt/dagster/storage
+      - chart-climate-data:/opt/chart/data/climate
+    command:
+      [
+        "dagster",
+        "code-server",
+        "start",
+        "-h",
+        "0.0.0.0",
+        "-p",
+        "4000",
+        "-m",
+        "chart_pipeline.definitions",
+        "--location-name",
+        "chart_pipeline",
+      ]
+    healthcheck:
+      test: ["CMD", "dagster", "api", "grpc-health-check", "-p", "4000"]
+      interval: 10s
+      timeout: 10s
+      retries: 18
+
+  chart-dagster-webserver:
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}
+    container_name: chart-dagster-webserver
+    restart: unless-stopped
+    depends_on:
+      chart-dagster-code:
+        condition: service_healthy
     environment:
       <<: *dagster-environment
     volumes:
@@ -311,8 +348,10 @@ services:
         "0.0.0.0",
         "-p",
         "3000",
-        "-m",
-        "chart_pipeline.definitions",
+        "--grpc-host",
+        "chart-dagster-code",
+        "--grpc-port",
+        "4000",
       ]
     healthcheck:
       test:
@@ -331,16 +370,22 @@ services:
     container_name: chart-dagster-daemon
     restart: unless-stopped
     depends_on:
-      chart-dagster-migrate:
-        condition: service_completed_successfully
-      chart-migrate:
-        condition: service_completed_successfully
+      chart-dagster-code:
+        condition: service_healthy
     environment:
       <<: *dagster-environment
     volumes:
       - chart-dagster-storage:/opt/dagster/storage
       - chart-climate-data:/opt/chart/data/climate
-    command: ["dagster-daemon", "run", "-m", "chart_pipeline.definitions"]
+    command:
+      [
+        "dagster-daemon",
+        "run",
+        "--grpc-host",
+        "chart-dagster-code",
+        "--grpc-port",
+        "4000",
+      ]
     healthcheck:
       test: ["CMD", "dagster-daemon", "liveness-check"]
       interval: 10s
