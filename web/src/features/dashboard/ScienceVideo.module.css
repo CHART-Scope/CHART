@@ -1,0 +1,22 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  min-width: 0;
+}
+.card h2 {
+  margin: 0;
+  font: inherit;
+  font-size: var(--fs-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-eyebrow);
+  color: var(--color-text-muted);
+}
+.card p {
+  margin: 0;
+  line-height: 1.5;
+}

@@ -86,8 +86,13 @@ def submit_prediction(
     requested_by_user_id: str | None = None,
     session_factory=None,
     now: datetime | None = None,
+    inline: bool = True,
 ) -> PredictResponse | PredictionAcceptedResponse:
-    """Create one versioned request; data preparation happens in Dagster."""
+    """Create one versioned request and score it now when its inputs are stored.
+
+    Otherwise (observations still to be pulled) Dagster prepares and scores
+    it, and the caller polls the returned request.
+    """
 
     place = validate_prediction_request(request, session_factory=session_factory)
     assert place.model is not None
@@ -175,6 +180,10 @@ def submit_prediction(
     )
     if record.status == "completed" and record.result_payload is not None:
         return PredictResponse.model_validate(record.result_payload)
+    if record.status == "queued" and inline:
+        scored = score_inline_if_ready(record.id, session_factory=session_factory)
+        if scored is not None:
+            return scored
     return _accepted(record)
 
 
@@ -284,6 +293,98 @@ def list_queued_prediction_requests(
             for record in records
             for request in [PredictRequest.model_validate(record.request_payload)]
         ]
+
+
+#: Lease owner of a request scored inside the API call that created it.
+INLINE_OWNER = "api-inline"
+
+
+def score_inline_if_ready(
+    request_id: int, *, session_factory=None
+) -> PredictResponse | None:
+    """Score a fresh request now when its climate inputs are already stored.
+
+    Scoring itself takes about two seconds (selecting the stored months and
+    one call to the model service). Through Dagster the same request waited
+    a minute or more on run and process start-up, so a planner opening a
+    month whose observations CHART already holds waited for nothing.
+
+    The request is reserved and claimed under the same lease rules as the
+    Dagster sensor, so exactly one of the two can own it. Anything that is not
+    an immediate success - observations still to be pulled, the model service
+    unavailable - hands the request back to the queue unchanged, and Dagster
+    runs it exactly as before. This path only ever saves time.
+    """
+
+    session_factory = session_factory or get_session_factory()
+    token = _reserve_one(request_id, session_factory=session_factory)
+    if token is None:
+        return None
+    if not claim_prediction_request(
+        request_id,
+        dagster_run_id=f"{INLINE_OWNER}-{token[:12]}",
+        lease_token=token,
+        session_factory=session_factory,
+    ):
+        _return_to_queue(request_id, token, session_factory=session_factory)
+        return None
+    try:
+        prepare_prediction_input(
+            request_id,
+            live=os.getenv("CLIMATE_USE_FIXTURE", os.getenv("ERA5_USE_FIXTURE", "0"))
+            != "1",
+            lease_token=token,
+            session_factory=session_factory,
+        )
+        return complete_prediction_request(
+            request_id, lease_token=token, session_factory=session_factory
+        )
+    except Exception:  # noqa: BLE001 - every failure falls back to Dagster
+        logger.info("prediction %s not scored inline; queued for Dagster", request_id)
+        _return_to_queue(request_id, token, session_factory=session_factory)
+        return None
+
+
+def _reserve_one(request_id: int, *, session_factory) -> str | None:
+    """Lease one queued request, as ``reserve_queued_prediction_requests`` does."""
+
+    current_time = _now()
+    with session_factory() as session:
+        record = session.get(PredictionRequestRecord, request_id, with_for_update=True)
+        if (
+            record is None
+            or record.status != "queued"
+            or record.lease_token is not None
+        ):
+            return None
+        token = secrets.token_hex(24)
+        record.lease_token = token
+        record.lease_owner = INLINE_OWNER
+        record.lease_expires_at = current_time + _lease_duration()
+        record.heartbeat_at = current_time
+        record.updated_at = current_time
+        session.commit()
+        return token
+
+
+def _return_to_queue(request_id: int, token: str, *, session_factory) -> None:
+    """Give an inline attempt back to the queue, keeping any stored inputs."""
+
+    with session_factory() as session:
+        record = session.get(PredictionRequestRecord, request_id, with_for_update=True)
+        if record is None or record.status == "completed":
+            return
+        if record.lease_token is None or not secrets.compare_digest(
+            record.lease_token, token
+        ):
+            return
+        record.status = "queued"
+        record.stage = "queued"
+        record.dagster_run_id = None
+        record.error_code = None
+        _clear_lease(record)
+        record.updated_at = _now()
+        session.commit()
 
 
 def reserve_queued_prediction_requests(

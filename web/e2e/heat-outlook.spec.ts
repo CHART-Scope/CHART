@@ -7,8 +7,20 @@ import { installKenya } from "./support/kenya";
 // read the 3rd trimester, so the fake API starts with it switched on.
 const withThirdTrimester = { settings: { lbw: { selectors: ["P", "T3"] } } };
 
-const panel = (page: Page) =>
-  page.getByRole("region", { name: /may be attributable to heat in an average year/ });
+// The question reads like India's ("may be attributable to heat exposure"),
+// so the Kenya panel is found by its test id rather than its heading.
+const panel = (page: Page) => page.getByTestId("heat-outlook");
+
+/** The published projections sit behind the Projected tab. */
+async function projected(page: Page) {
+  const outlook = panel(page);
+  await outlook.getByRole("tab", { name: "Projected" }).click();
+  await expect(outlook.getByRole("tab", { name: "Projected" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  return outlook;
+}
 
 test("Kenya LBW: the map, icon array, odds ratio and precision follow the selected county", async ({
   page,
@@ -16,7 +28,7 @@ test("Kenya LBW: the map, icon array, odds ratio and precision follow the select
   const api = await installKenya(page, true, ["/kenya"], withThirdTrimester);
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
 
-  const outlook = panel(page);
+  const outlook = await projected(page);
   const estimate = outlook.getByTestId("outlook-estimate");
   // Kajiado, whole pregnancy, 2041-2060, SSP5-8.5: 11.1% in the modeller's table.
   await expect(estimate).toContainText("11.1% of low birth weight cases in Kajiado");
@@ -27,7 +39,9 @@ test("Kenya LBW: the map, icon array, odds ratio and precision follow the select
   await expect(
     outlook.getByRole("img", { name: "11 of 100 newborn figures highlighted" }),
   ).toBeVisible();
-  await expect(outlook.getByTestId("outlook-baseline")).toContainText("1981–2010");
+  await expect(outlook.getByRole("group", { name: "Time horizon" })).toContainText(
+    "1981–2010 (baseline)",
+  );
 
   // Choosing a county on the map moves every figure to it.
   await outlook.getByRole("button", { name: /^Garissa: 36\.16% attributable/ }).click();
@@ -37,7 +51,7 @@ test("Kenya LBW: the map, icon array, odds ratio and precision follow the select
     outlook.getByRole("img", { name: "36 of 100 newborn figures highlighted" }),
   ).toBeVisible();
 
-  // Nothing is prepared or polled: Kenya reads published tables only.
+  // Projections are read from published tables: no month grid, no polling.
   await expect(page.getByRole("group", { name: /Months in/ })).toHaveCount(0);
   expect(api.requests.some((r) => r.includes("/climate/predict"))).toBe(false);
   // Let the icon array finish its colour transition before capturing.
@@ -71,14 +85,16 @@ test("Kenya under-five: post-neonatal by default, approximate death dates noted,
     "/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=under_5_mortality",
   );
 
-  const outlook = panel(page);
+  const outlook = await projected(page);
   await expect(outlook.getByRole("combobox", { name: "Age group" })).toContainText(
     "Post-neonatal",
   );
   await expect(
     outlook.getByRole("note").filter({ hasText: "Approximate death dates." }),
   ).toBeVisible();
-  await expect(outlook.getByTestId("outlook-baseline")).toContainText("1991–2020");
+  await expect(outlook.getByRole("group", { name: "Time horizon" })).toContainText(
+    "1991–2020 (baseline)",
+  );
   await expect(outlook.getByTestId("outlook-ratio")).toContainText("Risk ratio");
   // The exposed population is children, not pregnant women.
   await expect(page.getByText("children under five").first()).toBeVisible();
@@ -100,11 +116,10 @@ test("Kenya under-five: post-neonatal by default, approximate death dates noted,
 test("a place without published tables says so, and other countries keep the live panel", async ({
   page,
 }) => {
-  await installKenya(page, false);
+  await installKenya(page, false, ["/kenya"], { observedStatus: 404 });
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
-  await expect(
-    page.getByText("No outlook has been published for this place"),
-  ).toBeVisible();
+  await expect(page.getByText("Observed months are not available")).toBeVisible();
+  await expect(panel(page).getByRole("tab", { name: "Projected" })).toBeDisabled();
 
   await installFakeApi(page);
   await page.goto("/dashboard/geo-in-mp?admin_unit=geo-in-mp-bhopal&outcome=lbw");
@@ -125,7 +140,9 @@ test("planning for Kenya starts on Kenya, not on its first county", async ({
   await page.waitForURL(/\/dashboard\/geo-ke(\?|$)/);
   expect(page.url()).not.toContain("geo-ke-baringo");
   expect(page.url()).not.toContain("admin_unit");
-  await expect(panel(page).getByTestId("outlook-estimate")).toContainText("in Kenya");
+  await expect(panel(page).getByTestId("outlook-estimate")).toContainText(
+    /in Kenya.*averaged over \d+ counties/,
+  );
   await page.waitForTimeout(400);
   await page.screenshot({
     path: "../outputs/e2e/web/heat-outlook-kenya.png",
@@ -152,7 +169,7 @@ test("switching outcome never asks the map for the previous outcome's window", a
 }) => {
   const api = await installKenya(page, true, ["/kenya"], withThirdTrimester);
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
-  const outlook = panel(page);
+  const outlook = await projected(page);
   await outlook.getByRole("combobox", { name: "Pregnancy window" }).click();
   await page.getByRole("option", { name: "3rd trimester (lags 0-2)" }).click();
   await expect(
@@ -184,10 +201,10 @@ test("a county with no published tables keeps the map, so another can be chosen"
 }) => {
   await installKenya(page);
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
-  const outlook = panel(page);
+  const outlook = await projected(page);
   await outlook.getByRole("button", { name: /^Narok: Not integrated/ }).click();
   await page.waitForURL(/admin_unit=geo-ke-narok/);
-  await expect(outlook.getByText("No outlook has been published")).toBeVisible();
+  await expect(outlook.getByText("No projection has been published")).toBeVisible();
 
   await outlook.getByRole("button", { name: /^Garissa: 36\.16% attributable/ }).click();
   await page.waitForURL(/admin_unit=geo-ke-garissa/);

@@ -141,12 +141,26 @@ export function DashboardContextBar({
   // needs an option that says so. Without one its value matched no option and
   // the browser displayed the first county, claiming a selection the page was
   // not actually showing.
+  // A country-level view only says something when its areas are the leaves
+  // (Kenya's counties). India's one state holds the divisions, so an "All
+  // states" view would be a country map with Madhya Pradesh alone on it.
+  const countryViewOffered = useMemo(
+    () =>
+      topLevelAreas.every(
+        (area) =>
+          !geographies?.some(
+            (geo) => geo.parentId === area.id && (geo.models?.length ?? 0) > 0,
+          ),
+      ),
+    [topLevelAreas, geographies],
+  );
+
   const topLevelOptions = useMemo(() => {
     const areas = topLevelAreas.map((area) => ({
       value: area.id,
       label: area.name,
     }));
-    return activeFamily
+    return activeFamily && countryViewOffered
       ? [
           {
             value: activeFamily.root.id,
@@ -155,7 +169,7 @@ export function DashboardContextBar({
           ...areas,
         ]
       : areas;
-  }, [topLevelAreas, activeFamily, topLevelLabel]);
+  }, [topLevelAreas, activeFamily, topLevelLabel, countryViewOffered]);
 
   const hazards = useMemo(
     () =>
@@ -212,10 +226,11 @@ export function DashboardContextBar({
     const selected = geographies?.find((geo) => geo.id === nextGeographyId);
     const hasChildren = geographies?.some((geo) => geo.parentId === nextGeographyId);
     const countryRoot = activeFamily?.root.id;
-    // The page only keeps ?admin_unit= for a place with a model for this
-    // outcome. A state without one (MP under-five has only division models)
-    // opens as its own frame so the page can fall through to a division.
-    if (selected?.parentId && hasChildren && !hasOutcomeModel(selected, outcome)) {
+    // A state that holds divisions is its own frame: the map shows the whole
+    // state with each division shaded, never the country around it. (A
+    // state without a model for this outcome, like MP for under-five, then
+    // falls through to a division on the page.)
+    if (selected?.parentId && hasChildren) {
       onNavigate({ geographyId: nextGeographyId, adminUnit: null, outcome });
       return;
     }

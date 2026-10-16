@@ -209,11 +209,13 @@ def outlook_restriction(outcome: str, *, session_factory=None) -> OutlookRestric
         )
         outlook_selectors = _codes(support.available.selectors, "outlook")
         outlook_scenarios = _codes(support.available.scenarios, "outlook")
+        outlook_views = _codes(support.available.data_modes, "outlook")
         return OutlookRestriction(
             selectors=frozenset(values.selectors) & frozenset(outlook_selectors),
             scenarios=frozenset(values.scenarios) & frozenset(outlook_scenarios),
             default_selector=values.default_selector,
             default_scenario=values.default_scenario,
+            data_modes=frozenset(values.data_modes) & frozenset(outlook_views),
         )
 
 
@@ -383,7 +385,10 @@ def _support(session: Session, country_code: str, outcome: str) -> _Support | No
             offer(selectors, selector.code, label, "outlook")
         for code in published.scenarios:
             offer(scenarios, code, scenario_label(code), "outlook")
-        offer(data_modes, "projection", DATA_MODE_LABELS["projection"], "outlook")
+        if published.observed:
+            offer(data_modes, "observed", DATA_MODE_LABELS["observed"], "outlook")
+        if published.scenarios:
+            offer(data_modes, "projection", DATA_MODE_LABELS["projection"], "outlook")
 
     places = _live_places(session, country_code, outcome)
     place_windows: list[frozenset[str]] = []

@@ -2128,11 +2128,22 @@
               ],
               "title": "Selector"
             }
+          },
+          {
+            "name": "reference",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(annual|peak)$",
+              "default": "annual",
+              "title": "Reference"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Kenyan counties with display geometry and each county's published annual-average share, or the reason it is absent.",
+            "description": "Kenyan counties with display geometry and each county's published annual-average (or peak-season) share, or the reason it is absent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2152,7 +2163,191 @@
             }
           }
         },
-        "description": "Returns the counties of Kenya with their display geometry and the modelling team's annual-average heat-attributable share for the chosen outcome, scenario, period and selector, in the same shape as the risk map so the dashboard draws it identically. Requires a risk reader role and access to the geography path. Counties whose share is suppressed by the display rules carry missing_reason no_excess; windows with no period summary carry not_reported; counties with no published file carry no_model. Nothing is computed on request."
+        "description": "Returns the counties of Kenya with their display geometry and the modelling team's annual-average heat-attributable share for the chosen outcome, scenario, period and selector, in the same shape as the risk map so the dashboard draws it identically. Requires a risk reader role and access to the geography path. Counties whose share is suppressed by the display rules carry missing_reason no_excess; windows with no period summary carry not_reported; counties with no published file carry no_model. With reference=peak, each county is shaded by its peak-season share instead: the three consecutive months with the highest heat share. Nothing is computed on request."
+      }
+    },
+    "/heat-outlook/{geography_id}/observed": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Score an observed month for a Kenyan place from ERA5",
+        "operationId": "read_observed_heat_outlook__geography_id__observed_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The estimate with its 95% CI and ratio, the months that can be scored, the share for each of them, the temperatures used on both scales, and the notes the dashboard must display.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Scores one observed month for a Kenyan county (geo-ke-<county>), or the mean over Kenya's counties (geo-ke), with the modelling team's DLNM models, using the Copernicus ERA5 temperatures CHART has ingested. ERA5 is first moved onto the scale the models were fitted on by a fixed offset per county and calendar month. Low birth weight reads the birth month and the eight before it; under-five scores each day of the month on that day and the three before it and averages them. month (YYYY-MM) defaults to the newest month with complete inputs; selector is the pregnancy window or the age group. Requires a risk reader role and access to the geography path. The guides' display rules apply, so suppressed values arrive as null with the message to show in their place."
+      }
+    },
+    "/heat-outlook/{geography_id}/observed/map": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read Kenyan counties shaded by an observed month's heat share",
+        "operationId": "read_observed_map_heat_outlook__geography_id__observed_map_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Kenyan counties with display geometry and each county's share for the observed month, or the reason it is absent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns the counties of Kenya with their display geometry and each county's heat-attributable share for one observed month, scored as in the observed estimate. Requires a risk reader role and access to the geography path. Counties without complete ERA5 inputs carry missing_reason not_reported; suppressed shares carry no_excess."
       }
     },
     "/model-settings": {
@@ -5202,6 +5397,27 @@
             },
             "type": "array",
             "title": "Period Summary"
+          },
+          "peak_season": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeakSeason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "data_modes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Data Modes",
+            "default": [
+              "observed",
+              "projection"
+            ]
           }
         },
         "type": "object",
@@ -6575,6 +6791,278 @@
         "title": "MonthlyTemperature",
         "description": "The month's maximum temperature, area-level, from ERA5.\n\nThe variable is maximum temperature; the monthly value is the mean of\nits daily values, which is what the model was fitted on and therefore\nwhat it consumes. The month's single hottest day is deliberately not\nused. The dashboard says \"maximum temperature\" rather than \"average\nmaximum temperature\", which reads as a contradiction - agreed on the\n17 Sep modelling call."
       },
+      "ObservedEstimate": {
+        "properties": {
+          "side": {
+            "type": "string",
+            "enum": [
+              "heat",
+              "cool"
+            ],
+            "title": "Side",
+            "default": "heat"
+          },
+          "value_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Percent"
+          },
+          "low_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Percent"
+          },
+          "high_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Percent"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ratio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thin_data": {
+            "type": "boolean",
+            "title": "Thin Data"
+          },
+          "counties": {
+            "type": "integer",
+            "title": "Counties"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value_percent",
+          "low_percent",
+          "high_percent",
+          "thin_data",
+          "counties"
+        ],
+        "title": "ObservedEstimate"
+      },
+      "ObservedInput": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "era5_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Era5 C"
+          },
+          "model_scale_c": {
+            "type": "number",
+            "title": "Model Scale C"
+          },
+          "counted": {
+            "type": "boolean",
+            "title": "Counted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "era5_c",
+          "model_scale_c",
+          "counted"
+        ],
+        "title": "ObservedInput",
+        "description": "One temperature behind an observed estimate, before and after calibration."
+      },
+      "ObservedMonth": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "value_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "value_percent"
+        ],
+        "title": "ObservedMonth"
+      },
+      "ObservedResponse": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "place": {
+            "type": "string",
+            "title": "Place"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "county",
+              "country"
+            ],
+            "title": "Level"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "release": {
+            "type": "string",
+            "title": "Release"
+          },
+          "selectors": {
+            "items": {
+              "$ref": "#/components/schemas/Option"
+            },
+            "type": "array",
+            "title": "Selectors"
+          },
+          "selector": {
+            "type": "string",
+            "title": "Selector"
+          },
+          "selector_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selector Note"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "available_months": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Months"
+          },
+          "estimate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObservedEstimate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/ObservedInput"
+            },
+            "type": "array",
+            "title": "Inputs"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ObservedMonth"
+            },
+            "type": "array",
+            "title": "History"
+          },
+          "reference_note": {
+            "type": "string",
+            "title": "Reference Note"
+          },
+          "calibration_note": {
+            "type": "string",
+            "title": "Calibration Note"
+          },
+          "data_modes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Data Modes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "place",
+          "level",
+          "outcome",
+          "release",
+          "selectors",
+          "selector",
+          "selector_note",
+          "month",
+          "available_months",
+          "estimate",
+          "inputs",
+          "history",
+          "reference_note",
+          "calibration_note",
+          "data_modes"
+        ],
+        "title": "ObservedResponse"
+      },
       "OddsRatio": {
         "properties": {
           "value": {
@@ -6699,6 +7187,56 @@
           "parts"
         ],
         "title": "OutlookPeriod"
+      },
+      "PeakSeason": {
+        "properties": {
+          "months": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Months"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "part": {
+            "$ref": "#/components/schemas/MonthPart"
+          },
+          "gcm_min_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gcm Min Percent"
+          },
+          "gcm_max_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gcm Max Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "months",
+          "label",
+          "part",
+          "gcm_min_percent",
+          "gcm_max_percent"
+        ],
+        "title": "PeakSeason",
+        "description": "The three consecutive months of the period with the highest heat share.\n\nFor LBW the months are birth months. The share is the mean of the three\nmonths' typical-month shares; the range is the spread of the climate\nmodels, not a confidence interval."
       },
       "PeriodPart": {
         "properties": {

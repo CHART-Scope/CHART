@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
-import { ScienceVideoPlaceholder } from "@/features/dashboard/ScienceVideoPlaceholder";
+import { ScienceVideo } from "@/features/dashboard/ScienceVideo";
 import { useSession } from "@/features/auth/WorkspaceSession";
 import {
   DashboardHeader,
@@ -142,6 +142,34 @@ function Dashboard({
     );
   }, [geographies, geographyId, adminUnit, outcome, month, router]);
 
+  // A country whose areas hold their own sub-areas (India: one state, ten
+  // divisions) has no useful country view: open the state instead, keeping
+  // any division that was asked for.
+  useEffect(() => {
+    if (geographies.length === 0) return;
+    const current = geographies.find((geo) => geo.id === geographyId);
+    if (!current || current.parentId) return;
+    const hasModel = (geo: GeographyRecord) => (geo.models?.length ?? 0) > 0;
+    const areas = geographies.filter(
+      (geo) => geo.parentId === current.id && hasModel(geo),
+    );
+    const deeper = areas.filter((area) =>
+      geographies.some((geo) => geo.parentId === area.id && hasModel(geo)),
+    );
+    if (deeper.length === 0 || deeper.length !== areas.length) return;
+    const asked = geographies.find((geo) => geo.id === adminUnit);
+    const state =
+      deeper.find((area) => area.id === adminUnit || area.id === asked?.parentId) ??
+      deeper[0];
+    const params = new URLSearchParams();
+    if (asked && asked.parentId === state.id) params.set("admin_unit", asked.id);
+    params.set("outcome", outcome);
+    if (month) params.set("month", month);
+    router.replace(`/dashboard/${encodeURIComponent(state.id)}?${params}`, {
+      scroll: false,
+    });
+  }, [geographies, geographyId, adminUnit, outcome, month, router]);
+
   const currentGeography = geographies.find((geo) => geo.id === geographyId);
   const effectiveGeography =
     geographies.find((geo) => geo.id === effectiveAdminUnit) ?? currentGeography;
@@ -261,16 +289,20 @@ function Dashboard({
       !selectedCatalog?.visualization_type ? (
         <div className={styles.grid}>
           <aside className={styles.learning}>
-            <ScienceVideoPlaceholder />
+            <ScienceVideo />
             <RiskProtectionPanel
               outcomeLabel={outcomeLabel}
               contextFigure={exposedPopulationFigure(outcome)}
               description={selectedCatalog?.risk_description}
             />
           </aside>
-          {isKenya ? (
-            // Kenya reads the modelling team's published tables: no
-            // scoring on request, so nothing to prepare or poll.
+          {isKenya && cachedGeographies === null ? (
+            // Until the places are known the selected county is not either;
+            // mounting now would load Kenya as a whole first, then the county.
+            <section className={styles.panelPlaceholder} aria-busy="true" />
+          ) : isKenya ? (
+            // Kenya reads the modelling team's published tables and scores
+            // observed months in the API: nothing to prepare or poll.
             <HeatOutlookPanel
               geographyId={displayedAdminUnit ?? geographyId}
               mapGeographyId={geographyId}
@@ -357,9 +389,16 @@ function Dashboard({
                   )
                 }
                 onSelect={(nextGeography: string) => {
-                  setOptimisticAdminUnit(nextGeography);
+                  // Clicking the selected division again returns to the whole
+                  // state, where the state has an estimate of its own.
+                  const wholeState =
+                    nextGeography === displayedAdminUnit &&
+                    currentGeography?.models?.some(
+                      (model) => model.outcome === outcome,
+                    );
+                  setOptimisticAdminUnit(wholeState ? null : nextGeography);
                   const params = new URLSearchParams();
-                  params.set("admin_unit", nextGeography);
+                  if (!wholeState) params.set("admin_unit", nextGeography);
                   if (outcome) params.set("outcome", outcome);
                   if (month) params.set("month", month);
                   navigate(

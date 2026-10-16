@@ -32,10 +32,119 @@
   color: var(--color-nexus);
 }
 
-.controls {
+/* The view tabs of the design: blue, a step larger than body text. */
+.viewTabs [role="tab"] {
+  font-size: var(--fs-h3);
+  padding-inline: var(--space-1);
+}
+
+.viewTabs [role="tab"][data-selected="true"] {
+  color: var(--color-nexus);
+  border-bottom-color: var(--color-nexus);
+  border-bottom-width: 3px;
+}
+
+/* The filter box of the design: label on the left, choices on the right. */
+.controlBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-muted, #f5f4ef);
+  transition: opacity 180ms var(--ease-out-soft);
+}
+
+.controlRow {
+  display: grid;
+  grid-template-columns: minmax(9rem, 11rem) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.controlLabel {
+  font-size: var(--fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-charcoal);
+}
+
+.controlValue {
+  min-width: 0;
+}
+
+.choices {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--space-2);
+}
+
+.choice {
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-card);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.choice:hover:not(:disabled) {
+  border-color: var(--color-nexus);
+}
+
+.choice[aria-pressed="true"] {
+  background: var(--color-nexus);
+  border-color: var(--color-nexus);
+  color: var(--color-white);
+}
+
+.choice:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.choice:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* A new answer dims the old one rather than blanking it. */
+.results {
+  transition: opacity 180ms var(--ease-out-soft);
+}
+
+.results[data-busy],
+.controlBox[data-busy] {
+  opacity: 0.6;
+}
+
+.table tr[data-peak] th {
+  color: var(--color-maroon);
+}
+
+@container risk-panel (max-width: 570px) {
+  .controlRow {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .controlBox,
+  .results,
+  .choice {
+    transition: none;
+  }
 }
 
 .baseline {
@@ -120,4 +229,10 @@
   font-size: var(--fs-body-sm);
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.mapPlaceholder {
+  min-height: 320px;
+  border-radius: var(--radius-md);
+  background: var(--surface-muted, #f5f4ef);
 }

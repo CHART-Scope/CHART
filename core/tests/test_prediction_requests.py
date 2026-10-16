@@ -25,7 +25,11 @@ from chart.climate.requests import (
     scoring_windows,
     submit_prediction,
 )
-from chart.climate.schemas import PredictRequest, PredictionAcceptedResponse
+from chart.climate.schemas import (
+    PredictionAcceptedResponse,
+    PredictRequest,
+    PredictResponse,
+)
 from chart.climate.service import ClimateServiceError
 from chart.inference import LbwScore
 from chart.shared.db.base import Base
@@ -270,6 +274,87 @@ def test_submit_creates_one_durable_request_without_scoring(session_factory) -> 
     assert first.status == "queued"
     assert second.request_id == first.request_id
     score.assert_not_called()
+
+
+def test_stored_inputs_are_scored_in_the_request_itself(
+    session_factory, monkeypatch
+) -> None:
+    # Dagster spent a minute on start-up for two seconds of work; with the
+    # observations already stored, the planner gets the result at once.
+    monkeypatch.setenv("CLIMATE_USE_FIXTURE", "1")
+    _seed_three_climate_months(session_factory)
+    with patch("chart.climate.service.score_lbw_model", return_value=_score()) as score:
+        result = submit_prediction(
+            _request(), session_factory=session_factory, now=TEST_NOW
+        )
+
+    assert isinstance(result, PredictResponse)
+    assert result.request_status == "completed"
+    score.assert_called_once()
+    assert [item.temperature_c for item in result.climate] == [29.1, 30.4, 31.2]
+    status = get_prediction_request(result.request_id, session_factory=session_factory)
+    assert status.status == "completed"
+    # Nothing is left for the Dagster sensor to run a second time.
+    assert reserve_queued_prediction_requests(session_factory=session_factory) == []
+    with session_factory() as session:
+        record = session.get(PredictionRequestRecord, result.request_id)
+        assert record.lease_token is None
+        assert record.dagster_run_id.startswith("api-inline-")
+
+
+def test_a_failed_inline_attempt_is_left_to_dagster_unchanged(
+    session_factory, monkeypatch
+) -> None:
+    monkeypatch.setenv("CLIMATE_USE_FIXTURE", "1")
+    _seed_three_climate_months(session_factory)
+    with patch(
+        "chart.climate.service.score_lbw_model",
+        side_effect=RuntimeError("model service down"),
+    ):
+        accepted = submit_prediction(
+            _request(), session_factory=session_factory, now=TEST_NOW
+        )
+
+    assert isinstance(accepted, PredictionAcceptedResponse)
+    assert accepted.status == "queued"
+    reserved = reserve_queued_prediction_requests(session_factory=session_factory)
+    assert [item.id for item in reserved] == [accepted.request_id]
+    with session_factory() as session:
+        record = session.get(PredictionRequestRecord, accepted.request_id)
+        assert record.status == "queued" and record.error_code is None
+        # The stored inputs are kept, so Dagster goes straight to scoring.
+        assert record.climate_input_window_id is not None
+    with patch("chart.climate.service.score_lbw_model", return_value=_score()):
+        assert claim_prediction_request(
+            accepted.request_id,
+            dagster_run_id="dagster-after-inline",
+            lease_token=reserved[0].lease_token,
+            session_factory=session_factory,
+        )
+        result = complete_prediction_request(
+            accepted.request_id,
+            lease_token=reserved[0].lease_token,
+            session_factory=session_factory,
+        )
+    assert result.request_status == "completed"
+
+
+def test_missing_observations_leave_the_request_queued_for_a_pull(
+    session_factory, monkeypatch
+) -> None:
+    monkeypatch.setenv("CLIMATE_USE_FIXTURE", "1")
+    with patch("chart.climate.service.score_lbw_model") as score:
+        accepted = submit_prediction(
+            _request(), session_factory=session_factory, now=TEST_NOW
+        )
+
+    assert isinstance(accepted, PredictionAcceptedResponse)
+    assert accepted.status == "queued"
+    score.assert_not_called()
+    assert [
+        item.id
+        for item in reserve_queued_prediction_requests(session_factory=session_factory)
+    ] == [accepted.request_id]
 
 
 def test_expired_reservation_is_requeued_with_a_new_lease(

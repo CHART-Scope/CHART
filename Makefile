@@ -9,7 +9,7 @@ ifeq ($(filter $(CHART_SERVICES),local remote),)
 $(error CHART_SERVICES must be local or remote)
 endif
 
-.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build e2e e2e-orchestration e2e-web identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run wait-for-lbw bootstrap-token install-hooks
+.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build e2e e2e-orchestration e2e-core e2e-web identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run wait-for-lbw bootstrap-token install-hooks
 
 help:
 	@printf "\nQuick start (climate pipeline)\n"
@@ -163,13 +163,20 @@ web-start:
 web-typecheck:
 	$(NPM) run typecheck:web
 
-# E2E suites. Each run leaves its evidence under outputs/e2e/: JUnit for both,
-# plus Playwright's HTML report and per-test trace, screenshot and video.
-e2e: e2e-orchestration e2e-web
+# E2E suites. Each run leaves its evidence under outputs/e2e/: JUnit for the
+# Python suites, plus Playwright's HTML report and per-test trace, screenshot
+# and video.
+e2e: e2e-orchestration e2e-core e2e-web
+
+# The Kenya API through HTTP and a database: the observed scorer against the
+# modeller's R validation cases, and the published outlook.
+e2e-core:
+	mkdir -p outputs/e2e/core
+	$(VENV_PYTHON) -m pytest core/tests/test_kenya_observed_api.py core/tests/test_heat_outlook_api.py core/tests/test_prediction_requests.py -q --junitxml=outputs/e2e/core/junit.xml
 
 e2e-orchestration:
 	mkdir -p outputs/e2e/orchestration
-	$(VENV_PYTHON) -m pytest orchestration/tests/test_climate_pull_failures.py orchestration/tests/test_dagster_postgres_driver.py -q --junitxml=outputs/e2e/orchestration/junit.xml
+	$(VENV_PYTHON) -m pytest orchestration/tests/test_climate_pull_failures.py orchestration/tests/test_dagster_postgres_driver.py orchestration/tests/test_prediction_job_executor.py -q --junitxml=outputs/e2e/orchestration/junit.xml
 
 e2e-web:
 	$(NPM) run e2e:web
