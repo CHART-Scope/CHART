@@ -118,6 +118,20 @@ planning-area redirects for each route are declared beside the navigation in
 still enforces access on every request. The Learning hub stays public, so a
 visitor who is not signed in reads it under the public header.
 
+Settings is one page with tabs kept in `?tab=`, so each can be linked to and
+survives a reload. **Workspace** (planning location and per-country model
+options) is open to every signed-in user with a planning area. Administrators
+also see **Data** (climate observations held per country, one row each, with a
+Pull per country), **Models** (installed model releases; `/settings/models`
+redirects here), **Users** (people and access, with the installation reset
+folded into a "Danger zone" at its foot) and **Jobs** (running and recent
+background jobs, today the Dagster climate pulls, with progress, duration,
+failure reason and a retry). A tab the user may not open falls back to
+Workspace. Jobs, the Data tab and the top bar's "Background work" drawer read
+one store (`web/src/lib/backgroundJobs.ts`) over
+`GET /climate/ingestion-jobs`. That store polls every 4 seconds while a job is
+queued or running and something is reading it, and stops otherwise.
+
 ## Functional requirements
 
 | ID | Requirement | Acceptance outcome |

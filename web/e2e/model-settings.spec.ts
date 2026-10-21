@@ -37,7 +37,7 @@ test("turning on a pregnancy window saves it and the dashboard offers it", async
   ]);
 
   await page.goto("/settings");
-  const lbw = settingsFor(page, "Kenya · Low birth weight");
+  const lbw = settingsFor(page, "Low birth weight");
   const windows = lbw.getByRole("group", { name: "Pregnancy windows" });
   await expect(
     windows.getByRole("checkbox", { name: /Whole pregnancy/ }),
@@ -51,7 +51,7 @@ test("turning on a pregnancy window saves it and the dashboard offers it", async
     (request) =>
       request.method() === "PUT" && request.url().endsWith("/model-settings/KE/lbw"),
   );
-  await lbw.getByRole("button", { name: "Save Kenya · Low birth weight" }).click();
+  await lbw.getByRole("button", { name: "Save Low birth weight" }).click();
   expect((await saved).postDataJSON()).toEqual({
     selectors: ["P", "T3"],
     default_selector: "P",
@@ -86,7 +86,7 @@ test("switching off an age group hides it from the dashboard", async ({ page }) 
   const api = await installKenya(page, true, ["/kenya"], admin);
   await page.goto("/settings");
 
-  const u5 = settingsFor(page, "Kenya · Under-five mortality");
+  const u5 = settingsFor(page, "Under-five mortality");
   const groups = u5.getByRole("group", { name: "Age groups" });
   await expect(
     groups.getByRole("radio", { name: /Default: Post-neonatal/ }),
@@ -100,7 +100,7 @@ test("switching off an age group hides it from the dashboard", async ({ page }) 
     /^Under-5/,
   ])
     await groups.getByRole("checkbox", { name }).uncheck();
-  await u5.getByRole("button", { name: "Save Kenya · Under-five mortality" }).click();
+  await u5.getByRole("button", { name: "Save Under-five mortality" }).click();
   await expect(u5.getByRole("status")).toHaveText("Saved.");
   expect(api.settingsWrites.at(-1)).toEqual({
     path: "KE/under_5_mortality",
@@ -122,12 +122,12 @@ test("a refused save shows the reason and keeps the saved settings", async ({
   const api = await installKenya(page, true, ["/kenya"], admin);
   await page.goto("/settings");
 
-  const lbw = settingsFor(page, "Kenya · Low birth weight");
+  const lbw = settingsFor(page, "Low birth weight");
   await lbw
     .getByRole("group", { name: "Pregnancy windows" })
     .getByRole("checkbox", { name: /Whole pregnancy/ })
     .uncheck();
-  await lbw.getByRole("button", { name: "Save Kenya · Low birth weight" }).click();
+  await lbw.getByRole("button", { name: "Save Low birth weight" }).click();
   await expect(lbw.getByRole("alert")).toHaveText(
     "Keep at least one option switched on in each list for every view.",
   );
@@ -150,7 +150,7 @@ test("countries outside the user's scope are not listed", async ({ page }) => {
   await expect(
     page.getByText("No model is installed for the countries you can see."),
   ).toBeVisible();
-  await expect(page.getByRole("group", { name: /^Kenya ·/ })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Low birth weight" })).toHaveCount(0);
 });
 
 test("any signed-in planner can change model settings, without the admin cards", async ({
@@ -159,10 +159,10 @@ test("any signed-in planner can change model settings, without the admin cards",
   await installKenya(page, true, ["/kenya"], { roles: ["health_planning_lead"] });
   await page.goto("/settings");
 
-  const lbw = settingsFor(page, "Kenya · Low birth weight");
+  const lbw = settingsFor(page, "Low birth weight");
   await expect(lbw).toBeVisible();
-  // Installation administration stays with admins.
-  await expect(page.getByText("Administration", { exact: true })).toHaveCount(0);
+  // Installation administration stays with admins: no tabs, no admin cards.
+  await expect(page.getByRole("tablist")).toHaveCount(0);
   await expect(page.getByText("Climate data", { exact: true })).toHaveCount(0);
 
   const windows = lbw.getByRole("group", { name: "Pregnancy windows" });
@@ -171,7 +171,7 @@ test("any signed-in planner can change model settings, without the admin cards",
     (request) =>
       request.method() === "PUT" && request.url().endsWith("/model-settings/KE/lbw"),
   );
-  await lbw.getByRole("button", { name: "Save Kenya · Low birth weight" }).click();
+  await lbw.getByRole("button", { name: "Save Low birth weight" }).click();
   expect((await saved).postDataJSON().selectors).toEqual(["P", "T1"]);
   await page.screenshot({
     path: "../outputs/e2e/web/model-settings-planner.png",

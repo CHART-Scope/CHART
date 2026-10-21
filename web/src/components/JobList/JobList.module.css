@@ -1,0 +1,150 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.job {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+  min-width: 0;
+}
+
+.job:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.topline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.title {
+  font-weight: 600;
+  color: var(--color-charcoal);
+  font-size: var(--fs-body);
+}
+
+.progress {
+  margin: 0;
+  color: var(--color-charcoal);
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+}
+
+.job[data-status="failed"] .progress {
+  color: var(--color-maroon);
+}
+
+.code {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+}
+
+.meta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  background: var(--color-grey-light, #f0eeeb);
+  color: var(--color-text-muted);
+}
+
+.badge[data-status="queued"],
+.badge[data-status="running"] {
+  background: var(--color-amber-tint);
+  color: #9a4614;
+}
+
+.badge[data-status="completed"] {
+  background: var(--color-success-tint);
+  color: #1f6b2b;
+}
+
+.badge[data-status="failed"] {
+  background: var(--color-sem-low-tint);
+  color: var(--color-maroon);
+}
+
+.spinner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  animation: spin 0.9s linear infinite;
+}
+
+.bar {
+  position: relative;
+  height: 4px;
+  max-width: 28rem;
+  border-radius: var(--radius-pill);
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+
+.bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--color-amber);
+  transition: width 0.4s ease;
+}
+
+.bar[data-indeterminate] > span {
+  animation: slide 1.4s ease-in-out infinite;
+}
+
+.list[data-compact] .job {
+  padding: var(--space-2) 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner,
+  .bar[data-indeterminate] > span {
+    animation: none;
+  }
+}

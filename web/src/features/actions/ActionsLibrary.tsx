@@ -75,6 +75,7 @@ export function ActionsLibrary({
   ) => (
     <InlineSelect
       aria-label={label}
+      size="sm"
       value={filters[key]}
       onChange={(value) => setFilters((current) => ({ ...current, [key]: value }))}
       options={[{ value: "", label: allLabel }, ...options]}

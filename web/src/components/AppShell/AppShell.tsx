@@ -12,7 +12,6 @@ import {
 import { ActivityDrawer } from "../ActivityDrawer/ActivityDrawer";
 import { Icon, type IconName } from "../Icon";
 import { Skeleton } from "../Skeleton";
-import { BrandMark } from "../BrandMark";
 import styles from "./AppShell.module.css";
 
 export type NavItem = {
@@ -110,7 +109,7 @@ export function AppShell({
           {/* Hand-drawn rather than an entry in the shared icon sprite: the
               sprite is a product vocabulary (hazards, outcomes, places) and a
               chrome affordance does not belong in it. */}
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden focusable="false">
+          <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden focusable="false">
             <path
               d="M2 4h12M2 8h12M2 12h12"
               fill="none"
@@ -125,12 +124,10 @@ export function AppShell({
         </button>
         {onLogoClick ? (
           <button type="button" className={styles.logo} onClick={onLogoClick}>
-            <BrandMark size={22} tone="light" wordmark />
+            CHART
           </button>
         ) : (
-          <span className={styles.logo}>
-            <BrandMark size={22} tone="light" wordmark />
-          </span>
+          <span className={styles.logo}>CHART</span>
         )}
         <span className={styles.sep} aria-hidden>
           |

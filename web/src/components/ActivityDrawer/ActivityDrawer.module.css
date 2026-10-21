@@ -45,7 +45,7 @@
 
 .headerStatus {
   margin: 4px 0 0;
-  color: var(--color-forest);
+  color: #9a4614;
   font-size: var(--fs-caption);
 }
 
@@ -72,51 +72,15 @@
   font-size: var(--fs-caption);
 }
 
-.jobs {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.job {
-  padding: 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xs);
+.all {
+  display: inline-block;
+  margin-top: var(--space-3);
+  color: var(--color-nexus);
   font-size: var(--fs-caption);
-}
-
-.job[data-status="queued"],
-.job[data-status="running"] {
-  background: var(--surface-muted);
-}
-
-.jobTopline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.jobTitle {
-  color: var(--color-charcoal);
-  font-family: var(--font-display);
   font-weight: 500;
+  text-decoration: none;
 }
 
-.badge {
-  color: var(--color-maroon);
-  white-space: nowrap;
-}
-
-.jobDetail {
-  margin: 8px 0 6px;
-  color: var(--color-charcoal);
-}
-
-.jobTime {
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
+.all:hover {
+  text-decoration: underline;
 }

@@ -6,7 +6,6 @@ import { use, useCallback, useEffect, useMemo, useState, useTransition } from "r
 import { ScienceVideo } from "@/features/dashboard/ScienceVideo";
 import { useSession } from "@/features/auth/WorkspaceSession";
 import {
-  DashboardHeader,
   HeatLbwLinkPanel,
   HeatOutlookPanel,
   RecommendedActionsPanel,
@@ -181,20 +180,6 @@ function Dashboard({
     country === "Kenya" ||
     geographyId === "geo-ke" ||
     geographyId.startsWith("geo-ke-");
-  // The place trail, broadest first, walked from the area actually selected
-  // rather than from the page's geography. Built from the ancestry so it
-  // follows the sub-area picker: choosing a division must move the
-  // breadcrumb, and a country-level view must not render its own name twice.
-  const placeTrail = useMemo(() => {
-    const byId = new Map(geographies.map((geo) => [geo.id, geo]));
-    const names: string[] = [];
-    let cursor = byId.get(effectiveAdminUnit ?? geographyId);
-    while (cursor) {
-      names.unshift(cursor.name);
-      cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
-    }
-    return names.length > 0 ? names : [country || geographyId];
-  }, [geographies, effectiveAdminUnit, geographyId, country]);
   const stateLabel = currentGeography
     ? `${currentGeography.name} (${currentGeography.levelLabel})`
     : geographyId;
@@ -276,13 +261,6 @@ function Dashboard({
           const query = params.toString() ? `?${params.toString()}` : "";
           navigate(`/dashboard/${encodeURIComponent(nextGeo)}${query}`);
         }}
-      />
-      <DashboardHeader
-        trail={placeTrail}
-        hazardLabel={selectedCatalog?.climate_hazard_label ?? "Climate hazard"}
-        healthDomainLabel={
-          selectedCatalog?.health_domain_label ?? "Climate-sensitive health"
-        }
       />
 
       {selectedCatalog?.visualization_type === "odds_ratio_icon_array" ||

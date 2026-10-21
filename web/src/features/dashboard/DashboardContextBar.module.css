@@ -1,35 +1,55 @@
-/* Content-sized controls keep the context compact at every screen width. */
+/* Place on the left in a card; hazard and outcome to its right, uncarded and
+   taking at least half the row. Every picker is the default select pill. */
 .bar {
   display: flex;
   align-items: flex-end;
   flex-wrap: wrap;
-  align-self: flex-start;
-  width: fit-content;
+  gap: 12px 16px;
+}
+.place {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
   max-width: 100%;
-  gap: 10px 12px;
-  padding: 10px 12px;
+  gap: 10px 8px;
+  padding: 10px 10px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-card);
 }
-.bar > label {
+.place > label {
   flex: 0 1 auto;
   max-width: 100%;
-  gap: 4px;
-}
-.bar select,
-.bar button[role="combobox"] {
-  min-height: 32px;
-  border-radius: 8px;
-  padding: 4px 10px;
+  gap: 6px;
 }
 .bar label > span:last-child {
   margin: 0;
   max-width: 100%;
 }
+.topic {
+  display: flex;
+  align-items: flex-end;
+  flex: 1 1 50%;
+  min-width: min(100%, 360px);
+  gap: 16px;
+  /* Matches the card's border + padding so the triggers share its baseline. */
+  padding-bottom: 11px;
+}
+.topic > label {
+  flex: 1 1 0;
+  min-width: 0;
+  gap: 6px;
+}
+.topic > label:last-child {
+  flex-grow: 1.6;
+}
+.topic label > span:last-child {
+  width: 100%;
+}
 .staticField {
   display: inline-flex;
   flex-direction: column;
+  gap: 6px;
   min-width: 0;
 }
 .staticLabel {
@@ -39,18 +59,24 @@
   font-weight: 500;
   line-height: 1;
 }
+/* Same box as a trigger, so a fixed country lines up with the pills. */
 .staticValue {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  padding: 4px 10px;
+  min-height: 46px;
+  padding: 10px 2px;
   color: var(--color-charcoal);
   font-family: var(--font-body);
+  font-size: 17px;
   font-weight: 500;
   line-height: 1.4;
 }
-@media (pointer: coarse) {
-  .bar button[role="combobox"] {
-    min-height: 40px;
+@media (max-width: 600px) {
+  .topic {
+    flex-wrap: wrap;
+    padding-bottom: 0;
+  }
+  .topic > label {
+    flex-basis: 100%;
   }
 }
