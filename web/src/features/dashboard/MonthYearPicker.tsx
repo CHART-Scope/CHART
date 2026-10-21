@@ -108,6 +108,7 @@ export function MonthYearPicker({
       <div className={styles.yearRow}>
         <InlineSelect
           menu
+          size="sm"
           aria-label="Year"
           value={String(year)}
           onChange={(value) => setViewYear(Number(value))}

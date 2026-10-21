@@ -1,28 +1,50 @@
+/* The default: the plan page's sentence pill, at its own size wherever it is
+   placed, so every dropdown in the app reads as the same control. */
 .trigger {
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   width: 100%;
-  min-height: 32px;
+  min-height: 46px;
   max-width: 100%;
-  padding: 4px 10px;
+  padding: 10px 16px;
   border: 1px solid var(--color-nexus-tint);
   border-radius: 999px;
   background: var(--color-nexus-tint);
   color: var(--color-nexus);
-  font: inherit;
+  font-family: var(--font-body);
+  font-size: 17px;
   font-weight: 500;
+  line-height: 1.4;
   text-align: left;
   cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+/* Compact: for dense rows (a year above a month grid, a status badge). Takes
+   the surrounding type, as every trigger did before the default existed. */
+.sm {
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 10px;
+  font: inherit;
+  font-weight: 500;
 }
 .trigger > span:first-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.trigger:hover:not(:disabled) {
+.trigger:hover:not(:disabled),
+.trigger[aria-expanded="true"] {
   border-color: var(--color-nexus);
+  background: rgb(56 62 233 / 12%);
+}
+.trigger[aria-expanded="true"] {
+  box-shadow: 0 0 0 3px rgb(56 62 233 / 10%);
 }
 .trigger:focus-visible,
 .search:focus-visible {
@@ -33,8 +55,15 @@
   opacity: 0.55;
   cursor: default;
 }
+/* Sized in em so it tracks the label at every trigger size. */
 .chevron {
   flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+  transition: transform 160ms ease;
+}
+.trigger[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
 }
 .popup {
   position: fixed;
@@ -49,6 +78,13 @@
   font-family: var(--font-body);
   font-size: var(--fs-body);
   color: var(--color-charcoal);
+  animation: pop-in 140ms ease-out;
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
 }
 .search {
   flex-shrink: 0;
@@ -108,8 +144,22 @@
 }
 
 @media (pointer: coarse) {
-  .trigger,
+  .sm,
   .option {
     min-height: 40px;
+  }
+}
+@media (max-width: 600px) {
+  .trigger:not(.sm) {
+    min-height: 42px;
+    font-size: 15px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trigger,
+  .chevron,
+  .popup {
+    transition: none;
+    animation: none;
   }
 }

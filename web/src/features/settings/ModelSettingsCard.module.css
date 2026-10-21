@@ -229,3 +229,13 @@
 .error {
   color: var(--color-sem-low);
 }
+
+/* The only country in scope, named where the picker would be. */
+.country {
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--color-charcoal);
+  font-size: var(--fs-caption);
+  font-weight: 500;
+}

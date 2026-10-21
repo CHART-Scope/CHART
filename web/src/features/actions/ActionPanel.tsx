@@ -159,6 +159,7 @@ export function ActionPanel({
                 </h2>
                 <InlineSelect
                   aria-label="Action status"
+                  size="sm"
                   className={`${styles.status} ${styles[status]}`}
                   value={status}
                   onChange={(value) =>

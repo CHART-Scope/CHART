@@ -102,10 +102,6 @@ export function redirectForPath(
 ): string | null {
   const entry = NAV.find((item) => item.id === activeNavForPath(pathname));
   if (!entry) return null;
-  // Model release management stays with installation administrators.
-  if (pathname?.startsWith("/settings/models") && !user.roles.includes("chart_admin")) {
-    return "/settings";
-  }
   if (
     entry.requiresGeographyScope &&
     (user.roles.length === 0 || user.geographyScopes.length === 0)

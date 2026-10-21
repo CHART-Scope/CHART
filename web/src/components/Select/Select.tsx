@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { SelectMenu } from "../InlineSelect/SelectMenu";
+import { SelectMenu, type SelectSize } from "../InlineSelect/SelectMenu";
 import type { InlineSelectOption } from "../InlineSelect/InlineSelect";
 import styles from "./Select.module.css";
 
@@ -19,6 +19,7 @@ type Props = {
   defaultValue?: string;
   disabled?: boolean;
   onChange?: (value: string) => void;
+  size?: SelectSize;
 };
 
 export function Select({
@@ -34,6 +35,7 @@ export function Select({
   defaultValue,
   disabled,
   onChange,
+  size,
   "aria-label": ariaLabel,
 }: Props) {
   const generatedId = useId();
@@ -63,6 +65,7 @@ export function Select({
         label={ariaLabel ?? label ?? placeholder ?? "Choose an option"}
         value={selected}
         disabled={disabled}
+        size={size}
         options={
           placeholder ? [{ value: "", label: placeholder }, ...options] : options
         }

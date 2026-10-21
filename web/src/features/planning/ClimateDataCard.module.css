@@ -6,31 +6,49 @@
   color: var(--color-text-muted);
 }
 
-.list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-caption);
+  color: var(--color-charcoal);
+  container-type: inline-size;
 }
 
-.row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3) 0;
+.table th,
+.table td {
+  padding: var(--space-3) var(--space-2);
+  text-align: left;
+  vertical-align: middle;
   border-top: 1px solid var(--border-subtle);
 }
 
-.row:first-child {
+.table thead th {
+  padding-top: 0;
   border-top: none;
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
-.rowMain {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+.table th:first-child,
+.table td:first-child {
+  padding-left: 0;
+}
+
+.actionCell {
+  text-align: right;
+  padding-right: 0;
+  white-space: nowrap;
+}
+
+.table td.actionCell {
+  text-align: right;
+}
+
+.countryCell {
+  font-weight: 600;
 }
 
 /* The country name doubles as the disclosure control, so the whole label is
@@ -45,6 +63,13 @@
   cursor: pointer;
   color: var(--color-charcoal);
   font: inherit;
+  font-size: var(--fs-body);
+}
+
+.disclosure:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .chevron {
@@ -57,74 +82,28 @@
   transform: rotate(90deg);
 }
 
-.country {
-  font-weight: 600;
-}
-
-.summary {
-  font-size: var(--fs-caption);
-  color: var(--color-text-muted);
-  margin-right: auto;
-}
-
-.range {
+.muted {
   color: var(--color-text-muted);
 }
 
-.pull {
-  padding: 0.3125rem 0.75rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.5rem;
-  background: var(--surface-card);
-  color: var(--color-charcoal);
-  font-size: var(--fs-caption);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.pull:hover:not(:disabled) {
-  background: var(--surface-muted);
-}
-
-.pull:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
-.progress {
+.status {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--fs-caption);
-  color: var(--color-nexus);
-  white-space: nowrap;
+  flex-wrap: wrap;
 }
 
-.spinner {
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--color-nexus) 30%, transparent);
-  border-top-color: var(--color-nexus);
-  animation: spin 900ms linear infinite;
+.statusText {
+  color: var(--color-text-muted);
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .spinner {
-    animation-duration: 3s;
-  }
-}
-
-.rowError {
-  margin: 0;
-  font-size: var(--fs-caption);
+.statusText a {
   color: var(--color-maroon);
+}
+
+.areasRow td {
+  border-top: none;
+  padding-top: 0;
 }
 
 .areas {
@@ -140,8 +119,6 @@
   display: flex;
   justify-content: space-between;
   gap: var(--space-2);
-  font-size: var(--fs-caption);
-  color: var(--color-charcoal);
   padding: 0.125rem 0;
 }
 
@@ -155,13 +132,64 @@
   color: var(--color-maroon);
 }
 
-@media (max-width: 720px) {
-  .summary {
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Narrow: each country becomes a small stacked block, labelled per value,
+   so nothing scrolls sideways. */
+@media (max-width: 640px) {
+  .table thead {
+    display: none;
+  }
+
+  .table,
+  .table tbody,
+  .table tr,
+  .table th,
+  .table td {
+    display: block;
     width: 100%;
-    margin-right: 0;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-3) 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .table .row > * {
+    border-top: none;
+    padding: 0;
+  }
+
+  .row > .countryCell {
+    grid-column: 1;
+  }
+
+  .row > .actionCell {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .row > td[data-label] {
+    grid-column: 1 / -1;
+  }
+
+  .row > td[data-label]::before {
+    content: attr(data-label) ": ";
+    color: var(--color-text-muted);
   }
 
   .areas {
     grid-template-columns: 1fr;
+    padding-left: 0;
   }
 }

@@ -267,8 +267,11 @@ The display rules below apply to observed months as to projected ones.
 
 ## Model settings
 
-Settings → **Model settings** chooses, per country and outcome (for example
-Kenya + LBW, Kenya + under-five, India + LBW), which options CHART offers:
+Settings → Workspace → **Model options** chooses, per country and outcome
+(for example Kenya + LBW, Kenya + under-five, India + LBW), which options CHART
+offers. One country is shown at a time: a picker in the card's header (opening
+on the planning location's country) chooses it, and each outcome below it has
+its own Save.
 
 | Setting | Options come from | Default |
 | --- | --- | --- |
@@ -307,7 +310,8 @@ not by the page:
   saves again.
 - **Who may change them.** Any signed-in user who can read the country path
   (for example `/kenya`) may read and change them; roles are intentionally not
-  restricted yet. The page sits on Settings, which is shown to administrators.
+  restricted yet. The card sits on the Settings Workspace tab, which every
+  signed-in user with a planning area can open.
 - **Audit.** Every change writes an `audit_event` row of type
   `model_settings_changed` with the country, the outcome and the values before
   and after. It appears in the user's activity log.

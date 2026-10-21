@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from "react";
 
 import { Button } from "@/components/Button";
+import { InlineSelect } from "@/components/InlineSelect";
 import { SettingsCard } from "@/features/planning/SettingsCard";
 import {
   fetchModelSettings,
@@ -11,6 +12,7 @@ import {
   type ModelSettingsValues,
   type SettingOption,
 } from "@/lib/modelSettingsClient";
+import { useGeographies } from "@/lib/useGeographies";
 
 import styles from "./ModelSettingsCard.module.css";
 
@@ -21,6 +23,10 @@ import styles from "./ModelSettingsCard.module.css";
  * The API owns every rule: it lists only what the published tables and model
  * releases support, refuses a change that would widen them, and applies the
  * saved settings to the dashboard. This card only edits a draft and sends it.
+ *
+ * One country at a time: a picker chooses it (opening on the planning
+ * location's country), so the country is named once rather than on every
+ * outcome block.
  */
 
 const OUTCOME_LABELS: Record<string, string> = {
@@ -33,11 +39,13 @@ const VIEW_LABELS: Record<string, string> = {
   live: "Monthly model",
 };
 
-type Props = { accessToken: string };
+type Props = { accessToken: string; activeGeographyId?: string };
 
-export function ModelSettingsCard({ accessToken }: Props) {
+export function ModelSettingsCard({ accessToken, activeGeographyId }: Props) {
   const [items, setItems] = useState<ModelSettings[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+  const { geographies } = useGeographies();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -50,14 +58,36 @@ export function ModelSettingsCard({ accessToken }: Props) {
     return () => controller.abort();
   }, [accessToken]);
 
+  const countries = [
+    ...new Map((items ?? []).map((item) => [item.country_code, item.country_name])),
+  ].map(([value, label]) => ({ value, label }));
+  const rootPath = activeGeographyId?.split("/").slice(0, 2).join("/");
+  const planningCountry = geographies?.find((geo) => geo.path === rootPath)?.name;
+  const country =
+    picked ??
+    countries.find((option) => option.label === planningCountry)?.value ??
+    countries[0]?.value;
+
   return (
     <SettingsCard
-      eyebrow="Model settings"
-      title="Options offered per country"
+      eyebrow="Model options"
+      title="What the dashboard offers"
       headingId="model-settings-heading"
       description="Switch off model options a country should not see. Settings can only narrow what the model supports, and every change is recorded in the activity log."
       loading={items === null && !error}
       error={error}
+      action={
+        countries.length > 1 ? (
+          <InlineSelect
+            aria-label="Country"
+            value={country ?? ""}
+            onChange={setPicked}
+            options={countries}
+          />
+        ) : countries.length === 1 ? (
+          <span className={styles.country}>{countries[0].label}</span>
+        ) : null
+      }
     >
       {items !== null && items.length === 0 ? (
         <p className={styles.empty} role="status">
@@ -65,13 +95,15 @@ export function ModelSettingsCard({ accessToken }: Props) {
         </p>
       ) : (
         <div className={styles.list}>
-          {(items ?? []).map((item) => (
-            <ModelSettingsForm
-              key={`${item.country_code}|${item.outcome}`}
-              item={item}
-              accessToken={accessToken}
-            />
-          ))}
+          {(items ?? [])
+            .filter((item) => item.country_code === country)
+            .map((item) => (
+              <ModelSettingsForm
+                key={`${item.country_code}|${item.outcome}`}
+                item={item}
+                accessToken={accessToken}
+              />
+            ))}
         </div>
       )}
     </SettingsCard>
@@ -91,7 +123,7 @@ function ModelSettingsForm({
   const [saved, setSaved] = useState(item);
   const [draft, setDraft] = useState<ModelSettingsValues>(item.settings);
   const [state, setState] = useState<SaveState>({ kind: "idle" });
-  const title = `${saved.country_name} · ${OUTCOME_LABELS[saved.outcome] ?? saved.outcome}`;
+  const title = OUTCOME_LABELS[saved.outcome] ?? saved.outcome;
   const { available } = saved;
 
   function update(next: ModelSettingsValues) {
