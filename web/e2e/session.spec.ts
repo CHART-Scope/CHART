@@ -434,3 +434,60 @@ test("pulling model updates sends the administrator's token through the proxy", 
     await new Promise((resolve) => upstream.close(resolve));
   }
 });
+
+test("reading for two hours, moving only the pointer, keeps the session", async ({
+  page,
+}) => {
+  // The production failure: every sign-out was "idle" while the user was
+  // reading. Pointer movement now counts, and the token keeps rotating.
+  await page.clock.install({ time: new Date("2026-09-25T12:00:00Z") });
+  const api = await installFakeApi(page);
+  api.on(/^\/api\/setup$/, (route) => json(route, { requiresOnboarding: false }));
+  const tokens = rotateTokens(page, api, { lifetimeSeconds: 300 });
+  const signouts = await fakeSignOutRedirect(page);
+
+  await page.goto("/plan");
+  await expect(page.getByText("in Madhya Pradesh.")).toBeVisible();
+  await expect.poll(() => tokens.issued.length).toBe(1);
+
+  // Five-minute tokens renewed 30 s early: one rotation per five minutes,
+  // with the pointer moving every fifteen, for two hours.
+  for (let step = 1; step <= 24; step += 1) {
+    await page.clock.fastForward("05:00");
+    await expect.poll(() => tokens.issued.length).toBe(step + 1);
+    if (step % 3 === 0) await page.mouse.move(100 + step * 10, 200 + step * 5);
+  }
+
+  expect(signouts).toEqual([]);
+  expect(new URL(page.url()).pathname).toBe("/plan");
+  await expect(page.getByText("in Madhya Pradesh.")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Still there?" })).toHaveCount(0);
+  await page.screenshot({ path: `${evidence}/two-hours-reading.png` });
+});
+
+test("an idle warning offers to stay signed in before the sign-out", async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date("2026-09-25T12:00:00Z") });
+  const api = await installFakeApi(page);
+  api.on(/^\/api\/setup$/, (route) => json(route, { requiresOnboarding: false }));
+  const signouts = await fakeSignOutRedirect(page);
+
+  await page.goto("/plan");
+  await expect(page.getByText("in Madhya Pradesh.")).toBeVisible();
+  const warning = page.getByRole("dialog", { name: "Still there?" });
+
+  await page.clock.fastForward("27:00");
+  await expect(warning).toHaveCount(0);
+  await page.clock.fastForward("01:30");
+  await expect(warning).toBeVisible();
+  await expect(warning.getByRole("timer")).toHaveText("Signing out in 1:30");
+  await page.screenshot({ path: `${evidence}/idle-warning.png` });
+
+  await warning.getByRole("button", { name: "Stay signed in" }).click();
+  await expect(warning).toHaveCount(0);
+  await page.clock.fastForward("27:00");
+  expect(signouts).toEqual([]);
+  expect(new URL(page.url()).pathname).toBe("/plan");
+  await expect(warning).toHaveCount(0);
+});

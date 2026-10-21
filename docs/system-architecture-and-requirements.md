@@ -391,9 +391,12 @@ id tokens are httpOnly cookies read by the Next auth routes
   with backoff (5 s, 15 s, 30 s, then every 60 s); the page stays usable and
   never redirects. If the session cannot be restored at all because Keycloak
   or the API is down, the page shows "temporarily unavailable" and retries.
-- **Idle timeout.** Thirty minutes without pointer, key, scroll or visibility
-  activity in any tab stops renewal and signs the user out; the landing page
-  says why. Signing out in one tab signs out the others.
+- **Idle timeout.** Thirty minutes without pointer (including movement), key,
+  scroll or visibility activity in any tab stops renewal and signs the user
+  out; the landing page says why. For the last two minutes a "Still there?"
+  dialog counts down and offers "Stay signed in". Signing out in one tab signs
+  out the others. Moving the pointer counts because production sign-outs were
+  all "idle" while people were reading without clicking.
 - **Sign-out.** Pending audit events are sent with the user's own token
   first, then the session, the audit queue and per-user caches (geographies,
   model catalog, risk maps) are cleared. Action progress kept in the browser

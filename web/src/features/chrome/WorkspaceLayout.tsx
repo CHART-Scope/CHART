@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/Button";
 import { IconSprite } from "@/components/Icon";
+import { IdleWarning } from "@/features/auth/IdleWarning";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { WorkspaceSessionProvider } from "@/features/auth/WorkspaceSession";
 import loginStyles from "@/features/onboarding/Login.module.css";
@@ -134,6 +135,7 @@ function ShellFrame({
       userLabel={session?.user.username}
     >
       {children}
+      {session ? <IdleWarning /> : null}
     </AppShell>
   );
 }
