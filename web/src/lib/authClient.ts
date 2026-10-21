@@ -16,8 +16,9 @@ import { submitSignOut } from "@/lib/signOutRequest";
  *   kept and the refresh retried with backoff, and nothing redirects.
  * - `/auth/me` is read when a session starts (sign-in, restore, explicit
  *   re-check), not on every token rotation.
- * - Thirty minutes without pointer, key, scroll or visibility activity in any
- *   tab signs the user out with a message on the landing page.
+ * - Thirty minutes without pointer (including movement), key, scroll or
+ *   visibility activity in any tab signs the user out with a message on the
+ *   landing page. `IdleWarning` asks "Still there?" for the last two minutes.
  *
  * React subscribes through `subscribeAuthSession`. Listeners hear identity
  * changes and sign-outs only: a token rotation is invisible to the tree, so
@@ -463,7 +464,15 @@ function startSessionRuntime() {
   if (runtimeStarted || typeof window === "undefined") return;
   runtimeStarted = true;
   const onActivity = () => noteActivity();
-  for (const event of ["pointerdown", "keydown", "scroll", "wheel", "touchstart"]) {
+  // Moving the pointer counts: someone reading a dashboard is still there.
+  for (const event of [
+    "pointermove",
+    "pointerdown",
+    "keydown",
+    "scroll",
+    "wheel",
+    "touchstart",
+  ]) {
     window.addEventListener(event, onActivity, { passive: true, capture: true });
   }
   const onWake = () => {
@@ -485,6 +494,17 @@ function startSessionRuntime() {
   openChannel();
 }
 
+/** Milliseconds before an idle sign-out, or null when signed out. */
+export function msUntilIdleSignOut(): number | null {
+  if (!currentSession || typeof window === "undefined") return null;
+  return Math.max(0, latestActivity() + IDLE_TIMEOUT_MS - Date.now());
+}
+
+/** Restart the idle count, as any activity does ("Stay signed in"). */
+export function keepSessionActive() {
+  noteActivity(true);
+}
+
 function noteActivity(force = false) {
   const now = Date.now();
   lastActivity = now;
@@ -494,13 +514,17 @@ function noteActivity(force = false) {
 }
 
 function isIdle() {
+  const latest = latestActivity();
+  return latest > 0 && Date.now() - latest >= IDLE_TIMEOUT_MS;
+}
+
+function latestActivity() {
   // Activity in any tab keeps every tab's session: the cookies are shared,
   // so one idle tab signing out would end the busy one too.
   const shared = Number(
     safeStorage(() => window.localStorage.getItem(lastActivityStorageKey)) ?? 0,
   );
-  const latest = Math.max(lastActivity, Number.isFinite(shared) ? shared : 0);
-  return latest > 0 && Date.now() - latest >= IDLE_TIMEOUT_MS;
+  return Math.max(lastActivity, Number.isFinite(shared) ? shared : 0);
 }
 
 function openChannel() {

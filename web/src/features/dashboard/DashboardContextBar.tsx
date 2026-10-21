@@ -281,74 +281,68 @@ export function DashboardContextBar({
 
   return (
     <div className={styles.bar} role="group" aria-label="Dashboard context">
-      <div className={styles.place}>
-        {showCountryDropdown && families ? (
-          <InlineSelect
-            menu
-            label="Country"
-            aria-label="Country"
-            value={activeFamily?.root.path ?? ""}
-            onChange={handleFamilyChange}
-            options={families.map((family) => ({
-              value: family.root.path,
-              label: familyLabel(family.root),
-            }))}
-          />
-        ) : (
-          <label className={styles.staticField}>
-            <span className={styles.staticLabel}>Country</span>
-            <span className={styles.staticValue}>{country}</span>
-          </label>
-        )}
-
+      {showCountryDropdown && families ? (
         <InlineSelect
           menu
-          label={topLevelLabel}
-          aria-label={topLevelLabel}
-          value={topLevelValue}
-          onChange={handleTopLevelChange}
-          options={topLevelOptions}
-          disabled={topLevelAreas.length === 0}
+          label="Country"
+          aria-label="Country"
+          value={activeFamily?.root.path ?? ""}
+          onChange={handleFamilyChange}
+          options={families.map((family) => ({
+            value: family.root.path,
+            label: familyLabel(family.root),
+          }))}
         />
+      ) : (
+        <label className={styles.staticField}>
+          <span className={styles.staticLabel}>Country</span>
+          <span className={styles.staticValue}>{country}</span>
+        </label>
+      )}
 
-        {subAreas.length > 0 ? (
-          <InlineSelect
-            menu
-            label={subLevelLabel}
-            aria-label={subLevelLabel}
-            value={subLevelValue}
-            onChange={handleSubLevelChange}
-            options={[
-              { value: "", label: `Whole ${topLevelLabel.toLowerCase()}` },
-              ...subAreas.map((sub) => ({ value: sub.id, label: sub.name })),
-            ]}
-          />
-        ) : null}
-      </div>
+      <InlineSelect
+        menu
+        label={topLevelLabel}
+        aria-label={topLevelLabel}
+        value={topLevelValue}
+        onChange={handleTopLevelChange}
+        options={topLevelOptions}
+        disabled={topLevelAreas.length === 0}
+      />
 
-      {/* What is being asked carries the page, so it reads larger than the
-          place it is asked about and sits without a card. */}
-      <div className={styles.topic}>
+      {subAreas.length > 0 ? (
         <InlineSelect
           menu
-          label="Climate hazard"
-          aria-label="Climate hazard"
-          value={activeHazard}
-          onChange={handleHazardChange}
-          options={hazards}
-          disabled={hazards.length === 0}
+          label={subLevelLabel}
+          aria-label={subLevelLabel}
+          value={subLevelValue}
+          onChange={handleSubLevelChange}
+          options={[
+            { value: "", label: `Whole ${topLevelLabel.toLowerCase()}` },
+            ...subAreas.map((sub) => ({ value: sub.id, label: sub.name })),
+          ]}
         />
+      ) : null}
 
-        <InlineSelect
-          menu
-          label="Health outcome"
-          aria-label="Health outcome"
-          value={outcome}
-          onChange={handleOutcomeChange}
-          options={outcomes}
-          disabled={outcomes.length === 0}
-        />
-      </div>
+      <InlineSelect
+        menu
+        label="Climate hazard"
+        aria-label="Climate hazard"
+        value={activeHazard}
+        onChange={handleHazardChange}
+        options={hazards}
+        disabled={hazards.length === 0}
+      />
+
+      <InlineSelect
+        menu
+        label="Health outcome"
+        aria-label="Health outcome"
+        value={outcome}
+        onChange={handleOutcomeChange}
+        options={outcomes}
+        disabled={outcomes.length === 0}
+      />
     </div>
   );
 }

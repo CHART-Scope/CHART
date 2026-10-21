@@ -4,8 +4,8 @@ import { installFakeApi } from "./support/fakeApi";
 
 // Failure modes: a top bar too thin to read, the brand icon back beside the
 // wordmark, select carets hanging below their label (the old "⌄" glyph sat on
-// the text baseline), the hazard / outcome pickers squeezed into the place
-// card, and the "Kenya · Hazard + Domain" summary row the pickers already say.
+// the text baseline), a card boxing the place pickers, pickers stretched to
+// fill the row, and the "Kenya · Hazard + Domain" summary row.
 
 async function box(locator: Locator) {
   const rect = await locator.boundingBox();
@@ -13,7 +13,7 @@ async function box(locator: Locator) {
   return rect;
 }
 
-test("dashboard chrome: tall top bar, centred carets, wide topic pickers", async ({
+test("dashboard chrome: tall top bar, centred carets, one uncarded row", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -47,17 +47,29 @@ test("dashboard chrome: tall top bar, centred carets, wide topic pickers", async
     expect(caret.height, `${name} caret sized to its text`).toBeCloseTo(fontSize, 0);
   }
 
-  // Hazard and outcome sit outside the place card and span half the screen.
-  const hazard = await box(page.getByRole("combobox", { name: "Climate hazard" }));
-  const outcomeBox = await box(outcome);
-  expect(outcomeBox.x + outcomeBox.width - hazard.x).toBeGreaterThanOrEqual(1440 / 2);
-  expect(hazard.height).toBeGreaterThanOrEqual(46);
-  const card = await box(
-    page
-      .getByRole("combobox", { name: "State", exact: true })
-      .locator("xpath=ancestor::div[label][1]"),
+  // One row, no card, every pill sized to its label with space left over.
+  const names = ["State", "Division", "Climate hazard", "Health outcome"];
+  const boxes = await Promise.all(
+    names.map((name) => box(page.getByRole("combobox", { name, exact: true }))),
   );
-  expect(hazard.x).toBeGreaterThan(card.x + card.width);
+  for (const [index, rect] of boxes.entries()) {
+    expect(Math.abs(rect.y - boxes[0].y), `${names[index]} on the row`).toBeLessThan(1);
+    expect(rect.width, `${names[index]} sized to its label`).toBeLessThan(300);
+  }
+  const bar = page.getByRole("group", { name: "Dashboard context" });
+  const barBox = await box(bar);
+  const last = boxes.at(-1)!;
+  expect(barBox.x + barBox.width - (last.x + last.width)).toBeGreaterThan(200);
+  const carded = await bar.evaluate(
+    (node) =>
+      [node, ...node.querySelectorAll("div")].filter((el) => {
+        const style = getComputedStyle(el);
+        return (
+          style.borderTopWidth !== "0px" || style.backgroundColor !== "rgba(0, 0, 0, 0)"
+        );
+      }).length,
+  );
+  expect(carded, "no card around the pickers").toBe(0);
 
   await expect(page.getByTitle("Planning context")).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveCount(0);
@@ -65,7 +77,7 @@ test("dashboard chrome: tall top bar, centred carets, wide topic pickers", async
   await page.screenshot({ path: "../outputs/e2e/web/dashboard-layout-1440.png" });
 });
 
-test("dashboard topic pickers take the full row on a phone", async ({ page }) => {
+test("dashboard pickers wrap without sideways scroll on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installFakeApi(page);
   await page.goto("/dashboard/geo-in-mp?outcome=lbw");
@@ -74,8 +86,8 @@ test("dashboard topic pickers take the full row on a phone", async ({ page }) =>
   await expect(outcome).toHaveText(/Low birth weight/);
   const hazard = await box(page.getByRole("combobox", { name: "Climate hazard" }));
   const outcomeBox = await box(outcome);
-  expect(outcomeBox.y).toBeGreaterThan(hazard.y + hazard.height);
-  expect(hazard.width).toBeGreaterThanOrEqual(390 - 2 * 24);
+  expect(outcomeBox.y).toBeGreaterThanOrEqual(hazard.y);
+  expect(outcomeBox.x + outcomeBox.width).toBeLessThanOrEqual(390);
   const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(scrollWidth).toBeLessThanOrEqual(390);
 
