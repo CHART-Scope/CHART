@@ -100,6 +100,11 @@ export async function installFakeApi(
       return json(route, options.monthly?.(url) ?? { admin_unit_id: 1, months: {} });
     }
     if (path === "/api/chart/recommended-actions") return json(route, { items: [] });
+    // The vulnerability assessment, for specs that do not exercise it (see
+    // vra.ts for the full service): nothing held, nothing assessed.
+    if (/^\/api\/chart\/vra\/[^/]+\/coverage$/.test(path)) {
+      return json(route, { area_count: 0, indicators: [], ingestions: [] });
+    }
     if (path === "/api/chart/climate/predict") {
       return json(route, { request_id: 1, status: "queued" }, 202);
     }

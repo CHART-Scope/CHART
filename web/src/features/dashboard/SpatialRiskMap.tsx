@@ -50,6 +50,33 @@ type Props = {
    * outlook tables. `key` must change whenever the selection changes.
    */
   source?: { key: string; load: (accessToken: string) => Promise<MapResponse> };
+  /**
+   * How values read: classes, legend, wording. Defaults to the attributable
+   * share's fixed percent bands; another measure (the vulnerability index)
+   * brings its own.
+   */
+  scale?: MapScale;
+};
+
+export type MapBand = { upper: number; label: string; fill: string };
+
+export type MapScale = {
+  /** Names the measure; keeps one measure's cached frame from seeding another's. */
+  id: string;
+  /** Lowest first. `upper` is inclusive and read against `value_percent`. */
+  bands: readonly MapBand[];
+  /** Card heading; `{areas}` becomes the plural area level ("divisions"). */
+  heading: string;
+  /** Visible title over the legend, when the bands need one. */
+  legendTitle?: string;
+  /** An area's value as one phrase, e.g. "12% attributable". */
+  formatValue: (area: MapArea) => string;
+  /** The band label for an area whose class is decided elsewhere. */
+  classify?: (area: MapArea) => string | null;
+  /** Wording for this measure's own missing reasons: [value, hint]. */
+  missing?: Record<string, { value: string; hint: string }>;
+  /** Hint under a value in the tooltip. */
+  valueHint?: string;
 };
 
 // Dashboard query-string changes can remount this component even when the map
@@ -131,6 +158,7 @@ export function SpatialRiskMap({
   onSelect,
   canPrepare = false,
   source,
+  scale = ATTRIBUTABLE_SCALE,
 }: Props) {
   const id = useId();
   const hasToken = Boolean(accessToken);
@@ -145,7 +173,7 @@ export function SpatialRiskMap({
   // URL change updates the colours in place rather than blanking the map and
   // flashing its skeleton. A genuinely different country has no frame entry
   // and still gets the honest first-load placeholder.
-  const frameKey = `${userKey}:${geographyId}`;
+  const frameKey = `${userKey}:${geographyId}:${scale.id}`;
   const [result, setResult] = useState<{
     key: string;
     data: MapResponse;
@@ -307,7 +335,7 @@ export function SpatialRiskMap({
     null as ProjectedArea | null,
   );
   const areaLevel = pluralizeLevel(shapes[0]?.area.level);
-  const heading = `Risk across ${areaLevel} · area-level estimates`;
+  const heading = scale.heading.replace("{areas}", areaLevel);
 
   if (error) {
     return (
@@ -373,7 +401,7 @@ export function SpatialRiskMap({
               data-transitioning={isUpdating || undefined}
               viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
               role="group"
-              aria-label={describe(shapes, highest)}
+              aria-label={describe(shapes, highest, scale)}
               aria-busy={isUpdating}
             >
               <defs>
@@ -452,7 +480,7 @@ export function SpatialRiskMap({
                     }
                     data-muted={
                       (activeBand !== null &&
-                        activeBand !== legendLabelFor(shape.area)) ||
+                        activeBand !== legendLabelFor(shape.area, scale)) ||
                       undefined
                     }
                     role={onSelect && shape.area.geography_id ? "button" : undefined}
@@ -471,7 +499,7 @@ export function SpatialRiskMap({
                     }
                     fill={
                       shape.area.value_percent !== null
-                        ? shadeFor(shape.area.value_percent)
+                        ? shadeFor(shape.area, scale)
                         : shape.area.missing_reason === "no_excess"
                           ? NO_EXCESS_FILL
                           : shape.area.missing_reason === "no_model" ||
@@ -499,7 +527,7 @@ export function SpatialRiskMap({
                         onSelect(shape.area.geography_id);
                       }
                     }}
-                    aria-label={label(shape.area)}
+                    aria-label={label(shape.area, scale)}
                   />
                 );
               })}
@@ -522,9 +550,11 @@ export function SpatialRiskMap({
                   className={styles.tooltipValue}
                   data-state={stateOf(hovered.area)}
                 >
-                  {valueLine(hovered.area)}
+                  {valueLine(hovered.area, scale)}
                 </span>
-                <span className={styles.tooltipHint}>{hintFor(hovered.area)}</span>
+                <span className={styles.tooltipHint}>
+                  {hintFor(hovered.area, scale)}
+                </span>
               </div>
             ) : null}
           </div>
@@ -539,8 +569,8 @@ export function SpatialRiskMap({
               {preparing > 0
                 ? `Starting ${preparing} area${preparing === 1 ? "" : "s"}…`
                 : hovered
-                  ? label(hovered.area)
-                  : describe(shapes, highest)}
+                  ? label(hovered.area, scale)
+                  : describe(shapes, highest, scale)}
             </p>
             {/* The explicit route stays open however small the automatic
                 allowance is: a planner who wants the whole map now should not
@@ -561,9 +591,20 @@ export function SpatialRiskMap({
             ) : null}
           </div>
 
-          <div className={styles.legend} role="group" aria-label="Highlight risk range">
+          <div
+            className={styles.legend}
+            role="group"
+            aria-label={
+              scale.legendTitle
+                ? `${scale.legendTitle}: highlight a class`
+                : "Highlight risk range"
+            }
+          >
+            {scale.legendTitle ? (
+              <span className={styles.legendTitle}>{scale.legendTitle}</span>
+            ) : null}
             {[
-              ...RISK_BANDS,
+              ...scale.bands,
               // Only drawn when the map has such areas (the outlook's ratio
               // below 1), so the near-white fill is never mistaken for low risk.
               ...(data?.areas.some((area) => area.missing_reason === "no_excess")
@@ -686,9 +727,23 @@ export const RISK_BANDS = [
   { upper: Infinity, label: ">15%", fill: "#a3154f" },
 ] as const;
 
-function bandFor(percent: number) {
-  return RISK_BANDS.find((band) => percent <= band.upper) ?? RISK_BANDS[0];
+function bandFor(area: MapArea, scale: MapScale): MapBand {
+  const percent = area.value_percent ?? 0;
+  const named = scale.classify?.(area);
+  return (
+    scale.bands.find((band) => band.label === named) ??
+    scale.bands.find((band) => percent <= band.upper) ??
+    scale.bands[0]
+  );
 }
+
+const ATTRIBUTABLE_SCALE: MapScale = {
+  id: "attributable",
+  bands: RISK_BANDS,
+  heading: "Risk across {areas} · area-level estimates",
+  formatValue: (area) =>
+    `${(area.value_percent ?? 0).toLocaleString("en", { maximumFractionDigits: 2 })}% attributable`,
+};
 
 function pluralizeLevel(level?: string): string {
   if (!level) return "areas";
@@ -699,8 +754,8 @@ function pluralizeLevel(level?: string): string {
   return `${label}s`;
 }
 
-function shadeFor(percent: number): string {
-  return bandFor(percent).fill;
+function shadeFor(area: MapArea, scale: MapScale): string {
+  return bandFor(area, scale).fill;
 }
 
 type AbsentState = "running" | "pending" | "unmodelled" | "noExcess" | "notReported";
@@ -719,15 +774,15 @@ const NO_EXCESS_FILL = "#fbfaf6";
 const NO_EXCESS_LABEL = "No heat excess";
 
 /** The legend entry an area belongs to, for highlighting by legend. */
-function legendLabelFor(area: MapArea): string {
-  if (area.value_percent !== null) return bandFor(area.value_percent).label;
+function legendLabelFor(area: MapArea, scale: MapScale): string {
+  if (area.value_percent !== null) return bandFor(area, scale).label;
   return area.missing_reason === "no_excess" ? NO_EXCESS_LABEL : "Unavailable";
 }
 
-function valueLine(area: MapArea): string {
-  if (area.value_percent !== null) {
-    return `${area.value_percent.toLocaleString("en", { maximumFractionDigits: 2 })}% attributable`;
-  }
+function valueLine(area: MapArea, scale: MapScale): string {
+  if (area.value_percent !== null) return scale.formatValue(area);
+  const own = area.missing_reason ? scale.missing?.[area.missing_reason] : undefined;
+  if (own) return own.value;
   return {
     running: "Loading data…",
     unmodelled: "Not integrated",
@@ -737,12 +792,14 @@ function valueLine(area: MapArea): string {
   }[stateOf(area) as AbsentState];
 }
 
-function hintFor(area: MapArea): string {
+function hintFor(area: MapArea, scale: MapScale): string {
   if (area.value_percent !== null) {
     return area.on_training_support === false
       ? "Outside the model's training range"
-      : "Select to open this area";
+      : (scale.valueHint ?? "Select to open this area");
   }
+  const own = area.missing_reason ? scale.missing?.[area.missing_reason] : undefined;
+  if (own) return own.hint;
   return {
     running: "Fetching observations and scoring them",
     unmodelled: "No model has been fitted for this area",
@@ -752,17 +809,21 @@ function hintFor(area: MapArea): string {
   }[stateOf(area) as AbsentState];
 }
 
-function label(area: MapArea): string {
+function label(area: MapArea, scale: MapScale): string {
   if (area.value_percent !== null) {
-    return `${area.name}: ${area.value_percent.toLocaleString("en", { maximumFractionDigits: 2 })}% attributable`;
+    return `${area.name}: ${scale.formatValue(area)}`;
   }
   // Say which kind of absence it is, because each needs something different
   // from the reader: one is already on its way, one is a selection away, one
   // needs a fitted model.
-  return `${area.name}: ${valueLine(area).replace("…", "")} — ${hintFor(area)}`;
+  return `${area.name}: ${valueLine(area, scale).replace("…", "")} — ${hintFor(area, scale)}`;
 }
 
-function describe(shapes: ProjectedArea[], highest: ProjectedArea | null): string {
+function describe(
+  shapes: ProjectedArea[],
+  highest: ProjectedArea | null,
+  scale: MapScale,
+): string {
   const shaded = shapes.filter(
     (shape) =>
       shape.area.value_percent !== null || shape.area.missing_reason === "no_excess",
@@ -771,7 +832,11 @@ function describe(shapes: ProjectedArea[], highest: ProjectedArea | null): strin
     return `No area has a result yet — ${shapes.length} areas shown, no estimates available.`;
   }
   const peak = highest
-    ? `, highest in ${highest.area.name} at ${(highest.area.value_percent ?? 0).toLocaleString("en", { maximumFractionDigits: 2 })}%`
+    ? `, highest in ${highest.area.name}${
+        scale === ATTRIBUTABLE_SCALE
+          ? ` at ${(highest.area.value_percent ?? 0).toLocaleString("en", { maximumFractionDigits: 2 })}%`
+          : ` (${scale.formatValue(highest.area)})`
+      }`
     : "";
   return `${shaded} of ${shapes.length} areas have a result${peak}.`;
 }

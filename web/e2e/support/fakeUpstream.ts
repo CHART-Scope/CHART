@@ -17,11 +17,14 @@ export const upstreamPort = Number(process.env.E2E_UPSTREAM_PORT ?? 3301);
 export type UpstreamRequest = {
   method: string;
   path: string;
+  /** The query string, with its leading "?", or "". */
+  search: string;
   headers: http.IncomingHttpHeaders;
   body: string;
 };
 
-type Reply = { status: number; body: unknown };
+/** JSON unless `contentType` is given, in which case `body` is sent as text. */
+type Reply = { status: number; body: unknown; contentType?: string };
 type Handler = (request: UpstreamRequest) => Reply;
 
 export type FakeUpstream = {
@@ -43,16 +46,20 @@ export async function startFakeUpstream(): Promise<FakeUpstream> {
     const chunks: Buffer[] = [];
     incoming.on("data", (chunk: Buffer) => chunks.push(chunk));
     incoming.on("end", () => {
+      const url = new URL(incoming.url ?? "/", "http://upstream");
       const request: UpstreamRequest = {
         method: incoming.method ?? "GET",
-        path: new URL(incoming.url ?? "/", "http://upstream").pathname,
+        path: url.pathname,
+        search: url.search,
         headers: incoming.headers,
         body: Buffer.concat(chunks).toString("utf8"),
       };
       requests.push(request);
       const reply = answer(request);
-      outgoing.writeHead(reply.status, { "content-type": "application/json" });
-      outgoing.end(JSON.stringify(reply.body));
+      outgoing.writeHead(reply.status, {
+        "content-type": reply.contentType ?? "application/json",
+      });
+      outgoing.end(reply.contentType ? String(reply.body) : JSON.stringify(reply.body));
     });
   });
 

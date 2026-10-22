@@ -54,10 +54,16 @@ from chart.shared.db.models import (
     SetupStateRecord,
     UserGeographyScopeRecord,
     UserRoleRecord,
+    VraIndicatorValue,
+    VraIngestion,
+    VraResult,
+    VraResultIndicator,
+    VraRun,
     WorkspaceMemberRecord,
     WorkspaceRecord,
 )
 from chart.shared.db.session import get_session_factory
+from chart.vra.service import sync_catalogue as sync_vra_catalogue
 from chart.solution_repository.routes import SNAPSHOT_PATH as _SOLUTION_SEED_PATH
 
 from .model_configs import configs_for_country, deployed_configs
@@ -759,6 +765,12 @@ def complete(
             logger.exception(
                 "auto_seed: learning hub seed failed; setup will complete."
             )
+        try:
+            sync_vra_catalogue(session)
+        except Exception:  # noqa: BLE001 - best-effort, must not fail setup
+            logger.exception(
+                "auto_seed: VRA catalogue sync failed; setup will complete."
+            )
         state.completed = True
         state.phase = "complete"
         state.provisioning_token = None
@@ -805,6 +817,10 @@ def restore_deployed_models(
 
     session_factory = session_factory or get_session_factory()
     with session_factory() as session:
+        # The VRA catalogue ships with the code, so every start brings the
+        # stored copy up to date, whether or not setup has run.
+        sync_vra_catalogue(session)
+        session.commit()
         state = session.get(SetupStateRecord, SETUP_ID)
         if state is None or not state.completed:
             if require_complete:
@@ -850,6 +866,13 @@ def reset(user: CurrentUserContext) -> SetupStatus:
         # (upserted every setup) are intentionally not touched.
         session.execute(delete(WorkspaceMemberRecord))
         session.execute(delete(WorkspaceRecord))
+        # VRA values and results hang off admin units and geographies; the
+        # catalogue (vra_indicator) is shipped reference data and stays.
+        session.execute(delete(VraResultIndicator))
+        session.execute(delete(VraResult))
+        session.execute(delete(VraRun))
+        session.execute(delete(VraIndicatorValue))
+        session.execute(delete(VraIngestion))
         session.execute(delete(HealthImpact))
         session.execute(delete(Covariate))
         session.execute(delete(AuditEventRecord))

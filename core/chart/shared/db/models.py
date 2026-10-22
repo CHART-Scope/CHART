@@ -1430,3 +1430,191 @@ class ModelDisplaySetting(Base):
             "country_code", "outcome", name="uq_model_display_setting_country_outcome"
         ),
     )
+
+
+_JSON = JSON().with_variant(JSONB(), "postgresql")
+
+
+class VraIndicator(Base):
+    """One indicator in the vulnerability and resilience catalogue.
+
+    Synced from ``chart/vra/catalogue.json``; ``code`` is the stable key. The
+    direction is always relative to risk: +1 means more of it is worse.
+    """
+
+    __tablename__ = "vra_indicator"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    component: Mapped[str] = mapped_column(String(32), nullable=False)
+    category: Mapped[str] = mapped_column(String(64), nullable=False)
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    unit: Mapped[str] = mapped_column(String(64), nullable=False)
+    direction_to_risk: Mapped[int] = mapped_column(nullable=False)
+    route: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    ceew_ref: Mapped[str | None] = mapped_column(String(64))
+    catalogue_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class VraIngestion(Base):
+    """One checked CSV upload of indicator values for a frame's areas."""
+
+    __tablename__ = "vra_ingestion"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    frame_geography_id: Mapped[str] = mapped_column(
+        ForeignKey("geographies.id", ondelete="CASCADE"), nullable=False
+    )
+    route: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    file_name: Mapped[str | None] = mapped_column(String(256))
+    file_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    rows_accepted: Mapped[int] = mapped_column(nullable=False)
+    rows_rejected: Mapped[int] = mapped_column(nullable=False)
+    rejections: Mapped[list] = mapped_column(_JSON, nullable=False, default=list)
+    requested_by: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (Index("ix_vra_ingestion_frame", "frame_geography_id", "id"),)
+
+
+class VraIndicatorValue(Base):
+    """One indicator value for one area and vintage, with where it came from.
+
+    Uploaded values carry the row's source and the ingestion; values CHART
+    computes from climate data carry the ``climate_run`` they were read from.
+    """
+
+    __tablename__ = "vra_indicator_value"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    indicator_id: Mapped[int] = mapped_column(
+        ForeignKey("vra_indicator.id", ondelete="CASCADE"), nullable=False
+    )
+    admin_unit_id: Mapped[int] = mapped_column(
+        ForeignKey("admin_unit.id", ondelete="CASCADE"), nullable=False
+    )
+    vintage: Mapped[str] = mapped_column(String(32), nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    #: "observed" for uploads, "computed" for values derived by CHART.
+    method: Mapped[str] = mapped_column(String(32), nullable=False)
+    quality_flags: Mapped[dict] = mapped_column(_JSON, nullable=False, default=dict)
+    source_name: Mapped[str | None] = mapped_column(String(256))
+    source_url: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    ingestion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vra_ingestion.id", ondelete="SET NULL")
+    )
+    climate_run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("climate_run.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "indicator_id",
+            "admin_unit_id",
+            "vintage",
+            name="uq_vra_indicator_value_grain",
+        ),
+        Index("ix_vra_indicator_value_admin_unit", "admin_unit_id"),
+    )
+
+
+class VraRun(Base):
+    """One scoring of a frame's child areas, with everything needed to redo it."""
+
+    __tablename__ = "vra_run"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    frame_geography_id: Mapped[str] = mapped_column(
+        ForeignKey("geographies.id", ondelete="CASCADE"), nullable=False
+    )
+    method_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    catalogue_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: Percentiles, coverage rule, floor, per-indicator bounds and class breaks.
+    params: Mapped[dict] = mapped_column(_JSON, nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    output_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_by: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (Index("ix_vra_run_frame", "frame_geography_id", "id"),)
+
+
+class VraResult(Base):
+    """One area's component scores, risk, class and drivers in one run."""
+
+    __tablename__ = "vra_result"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("vra_run.id", ondelete="CASCADE"), nullable=False
+    )
+    admin_unit_id: Mapped[int] = mapped_column(
+        ForeignKey("admin_unit.id", ondelete="CASCADE"), nullable=False
+    )
+    hazard: Mapped[float | None] = mapped_column(Float)
+    exposure: Mapped[float | None] = mapped_column(Float)
+    sensitivity: Mapped[float | None] = mapped_column(Float)
+    adaptive_capacity: Mapped[float | None] = mapped_column(Float)
+    vulnerability: Mapped[float | None] = mapped_column(Float)
+    risk: Mapped[float | None] = mapped_column(Float)
+    risk_class: Mapped[str | None] = mapped_column(String(16))
+    rank: Mapped[int | None] = mapped_column()
+    missing_reason: Mapped[str | None] = mapped_column(String(32))
+    coverage: Mapped[dict] = mapped_column(_JSON, nullable=False, default=dict)
+    drivers: Mapped[list] = mapped_column(_JSON, nullable=False, default=list)
+
+    __table_args__ = (
+        UniqueConstraint("run_id", "admin_unit_id", name="uq_vra_result_area"),
+    )
+
+
+class VraResultIndicator(Base):
+    """One indicator's raw value, score and contribution for one area in a run."""
+
+    __tablename__ = "vra_result_indicator"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("vra_run.id", ondelete="CASCADE"), nullable=False
+    )
+    admin_unit_id: Mapped[int] = mapped_column(
+        ForeignKey("admin_unit.id", ondelete="CASCADE"), nullable=False
+    )
+    indicator_id: Mapped[int] = mapped_column(
+        ForeignKey("vra_indicator.id", ondelete="CASCADE"), nullable=False
+    )
+    value_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vra_indicator_value.id", ondelete="SET NULL")
+    )
+    vintage: Mapped[str | None] = mapped_column(String(32))
+    raw: Mapped[float | None] = mapped_column(Float)
+    normalised: Mapped[float | None] = mapped_column(Float)
+    weight: Mapped[float | None] = mapped_column(Float)
+    contribution: Mapped[float | None] = mapped_column(Float)
+    excluded_reason: Mapped[str | None] = mapped_column(String(32))
+
+    __table_args__ = (
+        UniqueConstraint(
+            "run_id",
+            "admin_unit_id",
+            "indicator_id",
+            name="uq_vra_result_indicator_grain",
+        ),
+    )

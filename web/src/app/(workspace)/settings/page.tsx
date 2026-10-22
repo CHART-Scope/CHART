@@ -16,6 +16,7 @@ import { ResetInstallationCard } from "@/features/planning/ResetInstallationCard
 import { JobsCard } from "@/features/settings/JobsCard";
 import { ModelReleasesCard } from "@/features/settings/ModelReleasesCard";
 import { ModelSettingsCard } from "@/features/settings/ModelSettingsCard";
+import { VraIndicatorsCard } from "@/features/vulnerability";
 import { isLive, useBackgroundJobs } from "@/lib/backgroundJobs";
 
 import styles from "./page.module.css";
@@ -51,7 +52,8 @@ export default function SettingsPage() {
 function Settings() {
   const session = useSession();
   const pathname = usePathname();
-  const requested = useSearchParams().get("tab");
+  const searchParams = useSearchParams();
+  const requested = searchParams.get("tab");
   const isAdmin = session.user.roles.includes("chart_admin");
   const allowed: Tab[] = isAdmin ? ["workspace", ...ADMIN_TABS] : ["workspace"];
   const tab = allowed.find((item) => item === requested) ?? "workspace";
@@ -89,7 +91,17 @@ function Settings() {
         />
       </>
     ),
-    data: <ClimateDataCard accessToken={session.accessToken} />,
+    data: (
+      <>
+        <ClimateDataCard accessToken={session.accessToken} />
+        <VraIndicatorsCard
+          accessToken={session.accessToken}
+          geographyScopes={session.user.geographyScopes}
+          activeGeographyId={session.user.activeGeographyId}
+          initialFrame={searchParams.get("vra_frame")}
+        />
+      </>
+    ),
     models: <ModelReleasesCard accessToken={session.accessToken} />,
     users: (
       <>

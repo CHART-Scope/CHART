@@ -38,6 +38,7 @@ from chart.solution_repository.hazards import router as hazards_router
 from chart.solution_repository.routes import router as solutions_router
 from chart.shared.db.session import dispose_engines, get_session_factory
 from chart.users.routes import router as users_router
+from chart.vra.routes import router as vra_router
 from chart.workspaces.routes import router as workspaces_router
 
 API_DESCRIPTION = """
@@ -125,6 +126,7 @@ app.include_router(users_router)
 app.include_router(workspaces_router)
 app.include_router(risk_router)
 app.include_router(heat_outlook_router)
+app.include_router(vra_router)
 app.include_router(model_settings_router)
 app.include_router(learning_router)
 app.include_router(erf_registry_router)
