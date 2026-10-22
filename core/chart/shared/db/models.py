@@ -1482,6 +1482,8 @@ class VraIngestion(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
+    __table_args__ = (Index("ix_vra_ingestion_frame", "frame_geography_id", "id"),)
+
 
 class VraIndicatorValue(Base):
     """One indicator value for one area and vintage, with where it came from.
