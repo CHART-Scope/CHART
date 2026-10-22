@@ -169,10 +169,11 @@ web-typecheck:
 e2e: e2e-orchestration e2e-core e2e-web
 
 # The Kenya API through HTTP and a database: the observed scorer against the
-# modeller's R validation cases, and the published outlook.
+# modeller's R validation cases, and the published outlook. The VRA suite
+# uploads, scores and reads assessments through the API.
 e2e-core:
 	mkdir -p outputs/e2e/core
-	$(VENV_PYTHON) -m pytest core/tests/test_kenya_observed_api.py core/tests/test_heat_outlook_api.py core/tests/test_prediction_requests.py -q --junitxml=outputs/e2e/core/junit.xml
+	$(VENV_PYTHON) -m pytest core/tests/test_kenya_observed_api.py core/tests/test_heat_outlook_api.py core/tests/test_prediction_requests.py core/tests/test_vra_api.py -q --junitxml=outputs/e2e/core/junit.xml
 
 e2e-orchestration:
 	mkdir -p outputs/e2e/orchestration

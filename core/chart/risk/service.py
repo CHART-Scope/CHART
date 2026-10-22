@@ -485,6 +485,27 @@ def _has_children(session: Session, geography_id: str) -> bool:
     ) > 0
 
 
+def resolve_map_frame(session: Session, geography_id: str) -> AppGeography:
+    """The geography whose children a map of ``geography_id`` shows.
+
+    A selection with nothing beneath it is framed on its siblings rather than
+    on itself. Drilling into one division used to return that division alone:
+    a single polygon floating with nothing to compare it against, and no
+    visible change when moving between divisions, because every one of them
+    drew the same lone shape. Which area is highlighted is the caller's
+    business - the frame it sits in is the parent's children.
+    """
+
+    selected = session.get(AppGeography, geography_id)
+    if selected is None:
+        raise NoAdminUnitForGeography(geography_id)
+    if selected.parent_id is not None and not _has_children(session, selected.id):
+        parent = session.get(AppGeography, selected.parent_id)
+        if parent is not None:
+            return parent
+    return selected
+
+
 # The map query's columns, in select order. SQLAlchemy 2.1 types rows this wide
 # as ``object``, so the shape is stated once here instead of cast per field.
 _MapRow = tuple[
@@ -522,21 +543,7 @@ def load_map_view(
     the opposite of what an absent model means.
     """
 
-    selected = session.get(AppGeography, geography_id)
-    if selected is None:
-        raise NoAdminUnitForGeography(geography_id)
-
-    # A selection with nothing beneath it is framed on its siblings rather
-    # than on itself. Drilling into one division used to return that division
-    # alone: a single polygon floating with nothing to compare it against, and
-    # no visible change when moving between divisions, because every one of
-    # them drew the same lone shape. Which area is highlighted is the caller's
-    # business - the frame it sits in is the parent's children.
-    frame = selected
-    if selected.parent_id is not None and not _has_children(session, selected.id):
-        parent = session.get(AppGeography, selected.parent_id)
-        if parent is not None:
-            frame = parent
+    frame = resolve_map_frame(session, geography_id)
 
     simplified = func.ST_AsGeoJSON(
         func.ST_SimplifyPreserveTopology(

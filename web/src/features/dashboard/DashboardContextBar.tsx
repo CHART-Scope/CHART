@@ -30,11 +30,14 @@ type Props = {
    * is viewing the whole top-level area (e.g. "Madhya Pradesh" state). */
   adminUnit: string | null;
   /** Active outcome from the dashboard URL query. */
-  outcome: string;
+  outcome?: string;
   /** Model catalog for the current geography (with descendants). The
    * dashboard page already fetches this to render its panels, so we
    * accept it as a prop rather than duplicating the request. */
-  catalog: ModelCatalogEntry[];
+  catalog?: ModelCatalogEntry[];
+  /** Only the place selectors: for pages that share the dashboard's place
+   * but not its models (the vulnerability assessment). */
+  placeOnly?: boolean;
   /** Fires when the user picks a different family, area, sub-area,
    * hazard, or outcome. Dashboard `router.push` uses this to navigate
    * the whole page in one click. */
@@ -54,8 +57,9 @@ export function DashboardContextBar({
   geographyScopes,
   geographyId,
   adminUnit,
-  outcome,
-  catalog,
+  outcome = "",
+  catalog = NO_CATALOG,
+  placeOnly = false,
   onNavigate,
 }: Props) {
   const { geographies } = useGeographies();
@@ -280,7 +284,11 @@ export function DashboardContextBar({
   const showCountryDropdown = (families?.length ?? 0) > 1;
 
   return (
-    <div className={styles.bar} role="group" aria-label="Dashboard context">
+    <div
+      className={styles.bar}
+      role="group"
+      aria-label={placeOnly ? "Place" : "Dashboard context"}
+    >
       {showCountryDropdown && families ? (
         <InlineSelect
           menu
@@ -324,28 +332,34 @@ export function DashboardContextBar({
         />
       ) : null}
 
-      <InlineSelect
-        menu
-        label="Climate hazard"
-        aria-label="Climate hazard"
-        value={activeHazard}
-        onChange={handleHazardChange}
-        options={hazards}
-        disabled={hazards.length === 0}
-      />
+      {placeOnly ? null : (
+        <>
+          <InlineSelect
+            menu
+            label="Climate hazard"
+            aria-label="Climate hazard"
+            value={activeHazard}
+            onChange={handleHazardChange}
+            options={hazards}
+            disabled={hazards.length === 0}
+          />
 
-      <InlineSelect
-        menu
-        label="Health outcome"
-        aria-label="Health outcome"
-        value={outcome}
-        onChange={handleOutcomeChange}
-        options={outcomes}
-        disabled={outcomes.length === 0}
-      />
+          <InlineSelect
+            menu
+            label="Health outcome"
+            aria-label="Health outcome"
+            value={outcome}
+            onChange={handleOutcomeChange}
+            options={outcomes}
+            disabled={outcomes.length === 0}
+          />
+        </>
+      )}
     </div>
   );
 }
+
+const NO_CATALOG: ModelCatalogEntry[] = [];
 
 function hasOutcomeModel(
   geography: { models?: { outcome: string }[] },

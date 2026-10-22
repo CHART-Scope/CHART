@@ -44,6 +44,14 @@
   --color-sem-behaviour-tint: rgba(91, 42, 198, 0.1);
   --color-maroon-tint: rgba(85, 17, 31, 0.1);
 
+  /* Sequential classes for relative indices (the vulnerability map): one
+     warm ramp built from amber and maroon, lightness falling as risk rises,
+     so the order survives greyscale and colour-vision differences. */
+  --color-seq-1: color-mix(in srgb, var(--color-amber) 14%, var(--color-white));
+  --color-seq-2: color-mix(in srgb, var(--color-amber) 42%, var(--color-white));
+  --color-seq-3: var(--color-amber);
+  --color-seq-4: var(--color-maroon);
+
   /* --- Semantic surfaces --- */
   --surface-app: var(--color-ivory);
   --surface-card: var(--color-white);

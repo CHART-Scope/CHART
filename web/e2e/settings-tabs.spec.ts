@@ -152,6 +152,12 @@ async function installAdmin(page: Page) {
   return { api, climate: fakeClimate(api) };
 }
 
+// The Data tab holds more than one table (climate data, vulnerability
+// indicators), so the climate table is found through its card.
+const climateTable = (page: Page) =>
+  page
+    .getByRole("region", { name: "Observations held per country" })
+    .getByRole("table");
 const tabList = (page: Page) =>
   page.getByRole("tablist", { name: "Settings sections" });
 const tab = (page: Page, name: string | RegExp) =>
@@ -256,7 +262,7 @@ test("each country appears once: one Data row, one model-options picker", async 
   await expect(options.getByRole("group", { name: /Kenya/ })).toHaveCount(0);
 
   await page.goto("/settings?tab=data");
-  const table = page.getByRole("table");
+  const table = climateTable(page);
   await expect(table.getByRole("row", { name: "India" })).toHaveCount(1);
   await expect(table.getByRole("row", { name: "Kenya" })).toHaveCount(1);
   await expect(table.getByRole("row", { name: "Kenya" })).toContainText("0 of 4");
@@ -272,7 +278,7 @@ test("a climate pull shows at once, then follows itself to done in Jobs and the 
 }) => {
   const { climate } = await installAdmin(page);
   await page.goto("/settings?tab=data");
-  const kenya = page.getByRole("table").getByRole("row", { name: "Kenya" });
+  const kenya = climateTable(page).getByRole("row", { name: "Kenya" });
   await kenya.getByRole("button", { name: "Pull climate data for Kenya" }).click();
 
   // Queued straight away, from the API's answer - no refresh needed.
@@ -321,7 +327,7 @@ test("a climate pull shows at once, then follows itself to done in Jobs and the 
 test("a failed pull says why in Jobs and retries the same months", async ({ page }) => {
   const { climate } = await installAdmin(page);
   await page.goto("/settings?tab=data");
-  const kenya = page.getByRole("table").getByRole("row", { name: "Kenya" });
+  const kenya = climateTable(page).getByRole("row", { name: "Kenya" });
   await kenya.getByRole("button", { name: "Pull climate data for Kenya" }).click();
   await expect(kenya).toContainText("Queued");
 
@@ -359,8 +365,7 @@ test("every tab fits a phone and a desktop without sideways scrolling", async ({
 }) => {
   const { climate } = await installAdmin(page);
   await page.goto("/settings?tab=data");
-  await page
-    .getByRole("table")
+  await climateTable(page)
     .getByRole("row", { name: "Kenya" })
     .getByRole("button", { name: "Pull climate data for Kenya" })
     .click();

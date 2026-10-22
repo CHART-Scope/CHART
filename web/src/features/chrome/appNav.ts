@@ -3,7 +3,18 @@ import type { NavItem } from "@/components/AppShell";
 /** The ids the shell knows about. A union rather than `string` so a typo in
  * `activeNav` or a route lookup is a compile error instead of a
  * silently dead nav item. */
-export type NavId = "learning" | "planning" | "settings";
+export type NavId = "learning" | "planning" | "vulnerability" | "settings";
+
+/** Roles that may read the risk map, and so the vulnerability assessment
+ * (the API checks the same list). */
+export const RISK_READER_ROLES = [
+  "chart_admin",
+  "health_planning_lead",
+  "cross_sector_planning_lead",
+  "health_implementation_officer",
+  "cross_sector_implementation_officer",
+  "public_viewer",
+] as const;
 
 type NavDefinition = NavItem & {
   id: NavId;
@@ -26,6 +37,14 @@ const NAV: readonly NavDefinition[] = [
     label: "Start planning",
     icon: "users",
     href: "/plan",
+    requiresGeographyScope: true,
+  },
+  {
+    id: "vulnerability",
+    label: "Vulnerability",
+    icon: "alert-triangle",
+    href: "/vulnerability",
+    requiredRoles: RISK_READER_ROLES,
     requiresGeographyScope: true,
   },
   {
@@ -81,6 +100,7 @@ export function activeNavForPath(pathname: string | null): NavId | null {
     return "planning";
   }
   if (pathname.startsWith("/learning")) return "learning";
+  if (pathname.startsWith("/vulnerability")) return "vulnerability";
   if (pathname.startsWith("/settings")) return "settings";
   return null;
 }

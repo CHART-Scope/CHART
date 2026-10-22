@@ -497,6 +497,141 @@ OPERATION_DOCUMENTATION: dict[
             )
         },
     ),
+    ("get", "/vra/indicators"): OperationDocumentation(
+        summary="List the vulnerability and resilience indicator catalogue",
+        description=(
+            "Returns every indicator in the VRA catalogue with its component "
+            "(hazard, exposure, sensitivity or adaptive capacity), unit, direction "
+            "relative to risk (+1 more is worse, -1 more is better), how values "
+            "arrive (computed, upload, manual or pull) and whether it is scored "
+            "(included), shown as context, or dropped. Requires a risk reader role."
+        ),
+        success_responses={
+            "200": (
+                "The catalogue of VRA indicators with component, unit, direction, "
+                "route, status and rationale."
+            )
+        },
+    ),
+    ("get", "/vra/{geography_id}/assessment"): OperationDocumentation(
+        summary="Read the latest vulnerability assessment of a frame's areas",
+        description=(
+            "Returns the latest VRA run for the child areas of the geography "
+            "(framed as the dashboard map frames them: a leaf is framed on its "
+            "siblings), with each area's risk, class, rank, component scores, "
+            "coverage and driving indicators. Scores are 0-1 and relative within "
+            "the frame; missing scores are null with a reason, never zero. run is "
+            "null until an administrator runs an assessment. Requires a risk "
+            "reader role and access to the geography path."
+        ),
+        success_responses={
+            "200": (
+                "The frame, its latest run summary (or null) and every child area "
+                "ranked by risk, unscored areas last."
+            )
+        },
+    ),
+    ("get", "/vra/{geography_id}/map"): OperationDocumentation(
+        summary="Read a frame's areas shaded by vulnerability assessment risk",
+        description=(
+            "Returns the frame's child areas with display geometry in the risk "
+            "map's shape, with value_percent set to the latest VRA risk score "
+            "times 100. Areas scored without enough evidence carry missing_reason "
+            "insufficient_data; areas no run has covered carry not_assessed. "
+            "Requires a risk reader role and access to the geography path."
+        ),
+        success_responses={
+            "200": (
+                "The frame's areas with display geometry and VRA risk, or the "
+                "reason the risk is absent."
+            )
+        },
+    ),
+    ("get", "/vra/{geography_id}/areas/{area_geography_id}"): OperationDocumentation(
+        summary="Read one area's vulnerability scores and indicator evidence",
+        description=(
+            "Returns one child area of the frame with its assessment and, for "
+            "every scored indicator in the catalogue, the raw value and vintage "
+            "used, the normalised score, weight and contribution, the source and "
+            "quality flags, and why it was excluded when it was (missing, "
+            "no_data, too_few_areas, no_spread). Requires a risk reader role and "
+            "access to the geography path."
+        ),
+        success_responses={
+            "200": (
+                "The area's assessment and the per-indicator raw values, scores "
+                "and sources behind it."
+            )
+        },
+    ),
+    ("get", "/vra/{geography_id}/coverage"): OperationDocumentation(
+        summary="Read VRA indicator coverage and upload history for a frame",
+        description=(
+            "For administrators: how many of the frame's child areas hold a value "
+            "for each catalogue indicator, the vintages held and when they were "
+            "last updated, plus the most recent uploads with their row-level "
+            "rejections. Requires the chart_admin role and access to the "
+            "geography path."
+        ),
+        success_responses={
+            "200": (
+                "Area count, per-indicator coverage and vintages, and recent "
+                "ingestions with their rejections."
+            )
+        },
+    ),
+    ("get", "/vra/{geography_id}/template.csv"): OperationDocumentation(
+        summary="Download the VRA value upload template for a frame",
+        description=(
+            "For administrators: a CSV with one blank row per child area and per "
+            "indicator entered by upload or by hand, in the columns the upload "
+            "accepts (area_code, area_name, indicator_code, value, vintage, "
+            "source_name, source_url, notes). Requires the chart_admin role and "
+            "access to the geography path."
+        ),
+        success_responses={
+            "200": (
+                "A text/csv template listing every child area and uploadable "
+                "indicator with blank values."
+            )
+        },
+    ),
+    ("post", "/vra/{geography_id}/values"): OperationDocumentation(
+        summary="Upload VRA indicator values for a frame's areas as CSV",
+        description=(
+            "For administrators: send the template columns as text/csv. Each row "
+            "is checked (the area must be a child of the frame, the indicator must "
+            "exist and be neither dropped nor computed, the value numeric and a "
+            "percentage within 0-100, the vintage present); blank values are "
+            "skipped. Valid rows are upserted on indicator, area and vintage. If "
+            "no row is valid the upload is recorded as failed and nothing is "
+            "written. Requires the chart_admin role and access to the geography."
+        ),
+        success_responses={
+            "200": (
+                "The ingestion id and status with accepted and rejected row counts "
+                "and a reason for each rejected row."
+            )
+        },
+    ),
+    ("post", "/vra/{geography_id}/runs"): OperationDocumentation(
+        summary="Run the vulnerability assessment for a frame's child areas",
+        description=(
+            "For administrators: recomputes the climate-derived hazard indicators "
+            "from stored ERA5 months, scores every child area with method vra-v1 "
+            "(5th-95th percentile min-max, equal weights, two-thirds coverage "
+            "rule, geometric mean of hazard, exposure and vulnerability, quartile "
+            "classes) and stores the run with its bounds and input and output "
+            "hashes. Synchronous. Requires the chart_admin role and access to the "
+            "geography path."
+        ),
+        success_responses={
+            "200": (
+                "The new assessment, in the same shape as the assessment read, "
+                "with the stored run summary."
+            )
+        },
+    ),
     ("get", "/model-settings"): OperationDocumentation(
         summary="Read model settings for the countries a user can see",
         description=(

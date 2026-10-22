@@ -2350,6 +2350,398 @@
         "description": "Returns the counties of Kenya with their display geometry and each county's heat-attributable share for one observed month, scored as in the observed estimate. Requires a risk reader role and access to the geography path. Counties without complete ERA5 inputs carry missing_reason not_reported; suppressed shares carry no_excess."
       }
     },
+    "/vra/indicators": {
+      "get": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "List the vulnerability and resilience indicator catalogue",
+        "operationId": "read_indicators_vra_indicators_get",
+        "responses": {
+          "200": {
+            "description": "The catalogue of VRA indicators with component, unit, direction, route, status and rationale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicatorList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Returns every indicator in the VRA catalogue with its component (hazard, exposure, sensitivity or adaptive capacity), unit, direction relative to risk (+1 more is worse, -1 more is better), how values arrive (computed, upload, manual or pull) and whether it is scored (included), shown as context, or dropped. Requires a risk reader role."
+      }
+    },
+    "/vra/{geography_id}/assessment": {
+      "get": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Read the latest vulnerability assessment of a frame's areas",
+        "operationId": "read_assessment_vra__geography_id__assessment_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The frame, its latest run summary (or null) and every child area ranked by risk, unscored areas last.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns the latest VRA run for the child areas of the geography (framed as the dashboard map frames them: a leaf is framed on its siblings), with each area's risk, class, rank, component scores, coverage and driving indicators. Scores are 0-1 and relative within the frame; missing scores are null with a reason, never zero. run is null until an administrator runs an assessment. Requires a risk reader role and access to the geography path."
+      }
+    },
+    "/vra/{geography_id}/map": {
+      "get": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Read a frame's areas shaded by vulnerability assessment risk",
+        "operationId": "read_map_vra__geography_id__map_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The frame's areas with display geometry and VRA risk, or the reason the risk is absent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns the frame's child areas with display geometry in the risk map's shape, with value_percent set to the latest VRA risk score times 100. Areas scored without enough evidence carry missing_reason insufficient_data; areas no run has covered carry not_assessed. Requires a risk reader role and access to the geography path."
+      }
+    },
+    "/vra/{geography_id}/areas/{area_geography_id}": {
+      "get": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Read one area's vulnerability scores and indicator evidence",
+        "operationId": "read_area_vra__geography_id__areas__area_geography_id__get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "area_geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Area Geography Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The area's assessment and the per-indicator raw values, scores and sources behind it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AreaDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns one child area of the frame with its assessment and, for every scored indicator in the catalogue, the raw value and vintage used, the normalised score, weight and contribution, the source and quality flags, and why it was excluded when it was (missing, no_data, too_few_areas, no_spread). Requires a risk reader role and access to the geography path."
+      }
+    },
+    "/vra/{geography_id}/coverage": {
+      "get": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Read VRA indicator coverage and upload history for a frame",
+        "operationId": "read_coverage_vra__geography_id__coverage_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Area count, per-indicator coverage and vintages, and recent ingestions with their rejections.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoverageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "For administrators: how many of the frame's child areas hold a value for each catalogue indicator, the vintages held and when they were last updated, plus the most recent uploads with their row-level rejections. Requires the chart_admin role and access to the geography path."
+      }
+    },
+    "/vra/{geography_id}/template.csv": {
+      "get": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Download the VRA value upload template for a frame",
+        "operationId": "read_template_vra__geography_id__template_csv_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A text/csv template listing every child area and uploadable indicator with blank values."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "For administrators: a CSV with one blank row per child area and per indicator entered by upload or by hand, in the columns the upload accepts (area_code, area_name, indicator_code, value, vintage, source_name, source_url, notes). Requires the chart_admin role and access to the geography path."
+      }
+    },
+    "/vra/{geography_id}/values": {
+      "post": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Upload VRA indicator values for a frame's areas as CSV",
+        "operationId": "upload_values_vra__geography_id__values_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "file_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "File Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ingestion id and status with accepted and rejected row counts and a reason for each rejected row.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/csv": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "description": "For administrators: send the template columns as text/csv. Each row is checked (the area must be a child of the frame, the indicator must exist and be neither dropped nor computed, the value numeric and a percentage within 0-100, the vintage present); blank values are skipped. Valid rows are upserted on indicator, area and vintage. If no row is valid the upload is recorded as failed and nothing is written. Requires the chart_admin role and access to the geography."
+      }
+    },
+    "/vra/{geography_id}/runs": {
+      "post": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Run the vulnerability assessment for a frame's child areas",
+        "operationId": "create_run_vra__geography_id__runs_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The new assessment, in the same shape as the assessment read, with the stored run summary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "For administrators: recomputes the climate-derived hazard indicators from stored ERA5 months, scores every child area with method vra-v1 (5th-95th percentile min-max, equal weights, two-thirds coverage rule, geometric mean of hazard, exposure and vulnerability, quartile classes) and stores the run with its bounds and input and output hashes. Synchronous. Requires the chart_admin role and access to the geography path."
+      }
+    },
     "/model-settings": {
       "get": {
         "tags": [
@@ -3342,6 +3734,98 @@
   },
   "components": {
     "schemas": {
+      "AreaAssessment": {
+        "properties": {
+          "geography_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geography Id"
+          },
+          "admin_unit_id": {
+            "type": "integer",
+            "title": "Admin Unit Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk"
+          },
+          "risk_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Class"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "components": {
+            "$ref": "#/components/schemas/Components"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "drivers": {
+            "items": {
+              "$ref": "#/components/schemas/Driver"
+            },
+            "type": "array",
+            "title": "Drivers"
+          },
+          "missing_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "admin_unit_id",
+          "code",
+          "name"
+        ],
+        "title": "AreaAssessment"
+      },
       "AreaBoundingBox": {
         "properties": {
           "north": {
@@ -3433,6 +3917,212 @@
           "name"
         ],
         "title": "AreaCoverage"
+      },
+      "AreaDetailResponse": {
+        "properties": {
+          "area": {
+            "$ref": "#/components/schemas/AreaAssessment"
+          },
+          "indicators": {
+            "items": {
+              "$ref": "#/components/schemas/AreaIndicator"
+            },
+            "type": "array",
+            "title": "Indicators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "area",
+          "indicators"
+        ],
+        "title": "AreaDetailResponse"
+      },
+      "AreaIndicator": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "component": {
+            "type": "string",
+            "title": "Component"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "direction_to_risk": {
+            "type": "integer",
+            "title": "Direction To Risk"
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw"
+          },
+          "vintage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vintage"
+          },
+          "normalised": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalised"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "contribution": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contribution"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "source_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Name"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "quality_flags": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Quality Flags"
+          },
+          "excluded_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "component",
+          "unit",
+          "direction_to_risk"
+        ],
+        "title": "AreaIndicator"
+      },
+      "AssessmentResponse": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "area_level_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Level Label"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/AreaAssessment"
+            },
+            "type": "array",
+            "title": "Areas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "name",
+          "area_level_label",
+          "run",
+          "areas"
+        ],
+        "title": "AssessmentResponse"
       },
       "AuditBatchAck": {
         "properties": {
@@ -4462,6 +5152,67 @@
         ],
         "title": "CompleteSetupInput"
       },
+      "Components": {
+        "properties": {
+          "hazard": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hazard"
+          },
+          "exposure": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exposure"
+          },
+          "sensitivity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sensitivity"
+          },
+          "adaptive_capacity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adaptive Capacity"
+          },
+          "vulnerability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vulnerability"
+          }
+        },
+        "type": "object",
+        "title": "Components"
+      },
       "CountryCoverage": {
         "properties": {
           "country_code": {
@@ -4525,6 +5276,120 @@
           "areas_with_data"
         ],
         "title": "CountryCoverage"
+      },
+      "Coverage": {
+        "properties": {
+          "hazard": {
+            "type": "number",
+            "title": "Hazard",
+            "default": 0.0
+          },
+          "exposure": {
+            "type": "number",
+            "title": "Exposure",
+            "default": 0.0
+          },
+          "sensitivity": {
+            "type": "number",
+            "title": "Sensitivity",
+            "default": 0.0
+          },
+          "adaptive_capacity": {
+            "type": "number",
+            "title": "Adaptive Capacity",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "title": "Coverage"
+      },
+      "CoverageIndicator": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "component": {
+            "type": "string",
+            "title": "Component"
+          },
+          "route": {
+            "type": "string",
+            "title": "Route"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "present": {
+            "type": "integer",
+            "title": "Present"
+          },
+          "vintages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Vintages"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "component",
+          "route",
+          "status",
+          "present",
+          "vintages",
+          "updated_at"
+        ],
+        "title": "CoverageIndicator"
+      },
+      "CoverageResponse": {
+        "properties": {
+          "area_count": {
+            "type": "integer",
+            "title": "Area Count"
+          },
+          "indicators": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageIndicator"
+            },
+            "type": "array",
+            "title": "Indicators"
+          },
+          "ingestions": {
+            "items": {
+              "$ref": "#/components/schemas/IngestionItem"
+            },
+            "type": "array",
+            "title": "Ingestions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "area_count",
+          "indicators",
+          "ingestions"
+        ],
+        "title": "CoverageResponse"
       },
       "CreateUserInput": {
         "properties": {
@@ -4777,6 +5642,34 @@
           "geographyScopes"
         ],
         "title": "CurrentUserContext"
+      },
+      "Driver": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "component": {
+            "type": "string",
+            "title": "Component"
+          },
+          "normalised": {
+            "type": "number",
+            "title": "Normalised"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "component",
+          "normalised"
+        ],
+        "title": "Driver"
       },
       "ErfParametersPublished": {
         "properties": {
@@ -5560,6 +6453,141 @@
         "title": "HorizonCard",
         "description": "One \"IN 3 MONTHS\" / \"IN 6 MONTHS\" style card."
       },
+      "IndicatorItem": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "component": {
+            "type": "string",
+            "title": "Component"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "direction_to_risk": {
+            "type": "integer",
+            "title": "Direction To Risk"
+          },
+          "route": {
+            "type": "string",
+            "title": "Route"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "component",
+          "category",
+          "name",
+          "unit",
+          "direction_to_risk",
+          "route",
+          "status",
+          "rationale"
+        ],
+        "title": "IndicatorItem"
+      },
+      "IndicatorList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IndicatorItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "IndicatorList"
+      },
+      "IngestionItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
+          },
+          "rows_accepted": {
+            "type": "integer",
+            "title": "Rows Accepted"
+          },
+          "rows_rejected": {
+            "type": "integer",
+            "title": "Rows Rejected"
+          },
+          "rejections": {
+            "items": {
+              "$ref": "#/components/schemas/Rejection"
+            },
+            "type": "array",
+            "title": "Rejections"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "file_name",
+          "rows_accepted",
+          "rows_rejected",
+          "rejections",
+          "created_at",
+          "requested_by"
+        ],
+        "title": "IngestionItem"
+      },
       "IngestionJobRequest": {
         "properties": {
           "country_code": {
@@ -5662,6 +6690,42 @@
           "updated_at"
         ],
         "title": "IngestionJobView"
+      },
+      "IngestionResult": {
+        "properties": {
+          "ingestion_id": {
+            "type": "integer",
+            "title": "Ingestion Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "rows_accepted": {
+            "type": "integer",
+            "title": "Rows Accepted"
+          },
+          "rows_rejected": {
+            "type": "integer",
+            "title": "Rows Rejected"
+          },
+          "rejections": {
+            "items": {
+              "$ref": "#/components/schemas/Rejection"
+            },
+            "type": "array",
+            "title": "Rejections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ingestion_id",
+          "status",
+          "rows_accepted",
+          "rows_rejected",
+          "rejections"
+        ],
+        "title": "IngestionResult"
       },
       "LagWindowSpec": {
         "properties": {
@@ -8484,6 +9548,24 @@
         "title": "Recommendation",
         "description": "A ranked suggestion plus the human-readable reason it was picked."
       },
+      "Rejection": {
+        "properties": {
+          "row": {
+            "type": "integer",
+            "title": "Row"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "reason"
+        ],
+        "title": "Rejection"
+      },
       "ReleaseInfo": {
         "properties": {
           "id": {
@@ -8867,6 +9949,63 @@
           "total"
         ],
         "title": "ResourceListResponse"
+      },
+      "RunSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "weights": {
+            "type": "string",
+            "title": "Weights",
+            "default": "equal"
+          },
+          "area_count": {
+            "type": "integer",
+            "title": "Area Count"
+          },
+          "indicator_count": {
+            "type": "integer",
+            "title": "Indicator Count"
+          },
+          "class_breaks": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Class Breaks"
+          },
+          "input_hash": {
+            "type": "string",
+            "title": "Input Hash"
+          },
+          "output_hash": {
+            "type": "string",
+            "title": "Output Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "method_version",
+          "area_count",
+          "indicator_count",
+          "class_breaks",
+          "input_hash",
+          "output_hash"
+        ],
+        "title": "RunSummary"
       },
       "SectorOption": {
         "properties": {
