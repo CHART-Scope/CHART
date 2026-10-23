@@ -79,7 +79,7 @@ for (const width of [1440, 390]) {
     await choices.getByRole("button", { name: "Dashboard", exact: true }).click();
     await expect(page.getByText("Inside CHART · Madhya Pradesh, India")).toHaveCount(0);
     const partners = page.getByRole("list", { name: "Partners" });
-    await expect(partners.getByRole("link")).toHaveCount(7);
+    await expect(partners.getByRole("link")).toHaveCount(8);
     await expect(partners.getByRole("link").nth(0)).toHaveAccessibleName(
       "UBS Optimus Foundation",
     );

@@ -27,5 +27,9 @@
   "amref.png": {
     "page": "https://amref.org/about-amref-health-africa/",
     "asset": "https://i0.wp.com/amref.org/wp-content/uploads/2020/05/white.png?resize=500%2C295&ssl=1"
+  },
+  "expert-analytics.png": {
+    "page": "https://www.expert-analytics.com/",
+    "asset": "https://static.wixstatic.com/media/9b8fbe_3e90f12545e6424dbfac3a17a44eeb9b~mv2.png"
   }
 }
