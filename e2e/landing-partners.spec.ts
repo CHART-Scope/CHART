@@ -7,7 +7,7 @@ for (const width of [1440, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
     const partners = page.getByRole("list", { name: "Partners" });
-    await expect(partners.getByRole("link")).toHaveCount(7);
+    await expect(partners.getByRole("link")).toHaveCount(8);
     await expect(partners.getByRole("link").nth(0)).toHaveAccessibleName(
       "UBS Optimus Foundation",
     );
@@ -17,6 +17,7 @@ for (const width of [1440, 768, 390]) {
     for (const [name, href] of [
       ["AMP Health", "https://amphealth.org/"],
       ["Amref Health Africa", "https://amref.org/"],
+      ["Expert Analytics", "https://www.expert-analytics.com/"],
     ]) {
       const link = partners.getByRole("link", { name, exact: true });
       await expect(link).toBeVisible();

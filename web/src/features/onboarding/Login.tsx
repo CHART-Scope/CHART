@@ -251,6 +251,21 @@ export function Login({
                   />
                 </a>
               </li>
+              <li>
+                <a
+                  href="https://www.expert-analytics.com/"
+                  aria-label="Expert Analytics"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img
+                    src="/partners/expert-analytics.png"
+                    alt="Expert Analytics"
+                    width="160"
+                    height="58"
+                  />
+                </a>
+              </li>
             </ul>
           </section>
         </main>
