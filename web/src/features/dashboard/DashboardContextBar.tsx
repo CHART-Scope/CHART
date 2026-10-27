@@ -80,100 +80,47 @@ export function DashboardContextBar({
     );
   }, [families, geographies, geographyId]);
 
-  // Top-level areas visible under the current family — i.e. the ones
-  // whose parent is the family root. For India that's just Madhya
-  // Pradesh; for Kenya it's each county. Everything shown here has at
-  // least one active model (uncovered leaves like Turkana are already
-  // filtered by the API).
-  const topLevelAreas = useMemo(() => {
+  // Walk the selected ancestry, then offer children at every level. Geography
+  // metadata supplies labels, so adding a level never needs another UI branch.
+  const geographyPickers = useMemo(() => {
     if (!geographies || !activeFamily) return [];
-    return geographies
-      .filter((geo) => geo.parentId === activeFamily.root.id)
-      .filter((geo) => (geo.models?.length ?? 0) > 0)
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [geographies, activeFamily]);
-
-  // Walk from the URL's geographyId up to whichever ancestor is a
-  // direct child of the family root — that's the option the top-level
-  // dropdown actually renders. Without this, a URL pointing at a
-  // division (parentId=state, grandparent=family root) would render a
-  // controlled <select value=divisionId> whose value matches no option.
-  const topLevelValue = useMemo(() => {
-    if (!geographies || !activeFamily) return topLevelAreas[0]?.id ?? "";
     const byId = new Map(geographies.map((geo) => [geo.id, geo]));
+    const ancestors = new Set<string>();
     let cursor = byId.get(adminUnit ?? geographyId);
-    while (cursor && cursor.parentId && cursor.parentId !== activeFamily.root.id) {
-      cursor = byId.get(cursor.parentId);
+    while (cursor && !ancestors.has(cursor.id)) {
+      ancestors.add(cursor.id);
+      cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
     }
-    return cursor?.id ?? topLevelAreas[0]?.id ?? "";
-  }, [geographies, activeFamily, geographyId, adminUnit, topLevelAreas]);
-
-  // Sub-level areas of the resolved top-level area (state / county).
-  // Only rendered when the top-level place has model-backed children —
-  // MP has 10 divisions, Kenya counties have none, so the sub-dropdown
-  // disappears for Kenya entirely. Uses topLevelValue (the walked
-  // ancestor) rather than geographyId, so a URL that points directly
-  // at a division still shows all sibling divisions in the picker.
-  const subAreas = useMemo(() => {
-    if (!geographies || !topLevelValue) return [];
-    // Never when the top-level selection is the family root itself. The root's
-    // children *are* the top-level list, so computing sub-areas here rendered
-    // the same 47 counties a second time under an identical "County" label -
-    // which is what a country-level Kenya dashboard showed.
-    if (topLevelValue === activeFamily?.root.id) return [];
-    return geographies
-      .filter((geo) => geo.parentId === topLevelValue)
-      .filter((geo) => (geo.models?.length ?? 0) > 0)
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [geographies, topLevelValue, activeFamily]);
-
-  // Sub-level select value: prefer the explicit ?admin_unit= override,
-  // fall back to the URL's geographyId when the URL itself points at
-  // a sub-level (division). Empty string == "Whole state".
-  // A state shown in its country frame arrives as ?admin_unit=<state>, which
-  // is the "Whole state" option here, not one of its divisions.
-  const subLevelValue =
-    adminUnit === topLevelValue
-      ? ""
-      : (adminUnit ?? (geographyId !== topLevelValue ? geographyId : ""));
-
-  const subLevelLabel = subAreas[0]?.levelLabel ?? "";
-  const topLevelLabel =
-    topLevelAreas[0]?.levelLabel ?? activeFamily?.root.levelLabel ?? "Area";
-
-  // A country-level dashboard has no top-level area selected, so the select
-  // needs an option that says so. Without one its value matched no option and
-  // the browser displayed the first county, claiming a selection the page was
-  // not actually showing.
-  // A country-level view only says something when its areas are the leaves
-  // (Kenya's counties). India's one state holds the divisions, so an "All
-  // states" view would be a country map with Madhya Pradesh alone on it.
-  const countryViewOffered = useMemo(
-    () =>
-      topLevelAreas.every(
-        (area) =>
-          !geographies?.some(
-            (geo) => geo.parentId === area.id && (geo.models?.length ?? 0) > 0,
-          ),
-      ),
-    [topLevelAreas, geographies],
-  );
-
-  const topLevelOptions = useMemo(() => {
-    const areas = topLevelAreas.map((area) => ({
-      value: area.id,
-      label: area.name,
-    }));
-    return activeFamily && countryViewOffered
-      ? [
-          {
-            value: activeFamily.root.id,
-            label: `All ${pluralLabel(topLevelLabel)}`,
-          },
-          ...areas,
-        ]
-      : areas;
-  }, [topLevelAreas, activeFamily, topLevelLabel, countryViewOffered]);
+    const pickers = [];
+    let parent = activeFamily.root;
+    const visited = new Set<string>();
+    while (!visited.has(parent.id)) {
+      visited.add(parent.id);
+      const children = geographies
+        .filter(
+          (geo) =>
+            geo.parentId === parent.id &&
+            ((geo.models?.length ?? 0) > 0 ||
+              geographies.some(
+                (child) =>
+                  child.path.startsWith(`${geo.path}/`) &&
+                  (child.models?.length ?? 0) > 0,
+              )),
+        )
+        .sort((a, b) => a.name.localeCompare(b.name));
+      if (children.length === 0) break;
+      const selected = children.find((geo) => ancestors.has(geo.id));
+      pickers.push({
+        parent,
+        children,
+        selected: selected?.id ?? "",
+        label: children[0].levelLabel,
+      });
+      if (!selected) break;
+      parent = selected;
+    }
+    return pickers;
+  }, [geographies, activeFamily, geographyId, adminUnit]);
 
   const hazards = useMemo(
     () =>
@@ -226,46 +173,13 @@ export function DashboardContextBar({
     onNavigate({ geographyId: target.id, adminUnit: null, outcome: "" });
   }
 
-  function handleTopLevelChange(nextGeographyId: string) {
-    const selected = geographies?.find((geo) => geo.id === nextGeographyId);
-    const hasChildren = geographies?.some((geo) => geo.parentId === nextGeographyId);
-    const countryRoot = activeFamily?.root.id;
-    // A state that holds divisions is its own frame: the map shows the whole
-    // state with each division shaded, never the country around it. (A
-    // state without a model for this outcome, like MP for under-five, then
-    // falls through to a division on the page.)
-    if (selected?.parentId && hasChildren) {
-      onNavigate({ geographyId: nextGeographyId, adminUnit: null, outcome });
-      return;
-    }
+  function handlePlaceChange(nextId: string, parentId: string) {
+    const selected = geographies?.find((geo) => geo.id === (nextId || parentId));
+    if (!selected) return;
+    const hasChildren = geographies?.some((geo) => geo.parentId === selected.id);
     onNavigate({
-      geographyId:
-        selected?.parentId && countryRoot
-          ? countryRoot
-          : !hasChildren && selected?.parentId
-            ? selected.parentId
-            : nextGeographyId,
-      // A top-level state/county is shown in its country frame. Places with a
-      // deeper level reveal that next selector; choosing one of those children
-      // moves the frame down by exactly one step.
-      adminUnit: selected?.parentId ? nextGeographyId : null,
-      outcome,
-    });
-  }
-
-  function handleSubLevelChange(nextAdminUnit: string) {
-    if (nextAdminUnit === "") {
-      handleTopLevelChange(topLevelValue);
-      return;
-    }
-    // Always anchor the URL geographyId on the resolved top-level so
-    // the ?admin_unit override remains the source of truth for the
-    // sub-level. Otherwise a URL that lands directly on a division
-    // would keep the division as geographyId AND set admin_unit,
-    // double-selecting the same place.
-    onNavigate({
-      geographyId: topLevelValue || geographyId,
-      adminUnit: nextAdminUnit,
+      geographyId: hasChildren || !selected.parentId ? selected.id : selected.parentId,
+      adminUnit: hasChildren || !selected.parentId ? null : selected.id,
       outcome,
     });
   }
@@ -308,29 +222,20 @@ export function DashboardContextBar({
         </label>
       )}
 
-      <InlineSelect
-        menu
-        label={topLevelLabel}
-        aria-label={topLevelLabel}
-        value={topLevelValue}
-        onChange={handleTopLevelChange}
-        options={topLevelOptions}
-        disabled={topLevelAreas.length === 0}
-      />
-
-      {subAreas.length > 0 ? (
+      {geographyPickers.map(({ parent, children, selected, label }) => (
         <InlineSelect
+          key={parent.id}
           menu
-          label={subLevelLabel}
-          aria-label={subLevelLabel}
-          value={subLevelValue}
-          onChange={handleSubLevelChange}
+          label={label}
+          aria-label={label}
+          value={selected}
+          onChange={(next) => handlePlaceChange(next, parent.id)}
           options={[
-            { value: "", label: `Whole ${topLevelLabel.toLowerCase()}` },
-            ...subAreas.map((sub) => ({ value: sub.id, label: sub.name })),
+            { value: "", label: `Whole ${parent.levelLabel.toLowerCase()}` },
+            ...children.map((child) => ({ value: child.id, label: child.name })),
           ]}
         />
-      ) : null}
+      ))}
 
       {placeOnly ? null : (
         <>
@@ -361,13 +266,6 @@ export function DashboardContextBar({
 
 const NO_CATALOG: ModelCatalogEntry[] = [];
 
-function hasOutcomeModel(
-  geography: { models?: { outcome: string }[] },
-  outcome: string,
-) {
-  return geography.models?.some((model) => model.outcome === outcome) ?? false;
-}
-
 function dedupe<T>(items: T[], key: (item: T) => string): T[] {
   const seen = new Set<string>();
   const out: T[] = [];
@@ -388,15 +286,4 @@ function countryLabel(family: Family | null): string {
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-/** "County" -> "counties", "State" -> "states", "Division" -> "divisions". */
-function pluralLabel(label: string): string {
-  const lower = label.toLowerCase();
-  if (!lower) return "areas";
-  return lower.endsWith("y")
-    ? `${lower.slice(0, -1)}ies`
-    : lower.endsWith("s")
-      ? lower
-      : `${lower}s`;
 }

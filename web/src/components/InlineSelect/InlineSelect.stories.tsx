@@ -41,7 +41,7 @@ export const InASentence: Story = {
     const [hazard, setHazard] = useState("heat");
     const [outcome, setOutcome] = useState("lbw");
     return (
-      <p style={{ fontSize: 17, lineHeight: 2.1, maxWidth: 760 }}>
+      <p style={{ fontSize: "var(--fs-body-lg)", lineHeight: 2.1, maxWidth: 760 }}>
         We&apos;re planning together for the impacts of{" "}
         <InlineSelect
           aria-label="Choose the climate hazard"

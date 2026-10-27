@@ -28,6 +28,7 @@
   font-size: var(--fs-micro);
   font-weight: 600;
   letter-spacing: 0.06em;
+  font-family: var(--font-display);
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
@@ -123,6 +124,7 @@
 }
 
 .areaMonths {
+  font-family: var(--font-display);
   color: var(--color-text-muted);
 }
 

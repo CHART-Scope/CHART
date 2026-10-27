@@ -1,4 +1,4 @@
-"""Read the published Kenya tables and apply the modeller's display rules.
+"""Read published geography outlook tables and apply the modeller's display rules.
 
 The files are produced by ``publish.py`` and mirrored from the model bucket
 into ``MODEL_CACHE_DIR/kenya/<release>/``. This module only filters
@@ -135,26 +135,61 @@ def file_slug_for_geography(geography_id: str) -> str | None:
     return None
 
 
-def _document(geography_id: str, outcome: str) -> tuple[dict, str] | None:
-    """The published file for a place and outcome, and its file slug."""
+def published_index() -> dict[str, dict]:
+    path = model_cache_dir() / "outlooks" / "index.json"
+    return _read(path, path.stat().st_mtime_ns) if path.is_file() else {}
 
+
+def _document(geography_id: str, outcome: str) -> tuple[dict, str] | None:
+    # IDs are data, never paths supplied by the request.
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", geography_id) or outcome not in OUTCOMES:
+        return None
+    if outcome in published_index().get(geography_id, {}).get("outcomes", []):
+        path = model_cache_dir() / "outlooks" / geography_id / f"{outcome}.json"
+        if path.is_file():
+            return _read(path, path.stat().st_mtime_ns), geography_id
+        return None  # Never silently fall back to a superseded release.
     slug = file_slug_for_geography(geography_id)
-    if slug is None or outcome not in OUTCOMES:
+    if slug is None:
         return None
     path = outlook_dir() / outcome / f"{slug}.json"
-    if not path.is_file():
-        return None
-    return _read(path, path.stat().st_mtime_ns), slug
+    return (_read(path, path.stat().st_mtime_ns), slug) if path.is_file() else None
 
 
-def published_options(outcome: str) -> PublishedOptions | None:
-    """The selectors and scenarios Kenya's national file publishes.
-
-    Without the tables, the shipped models still score observed months, so
-    their drop-down is offered with no scenarios.
-    """
-
-    if outcome not in OUTCOMES:
+def published_options(
+    outcome: str, country_code: str = "KE"
+) -> PublishedOptions | None:
+    candidates = [
+        (geo, item)
+        for geo, item in published_index().items()
+        if item["country_code"] == country_code and outcome in item.get("outcomes", [])
+    ]
+    candidates.sort(
+        key=lambda pair: (
+            pair[1].get("level") not in ("country", "state"),
+            len(pair[0]),
+        )
+    )
+    documents = []
+    for geo, _ in candidates:
+        found = _document(geo, outcome)
+        if found is not None:
+            documents = [found[0]]
+            break
+    if documents:
+        options = {
+            option["code"]: _selector_option(option)
+            for doc in documents
+            for option in doc["selectors"]
+        }
+        return PublishedOptions(
+            selectors=list(options.values()),
+            scenarios=sorted(
+                {row["scenario"] for doc in documents for row in doc["periods"]}
+            ),
+            observed=any("observed" in doc.get("data_modes", []) for doc in documents),
+        )
+    if country_code != "KE" or outcome not in OUTCOMES:
         return None
     found = _document("geo-ke", outcome)
     if found is None:
@@ -165,10 +200,9 @@ def published_options(outcome: str) -> PublishedOptions | None:
         return PublishedOptions(
             selectors=selectors, scenarios=[], observed=_calibrated()
         )
-    document = found[0]
     return PublishedOptions(
-        selectors=[_selector_option(option) for option in document["selectors"]],
-        scenarios=sorted({row["scenario"] for row in document["periods"]}),
+        selectors=[_selector_option(option) for option in found[0]["selectors"]],
+        scenarios=sorted({row["scenario"] for row in found[0]["periods"]}),
         observed=_calibrated(),
     )
 
@@ -229,7 +263,12 @@ def _resolve_selection(
     defaults = restriction or OutlookRestriction(frozenset(), frozenset())
     scenario = scenario or defaults.default_scenario or DEFAULT_SCENARIO
     period = period or DEFAULT_PERIOD
-    selector = selector or defaults.default_selector or DEFAULT_SELECTOR[outcome]
+    selector = (
+        selector
+        or defaults.default_selector
+        or document.get("default_selector")
+        or DEFAULT_SELECTOR[outcome]
+    )
     # A disabled option is refused exactly like one the file does not have.
     if (
         scenario not in scenarios
@@ -260,7 +299,7 @@ def load_outlook_map(
 
     if restriction is not None and not restriction.allows("projection"):
         raise ViewTurnedOff("projection")
-    national = _document("geo-ke", outcome)
+    national = _document(geography_id, outcome)
     if national is None:
         raise OutlookNotAvailable(geography_id)
     scenario, period, selector = _resolve_selection(
@@ -311,6 +350,7 @@ def load_outlook_map(
             row["value_pct"],
             row["low_pct"],
             row["high_pct"],
+            legacy_rules="country_code" not in found[0],
         )
         area.value_percent = shown["value_percent"]
         area.missing_reason = (
@@ -344,7 +384,7 @@ def load_outlook(
     if found is None:
         raise OutlookNotAvailable(geography_id)
     document, slug = found
-    release = outlook_release()
+    release = document.get("release", outlook_release())
     periods = sorted({row["period"] for row in document["periods"]})
     offered_selectors, scenarios = _offered(document, restriction)
     selectors = [_selector_option(option) for option in offered_selectors]
@@ -352,14 +392,17 @@ def load_outlook(
         document, outcome, scenario, period, selector, restriction
     )
 
-    baseline = periods[0]
+    baseline = document.get("baseline_period", periods[0])
     return HeatOutlookResponse(
         geography_id=geography_id,
         place=document["place"],
         level=document["level"],
         outcome=outcome,
         release=release,
-        source_uri=f"{MODEL_BUCKET_URI}/kenya/{release}/{outcome}/{slug}.json",
+        source_uri=document.get(
+            "source_uri", f"{MODEL_BUCKET_URI}/kenya/{release}/{outcome}/{slug}.json"
+        ),
+        metadata_note=document.get("metadata_note"),
         baseline_period=_period_label(baseline),
         reference_note=_reference_note(document, baseline),
         scenarios=[Option(code=code, label=scenario_label(code)) for code in scenarios],
@@ -368,11 +411,17 @@ def load_outlook(
         scenario=scenario,
         period=period,
         selector=selector,
-        selector_note=_selector_note(outcome, selector, selectors),
+        selector_note=(
+            document.get("caveat") or _selector_note(outcome, selector, selectors)
+        ),
         months=_months(document, outcome, scenario, period, selector),
         period_summary=_period_summary(document, outcome, scenario, selector, baseline),
         peak_season=_peak_season(document, outcome, scenario, period, selector),
-        data_modes=enabled_views(restriction),
+        data_modes=[
+            v
+            for v in document.get("data_modes", ["observed", "projection"])
+            if v in enabled_views(restriction)
+        ],
     )
 
 
@@ -386,16 +435,44 @@ def enabled_views(restriction: OutlookRestriction | None) -> list[str]:
     ]
 
 
-@lru_cache(maxsize=256)
+@lru_cache(maxsize=16)
 def _read(path: Path, _mtime_ns: int) -> dict:
     # The modification time is part of the key so a fresh sync is picked up
     # without a restart.
     return json.loads(path.read_text())
 
 
+def _month_rows(document, scenario, period, selector):
+    yield from (
+        row
+        for row in document["months"]
+        if (row["scenario"], row["period"], row["selector"])
+        == (scenario, period, selector)
+    )
+    for row in document.get("derived_months", []):
+        if row[:3] == [scenario, period, selector]:
+            yield dict(
+                zip(
+                    (
+                        "scenario",
+                        "period",
+                        "selector",
+                        "side",
+                        "month",
+                        "mean",
+                        "min",
+                        "max",
+                        "change_mean",
+                    ),
+                    row,
+                ),
+                tmax_c=None,
+            )
+
+
 def _months(document, outcome, scenario, period, selector) -> list[OutlookMonth]:
     by_month: dict[int, OutlookMonth] = {}
-    for row in document["months"]:
+    for row in _month_rows(document, scenario, period, selector):
         if (row["scenario"], row["period"], row["selector"]) != (
             scenario,
             period,
@@ -416,6 +493,7 @@ def _months(document, outcome, scenario, period, selector) -> list[OutlookMonth]
                     _percent(row["mean"]),
                     _percent(row["min"]),
                     _percent(row["max"]),
+                    legacy_rules="country_code" not in document,
                 ),
             )
         )
@@ -454,7 +532,7 @@ def _peak_season(document, outcome, scenario, period, selector) -> PeakSeason | 
 
     rows = {
         row["month"]: row
-        for row in document["months"]
+        for row in _month_rows(document, scenario, period, selector)
         if (row["scenario"], row["period"], row["selector"], row["side"])
         == (scenario, period, selector, "heat")
     }
@@ -475,14 +553,26 @@ def _peak_season(document, outcome, scenario, period, selector) -> PeakSeason | 
             return None
         return _percent(sum(values) / len(values))
 
-    shown = _shown(outcome, selector, "heat", mean("mean"), None, None)
+    shown = _shown(
+        outcome,
+        selector,
+        "heat",
+        mean("mean"),
+        None,
+        None,
+        legacy_rules="country_code" not in document,
+    )
     visible = shown["value_percent"] is not None
     return PeakSeason(
         months=chosen,
         label=f"{MONTH_NAMES[chosen[0] - 1]}–{MONTH_NAMES[chosen[-1] - 1]}",
         part=MonthPart(side="heat", **shown),
-        gcm_min_percent=mean("min") if visible else None,
-        gcm_max_percent=mean("max") if visible else None,
+        gcm_min_percent=(
+            mean("min") if visible and "country_code" not in document else None
+        ),
+        gcm_max_percent=(
+            mean("max") if visible and "country_code" not in document else None
+        ),
     )
 
 
@@ -510,6 +600,7 @@ def _period_summary(
             row["value_pct"],
             row["low_pct"],
             row["high_pct"],
+            legacy_rules="country_code" not in document,
         )
         if thin and shown["message"] is None:
             shown["message"] = THIN_DATA
@@ -573,6 +664,8 @@ def _shown(
     value: float | None,
     low: float | None,
     high: float | None,
+    *,
+    legacy_rules: bool = True,
 ) -> dict:
     """The value and range to display, or the guide's message in their place.
 
@@ -584,14 +677,27 @@ def _shown(
     hidden = {"value_percent": None, "low_percent": None, "high_percent": None}
     shown = {"value_percent": value, "low_percent": low, "high_percent": high}
     negative = value is not None and value < 0
-    if outcome == LBW_OUTCOME and (selector == "T3" or negative):
+    if outcome == LBW_OUTCOME and ((legacy_rules and selector == "T3") or negative):
         return {**hidden, "message": NO_EXCESS_LBW}
-    if outcome == U5_OUTCOME and selector == "neonatal" and side == "heat":
+    if (
+        legacy_rules
+        and outcome == U5_OUTCOME
+        and selector == "neonatal"
+        and side == "heat"
+    ):
         # The guide's finding is that newborn deaths carry no heat excess; a
         # share beside that note would contradict it, so none is shown.
         return {**hidden, "message": NO_EXCESS_NEONATAL}
     if negative:
-        message = NO_EXCESS_HEAT if side == "heat" else NO_EXCESS_COOL
+        message = (
+            NO_EXCESS_HEAT
+            if side == "heat"
+            else (
+                NO_EXCESS_COOL
+                if side == "cool"
+                else "No excess attributable to temperature estimated (risk ratio below 1)."
+            )
+        )
         return {**hidden, "message": message}
     return {**shown, "message": None}
 
@@ -616,7 +722,7 @@ def _reference_note(document: dict, baseline: str) -> str:
     if document["outcome"] == LBW_OUTCOME:
         return (
             "Heat-attributable share of low birth weight: only months warmer than "
-            f"the national minimum-risk temperature "
+            f"the model minimum-risk temperature "
             f"({document['reference_temperature_c']:.1f} °C) count. "
             f"Baseline {_period_label(baseline)}."
         )

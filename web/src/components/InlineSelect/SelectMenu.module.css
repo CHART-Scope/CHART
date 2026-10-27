@@ -14,7 +14,7 @@
   background: var(--color-nexus-tint);
   color: var(--color-nexus);
   font-family: var(--font-body);
-  font-size: 17px;
+  font-size: var(--fs-body-lg);
   font-weight: 500;
   line-height: 1.4;
   text-align: left;
@@ -152,7 +152,6 @@
 @media (max-width: 600px) {
   .trigger:not(.sm) {
     min-height: 42px;
-    font-size: 15px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -12,7 +12,7 @@
 
 .tag {
   padding: 3px 10px;
-  font-size: 10.5px;
+  font-size: var(--fs-micro);
   background: var(--color-white);
 }
 

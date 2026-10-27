@@ -36,7 +36,7 @@
   padding: 10px 2px;
   color: var(--color-charcoal);
   font-family: var(--font-body);
-  font-size: 17px;
+  font-size: var(--fs-body-lg);
   font-weight: 500;
   line-height: 1.4;
 }

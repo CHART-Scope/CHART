@@ -414,20 +414,44 @@ OPERATION_DOCUMENTATION: dict[
             )
         },
     ),
-    ("get", "/heat-outlook/{geography_id}"): OperationDocumentation(
-        summary="Read the pre-computed heat outlook for a Kenyan place",
+    ("get", "/heat-outlook/{geography_id}/capabilities"): OperationDocumentation(
+        summary="Read published outlook coverage and enabled data modes",
         description=(
-            "Returns the modelling team's pre-computed heat outlook for a Kenyan "
-            "county (geo-ke-<county>) or for Kenya as a whole (geo-ke): a typical "
-            "month by calendar month, and a summary for each period with its 95% "
-            "CI, climate-model range and change from the baseline. The outcome "
+            "Reports whether the selected geography and outcome have a published "
+            "outlook, the publication's geography level, and the data modes left "
+            "enabled by country model settings. Requires a risk reader role and "
+            "access to the geography path. October 2026 India and Kenya handover "
+            "outlooks expose projection only; observed estimates remain unavailable "
+            "until their inputs are separately calibrated and validated. An "
+            "unsupported outcome returns published=false with no data modes. A "
+            "document advertised by the publication index but missing from storage "
+            "returns OUTLOOK_NOT_PUBLISHED instead of using a superseded release."
+        ),
+        success_responses={
+            "200": (
+                "Publication availability and enabled data modes, with the geography "
+                "level when an outlook document is available."
+            )
+        },
+    ),
+    ("get", "/heat-outlook/{geography_id}"): OperationDocumentation(
+        summary="Read a published geography heat outlook and its period options",
+        description=(
+            "Returns the modelling team's published heat outlook for a configured "
+            "geography: typical calendar months, period summaries, available "
+            "selections, provenance and baseline notes. Installed October 2026 "
+            "handovers cover Madhya Pradesh's state, divisions and districts and "
+            "Kenya's country, counties and supplied constituencies. The outcome "
             "selects low birth weight (lbw) or under-five mortality "
             "(under_5_mortality); scenario, period and selector (the pregnancy "
-            "window or the age group) filter the tables. Requires a risk reader "
-            "role and access to the geography path. No model is evaluated at run "
-            "time: the tables are read from the model bucket mirror. The guides' "
-            "display rules are applied here, so suppressed values arrive as null "
-            "with the message to show in their place."
+            "window or age group) filter the publication. Supplied periods retain "
+            "their coefficient confidence intervals; derived 5/10/20-year periods "
+            "offer climate-model ranges, not confidence intervals, and omit "
+            "unavailable temperature summaries. Requires a risk reader role and "
+            "access to the geography path. No health model is evaluated on request. "
+            "Installed handovers take precedence over legacy Kenya publications. "
+            "Release-specific display rules return suppressed values as null with "
+            "an explanatory message; country settings restrict offered selections."
         ),
         success_responses={
             "200": (
@@ -437,22 +461,27 @@ OPERATION_DOCUMENTATION: dict[
         },
     ),
     ("get", "/heat-outlook/{geography_id}/map"): OperationDocumentation(
-        summary="Read Kenyan counties shaded by annual-average heat share",
+        summary="Read administrative areas shaded by their published heat outlook",
         description=(
-            "Returns the counties of Kenya with their display geometry and the "
-            "modelling team's annual-average heat-attributable share for the "
+            "Returns administrative areas in the selected geography frame with "
+            "display geometry and the published annual-average attributable share "
+            "for the "
             "chosen outcome, scenario, period and selector, in the same shape as "
             "the risk map so the dashboard draws it identically. Requires a risk "
-            "reader role and access to the geography path. Counties whose share "
+            "reader role and access to the geography path, and filters returned "
+            "areas to the caller's allowed paths. Coverage follows the installed "
+            "geography hierarchy and publication, including India districts and "
+            "Kenya constituencies. Areas whose share "
             "is suppressed by the display rules carry missing_reason no_excess; "
-            "windows with no period summary carry not_reported; counties with no "
-            "published file carry no_model. With reference=peak, each county is "
+            "windows with no period summary carry not_reported; areas with no "
+            "published file carry no_model. With reference=peak, each area is "
             "shaded by its peak-season share instead: the three consecutive "
-            "months with the highest heat share. Nothing is computed on request."
+            "months with the highest heat share where available. No health model "
+            "is evaluated on request."
         ),
         success_responses={
             "200": (
-                "Kenyan counties with display geometry and each county's published "
+                "Permitted areas with display geometry and each area's published "
                 "annual-average (or peak-season) share, or the reason it is absent."
             )
         },
@@ -471,7 +500,10 @@ OPERATION_DOCUMENTATION: dict[
             "inputs; selector is the pregnancy window or the age group. Requires a "
             "risk reader role and access to the geography path. The guides' "
             "display rules apply, so suppressed values arrive as null with the "
-            "message to show in their place."
+            "message to show in their place. This is the calibrated legacy Kenya "
+            "scoring contract. Installed projection-only handovers return "
+            "OBSERVED_NOT_AVAILABLE; they do not reuse legacy calibration or "
+            "claim that future ERA5 downscaling has been implemented."
         ),
         success_responses={
             "200": (
@@ -488,7 +520,11 @@ OPERATION_DOCUMENTATION: dict[
             "county's heat-attributable share for one observed month, scored as "
             "in the observed estimate. Requires a risk reader role and access to "
             "the geography path. Counties without complete ERA5 inputs carry "
-            "missing_reason not_reported; suppressed shares carry no_excess."
+            "missing_reason not_reported; suppressed shares carry no_excess. "
+            "Returned areas are restricted to the caller's allowed geography "
+            "paths. This map uses the calibrated legacy Kenya scoring contract; "
+            "installed projection-only handovers return OBSERVED_NOT_AVAILABLE "
+            "until separate calibration and validation support observed inputs."
         ),
         success_responses={
             "200": (

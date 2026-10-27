@@ -76,3 +76,9 @@ new_design
 
 # Kenya outlook files published locally by chart-publish-kenya (mirrors the model bucket)
 pipelines/models/kenya
+
+# Locally derived modeller handover projections
+pipelines/models/outlooks/
+
+# Isolated live E2E browser build
+web/.next-outlook-e2e/

@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from chart.heat_outlook.service import published_index
 from chart.model_registry.service import get_active_model_mappings
 from chart.setup.model_configs import deployed_geography_ids_by_country
 from chart.shared.db.models import (
@@ -52,7 +53,13 @@ def list_geographies(
     """
 
     with get_session_factory()() as session:
-        configured_ids = deployed_geography_ids_by_country()
+        configured_ids = {
+            country: set(ids)
+            for country, ids in deployed_geography_ids_by_country().items()
+        }
+        published = published_index()
+        for geo_id, item in published.items():
+            configured_ids.setdefault(item["country_code"], set()).add(geo_id)
         # Only the admin unit's id is ever read below. Selecting the whole
         # entity also loaded AdminUnit.boundary - a MULTIPOLYGON per row - so
         # every call shipped and parsed the full national geometry just to
@@ -113,8 +120,16 @@ def list_geographies(
             # direct model but with model-backed divisions is still
             # usable as a parent.
             is_leaf = row.id not in parent_ids
-            has_any_model = admin_unit_id is not None and bool(
-                models_by_admin.get(admin_unit_id)
+            published_models = [
+                GeographyModelResponse(
+                    outcome=outcome,
+                    modelAreaName=row.name,
+                    releaseId=published[row.id].get("release", "handover-2026-10-22"),
+                )
+                for outcome in published.get(row.id, {}).get("outcomes", [])
+            ]
+            has_any_model = bool(published_models) or (
+                admin_unit_id is not None and bool(models_by_admin.get(admin_unit_id))
             )
             if not include_unsupported and is_leaf and not has_any_model:
                 continue
@@ -137,7 +152,8 @@ def list_geographies(
                         if admin_unit_id is not None and admin_unit_id in models
                         else None
                     ),
-                    models=(
+                    models=published_models
+                    or (
                         models_by_admin.get(admin_unit_id, [])
                         if admin_unit_id is not None
                         else []

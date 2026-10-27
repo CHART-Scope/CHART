@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Display:wght@400;500;600&display=swap");
+@import "../fonts/fonts.css";
 
 :root {
   --chart-ivory: #f7f5f3;
@@ -17,7 +17,15 @@
     "Fira Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --chart-font-body:
     "Noto Sans Display", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --chart-font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+  /* The separately served sign-in theme mirrors Foundations/Typography.
+     Live E2E checks these roles against the app's shared scale. */
+  --fs-h1: 20px;
+  --fs-body: 13px;
+  --fs-caption: 12px;
+  --fs-eyebrow: 11px;
+  --lh-tight: 1.3;
+  --lh-body: 1.6;
+  --ls-eyebrow: 0.06em;
 }
 
 html,
@@ -30,6 +38,8 @@ body {
   color: var(--chart-charcoal);
   background: var(--chart-ivory);
   font-family: var(--chart-font-body);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -60,8 +70,8 @@ body {
 #kc-header-wrapper {
   padding: 0;
   color: var(--chart-charcoal);
-  font-family: var(--chart-font-mono);
-  font-size: 20px;
+  font-family: var(--chart-font-display);
+  font-size: var(--fs-h1);
   font-weight: 500;
   letter-spacing: 0.05em;
   line-height: 1.4;
@@ -93,10 +103,10 @@ body {
 #kc-page-title {
   margin: 0;
   color: var(--chart-charcoal);
-  font-family: var(--chart-font-mono);
-  font-size: 16px;
+  font-family: var(--chart-font-display);
+  font-size: var(--fs-h1);
   font-weight: 500;
-  line-height: 1.4;
+  line-height: var(--lh-tight);
   text-align: center;
 }
 
@@ -106,10 +116,10 @@ body {
 
 .pf-v5-c-form__label-text {
   color: var(--chart-text-light);
-  font-family: var(--chart-font-body);
-  font-size: 10px;
+  font-family: var(--chart-font-display);
+  font-size: var(--fs-eyebrow);
   font-weight: 500;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--ls-eyebrow);
   line-height: 1.4;
   text-transform: uppercase;
 }
@@ -138,7 +148,7 @@ body {
   color: var(--chart-charcoal);
   background: transparent;
   font-family: var(--chart-font-body);
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 
 .pf-v5-c-input-group {
@@ -162,7 +172,7 @@ body {
   color: var(--chart-white);
   background: var(--chart-nexus);
   font-family: var(--chart-font-body);
-  font-size: 13px;
+  font-size: var(--fs-body);
   font-weight: 500;
 }
 
@@ -188,10 +198,10 @@ body {
 
 #kc-social-providers h2 {
   color: var(--chart-text-light);
-  font-family: var(--chart-font-body);
-  font-size: 10px;
+  font-family: var(--chart-font-display);
+  font-size: var(--fs-eyebrow);
   font-weight: 500;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
 }
 
@@ -205,7 +215,7 @@ body {
   background: var(--chart-white);
   box-shadow: none;
   font-family: var(--chart-font-body);
-  font-size: 13px;
+  font-size: var(--fs-body);
   font-weight: 500;
 }
 
@@ -231,7 +241,7 @@ body {
 #kc-registration,
 #kc-info {
   color: var(--chart-text-muted);
-  font-size: 12px;
+  font-size: var(--fs-caption);
 }
 
 a {
@@ -241,7 +251,7 @@ a {
 .pf-v5-c-alert {
   border-radius: var(--chart-radius-md);
   font-family: var(--chart-font-body);
-  font-size: 12px;
+  font-size: var(--fs-caption);
 }
 
 @media (max-width: 480px) {

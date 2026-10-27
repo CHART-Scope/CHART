@@ -173,7 +173,7 @@ function PublicFrame({ children }: { children: ReactNode }) {
         </a>
         <Button onClick={startKeycloakSignIn}>Sign in</Button>
       </header>
-      {children}
+      <div className={loginStyles.publicContent}>{children}</div>
     </div>
   );
 }

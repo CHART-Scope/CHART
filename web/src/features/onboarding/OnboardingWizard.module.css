@@ -30,7 +30,7 @@
   margin-bottom: 24px;
   padding-bottom: 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-weight: 500;
   font-size: 16px;
   letter-spacing: var(--ls-mono);
@@ -40,14 +40,14 @@
   margin-bottom: 28px;
 }
 .intro h2 {
-  font-family: var(--font-mono);
-  font-size: 14px;
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
   font-weight: 500;
   line-height: 1.5;
   margin-bottom: 12px;
 }
 .intro p {
-  font-size: 13px;
+  font-size: var(--fs-body);
   color: rgba(255, 255, 255, 0.5);
   line-height: 1.6;
 }
@@ -64,9 +64,9 @@
   flex-shrink: 0;
 }
 .indicator {
-  font-size: 12px;
+  font-size: var(--fs-caption);
   color: var(--color-text-light);
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   letter-spacing: var(--ls-mono);
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border-subtle);
@@ -93,7 +93,7 @@
   flex: 1;
   margin: 0;
   color: var(--color-maroon);
-  font-size: 12px;
+  font-size: var(--fs-caption);
   line-height: 1.45;
 }
 
@@ -104,8 +104,8 @@
 }
 
 .heading {
-  font-family: var(--font-mono);
-  font-size: var(--fs-h2);
+  font-family: var(--font-display);
+  font-size: var(--fs-h1);
   font-weight: 500;
   color: var(--color-charcoal);
   margin-bottom: 8px;
@@ -134,8 +134,8 @@
   border-radius: 50%;
   background: var(--color-charcoal);
   color: var(--color-white);
-  font-size: 10px;
-  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-family: var(--font-display);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -143,10 +143,11 @@
   margin-top: 1px;
 }
 .subtitle {
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 500;
   color: var(--color-text-muted);
   letter-spacing: var(--ls-eyebrow);
+  font-family: var(--font-display);
   text-transform: uppercase;
   padding-top: 3px;
 }
@@ -156,7 +157,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 16px 18px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   color: var(--color-text-muted);
   line-height: 1.65;
   margin-top: 10px;
@@ -164,10 +165,11 @@
 }
 .infoNote strong {
   display: block;
-  font-size: 12px;
+  font-size: var(--fs-caption);
   font-weight: 500;
   color: var(--color-charcoal);
   margin-bottom: 3px;
+  font-family: var(--font-display);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -181,7 +183,7 @@
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
   background: var(--color-white);
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--fs-caption);
   line-height: 1.55;
 }
 
@@ -192,9 +194,10 @@
 
 .modelMapping > strong {
   color: var(--color-charcoal);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 600;
   letter-spacing: 0.04em;
+  font-family: var(--font-display);
   text-transform: uppercase;
 }
 
@@ -218,7 +221,7 @@
   margin: 4px 0 20px;
   padding: 14px 16px;
   border-radius: var(--radius-md);
-  font-size: 12px;
+  font-size: var(--fs-caption);
   line-height: 1.5;
 }
 
@@ -231,9 +234,10 @@
 .mappingUnavailable > strong {
   display: block;
   color: var(--color-charcoal);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 600;
   letter-spacing: 0.04em;
+  font-family: var(--font-display);
   text-transform: uppercase;
 }
 
@@ -254,7 +258,7 @@
   border-radius: 999px;
   background: var(--color-nexus-tint);
   color: var(--color-nexus);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
 }
 
 .mappingDirectory details {
@@ -307,16 +311,17 @@
   margin-top: 8px;
 }
 .whyBox strong {
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 500;
   color: var(--color-maroon);
   display: block;
   margin-bottom: 4px;
+  font-family: var(--font-display);
   text-transform: uppercase;
   letter-spacing: var(--ls-eyebrow);
 }
 .whyBox p {
-  font-size: 12px;
+  font-size: var(--fs-caption);
   color: var(--color-text-muted);
   line-height: 1.65;
 }
@@ -335,24 +340,26 @@
   margin-bottom: 16px;
 }
 .reviewLabel {
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 500;
   color: var(--color-text-light);
   letter-spacing: 0.08em;
+  font-family: var(--font-display);
   text-transform: uppercase;
   margin-bottom: 5px;
 }
 .reviewValue {
-  font-size: 15px;
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
   color: var(--color-charcoal);
 }
 .reviewEdit {
-  font-size: 12px;
+  font-family: var(--font-body);
   color: var(--color-nexus);
   cursor: pointer;
   background: none;
   border: none;
-  font: inherit;
+  font-size: var(--fs-caption);
   padding: 0;
 }
 
@@ -363,7 +370,7 @@
 }
 
 .collabHelp {
-  font-size: 13px;
+  font-size: var(--fs-body);
   color: var(--color-text-light);
   margin-bottom: 14px;
 }
@@ -393,7 +400,7 @@
   max-width: 620px;
   margin: 9px 0 20px;
   color: var(--color-text-light);
-  font-size: 11.5px;
+  font-size: var(--fs-caption);
   line-height: 1.6;
 }
 
@@ -410,14 +417,14 @@
   margin-bottom: 4px;
 }
 .launchBanner h3 {
-  font-family: var(--font-mono);
-  font-size: 14px;
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
   font-weight: 500;
   color: var(--color-lime);
   margin-bottom: 5px;
 }
 .launchBanner p {
-  font-size: 12px;
+  font-size: var(--fs-caption);
   color: rgba(247, 245, 243, 0.8);
   line-height: 1.6;
 }
@@ -447,17 +454,18 @@
   display: block;
   margin-bottom: 10px;
   color: var(--color-maroon);
-  font-size: 11px;
+  font-size: var(--fs-eyebrow);
   font-weight: 500;
   letter-spacing: var(--ls-eyebrow);
+  font-family: var(--font-display);
   text-transform: uppercase;
 }
 
 .adminDialog h2 {
   margin-bottom: 10px;
   color: var(--color-charcoal);
-  font-family: var(--font-mono);
-  font-size: var(--fs-h2);
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
   font-weight: 500;
   line-height: 1.3;
 }

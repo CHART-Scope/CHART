@@ -32,7 +32,7 @@
 
 .caption {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--fs-body);
   color: var(--color-slate, #5c6660);
   text-align: center;
 }

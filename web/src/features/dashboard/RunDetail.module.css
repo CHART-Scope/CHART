@@ -137,6 +137,7 @@
 }
 
 .climateRow strong {
+  font-family: var(--font-display);
   font-size: var(--fs-body-lg);
   color: var(--color-charcoal);
 }

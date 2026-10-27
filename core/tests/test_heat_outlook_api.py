@@ -9,7 +9,6 @@ display rules.
 from __future__ import annotations
 
 import csv
-from contextlib import nullcontext
 import json
 from collections.abc import Iterator
 from pathlib import Path
@@ -227,7 +226,26 @@ def settings_db(monkeypatch):
                 path="/kenya",
             )
         )
+        session.add(
+            CountryGeoConfig(
+                country_code="KE", level_key="county", level_label="County"
+            )
+        )
+        session.flush()
+        for name in ("Kajiado", "Narok"):
+            session.add(
+                AppGeography(
+                    id="geo-ke-" + name.lower(),
+                    country_code="KE",
+                    level="county",
+                    level_label="County",
+                    name=name,
+                    parent_id="geo-ke",
+                    path="/kenya/" + name.lower(),
+                )
+            )
         session.commit()
+    monkeypatch.setattr(outlook_routes, "get_session_factory", lambda: factory)
     monkeypatch.setattr(settings_service, "get_session_factory", lambda: factory)
     return factory
 
@@ -332,7 +350,6 @@ def test_peak_season_map_and_suppressed_window(client, monkeypatch) -> None:
             )
         ],
     )
-    monkeypatch.setattr(outlook_routes, "get_session_factory", lambda: nullcontext)
     monkeypatch.setattr(
         outlook_service, "load_map_view", lambda *_a, **_k: frame.model_copy(deep=True)
     )
@@ -345,7 +362,6 @@ def test_peak_season_map_and_suppressed_window(client, monkeypatch) -> None:
 
 def test_projection_view_can_be_switched_off(client, monkeypatch) -> None:
     monkeypatch.setattr(outlook_service, "_calibrated", lambda: True)
-    monkeypatch.setattr(outlook_routes, "get_session_factory", lambda: nullcontext)
     response = client.put(
         "/model-settings/KE/lbw",
         json={
@@ -478,7 +494,6 @@ def test_map_shades_counties_with_the_published_annual_share(
     )
     # The frame (shapes) comes from the risk map, which needs PostGIS; the test
     # supplies it directly and checks the values laid over it.
-    monkeypatch.setattr(outlook_routes, "get_session_factory", lambda: nullcontext)
     calls: list[dict] = []
 
     def shapes_only(*_args, **kwargs):

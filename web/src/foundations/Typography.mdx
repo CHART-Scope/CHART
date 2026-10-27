@@ -6,7 +6,7 @@ import { TokenTable, TokenRow } from "./TokenTable";
 
 # Typography
 
-Two typefaces. Everything else follows from the token scale.
+Two UI typefaces. Sizes follow the shared token scale.
 
 ## Fira Sans — display, data, labels
 
@@ -29,7 +29,13 @@ Two typefaces. Everything else follows from the token scale.
   >
     Aa 35°C 12%
   </div>
-  <p style={{ marginTop: 8, fontSize: 12, color: "var(--color-text-muted)" }}>
+  <p
+    style={{
+      marginTop: 8,
+      fontSize: "var(--fs-caption)",
+      color: "var(--color-text-muted)",
+    }}
+  >
     Used for: page titles, panel titles, eyebrow labels (uppercase, letter-spaced), stat
     numbers, breadcrumb chips, buttons with numeric content.
   </p>
@@ -49,12 +55,18 @@ Two typefaces. Everything else follows from the token scale.
   <div
     style={{
       fontFamily: "var(--font-body)",
-      fontSize: 16,
+      fontSize: "var(--fs-body)",
     }}
   >
     Aa The quick brown fox jumps over the lazy dog
   </div>
-  <p style={{ marginTop: 8, fontSize: 12, color: "var(--color-text-muted)" }}>
+  <p
+    style={{
+      marginTop: 8,
+      fontSize: "var(--fs-caption)",
+      color: "var(--color-text-muted)",
+    }}
+  >
     Used for: paragraphs, descriptions, form inputs, buttons, nav items — everything
     that isn't a heading or a data value.
   </p>
@@ -75,3 +87,47 @@ Two typefaces. Everything else follows from the token scale.
   <TokenRow token="--fs-eyebrow">Uppercase eyebrow (11px)</TokenRow>
   <TokenRow token="--fs-micro">Micro labels (10.5px)</TokenRow>
 </TokenTable>
+
+## Applying the scale
+
+The app and Storybook import the same `tokens.css` and `globals.css`.
+Body text defaults to Noto Sans Display, `--fs-body` (13px), and `--lh-body`
+(1.6). Headings default to Fira Sans, weight 500, and `--lh-tight` (1.3).
+
+- Use `--fs-h1` for page titles, `--fs-section` for major sections,
+  `--fs-h2` for sub-sections, and `--fs-h3` for card and modal titles.
+  The marketing hero uses `--fs-hero`; ordinary page titles do not grow with
+  viewport width.
+- Use Noto Sans Display for prose, navigation and form controls. The shared
+  dropdown uses `--fs-body-lg` (14px) on desktop and mobile. Compact dropdowns
+  inherit their surrounding text size.
+- Uppercase eyebrows use Fira Sans, `--fs-eyebrow`, and `--ls-eyebrow`.
+  Sentence-case form labels use the body font and `--fs-caption`.
+- Data values, breadcrumb chips, and numeric choices such as projection periods
+  use Fira Sans. Use an existing size token for the role instead of a literal size.
+- JetBrains Mono is reserved for technical content such as code, logs, release
+  identifiers and file paths. It is not a heading or eyebrow font.
+- Brand lettering and icon glyphs retain their own visual dimensions; they are
+  not body text or heading size exceptions.
+
+The font stylesheet provides weights 400, 500, 600 and 700 for both UI families
+so components do not depend on synthesized semibold or bold weights. Fonts are
+bundled from `web/src/styles/fonts/`; opening the app or Storybook does not
+depend on Google Fonts being reachable. The folder retains the original font
+subsets, licenses, source URLs and checksums in `sources.json`.
+Copies of the font licenses in `web/public/fonts/` ship with both the app and
+Storybook; keep those copies current when updating the bundled fonts.
+
+The separately served Keycloak sign-in theme mirrors these roles in
+`infra/keycloak/themes/chart/login/resources/css/chart.css`. Its page title,
+labels, inputs and buttons are checked by the same live browser suite. Theme
+changes take effect when the updated theme files are installed on that Keycloak
+service; changing the web app alone does not update a remote identity service.
+When updating fonts, also update the theme's copies in `resources/fonts/`
+(Fira Sans and Noto Sans Display only), including their licenses and provenance.
+
+Typography changes must include browser coverage in root `e2e/` and pass
+`make e2e`. Check computed font family and size, wrapping on small screens, and
+the actual rendered page; token declarations alone do not verify the result.
+The live typography journeys run with Google Fonts unavailable and require
+successful font loading from the app and sign-in service themselves.

@@ -113,6 +113,8 @@ def release(tmp_path, monkeypatch) -> str:
     )
     monkeypatch.setattr(dlnm, "RELEASES_DIR", tmp_path / "releases")
     monkeypatch.setenv("CHART_KENYA_OUTLOOK_RELEASE", name)
+    # Local publications must not replace this fixture's calibrated legacy release.
+    monkeypatch.setenv("MODEL_CACHE_DIR", str(tmp_path / "models"))
     return name
 
 
@@ -140,6 +142,12 @@ def factory(monkeypatch):
                 path="/kenya",
             )
         )
+        session.add(
+            CountryGeoConfig(
+                country_code="KE", level_key="county", level_label="County"
+            )
+        )
+        session.flush()
         geography = Geography(slug="kenya", country="Kenya", name="Kenya")
         session.add(geography)
         session.flush()
@@ -148,6 +156,18 @@ def factory(monkeypatch):
             ("narok", "Narok"),
             ("garissa", "Garissa"),
         ):
+            session.add(
+                AppGeography(
+                    id=f"geo-ke-{slug}",
+                    country_code="KE",
+                    level="county",
+                    level_label="County",
+                    name=name,
+                    parent_id="geo-ke",
+                    path=f"/kenya/{slug}",
+                )
+            )
+            session.flush()
             session.add(
                 AdminUnit(
                     geography_id=geography.id,

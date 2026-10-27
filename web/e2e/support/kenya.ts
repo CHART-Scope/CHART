@@ -220,6 +220,10 @@ export async function installKenya(
   };
   const views = (settings: Values) =>
     ["observed", "projection"].filter((view) => settings.data_modes.includes(view));
+  api.on(/^\/api\/chart\/heat-outlook\/[^/]+\/capabilities$/, (route, url) => {
+    const { settings } = selection(url);
+    return json(route, { published: true, data_modes: views(settings) });
+  });
   api.on(/^\/api\/chart\/heat-outlook\/[^/]+\/observed\/map$/, (route, url) => {
     const { outcome, settings, selector, enabled } = selection(url);
     // Without a month the API maps Kenya's newest month, as captured.

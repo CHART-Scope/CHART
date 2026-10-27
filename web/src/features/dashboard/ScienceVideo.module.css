@@ -11,6 +11,7 @@
 .card h2 {
   margin: 0;
   font: inherit;
+  font-family: var(--font-display);
   font-size: var(--fs-eyebrow);
   text-transform: uppercase;
   letter-spacing: var(--ls-eyebrow);
