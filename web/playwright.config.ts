@@ -29,6 +29,7 @@ export default defineConfig({
     {
       name: "chromium-public",
       testDir: "../e2e",
+      testIgnore: "**/*-live.spec.ts",
       use: { ...devices["Desktop Chrome"] },
     },
   ],

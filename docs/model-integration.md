@@ -1,5 +1,45 @@
 # From R output to the dashboard
 
+## October 2026 handover outlook installation
+
+Install the importer dependencies with `.venv/bin/python -m pip install -e 'core[handover]'`.
+Keep the modeller ZIPs and their extracted folders outside Git. To publish locally:
+
+```bash
+.venv/bin/python -m chart.heat_outlook.handover \
+  --source "$HOME/Downloads/OneDrive_1_26-10-2026" \
+  --output pipelines/models/outlooks
+.venv/bin/python -m chart.heat_outlook.geography pipelines/models/outlooks
+```
+
+The second command uses the configured database. Use only a local development
+database for local installation. `MODEL_CACHE_DIR` defaults to `pipelines/models`;
+if overridden, publish into its `outlooks/` child instead. The importer writes
+`index.json`, `boundaries.json`, per-place/outcome JSON and source provenance.
+The registration transaction upserts geography records without creating active
+R-model assignments. No schema migration is needed for a new administrative
+level. Existing geography IDs and access-scope paths are preserved.
+
+The dashboard discovers published capabilities, offers configured levels and
+5/10/20-year periods, and disables observed estimates for uncalibrated releases.
+Available new starting years are 2027 and five-year steps from 2031, with periods
+ending no later than 2100; supplied fixed periods remain available. Monthly
+temperature summaries and coefficient confidence intervals stay unavailable for
+new grid-derived periods. The climate-model range is not a confidence interval.
+See [Modeling](modeling.md) for baselines, spatial aggregation, release limitations
+and the future ERA5 downscaling extension point.
+
+Run `make e2e` after changes. The real handover suite is under root `e2e/` and
+uses disposable PostGIS/Keycloak services, real HTTP authentication and browser
+navigation. Set `CHART_HANDOVER_ROOT` when source folders are elsewhere.
+Evidence is saved under `outputs/e2e/`; no production database is used.
+
+## Earlier model-registry integration
+
+The following describes the separate legacy inference releases, not the
+October 2026 published outlook data.
+
+
 This page explains how a model team's results reach the CHART dashboard. The
 Kenya low birth weight (LBW) heat model and the under-five mortality
 temperature model use this path, in two views:

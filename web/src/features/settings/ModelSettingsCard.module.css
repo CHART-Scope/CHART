@@ -36,7 +36,7 @@
   padding: 0;
   margin-bottom: var(--space-1);
   font-family: var(--font-display);
-  font-size: var(--fs-body-lg);
+  font-size: var(--fs-h3);
   font-weight: 500;
   color: var(--color-charcoal);
 }
@@ -67,6 +67,7 @@
   font-size: var(--fs-eyebrow);
   font-weight: 600;
   color: var(--color-text-muted);
+  font-family: var(--font-display);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -232,6 +233,7 @@
 
 /* The only country in scope, named where the picker would be. */
 .country {
+  font-family: var(--font-display);
   padding: 4px 12px;
   border-radius: var(--radius-pill);
   background: var(--surface-muted);

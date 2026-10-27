@@ -197,16 +197,16 @@ def update_settings(
         return _response(session, country, outcome, support)
 
 
-def outlook_restriction(outcome: str, *, session_factory=None) -> OutlookRestriction:
+def outlook_restriction(
+    outcome: str, *, country_code: str = "KE", session_factory=None
+) -> OutlookRestriction:
     """The Kenya outlook options left on for one outcome."""
 
     with (session_factory or get_session_factory())() as session:
-        support = _support(session, OUTLOOK_COUNTRY, outcome)
+        support = _support(session, country_code, outcome)
         if support is None:
             return OutlookRestriction(frozenset(), frozenset())
-        values, _ = _effective(
-            _row(session, OUTLOOK_COUNTRY, outcome), support, outcome
-        )
+        values, _ = _effective(_row(session, country_code, outcome), support, outcome)
         outlook_selectors = _codes(support.available.selectors, "outlook")
         outlook_scenarios = _codes(support.available.scenarios, "outlook")
         outlook_views = _codes(support.available.data_modes, "outlook")
@@ -375,8 +375,8 @@ def _support(session: Session, country_code: str, outcome: str) -> _Support | No
             option.views.append(view)
 
     published = (
-        published_options(outcome)
-        if country_code == OUTLOOK_COUNTRY and outcome in OUTLOOK_OUTCOMES
+        published_options(outcome, country_code)
+        if outcome in OUTLOOK_OUTCOMES
         else None
     )
     if published is not None:
@@ -483,7 +483,11 @@ def _outcomes(session: Session, country_code: str) -> list[str]:
         )
         .distinct()
     ).all()
-    outlook = OUTLOOK_OUTCOMES if country_code == OUTLOOK_COUNTRY else ()
+    outlook = [
+        outcome
+        for outcome in OUTLOOK_OUTCOMES
+        if published_options(outcome, country_code) is not None
+    ]
     return sorted({*live, *outlook})
 
 

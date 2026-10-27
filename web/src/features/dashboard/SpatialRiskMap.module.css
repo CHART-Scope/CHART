@@ -20,7 +20,7 @@
 .panel h2 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--fs-body-lg);
+  font-size: var(--fs-h3);
   font-weight: 400;
   color: var(--color-charcoal);
 }
@@ -80,7 +80,7 @@
 .readout {
   margin: 0;
   min-height: 1.25rem;
-  font-size: var(--fs-body-sm, 0.875rem);
+  font-size: var(--fs-body-sm);
   color: var(--color-text-muted);
 }
 
@@ -95,7 +95,7 @@
   /* Row gap larger than column gap: when the legend wraps, the bands should
      read as two lines rather than one crowded block. */
   flex-wrap: wrap;
-  font-size: 0.75rem;
+  font-size: var(--fs-caption);
   color: var(--color-text-muted);
   justify-content: center;
   gap: 4px;
@@ -146,12 +146,13 @@
 
 .tooltipName {
   font-family: var(--font-display);
-  font-size: 0.875rem;
+  font-size: var(--fs-body-lg);
   color: var(--color-charcoal);
 }
 
 .tooltipValue {
-  font-size: 0.9375rem;
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
   font-weight: 600;
   color: var(--color-charcoal);
 }
@@ -167,7 +168,7 @@
 }
 
 .tooltipHint {
-  font-size: 0.75rem;
+  font-size: var(--fs-caption);
   color: var(--color-text-muted);
 }
 .area:focus-visible {
@@ -190,7 +191,7 @@
   background: transparent;
   color: var(--color-text-muted);
   font: inherit;
-  font-size: 0.75rem;
+  font-size: var(--fs-caption);
   line-height: 1.2;
   cursor: pointer;
   white-space: nowrap;
@@ -238,7 +239,8 @@
   padding: 5px 6px;
   background: transparent;
   font: inherit;
-  font-size: 0.75rem;
+  font-family: var(--font-display);
+  font-size: var(--fs-caption);
   min-height: 28px;
   cursor: pointer;
 }
@@ -260,7 +262,8 @@
 }
 .embedded h2 {
   margin: 0;
-  font-size: var(--fs-caption);
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
   font-weight: 400;
   color: var(--color-text-muted);
 }

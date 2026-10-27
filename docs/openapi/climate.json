@@ -1937,12 +1937,68 @@
         "description": "Returns three overlaid RCP scenarios and their 5- / 15- / 25-year horizon rows for the requested admin_unit under an SSP2 population baseline. Missing scenarios are omitted, so the client renders the scenarios that are available today. Requires a bearer token and geography scope."
       }
     },
+    "/heat-outlook/{geography_id}/capabilities": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read published outlook coverage and enabled data modes",
+        "operationId": "capabilities_heat_outlook__geography_id__capabilities_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Publication availability and enabled data modes, with the geography level when an outlook document is available.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Reports whether the selected geography and outcome have a published outlook, the publication's geography level, and the data modes left enabled by country model settings. Requires a risk reader role and access to the geography path. October 2026 India and Kenya handover outlooks expose projection only; observed estimates remain unavailable until their inputs are separately calibrated and validated. An unsupported outcome returns published=false with no data modes. A document advertised by the publication index but missing from storage returns OUTLOOK_NOT_PUBLISHED instead of using a superseded release."
+      }
+    },
     "/heat-outlook/{geography_id}": {
       "get": {
         "tags": [
           "heat-outlook"
         ],
-        "summary": "Read the pre-computed heat outlook for a Kenyan place",
+        "summary": "Read a published geography heat outlook and its period options",
         "operationId": "read_heat_outlook_heat_outlook__geography_id__get",
         "security": [
           {
@@ -2043,7 +2099,7 @@
             }
           }
         },
-        "description": "Returns the modelling team's pre-computed heat outlook for a Kenyan county (geo-ke-<county>) or for Kenya as a whole (geo-ke): a typical month by calendar month, and a summary for each period with its 95% CI, climate-model range and change from the baseline. The outcome selects low birth weight (lbw) or under-five mortality (under_5_mortality); scenario, period and selector (the pregnancy window or the age group) filter the tables. Requires a risk reader role and access to the geography path. No model is evaluated at run time: the tables are read from the model bucket mirror. The guides' display rules are applied here, so suppressed values arrive as null with the message to show in their place."
+        "description": "Returns the modelling team's published heat outlook for a configured geography: typical calendar months, period summaries, available selections, provenance and baseline notes. Installed October 2026 handovers cover Madhya Pradesh's state, divisions and districts and Kenya's country, counties and supplied constituencies. The outcome selects low birth weight (lbw) or under-five mortality (under_5_mortality); scenario, period and selector (the pregnancy window or age group) filter the publication. Supplied periods retain their coefficient confidence intervals; derived 5/10/20-year periods offer climate-model ranges, not confidence intervals, and omit unavailable temperature summaries. Requires a risk reader role and access to the geography path. No health model is evaluated on request. Installed handovers take precedence over legacy Kenya publications. Release-specific display rules return suppressed values as null with an explanatory message; country settings restrict offered selections."
       }
     },
     "/heat-outlook/{geography_id}/map": {
@@ -2051,7 +2107,7 @@
         "tags": [
           "heat-outlook"
         ],
-        "summary": "Read Kenyan counties shaded by annual-average heat share",
+        "summary": "Read administrative areas shaded by their published heat outlook",
         "operationId": "read_heat_outlook_map_heat_outlook__geography_id__map_get",
         "security": [
           {
@@ -2143,7 +2199,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Kenyan counties with display geometry and each county's published annual-average (or peak-season) share, or the reason it is absent.",
+            "description": "Permitted areas with display geometry and each area's published annual-average (or peak-season) share, or the reason it is absent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2163,7 +2219,7 @@
             }
           }
         },
-        "description": "Returns the counties of Kenya with their display geometry and the modelling team's annual-average heat-attributable share for the chosen outcome, scenario, period and selector, in the same shape as the risk map so the dashboard draws it identically. Requires a risk reader role and access to the geography path. Counties whose share is suppressed by the display rules carry missing_reason no_excess; windows with no period summary carry not_reported; counties with no published file carry no_model. With reference=peak, each county is shaded by its peak-season share instead: the three consecutive months with the highest heat share. Nothing is computed on request."
+        "description": "Returns administrative areas in the selected geography frame with display geometry and the published annual-average attributable share for the chosen outcome, scenario, period and selector, in the same shape as the risk map so the dashboard draws it identically. Requires a risk reader role and access to the geography path, and filters returned areas to the caller's allowed paths. Coverage follows the installed geography hierarchy and publication, including India districts and Kenya constituencies. Areas whose share is suppressed by the display rules carry missing_reason no_excess; windows with no period summary carry not_reported; areas with no published file carry no_model. With reference=peak, each area is shaded by its peak-season share instead: the three consecutive months with the highest heat share where available. No health model is evaluated on request."
       }
     },
     "/heat-outlook/{geography_id}/observed": {
@@ -2255,7 +2311,7 @@
             }
           }
         },
-        "description": "Scores one observed month for a Kenyan county (geo-ke-<county>), or the mean over Kenya's counties (geo-ke), with the modelling team's DLNM models, using the Copernicus ERA5 temperatures CHART has ingested. ERA5 is first moved onto the scale the models were fitted on by a fixed offset per county and calendar month. Low birth weight reads the birth month and the eight before it; under-five scores each day of the month on that day and the three before it and averages them. month (YYYY-MM) defaults to the newest month with complete inputs; selector is the pregnancy window or the age group. Requires a risk reader role and access to the geography path. The guides' display rules apply, so suppressed values arrive as null with the message to show in their place."
+        "description": "Scores one observed month for a Kenyan county (geo-ke-<county>), or the mean over Kenya's counties (geo-ke), with the modelling team's DLNM models, using the Copernicus ERA5 temperatures CHART has ingested. ERA5 is first moved onto the scale the models were fitted on by a fixed offset per county and calendar month. Low birth weight reads the birth month and the eight before it; under-five scores each day of the month on that day and the three before it and averages them. month (YYYY-MM) defaults to the newest month with complete inputs; selector is the pregnancy window or the age group. Requires a risk reader role and access to the geography path. The guides' display rules apply, so suppressed values arrive as null with the message to show in their place. This is the calibrated legacy Kenya scoring contract. Installed projection-only handovers return OBSERVED_NOT_AVAILABLE; they do not reuse legacy calibration or claim that future ERA5 downscaling has been implemented."
       }
     },
     "/heat-outlook/{geography_id}/observed/map": {
@@ -2347,7 +2403,7 @@
             }
           }
         },
-        "description": "Returns the counties of Kenya with their display geometry and each county's heat-attributable share for one observed month, scored as in the observed estimate. Requires a risk reader role and access to the geography path. Counties without complete ERA5 inputs carry missing_reason not_reported; suppressed shares carry no_excess."
+        "description": "Returns the counties of Kenya with their display geometry and each county's heat-attributable share for one observed month, scored as in the observed estimate. Requires a risk reader role and access to the geography path. Counties without complete ERA5 inputs carry missing_reason not_reported; suppressed shares carry no_excess. Returned areas are restricted to the caller's allowed geography paths. This map uses the calibrated legacy Kenya scoring contract; installed projection-only handovers return OBSERVED_NOT_AVAILABLE until separate calibration and validation support observed inputs."
       }
     },
     "/vra/indicators": {
@@ -6207,10 +6263,6 @@
           },
           "level": {
             "type": "string",
-            "enum": [
-              "county",
-              "country"
-            ],
             "title": "Level"
           },
           "outcome": {
@@ -6224,6 +6276,17 @@
           "source_uri": {
             "type": "string",
             "title": "Source Uri"
+          },
+          "metadata_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Note"
           },
           "baseline_period": {
             "type": "string",
@@ -7419,7 +7482,8 @@
             "type": "string",
             "enum": [
               "heat",
-              "cool"
+              "cool",
+              "total"
             ],
             "title": "Side"
           },
@@ -7861,7 +7925,8 @@
             "type": "string",
             "enum": [
               "heat",
-              "cool"
+              "cool",
+              "total"
             ],
             "title": "Side",
             "default": "heat"
@@ -8012,10 +8077,6 @@
           },
           "level": {
             "type": "string",
-            "enum": [
-              "county",
-              "country"
-            ],
             "title": "Level"
           },
           "outcome": {
@@ -8308,7 +8369,8 @@
             "type": "string",
             "enum": [
               "heat",
-              "cool"
+              "cool",
+              "total"
             ],
             "title": "Side"
           },

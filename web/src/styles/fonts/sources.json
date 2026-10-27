@@ -1,0 +1,550 @@
+{
+  "source": "https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Display:wght@400;500;600;700&display=swap",
+  "retrieved": "2026-10-27",
+  "files": [
+    {
+      "family": "Fira Sans",
+      "weight": "400",
+      "subset": "cyrillic-ext",
+      "file": "fira-sans-400-cyrillic-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9E4kDNxMZdWfMOD5VvmojLazX3dGTP.woff2",
+      "sha256": "3486b12fb28ae300bf9263582d6c77f6726beccfc5af9159298a58c12414a679"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "400",
+      "subset": "cyrillic",
+      "file": "fira-sans-400-cyrillic.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9E4kDNxMZdWfMOD5Vvk4jLazX3dGTP.woff2",
+      "sha256": "09983c6cab069917897596945713d695a3c682d0d81896f80ca2c4c792852f4e"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "400",
+      "subset": "greek-ext",
+      "file": "fira-sans-400-greek-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9E4kDNxMZdWfMOD5Vvm4jLazX3dGTP.woff2",
+      "sha256": "74435b9e7912bacd33b357303a3580997d8c139270489144e5c55fba385814b8"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "400",
+      "subset": "greek",
+      "file": "fira-sans-400-greek.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9E4kDNxMZdWfMOD5VvlIjLazX3dGTP.woff2",
+      "sha256": "784cc9b7dfbfd2f99f7e3cdc8f8455b30da179706c2e3c27e56bced8cbea5120"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "400",
+      "subset": "vietnamese",
+      "file": "fira-sans-400-vietnamese.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9E4kDNxMZdWfMOD5VvmIjLazX3dGTP.woff2",
+      "sha256": "5b63c9ab04d18db4619617162501c6ad94128d4df237bfb6ec1ea31478df8842"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "400",
+      "subset": "latin-ext",
+      "file": "fira-sans-400-latin-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9E4kDNxMZdWfMOD5VvmYjLazX3dGTP.woff2",
+      "sha256": "832c1a4f6010645786a5ea6a27f39eafc90087ead31ded71d0c1302509a07ef6"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "400",
+      "subset": "latin",
+      "file": "fira-sans-400-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9E4kDNxMZdWfMOD5Vvl4jLazX3dA.woff2",
+      "sha256": "7b8f0fbf813f59df6e7df17410a84850c3e690f98c90b9273371ef83796f8bc5"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "500",
+      "subset": "cyrillic-ext",
+      "file": "fira-sans-500-cyrillic-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnZKveSxf6Xl7Gl3LX.woff2",
+      "sha256": "68d0fc7536b673f759e4ea986ff9a31f8b5391280083c458677dc90eb2d07fe1"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "500",
+      "subset": "cyrillic",
+      "file": "fira-sans-500-cyrillic.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnZKveQhf6Xl7Gl3LX.woff2",
+      "sha256": "9e677029dbcd0eba88b93e9e1eeaa6535b8a9b64bdc55a3a8981a8708240ba05"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "500",
+      "subset": "greek-ext",
+      "file": "fira-sans-500-greek-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnZKveShf6Xl7Gl3LX.woff2",
+      "sha256": "4e875c7fe6c8acea0f2cd62b6a494a3ba774e92137e37c6cefc8cf514457759b"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "500",
+      "subset": "greek",
+      "file": "fira-sans-500-greek.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnZKveRRf6Xl7Gl3LX.woff2",
+      "sha256": "e734d9f6c58e2f96e3c96439c796158daee6fd5eebbe6faa11d2ded475389b38"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "500",
+      "subset": "vietnamese",
+      "file": "fira-sans-500-vietnamese.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnZKveSRf6Xl7Gl3LX.woff2",
+      "sha256": "b4ea7af3871a86e8c118220032cb3ecf01c01cca9059f8bf1831e86891dde6cc"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "500",
+      "subset": "latin-ext",
+      "file": "fira-sans-500-latin-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnZKveSBf6Xl7Gl3LX.woff2",
+      "sha256": "b43cbd7d07405856b33eeab9ee417792b369393deaf02e61dd77a43999ff2811"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "500",
+      "subset": "latin",
+      "file": "fira-sans-500-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnZKveRhf6Xl7Glw.woff2",
+      "sha256": "8a76b4c523d2fcf672c0aa234e33e2c2dea66f11f328c74423d0f551a6fe5a65"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "600",
+      "subset": "cyrillic-ext",
+      "file": "fira-sans-600-cyrillic-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnSKzeSxf6Xl7Gl3LX.woff2",
+      "sha256": "2f1cf969a625bbb01eeb72db32990e57afe28ca82b8cbb8ffd2ad06a34504aff"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "600",
+      "subset": "cyrillic",
+      "file": "fira-sans-600-cyrillic.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnSKzeQhf6Xl7Gl3LX.woff2",
+      "sha256": "df1ce94b652f2df08ca6cbf0f89483316f01489bf9aa4ae49089d5f8fe3e0eca"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "600",
+      "subset": "greek-ext",
+      "file": "fira-sans-600-greek-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnSKzeShf6Xl7Gl3LX.woff2",
+      "sha256": "f0859059bab9fa15ea3841304d95c19864930f4c23c94882a255cfec81274a1b"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "600",
+      "subset": "greek",
+      "file": "fira-sans-600-greek.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnSKzeRRf6Xl7Gl3LX.woff2",
+      "sha256": "a3b7cab9864173d11779a64c5634f4f9a313f1cdfb46711b6e661b8f42ec9992"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "600",
+      "subset": "vietnamese",
+      "file": "fira-sans-600-vietnamese.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnSKzeSRf6Xl7Gl3LX.woff2",
+      "sha256": "b4b4253950cb97fab036e982aac4cf561d3fb6a6738d3695812d8d72451aea70"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "600",
+      "subset": "latin-ext",
+      "file": "fira-sans-600-latin-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnSKzeSBf6Xl7Gl3LX.woff2",
+      "sha256": "0417cdbc8747fb3bebd0bf7630d24e8099695327b332f5d294251c6f9482b954"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "600",
+      "subset": "latin",
+      "file": "fira-sans-600-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnSKzeRhf6Xl7Glw.woff2",
+      "sha256": "f3cc7b2756c566cf8172bfd269d805c4a1eb953f6b6ce8bf2b2ddf49c5422189"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "700",
+      "subset": "cyrillic-ext",
+      "file": "fira-sans-700-cyrillic-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnLK3eSxf6Xl7Gl3LX.woff2",
+      "sha256": "b5363e813bb23a003835136581fa0fc88f80469fd97bc0e80efd88e326941abc"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "700",
+      "subset": "cyrillic",
+      "file": "fira-sans-700-cyrillic.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnLK3eQhf6Xl7Gl3LX.woff2",
+      "sha256": "42a8013e902099b563e434d3ccb3bed87ff6d6af8d80fe51ff203f2ac487673b"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "700",
+      "subset": "greek-ext",
+      "file": "fira-sans-700-greek-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnLK3eShf6Xl7Gl3LX.woff2",
+      "sha256": "dfe80bfa93a4c0de08ea9bdf00d94c6e452ef318c47ae9600a61f245f2c07e8a"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "700",
+      "subset": "greek",
+      "file": "fira-sans-700-greek.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnLK3eRRf6Xl7Gl3LX.woff2",
+      "sha256": "b58bb419e4a90759655c6193ad18397ac4377723f8ce120415bfb359a8863c2d"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "700",
+      "subset": "vietnamese",
+      "file": "fira-sans-700-vietnamese.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnLK3eSRf6Xl7Gl3LX.woff2",
+      "sha256": "7193d1d58124bd3ba6e05b0470def1a28b7c1f7af445ddbc783d4726d7fe33fc"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "700",
+      "subset": "latin-ext",
+      "file": "fira-sans-700-latin-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnLK3eSBf6Xl7Gl3LX.woff2",
+      "sha256": "7c621eb4dba8b6aa4f7e060d0f4121fb557dde15145ba1573a39c3b6fdb11167"
+    },
+    {
+      "family": "Fira Sans",
+      "weight": "700",
+      "subset": "latin",
+      "file": "fira-sans-700-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/firasans/v18/va9B4kDNxMZdWfMOD5VnLK3eRhf6Xl7Glw.woff2",
+      "sha256": "811e73619cc2909792e8fa134c8d1ed714b898310dd4cc218fc29e40a5dc2890"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "400",
+      "subset": "cyrillic-ext",
+      "file": "jetbrains-mono-400-cyrillic-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPx3cwgknk-6nFg.woff2",
+      "sha256": "9343de2ca5d9549f792e7962375af8efb0f320c7643bfd36c884b5a30e5c396f"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "400",
+      "subset": "cyrillic",
+      "file": "jetbrains-mono-400-cyrillic.woff2",
+      "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPxTcwgknk-6nFg.woff2",
+      "sha256": "4995a9a43ac659ec32fcd8b463755cd6a07b31a6e6b3894a6a153b661cf490e2"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "400",
+      "subset": "greek",
+      "file": "jetbrains-mono-400-greek.woff2",
+      "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPxPcwgknk-6nFg.woff2",
+      "sha256": "49c3da6c9a2b279b0f1f860f5cfb1f5dc38d88a5c7be9c9b1837bbc4e3db6111"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "400",
+      "subset": "vietnamese",
+      "file": "jetbrains-mono-400-vietnamese.woff2",
+      "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPx_cwgknk-6nFg.woff2",
+      "sha256": "d44eb1936043a56038eb02dd70b243f379bef65783f94ec12f277550720411f1"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "400",
+      "subset": "latin-ext",
+      "file": "jetbrains-mono-400-latin-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPx7cwgknk-6nFg.woff2",
+      "sha256": "9c38cb2d0d2d93c1ee6e21fa78db76f13ea7e15e15cc64214c7ca89b6aaa35c4"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "400",
+      "subset": "latin",
+      "file": "jetbrains-mono-400-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPxDcwgknk-4.woff2",
+      "sha256": "2c32b9b3ee358c119e210f6f5195f9bd34894d78a785ff2e95d60e718e400af4"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "500",
+      "subset": "cyrillic-ext",
+      "file": "jetbrains-mono-400-cyrillic-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPx3cwgknk-6nFg.woff2",
+      "sha256": "9343de2ca5d9549f792e7962375af8efb0f320c7643bfd36c884b5a30e5c396f"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "500",
+      "subset": "cyrillic",
+      "file": "jetbrains-mono-400-cyrillic.woff2",
+      "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPxTcwgknk-6nFg.woff2",
+      "sha256": "4995a9a43ac659ec32fcd8b463755cd6a07b31a6e6b3894a6a153b661cf490e2"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "500",
+      "subset": "greek",
+      "file": "jetbrains-mono-400-greek.woff2",
+      "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPxPcwgknk-6nFg.woff2",
+      "sha256": "49c3da6c9a2b279b0f1f860f5cfb1f5dc38d88a5c7be9c9b1837bbc4e3db6111"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "500",
+      "subset": "vietnamese",
+      "file": "jetbrains-mono-400-vietnamese.woff2",
+      "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPx_cwgknk-6nFg.woff2",
+      "sha256": "d44eb1936043a56038eb02dd70b243f379bef65783f94ec12f277550720411f1"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "500",
+      "subset": "latin-ext",
+      "file": "jetbrains-mono-400-latin-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPx7cwgknk-6nFg.woff2",
+      "sha256": "9c38cb2d0d2d93c1ee6e21fa78db76f13ea7e15e15cc64214c7ca89b6aaa35c4"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "500",
+      "subset": "latin",
+      "file": "jetbrains-mono-400-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbv2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwBNntkaToggR7BYRbKPxDcwgknk-4.woff2",
+      "sha256": "2c32b9b3ee358c119e210f6f5195f9bd34894d78a785ff2e95d60e718e400af4"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "400",
+      "subset": "cyrillic-ext",
+      "file": "noto-sans-display-400-cyrillic-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEVssiGqWZ-y-o.woff2",
+      "sha256": "1283dcd1f3f4bc0ea0127e7da01dbd4140161112d3f7e5528ba6fabb2ad2e2e9"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "400",
+      "subset": "cyrillic",
+      "file": "noto-sans-display-400-cyrillic.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEX8siGqWZ-y-o.woff2",
+      "sha256": "8a4fbc44600a82551c0120b8144e1434c87f16bcd0b9b945f209073e6ad336b3"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "400",
+      "subset": "greek-ext",
+      "file": "noto-sans-display-400-greek-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEV8siGqWZ-y-o.woff2",
+      "sha256": "6ea5d1600098e0f1559d10f17113ed474707b50e5bd9673a588dd92abcdd8c34"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "400",
+      "subset": "greek",
+      "file": "noto-sans-display-400-greek.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEWMsiGqWZ-y-o.woff2",
+      "sha256": "bc94be996c5c3b11a1e07fb7374cc551b8f0a3b72ae233acd813f758e946b9b2"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "400",
+      "subset": "vietnamese",
+      "file": "noto-sans-display-400-vietnamese.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEVMsiGqWZ-y-o.woff2",
+      "sha256": "4ce4fbf10e0a44af425567b640e30d3d4544d06c41ec36503112e671a5566bcf"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "400",
+      "subset": "latin-ext",
+      "file": "noto-sans-display-400-latin-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEVcsiGqWZ-y-o.woff2",
+      "sha256": "e1901796193a8bff81bffe6a3c1ae827364088dd56cb34eed8812e25f5f5ff60"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "400",
+      "subset": "latin",
+      "file": "noto-sans-display-400-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEW8siGqWZ-w.woff2",
+      "sha256": "08d9318fa95d11e7da7c9d7819c9e9826f9c304220c01c6f7d963057f292978b"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "500",
+      "subset": "cyrillic-ext",
+      "file": "noto-sans-display-400-cyrillic-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEVssiGqWZ-y-o.woff2",
+      "sha256": "1283dcd1f3f4bc0ea0127e7da01dbd4140161112d3f7e5528ba6fabb2ad2e2e9"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "500",
+      "subset": "cyrillic",
+      "file": "noto-sans-display-400-cyrillic.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEX8siGqWZ-y-o.woff2",
+      "sha256": "8a4fbc44600a82551c0120b8144e1434c87f16bcd0b9b945f209073e6ad336b3"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "500",
+      "subset": "greek-ext",
+      "file": "noto-sans-display-400-greek-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEV8siGqWZ-y-o.woff2",
+      "sha256": "6ea5d1600098e0f1559d10f17113ed474707b50e5bd9673a588dd92abcdd8c34"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "500",
+      "subset": "greek",
+      "file": "noto-sans-display-400-greek.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEWMsiGqWZ-y-o.woff2",
+      "sha256": "bc94be996c5c3b11a1e07fb7374cc551b8f0a3b72ae233acd813f758e946b9b2"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "500",
+      "subset": "vietnamese",
+      "file": "noto-sans-display-400-vietnamese.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEVMsiGqWZ-y-o.woff2",
+      "sha256": "4ce4fbf10e0a44af425567b640e30d3d4544d06c41ec36503112e671a5566bcf"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "500",
+      "subset": "latin-ext",
+      "file": "noto-sans-display-400-latin-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEVcsiGqWZ-y-o.woff2",
+      "sha256": "e1901796193a8bff81bffe6a3c1ae827364088dd56cb34eed8812e25f5f5ff60"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "500",
+      "subset": "latin",
+      "file": "noto-sans-display-400-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEW8siGqWZ-w.woff2",
+      "sha256": "08d9318fa95d11e7da7c9d7819c9e9826f9c304220c01c6f7d963057f292978b"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "600",
+      "subset": "cyrillic-ext",
+      "file": "noto-sans-display-400-cyrillic-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEVssiGqWZ-y-o.woff2",
+      "sha256": "1283dcd1f3f4bc0ea0127e7da01dbd4140161112d3f7e5528ba6fabb2ad2e2e9"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "600",
+      "subset": "cyrillic",
+      "file": "noto-sans-display-400-cyrillic.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEX8siGqWZ-y-o.woff2",
+      "sha256": "8a4fbc44600a82551c0120b8144e1434c87f16bcd0b9b945f209073e6ad336b3"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "600",
+      "subset": "greek-ext",
+      "file": "noto-sans-display-400-greek-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEV8siGqWZ-y-o.woff2",
+      "sha256": "6ea5d1600098e0f1559d10f17113ed474707b50e5bd9673a588dd92abcdd8c34"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "600",
+      "subset": "greek",
+      "file": "noto-sans-display-400-greek.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEWMsiGqWZ-y-o.woff2",
+      "sha256": "bc94be996c5c3b11a1e07fb7374cc551b8f0a3b72ae233acd813f758e946b9b2"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "600",
+      "subset": "vietnamese",
+      "file": "noto-sans-display-400-vietnamese.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEVMsiGqWZ-y-o.woff2",
+      "sha256": "4ce4fbf10e0a44af425567b640e30d3d4544d06c41ec36503112e671a5566bcf"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "600",
+      "subset": "latin-ext",
+      "file": "noto-sans-display-400-latin-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEVcsiGqWZ-y-o.woff2",
+      "sha256": "e1901796193a8bff81bffe6a3c1ae827364088dd56cb34eed8812e25f5f5ff60"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "600",
+      "subset": "latin",
+      "file": "noto-sans-display-400-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEW8siGqWZ-w.woff2",
+      "sha256": "08d9318fa95d11e7da7c9d7819c9e9826f9c304220c01c6f7d963057f292978b"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "700",
+      "subset": "cyrillic-ext",
+      "file": "noto-sans-display-400-cyrillic-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEVssiGqWZ-y-o.woff2",
+      "sha256": "1283dcd1f3f4bc0ea0127e7da01dbd4140161112d3f7e5528ba6fabb2ad2e2e9"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "700",
+      "subset": "cyrillic",
+      "file": "noto-sans-display-400-cyrillic.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEX8siGqWZ-y-o.woff2",
+      "sha256": "8a4fbc44600a82551c0120b8144e1434c87f16bcd0b9b945f209073e6ad336b3"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "700",
+      "subset": "greek-ext",
+      "file": "noto-sans-display-400-greek-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEV8siGqWZ-y-o.woff2",
+      "sha256": "6ea5d1600098e0f1559d10f17113ed474707b50e5bd9673a588dd92abcdd8c34"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "700",
+      "subset": "greek",
+      "file": "noto-sans-display-400-greek.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEWMsiGqWZ-y-o.woff2",
+      "sha256": "bc94be996c5c3b11a1e07fb7374cc551b8f0a3b72ae233acd813f758e946b9b2"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "700",
+      "subset": "vietnamese",
+      "file": "noto-sans-display-400-vietnamese.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEVMsiGqWZ-y-o.woff2",
+      "sha256": "4ce4fbf10e0a44af425567b640e30d3d4544d06c41ec36503112e671a5566bcf"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "700",
+      "subset": "latin-ext",
+      "file": "noto-sans-display-400-latin-ext.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEVcsiGqWZ-y-o.woff2",
+      "sha256": "e1901796193a8bff81bffe6a3c1ae827364088dd56cb34eed8812e25f5f5ff60"
+    },
+    {
+      "family": "Noto Sans Display",
+      "weight": "700",
+      "subset": "latin",
+      "file": "noto-sans-display-400-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/notosansdisplay/v30/RLpWK4fy6r6tOBEJg0IAKzqdFZVZxpMkXJMhnB9XjO1o90LEW8siGqWZ-w.woff2",
+      "sha256": "08d9318fa95d11e7da7c9d7819c9e9826f9c304220c01c6f7d963057f292978b"
+    }
+  ]
+}

@@ -22,6 +22,7 @@ from chart.shared.db.models import (
     ModelRelease,
 )
 from chart.shared.db.session import get_session_factory
+from chart.heat_outlook.service import published_index
 
 router = APIRouter(prefix="/model-catalog", tags=["model-catalog"])
 releases_router = APIRouter(prefix="/model-releases", tags=["model-releases"])
@@ -115,8 +116,6 @@ def list_catalog(
                     AppGeography.id == selected_geography.id
                 )
         active_release_ids = session.execute(assignment_query).scalars().all()
-        if not active_release_ids:
-            return CatalogResponse(items=[])
         rows = (
             session.execute(
                 select(ModelRelease).where(ModelRelease.id.in_(active_release_ids))
@@ -167,6 +166,47 @@ def list_catalog(
         )
         for (hazard, domain, outcome), releases in sorted(grouped.items())
     ]
+    published = published_index()
+    selected_ids = {geography_id} if geography_id else set(published)
+    if include_descendants and geography_id:
+        pending = [geography_id]
+        while pending:
+            parent = pending.pop()
+            children = {
+                geo
+                for geo, item in published.items()
+                if item.get("parent_id") == parent
+            } - selected_ids
+            selected_ids.update(children)
+            pending.extend(children)
+    outcomes = {
+        outcome
+        for geo in selected_ids
+        for outcome in published.get(geo, {}).get("outcomes", [])
+    }
+    for outcome in sorted(outcomes):
+        items = [item for item in items if item.outcome != outcome]
+        domain = _domain_from_outcome(outcome)
+        items.append(
+            CatalogEntry(
+                climate_hazard="extreme_heat",
+                climate_hazard_label="Extreme heat",
+                health_domain=domain,
+                health_domain_label=_DOMAIN_LABELS.get(domain, domain),
+                outcome=outcome,
+                outcome_label=_OUTCOME_LABELS.get(outcome, outcome),
+                visualization_type="odds_ratio_icon_array",
+                model_scope_label="Published climate scenario",
+                batch_status="projection_only",
+                release_ids=sorted(
+                    {
+                        published[geo].get("release", "handover-2026-10-22")
+                        for geo in selected_ids
+                        if outcome in published.get(geo, {}).get("outcomes", [])
+                    }
+                ),
+            )
+        )
     return CatalogResponse(items=items)
 
 

@@ -78,8 +78,8 @@
     "Noto Sans Display", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
 
-  /* Type scale — hero/section sizes mirror the design-system reference doc;
-     component-level sizes match the three source prototypes. */
+  /* Shared type scale — see Foundations/Typography for roles and usage.
+     Use these tokens for UI text; brand lettering and icon glyphs are separate. */
   --fs-hero: 28px;
   --fs-h1: 20px;
   --fs-section: 19px;

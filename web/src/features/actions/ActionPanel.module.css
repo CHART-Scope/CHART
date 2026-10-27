@@ -74,6 +74,7 @@
   color: var(--color-charcoal);
 }
 .crumb {
+  font-family: var(--font-display);
   margin: 0;
   min-width: 0;
   font-size: var(--fs-caption);
@@ -89,7 +90,7 @@
 .title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: var(--fs-h3);
   font-weight: 700;
   line-height: 1.35;
 }
@@ -128,7 +129,7 @@
   border: 0;
   border-bottom: 2px solid transparent;
   background: none;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: var(--fs-body-sm);
   font-weight: 600;
   color: var(--color-text-muted);
@@ -159,6 +160,7 @@
   margin: var(--space-4) 0 var(--space-2);
   font-size: var(--fs-eyebrow);
   font-weight: 700;
+  font-family: var(--font-display);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--color-text-muted);
@@ -230,6 +232,7 @@
   margin-bottom: 10px;
 }
 .priorityTitle {
+  font-family: var(--font-display);
   margin: 0;
   font-size: var(--fs-body-sm);
   font-weight: 700;
@@ -324,6 +327,7 @@
 }
 
 .body .stepsHeading {
+  font-family: var(--font-display);
   margin-bottom: 4px;
   font-weight: 600;
 }

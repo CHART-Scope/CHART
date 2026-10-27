@@ -42,14 +42,18 @@ const MONTHS = [
   "Nov",
   "Dec",
 ];
-const SIDE_LABEL = { heat: "Heat", cool: "Cooler than usual" } as const;
+const SIDE_LABEL = {
+  heat: "Heat",
+  cool: "Cooler than usual",
+  total: "Total temperature effect",
+} as const;
 const RATIO_LABEL = { odds_ratio: "Odds ratio", risk_ratio: "Risk ratio" } as const;
 const VIEW_TABS = [
   { value: "observed", label: "Observed" },
   { value: "projection", label: "Projected" },
 ] as const;
 
-type Choices = {
+export type OutlookChoices = {
   view?: OutlookView;
   selector?: string;
   month?: string;
@@ -58,25 +62,30 @@ type Choices = {
   reference?: OutlookReference;
 };
 
+type Choices = OutlookChoices;
+
 type Load<T> = {
   data: T | null;
   state: "loading" | "ready" | "missing" | "error";
 };
 
 type Props = {
-  /** The place the figures describe: a county, or Kenya itself. */
+  /** The place the figures describe at any configured geography level. */
   geographyId: string;
   /** The place the map frames (the dashboard's page geography). */
   mapGeographyId: string;
   accessToken: string;
   outcome: string;
   outcomeLabel: string;
+  dataModes?: OutlookView[];
+  selection?: OutlookChoices;
+  onSelectionChange?: (selection: OutlookChoices) => void;
   figure?: IconName;
   onSelectArea?: (geographyId: string) => void;
 };
 
 /**
- * Kenya's climate-attributable risk in two views. Observed scores a month of
+ * Published climate-attributable risk in two views. Observed scores a month of
  * ERA5 with the modeller's DLNM on request; Projected reads the modeller's
  * pre-computed typical months for a future period. Both show an icon array,
  * a ratio with its 95% CI and a precision badge beside a county map of the
@@ -89,36 +98,49 @@ export function HeatOutlookPanel({
   outcome,
   outcomeLabel,
   figure = "newborn",
+  dataModes = ["observed", "projection"],
+  selection,
+  onSelectionChange,
   onSelectArea,
 }: Props) {
   // Choices are kept per outcome: a different outcome has different windows
-  // and periods, while a different county keeps them so counties compare.
+  // and periods, while a different area keeps them for comparison.
   const [picked, setPicked] = useState<Choices & { outcome: string }>({ outcome });
-  const choice: Choices = picked.outcome === outcome ? picked : {};
-  const choose = (next: Choices) =>
-    setPicked((current) => ({
-      ...(current.outcome === outcome ? current : {}),
-      ...next,
-      outcome,
-    }));
+  const choice: Choices = selection ?? (picked.outcome === outcome ? picked : {});
+  const choose = (next: Choices) => {
+    const merged = { ...choice, ...next };
+    setPicked({ ...merged, outcome });
+    onSelectionChange?.(merged);
+  };
   const [precisionOpen, setPrecisionOpen] = useState(false);
   const { selector, month, scenario, period } = choice;
   const reference = choice.reference ?? "annual";
 
+  const observedEnabled = dataModes.includes("observed");
   const observed = useLoaded<ObservedRisk>(
     (signal) =>
-      fetchObservedRisk(geographyId, accessToken, { outcome, month, selector }, signal),
-    [geographyId, accessToken, outcome, month, selector],
+      observedEnabled
+        ? fetchObservedRisk(
+            geographyId,
+            accessToken,
+            { outcome, month, selector },
+            signal,
+          )
+        : Promise.reject(new OutlookNotPublished(geographyId)),
+    [geographyId, accessToken, outcome, month, selector, observedEnabled],
   );
+  const projectionEnabled = dataModes.includes("projection");
   const projected = useLoaded<HeatOutlook>(
     (signal) =>
-      fetchHeatOutlook(
-        geographyId,
-        accessToken,
-        { outcome, scenario, period, selector },
-        signal,
-      ),
-    [geographyId, accessToken, outcome, scenario, period, selector],
+      projectionEnabled
+        ? fetchHeatOutlook(
+            geographyId,
+            accessToken,
+            { outcome, scenario, period, selector },
+            signal,
+          )
+        : Promise.reject(new OutlookNotPublished(geographyId)),
+    [geographyId, accessToken, outcome, scenario, period, selector, projectionEnabled],
   );
 
   // A previous answer stays on screen (dimmed) while the next loads, but only
@@ -129,15 +151,16 @@ export function HeatOutlookPanel({
 
   // A view loading for the first time stays open, so the tabs do not flicker.
   const observedOpen =
-    observed.state === "loading" ||
-    (observed.state === "ready" && observedData !== null);
+    observedEnabled &&
+    (observed.state === "loading" ||
+      (observed.state === "ready" && observedData !== null));
   const projectedOpen =
     projected.state === "loading" ||
     (projected.state === "ready" && projectedData !== null);
   // Observed is the default once it has a month to show; a place or setting
   // without it opens on the projection instead.
   const view: OutlookView =
-    choice.view ??
+    (!observedEnabled ? "projection" : !projectionEnabled ? "observed" : choice.view) ??
     (observedData && observedData.available_months.length > 0
       ? "observed"
       : observed.state === "loading"
@@ -168,6 +191,17 @@ export function HeatOutlookPanel({
     projected: projectedData,
     choice: { ...choice, reference },
   });
+
+  if (dataModes.length === 0) {
+    return (
+      <section className={base.panel} data-testid="heat-outlook">
+        <p role="status">
+          No outlook views are enabled for this outcome. Update the model settings to
+          enable a published view.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section
@@ -242,6 +276,12 @@ export function HeatOutlookPanel({
             />
           )}
         </div>
+      )}
+
+      {projectedData?.metadata_note && view === "projection" && (
+        <p className={styles.note} role="note">
+          {projectedData.metadata_note}
+        </p>
       )}
 
       {shown.note && (
@@ -337,9 +377,8 @@ export function HeatOutlookPanel({
           {projectedData.months.length > 0 && <TypicalMonths outlook={projectedData} />}
           <PeriodSummary outlook={projectedData} />
           <p className={styles.source}>
-            Model tables {projectedData.release} from the modelling team, read as
-            published; no model is run on request. Source:{" "}
-            <code>{projectedData.source_uri}</code>
+            Projection release {projectedData.release} from the modelling team; no model
+            is run on request. Source: <code>{projectedData.source_uri}</code>
           </p>
         </details>
       )}
@@ -599,7 +638,25 @@ function ProjectedControls({
   reference: OutlookReference;
   choose: (next: Choices) => void;
 }) {
-  const baseline = outlook.periods[0]?.code;
+  const baseline =
+    outlook.period_summary.find((period) => period.is_baseline)?.period ??
+    outlook.periods[0]?.code;
+  const periodLength = (code: string) => {
+    const years = code.match(/(\d{4})\D+(\d{4})/);
+    return years ? Number(years[2]) - Number(years[1]) + 1 : 0;
+  };
+  const durations = [5, 10, 20].filter((years) =>
+    outlook.periods.some(
+      (period) => period.code !== baseline && periodLength(period.code) === years,
+    ),
+  );
+  const selectedLength = periodLength(outlook.period);
+  const selectablePeriods = outlook.periods.filter(
+    (period) =>
+      durations.length < 2 ||
+      period.code === baseline ||
+      selectedLength === periodLength(period.code),
+  );
   return (
     <>
       <ControlRow label="Scenario">
@@ -613,17 +670,55 @@ function ProjectedControls({
           onChange={(next) => choose({ scenario: next })}
         />
       </ControlRow>
+      {durations.length > 1 && (
+        <ControlRow label="Period length">
+          <Choice
+            label="Period length"
+            value={String(selectedLength)}
+            options={durations.map((years) => ({
+              value: String(years),
+              label: `${years} years`,
+            }))}
+            onChange={(next) => {
+              const start = outlook.period.match(/\d{4}/)?.[0];
+              const candidates = outlook.periods.filter(
+                (period) => periodLength(period.code) === Number(next),
+              );
+              const nextPeriod =
+                candidates.find((period) => period.code.startsWith(start ?? "")) ??
+                candidates.find(
+                  (period) => Number(period.code.match(/\d{4}/)?.[0]) >= 2021,
+                ) ??
+                candidates[0];
+              if (nextPeriod) choose({ period: nextPeriod.code, reference: "annual" });
+            }}
+          />
+        </ControlRow>
+      )}
       <ControlRow label="Time horizon">
-        <Choice
-          label="Time horizon"
-          value={outlook.period}
-          options={outlook.periods.map((option) => ({
-            value: option.code,
-            label:
-              option.code === baseline ? `${option.label} (baseline)` : option.label,
-          }))}
-          onChange={(next) => choose({ period: next })}
-        />
+        {selectablePeriods.length > 6 ? (
+          <Select
+            aria-label="Time horizon"
+            value={outlook.period}
+            options={selectablePeriods.map((option) => ({
+              value: option.code,
+              label:
+                option.code === baseline ? `${option.label} (baseline)` : option.label,
+            }))}
+            onChange={(next) => choose({ period: next })}
+          />
+        ) : (
+          <Choice
+            label="Time horizon"
+            value={outlook.period}
+            options={selectablePeriods.map((option) => ({
+              value: option.code,
+              label:
+                option.code === baseline ? `${option.label} (baseline)` : option.label,
+            }))}
+            onChange={(next) => choose({ period: next })}
+          />
+        )}
       </ControlRow>
       <ControlRow label="Reference period">
         <Choice
@@ -646,8 +741,8 @@ function ProjectedControls({
         />
       </ControlRow>
       <p className={styles.note}>
-        Projections are 20-year averages from the modelling team. One-, five- and
-        ten-year horizons arrive with their monthly projections.
+        Projections average the selected years under a climate scenario. They do not
+        predict the conditions in any individual year.
       </p>
     </>
   );

@@ -18,6 +18,12 @@ import { exposedPopulationFigure, iconArrayFigure } from "@/features/dashboard/f
 import { useGeographies } from "@/lib/useGeographies";
 import { useModelCatalog } from "@/lib/useModelCatalog";
 import { type GeographyRecord } from "@/lib/planningClient";
+import { type OutlookChoices } from "@/features/dashboard/HeatOutlookPanel";
+
+import {
+  fetchOutlookCapabilities,
+  type OutlookCapabilities,
+} from "@/lib/heatOutlookClient";
 
 import styles from "./page.module.css";
 
@@ -62,6 +68,11 @@ function Dashboard({
   const session = useSession();
   const router = useRouter();
   const [mapRefresh, setMapRefresh] = useState(0);
+  const [outlookSelection, setOutlookSelection] = useState<{
+    key: string;
+    value: OutlookChoices;
+  } | null>(null);
+  const outlookSelectionKey = `${geographyId}:${outcome}`;
   // Geography changes inside the current map frame (state ↔ division,
   // country ↔ county) should feel like direct manipulation. The URL remains
   // the durable source of truth, but waiting for a Next navigation before
@@ -155,7 +166,8 @@ function Dashboard({
     const deeper = areas.filter((area) =>
       geographies.some((geo) => geo.parentId === area.id && hasModel(geo)),
     );
-    if (deeper.length === 0 || deeper.length !== areas.length) return;
+    if (hasModel(current) || deeper.length === 0 || deeper.length !== areas.length)
+      return;
     const asked = geographies.find((geo) => geo.id === adminUnit);
     const state =
       deeper.find((area) => area.id === adminUnit || area.id === asked?.parentId) ??
@@ -172,19 +184,40 @@ function Dashboard({
   const currentGeography = geographies.find((geo) => geo.id === geographyId);
   const effectiveGeography =
     geographies.find((geo) => geo.id === effectiveAdminUnit) ?? currentGeography;
-  const country = currentGeography ? countryFromPath(currentGeography.path) : "";
-  // Kenya reads published tables. Decided from the URL's geography id as
-  // well as the loaded path, so the live panel never flashes up for Kenya
-  // while the geography list is still loading.
-  const isKenya =
-    country === "Kenya" ||
-    geographyId === "geo-ke" ||
-    geographyId.startsWith("geo-ke-");
+  const selectedGeographyId = displayedAdminUnit ?? geographyId;
+  const [capabilities, setCapabilities] = useState<{
+    key: string;
+    data?: OutlookCapabilities;
+    error?: boolean;
+  } | null>(null);
+  const capabilityKey = `${selectedGeographyId}:${outcome}`;
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchOutlookCapabilities(
+      selectedGeographyId,
+      session.accessToken,
+      outcome,
+      controller.signal,
+    )
+      .then((data) => setCapabilities({ key: capabilityKey, data }))
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setCapabilities({ key: capabilityKey, error: true });
+      });
+    return () => controller.abort();
+  }, [selectedGeographyId, session.accessToken, outcome, capabilityKey]);
+  const resolvedCapabilities =
+    capabilities?.key === capabilityKey ? capabilities : null;
+  const publishedOutlook = resolvedCapabilities?.data?.published ?? false;
   const stateLabel = currentGeography
     ? `${currentGeography.name} (${currentGeography.levelLabel})`
     : geographyId;
   const selectedCatalog = catalog.find((entry) => entry.outcome === outcome);
   const outcomeLabel = selectedCatalog?.outcome_label ?? humanizeCode(outcome);
+  const batchEnabled = ![
+    "blocked_pending_modeller_confirmation",
+    "projection_only",
+  ].includes(selectedCatalog?.batch_status ?? "");
   const selectedModel = effectiveGeography?.models?.find(
     (model) => model.outcome === outcome,
   );
@@ -274,14 +307,26 @@ function Dashboard({
               description={selectedCatalog?.risk_description}
             />
           </aside>
-          {isKenya && cachedGeographies === null ? (
-            // Until the places are known the selected county is not either;
+          {cachedGeographies === null || resolvedCapabilities === null ? (
+            // Wait for the geography and its published capabilities;
             // mounting now would load Kenya as a whole first, then the county.
             <section className={styles.panelPlaceholder} aria-busy="true" />
-          ) : isKenya ? (
-            // Kenya reads the modelling team's published tables and scores
-            // observed months in the API: nothing to prepare or poll.
+          ) : resolvedCapabilities.error ? (
+            <section role="alert">
+              Available outlook views could not load. Reload to try again.
+            </section>
+          ) : publishedOutlook ? (
+            // Published capabilities choose the view for every geography.
             <HeatOutlookPanel
+              selection={
+                outlookSelection?.key === outlookSelectionKey
+                  ? outlookSelection.value
+                  : undefined
+              }
+              onSelectionChange={(value) =>
+                setOutlookSelection({ key: outlookSelectionKey, value })
+              }
+              dataModes={resolvedCapabilities.data?.data_modes}
               geographyId={displayedAdminUnit ?? geographyId}
               mapGeographyId={geographyId}
               accessToken={session.accessToken}
@@ -306,10 +351,7 @@ function Dashboard({
               outcome={outcome}
               outcomeLabel={outcomeLabel}
               figure={iconArrayFigure(outcome)}
-              batchEnabled={
-                selectedCatalog?.batch_status !==
-                "blocked_pending_modeller_confirmation"
-              }
+              batchEnabled={batchEnabled}
               geographyId={effectiveAdminUnit ?? geographyId}
               month={month}
               onMonthChange={(nextMonth) => {
@@ -328,8 +370,7 @@ function Dashboard({
               accessToken={selectedModel ? session.accessToken : undefined}
               canPrepare={
                 Boolean(selectedModel) &&
-                selectedCatalog?.batch_status !==
-                  "blocked_pending_modeller_confirmation" &&
+                batchEnabled &&
                 session.user.roles.some((role) =>
                   [
                     "chart_admin",
@@ -354,8 +395,7 @@ function Dashboard({
                 // division directly rather than choosing a sub-area.
                 selectedGeographyId={displayedAdminUnit ?? geographyId}
                 canPrepare={
-                  selectedCatalog?.batch_status !==
-                    "blocked_pending_modeller_confirmation" &&
+                  batchEnabled &&
                   session.user.roles.some((role) =>
                     [
                       "chart_admin",
@@ -406,15 +446,6 @@ function Dashboard({
       />
     </main>
   );
-}
-
-function countryFromPath(path: string): string {
-  const parts = path.split("/").filter(Boolean);
-  if (parts.length === 0) return "";
-  return parts[0]
-    .split("-")
-    .map((piece) => piece.charAt(0).toUpperCase() + piece.slice(1))
-    .join(" ");
 }
 
 function humanizeCode(value: string): string {

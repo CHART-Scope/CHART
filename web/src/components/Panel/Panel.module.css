@@ -44,8 +44,8 @@
 
 .title {
   font-family: var(--font-display);
-  font-size: var(--fs-body-lg);
+  font-size: var(--fs-h3);
   font-weight: 500;
   color: var(--color-charcoal);
-  line-height: 1.4;
+  line-height: var(--lh-tight);
 }

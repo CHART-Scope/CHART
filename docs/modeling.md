@@ -1,16 +1,90 @@
 # Modeling
 
-CHART's current fitted health models estimate temperature associations with
-low birth weight (LBW) in Madhya Pradesh and Kenya, and under-five mortality
-in Madhya Pradesh.
+## October 2026 published scenario outlooks
 
-The current model is an **inference demo around already fitted R models**. It
-does not train a new model, download climate data, forecast weather, or estimate
-an individual baby's probability of low birth weight.
+The October 22 handovers provide low-birth-weight (LBW) and under-five mortality
+scenario outputs for Madhya Pradesh and Kenya. The outlook imports those
+outputs; it does not refit models or predict individual outcomes. Published
+outlooks take precedence in the dashboard where installed. The older R scoring
+releases remain separate and are described below for reproducibility.
 
-## Current modeling status
+| Outcome | Madhya Pradesh | Kenya | Exposure and baseline |
+| --- | --- | --- | --- |
+| LBW | One state curve; 52 districts, 10 divisions, state | One national curve; 289 constituencies, 47 counties, country | Nine monthly Tmax values, lag 0 = birth month; whole pregnancy and T1/T2/T3; baseline 1981–2010 |
+| Under-five mortality | Seven state age-group curves plus neonatal/under-five division curves | Seven national age-group curves | Daily Tmax lags 0–3; baseline 1991–2020 |
 
-All three releases use **Distributed Lag Non-linear Model (DLNM)** terms. A
+District/constituency outputs are local climate applications of these curves,
+not independently fitted district/constituency models. Constituencies are the
+supplied Kenya units, not an asserted one-to-one administrative sub-county
+mapping. The package excludes the Msambweni polygon. Coverage follows this
+boundary edition; it is not a claim about today's administrative inventory.
+
+The Kenya mortality v3 handover corrects the October 6 area/day attribution
+error in published tables. Its coefficients and basis lookup are unchanged.
+The MP mortality handover supersedes the August analysis. MP LBW uses 28°C as
+its minimum-risk reference and caps temperature at 36.9°C; Kenya uses 24.3°C
+and 38.6°C. Mortality attribution instead uses each area's baseline mean Tmax.
+The handover identifies neonatal as the main mortality analysis and other
+age groups as exploratory where death dates are approximate. Existing country
+settings can retain an explicitly selected default.
+
+### Five-, ten- and twenty-year periods
+
+Original tables retain their supplied periods and confidence intervals. New
+periods are computed from the per-climate-model monthly NetCDF health outputs,
+with area-overlap weighting for polygons. Compute the selected period for each
+GCM first, then report the mean and minimum/maximum across the five GCMs. Do not
+average ensemble extrema to manufacture a period range. Source grids are
+approximately 0.5 degrees; small polygons do not create finer climate data.
+Derived grid results can differ from supplied area-series summaries because
+the spatial operations and model evaluation order differ.
+
+Short periods have GCM spread, **not coefficient confidence intervals**. The
+latter are unavailable in these grids and remain null. Changes use the
+outcome-specific baseline; signed changes remain meaningful even where negative
+attributable burden is suppressed. These are scenario averages, not exact-year
+weather or death forecasts. Missing values are not replaced with zero.
+
+### Future ERA5 downscaling (not implemented)
+
+The extension point is the projection input/derivation stage, before publishing
+geography outlook documents. A future adapter can supply versioned,
+downscaled monthly temperature histories on the fitted model's observed scale,
+then evaluate the unchanged health model contracts and publish the same API
+shape. Do not downscale an already aggregated health fraction or simply copy
+coarse-cell values into a finer raster and call that an accuracy improvement.
+
+That adapter must declare the ERA5 product, resolution, units, calibration
+period, bias adjustment, lag history, missing-data rules and validation against
+independent observations. LBW requires nine monthly values; mortality requires
+daily variability and four-day histories, so monthly downscaling alone is not
+a complete mortality input. Keep source releases and boundary hashes in its
+provenance and verify numerical parity plus real application E2E coverage.
+Accuracy improvements must be measured, not assumed. New handover outlooks
+expose projections only until observed inputs are separately calibrated and
+validated; legacy Kenya ERA5 scoring is not relabelled as a new release.
+
+### Geography and installation
+
+Place IDs, parent relationships and country-specific level labels are data in
+the existing geography tables. Published model coverage is separate from
+active scoring assignments. New levels require configured records and
+versioned boundaries, not a schema migration. The API validates selections
+against published rows and applies country settings and geography permissions.
+A single-parent administrative hierarchy does not represent overlapping
+watersheds or service areas; those would need explicit relationship semantics.
+
+See [Model integration](model-integration.md) for the local publication and
+registration commands. No cloud upload or deployment is part of local import.
+
+## Legacy R scoring releases
+
+The following sections describe the older inference contracts only. Their
+coverage limitations do not apply to the October 2026 published outlooks.
+
+### Legacy modeling status
+
+These three legacy releases use **Distributed Lag Non-linear Model (DLNM)** terms. A
 DLNM represents a non-linear temperature-response relationship while also
 representing effects across several preceding time intervals. The releases do
 not share one interchangeable input contract.

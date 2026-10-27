@@ -21,7 +21,7 @@ class OddsRatio(BaseModel):
 
 
 class MonthPart(BaseModel):
-    side: Literal["heat", "cool"]
+    side: Literal["heat", "cool", "total"]
     value_percent: float | None
     low_percent: float | None
     high_percent: float | None
@@ -86,10 +86,11 @@ class PeakSeason(BaseModel):
 class HeatOutlookResponse(BaseModel):
     geography_id: str
     place: str
-    level: Literal["county", "country"]
+    level: str
     outcome: str
     release: str
     source_uri: str
+    metadata_note: str | None = None
     baseline_period: str
     reference_note: str
     scenarios: list[Option]
@@ -115,7 +116,7 @@ class ObservedInput(BaseModel):
 
 
 class ObservedEstimate(MonthPart):
-    side: Literal["heat", "cool"] = "heat"
+    side: Literal["heat", "cool", "total"] = "heat"
     ratio: Ratio | None = None
     thin_data: bool
     counties: int
@@ -129,7 +130,7 @@ class ObservedMonth(BaseModel):
 class ObservedResponse(BaseModel):
     geography_id: str
     place: str
-    level: Literal["county", "country"]
+    level: str
     outcome: str
     release: str
     selectors: list[Option]

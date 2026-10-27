@@ -20,8 +20,8 @@
 
 .title {
   margin: 0;
-  font-family: var(--font-body);
-  font-size: var(--fs-body-lg);
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
   font-weight: 400;
   line-height: 1.7;
   color: var(--color-charcoal);
@@ -32,9 +32,8 @@
   color: var(--color-nexus);
 }
 
-/* The view tabs of the design: blue, a step larger than body text. */
+/* Keep the shared tab typography with the dashboard's compact spacing. */
 .viewTabs [role="tab"] {
-  font-size: var(--fs-h3);
   padding-inline: var(--space-1);
 }
 
@@ -64,6 +63,7 @@
 }
 
 .controlLabel {
+  font-family: var(--font-display);
   font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: var(--ls-eyebrow);
@@ -89,6 +89,7 @@
   background: var(--surface-card);
   color: var(--color-text);
   font: inherit;
+  font-family: var(--font-display);
   font-size: var(--fs-caption);
   font-weight: 600;
   cursor: pointer;
@@ -176,6 +177,7 @@
 
 .subtitle {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--fs-h3);
   font-weight: 600;
 }
@@ -206,6 +208,10 @@
 
 .table tbody th {
   font-weight: 500;
+}
+
+.table td {
+  font-family: var(--font-display);
 }
 
 .table tr[aria-current="true"] {

@@ -28,6 +28,7 @@
 }
 
 .title {
+  font-family: var(--font-display);
   font-weight: 600;
   color: var(--color-charcoal);
   font-size: var(--fs-body);

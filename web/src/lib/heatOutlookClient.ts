@@ -2,7 +2,7 @@ import { authFetch } from "./authFetch";
 import { type MapResponse } from "./dashboardClient";
 
 /**
- * Typed client for the Kenya heat outlook: the modelling team's
+ * Typed client for the published heat outlook: the modelling team's
  * pre-computed tables, filtered by the Python API. Nothing is computed on
  * request, so there is no "preparing" state - a place either has a
  * published file or it does not (404).
@@ -11,7 +11,7 @@ import { type MapResponse } from "./dashboardClient";
 export type OutlookOption = { code: string; label: string; exploratory: boolean };
 
 export type OutlookPart = {
-  side: "heat" | "cool";
+  side: "heat" | "cool" | "total";
   value_percent: number | null;
   low_percent: number | null;
   high_percent: number | null;
@@ -59,12 +59,13 @@ export type OutlookView = "observed" | "projection";
 export type HeatOutlook = {
   geography_id: string;
   place: string;
-  level: "county" | "country";
+  level: string;
   outcome: string;
   release: string;
   source_uri: string;
   baseline_period: string;
   reference_note: string;
+  metadata_note?: string;
   scenarios: OutlookOption[];
   periods: OutlookOption[];
   selectors: OutlookOption[];
@@ -101,7 +102,7 @@ export type ObservedEstimate = OutlookPart & {
 export type ObservedRisk = {
   geography_id: string;
   place: string;
-  level: "county" | "country";
+  level: string;
   outcome: string;
   release: string;
   selectors: OutlookOption[];
@@ -113,6 +114,7 @@ export type ObservedRisk = {
   inputs: ObservedInput[];
   history: { month: string; value_percent: number | null }[];
   reference_note: string;
+  metadata_note?: string;
   calibration_note: string;
   data_modes: OutlookView[];
 };
@@ -203,4 +205,21 @@ export async function fetchObservedRiskMap(
   );
   if (!response.ok) throw new Error("The observed map could not load.");
   return (await response.json()) as MapResponse;
+}
+
+export type OutlookCapabilities = { published: boolean; data_modes: OutlookView[] };
+
+export async function fetchOutlookCapabilities(
+  geographyId: string,
+  accessToken: string,
+  outcome: string,
+  signal?: AbortSignal,
+): Promise<OutlookCapabilities> {
+  const params = new URLSearchParams({ outcome });
+  const response = await authFetch(
+    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/capabilities?${params}`,
+    { accessToken, signal },
+  );
+  if (!response.ok) throw new Error("Available outlook views could not load.");
+  return response.json() as Promise<OutlookCapabilities>;
 }

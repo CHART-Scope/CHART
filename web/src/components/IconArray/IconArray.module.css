@@ -30,7 +30,7 @@
 
 .pct {
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: var(--fs-h1);
   font-weight: 500;
   color: var(--color-maroon);
   line-height: 1;

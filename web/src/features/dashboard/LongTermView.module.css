@@ -26,6 +26,10 @@
   font-weight: 500;
 }
 
+.table td:not(:first-child) {
+  font-family: var(--font-display);
+}
+
 .swatch {
   display: inline-block;
   width: 10px;

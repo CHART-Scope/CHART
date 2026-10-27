@@ -19,7 +19,7 @@
 .title {
   margin: 0 0 6px;
   font-family: var(--font-display);
-  font-size: var(--fs-section);
+  font-size: var(--fs-h1);
 }
 .lede {
   margin: 0;

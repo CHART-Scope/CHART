@@ -91,6 +91,8 @@ export async function installFakeApi(
     if (path === "/api/chart/audit/events" || path.startsWith("/api/chart/audit")) {
       return json(route, {}, 202);
     }
+    if (/^\/api\/chart\/heat-outlook\/[^/]+\/capabilities$/.test(path))
+      return json(route, { published: false, data_modes: [] });
     if (path === "/api/chart/geographies") return json(route, geographies);
     if (path === "/api/chart/model-catalog") return json(route, { items: catalog });
     if (/^\/api\/chart\/risk\/[^/]+\/map$/.test(path)) {
