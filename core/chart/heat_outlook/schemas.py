@@ -13,6 +13,22 @@ class Option(BaseModel):
     exploratory: bool = False
 
 
+class ObservedCapability(BaseModel):
+    source: Literal["outlook", "monthly"] | None = None
+    release: str | None = None
+    reason: str | None = None
+    model_area_name: str | None = None
+    batch_enabled: bool = False
+
+
+class OutlookCapabilities(BaseModel):
+    published: bool
+    data_modes: list[str]
+    level: str | None = None
+    projection_release: str | None = None
+    observed: ObservedCapability
+
+
 class OddsRatio(BaseModel):
     value: float
     low: float

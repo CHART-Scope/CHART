@@ -67,6 +67,9 @@
   color: var(--color-charcoal);
   resize: vertical;
 }
+.assignee {
+  margin-bottom: 11px;
+}
 .form .hint {
   margin: 0 0 8px;
   font-size: var(--fs-caption);

@@ -11,7 +11,6 @@ import {
   RecommendedActionsPanel,
   RiskProtectionPanel,
   SpatialRiskMap,
-  lastCompleteMonth,
 } from "@/features/dashboard";
 import { DashboardContextBar } from "@/features/dashboard";
 import { exposedPopulationFigure, iconArrayFigure } from "@/features/dashboard/figures";
@@ -19,6 +18,7 @@ import { useGeographies } from "@/lib/useGeographies";
 import { useModelCatalog } from "@/lib/useModelCatalog";
 import { type GeographyRecord } from "@/lib/planningClient";
 import { type OutlookChoices } from "@/features/dashboard/HeatOutlookPanel";
+import { resolveMonthlyRiskMonth } from "@/features/dashboard/HeatLbwLinkPanel";
 
 import {
   fetchOutlookCapabilities,
@@ -182,9 +182,9 @@ function Dashboard({
   }, [geographies, geographyId, adminUnit, outcome, month, router]);
 
   const currentGeography = geographies.find((geo) => geo.id === geographyId);
-  const effectiveGeography =
-    geographies.find((geo) => geo.id === effectiveAdminUnit) ?? currentGeography;
   const selectedGeographyId = displayedAdminUnit ?? geographyId;
+  const effectiveGeography =
+    geographies.find((geo) => geo.id === selectedGeographyId) ?? currentGeography;
   const [capabilities, setCapabilities] = useState<{
     key: string;
     data?: OutlookCapabilities;
@@ -209,18 +209,26 @@ function Dashboard({
   const resolvedCapabilities =
     capabilities?.key === capabilityKey ? capabilities : null;
   const publishedOutlook = resolvedCapabilities?.data?.published ?? false;
+  const useOutlookPanel =
+    publishedOutlook || Boolean(resolvedCapabilities?.data?.observed?.source);
   const stateLabel = currentGeography
     ? `${currentGeography.name} (${currentGeography.levelLabel})`
     : geographyId;
   const selectedCatalog = catalog.find((entry) => entry.outcome === outcome);
   const outcomeLabel = selectedCatalog?.outcome_label ?? humanizeCode(outcome);
-  const batchEnabled = ![
-    "blocked_pending_modeller_confirmation",
-    "projection_only",
-  ].includes(selectedCatalog?.batch_status ?? "");
+  const batchEnabled =
+    resolvedCapabilities?.data?.observed?.source === "monthly"
+      ? resolvedCapabilities.data.observed.batch_enabled
+      : !["blocked_pending_modeller_confirmation", "projection_only"].includes(
+          selectedCatalog?.batch_status ?? "",
+        );
   const selectedModel = effectiveGeography?.models?.find(
     (model) => model.outcome === outcome,
   );
+  const observedModelAvailable = resolvedCapabilities?.data?.observed
+    ? resolvedCapabilities.data.observed.source === "monthly" &&
+      resolvedCapabilities.data.data_modes.includes("observed")
+    : Boolean(selectedModel);
 
   const districts = useMemo(() => {
     if (!currentGeography) return [];
@@ -267,6 +275,94 @@ function Dashboard({
     selectedModel,
     currentGeography?.parentId,
   ]);
+
+  const observedMonth = resolveMonthlyRiskMonth(month);
+  const observedPanel = (
+    <HeatLbwLinkPanel
+      embedded={useOutlookPanel}
+      onPredictionReady={refreshMap}
+      placeLabel={effectiveGeography?.name ?? stateLabel}
+      modelAreaName={
+        resolvedCapabilities?.data?.observed?.model_area_name ??
+        selectedModel?.modelAreaName ??
+        null
+      }
+      outcome={outcome}
+      outcomeLabel={outcomeLabel}
+      figure={iconArrayFigure(outcome)}
+      batchEnabled={batchEnabled}
+      geographyId={selectedGeographyId}
+      month={observedMonth}
+      onMonthChange={(nextMonth) => {
+        const params = new URLSearchParams();
+        if (adminUnit) params.set("admin_unit", adminUnit);
+        if (outcome) params.set("outcome", outcome);
+        if (nextMonth) params.set("month", nextMonth);
+        // push, not replace: choosing a month is a step the reader
+        // took, and replacing the entry meant Back left the
+        // dashboard entirely instead of walking the months visited.
+        navigate(`/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`, {
+          scroll: false,
+        });
+      }}
+      accessToken={observedModelAvailable ? session.accessToken : undefined}
+      canPrepare={
+        observedModelAvailable &&
+        batchEnabled &&
+        session.user.roles.some((role) =>
+          [
+            "chart_admin",
+            "health_planning_lead",
+            "cross_sector_planning_lead",
+            "health_implementation_officer",
+            "cross_sector_implementation_officer",
+          ].includes(role),
+        )
+      }
+    >
+      <SpatialRiskMap
+        dataRefreshKey={mapRefresh}
+        embedded
+        geographyId={geographyId}
+        accessToken={session.accessToken}
+        month={observedMonth}
+        outcome={outcome}
+        // Falls back to the place the dashboard is on. The map now
+        // frames a leaf selection on its siblings, so without this
+        // nothing is picked out among them when you land on a
+        // division directly rather than choosing a sub-area.
+        selectedGeographyId={displayedAdminUnit ?? geographyId}
+        canPrepare={
+          observedModelAvailable &&
+          batchEnabled &&
+          session.user.roles.some((role) =>
+            [
+              "chart_admin",
+              "health_planning_lead",
+              "cross_sector_planning_lead",
+              "health_implementation_officer",
+              "cross_sector_implementation_officer",
+            ].includes(role),
+          )
+        }
+        onSelect={(nextGeography: string) => {
+          // Clicking the selected division again returns to the whole
+          // state, where the state has an estimate of its own.
+          const wholeState =
+            nextGeography === displayedAdminUnit &&
+            currentGeography?.models?.some((model) => model.outcome === outcome);
+          setOptimisticAdminUnit(wholeState ? null : nextGeography);
+          const params = new URLSearchParams();
+          if (!wholeState) params.set("admin_unit", nextGeography);
+          if (outcome) params.set("outcome", outcome);
+          if (month) params.set("month", month);
+          navigate(
+            `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
+          );
+        }}
+      />
+    </HeatLbwLinkPanel>
+  );
 
   return (
     <main className={styles.page} aria-busy={isPending}>
@@ -315,7 +411,7 @@ function Dashboard({
             <section role="alert">
               Available outlook views could not load. Reload to try again.
             </section>
-          ) : publishedOutlook ? (
+          ) : useOutlookPanel ? (
             // Published capabilities choose the view for every geography.
             <HeatOutlookPanel
               selection={
@@ -327,6 +423,10 @@ function Dashboard({
                 setOutlookSelection({ key: outlookSelectionKey, value })
               }
               dataModes={resolvedCapabilities.data?.data_modes}
+              observedCapability={resolvedCapabilities.data?.observed}
+              projectionRelease={resolvedCapabilities.data?.projection_release}
+              observedContent={observedPanel}
+              placeLabel={effectiveGeography?.name ?? stateLabel}
               geographyId={displayedAdminUnit ?? geographyId}
               mapGeographyId={geographyId}
               accessToken={session.accessToken}
@@ -334,97 +434,27 @@ function Dashboard({
               outcomeLabel={outcomeLabel}
               figure={iconArrayFigure(outcome)}
               onSelectArea={(nextGeography: string) => {
-                setOptimisticAdminUnit(nextGeography);
+                const pickedArea = geographies.find((geo) => geo.id === nextGeography);
+                // Observed county coverage can frame siblings even when the
+                // projection frame has finer areas. Navigate to their real parent.
+                const nextFrame = pickedArea?.parentId ?? geographyId;
+                if (nextFrame === geographyId) setOptimisticAdminUnit(nextGeography);
                 const params = new URLSearchParams();
                 params.set("admin_unit", nextGeography);
                 if (outcome) params.set("outcome", outcome);
+                if (month) params.set("month", month);
                 navigate(
-                  `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
+                  `/dashboard/${encodeURIComponent(nextFrame)}?${params.toString()}`,
                 );
               }}
             />
+          ) : observedModelAvailable || !resolvedCapabilities.data?.observed ? (
+            observedPanel
           ) : (
-            <HeatLbwLinkPanel
-              onPredictionReady={refreshMap}
-              placeLabel={effectiveGeography?.name ?? stateLabel}
-              modelAreaName={selectedModel?.modelAreaName ?? null}
-              outcome={outcome}
-              outcomeLabel={outcomeLabel}
-              figure={iconArrayFigure(outcome)}
-              batchEnabled={batchEnabled}
-              geographyId={effectiveAdminUnit ?? geographyId}
-              month={month}
-              onMonthChange={(nextMonth) => {
-                const params = new URLSearchParams();
-                if (adminUnit) params.set("admin_unit", adminUnit);
-                if (outcome) params.set("outcome", outcome);
-                if (nextMonth) params.set("month", nextMonth);
-                // push, not replace: choosing a month is a step the reader
-                // took, and replacing the entry meant Back left the
-                // dashboard entirely instead of walking the months visited.
-                navigate(
-                  `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
-                  { scroll: false },
-                );
-              }}
-              accessToken={selectedModel ? session.accessToken : undefined}
-              canPrepare={
-                Boolean(selectedModel) &&
-                batchEnabled &&
-                session.user.roles.some((role) =>
-                  [
-                    "chart_admin",
-                    "health_planning_lead",
-                    "cross_sector_planning_lead",
-                    "health_implementation_officer",
-                    "cross_sector_implementation_officer",
-                  ].includes(role),
-                )
-              }
-            >
-              <SpatialRiskMap
-                dataRefreshKey={mapRefresh}
-                embedded
-                geographyId={geographyId}
-                accessToken={session.accessToken}
-                month={month ?? lastCompleteMonth()}
-                outcome={outcome}
-                // Falls back to the place the dashboard is on. The map now
-                // frames a leaf selection on its siblings, so without this
-                // nothing is picked out among them when you land on a
-                // division directly rather than choosing a sub-area.
-                selectedGeographyId={displayedAdminUnit ?? geographyId}
-                canPrepare={
-                  batchEnabled &&
-                  session.user.roles.some((role) =>
-                    [
-                      "chart_admin",
-                      "health_planning_lead",
-                      "cross_sector_planning_lead",
-                      "health_implementation_officer",
-                      "cross_sector_implementation_officer",
-                    ].includes(role),
-                  )
-                }
-                onSelect={(nextGeography: string) => {
-                  // Clicking the selected division again returns to the whole
-                  // state, where the state has an estimate of its own.
-                  const wholeState =
-                    nextGeography === displayedAdminUnit &&
-                    currentGeography?.models?.some(
-                      (model) => model.outcome === outcome,
-                    );
-                  setOptimisticAdminUnit(wholeState ? null : nextGeography);
-                  const params = new URLSearchParams();
-                  if (!wholeState) params.set("admin_unit", nextGeography);
-                  if (outcome) params.set("outcome", outcome);
-                  if (month) params.set("month", month);
-                  navigate(
-                    `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
-                  );
-                }}
-              />
-            </HeatLbwLinkPanel>
+            <section role="status">
+              {resolvedCapabilities.data.observed.reason ??
+                "No observed model is available for this place and outcome."}
+            </section>
           )}
         </div>
       ) : (

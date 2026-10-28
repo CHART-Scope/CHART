@@ -21,6 +21,15 @@ published district/constituency coverage, persisted parent relationships,
 selection errors, authentication/authorization, scope isolation, unavailable
 observed estimates, browser selectors and session restoration.
 
+Observed regressions persist disposable monthly/daily climate inputs for Kenya
+and stored monthly results with exact active model assignments for India. They
+verify both outcomes alongside the new projections, source-release labels
+(including historical results from an older model), county maps, country
+settings, denied scopes, incomplete observations and publication failure/recovery.
+Kenya's LBW fixture matches a supplied R validation case through the real API;
+India's stored-result fixtures verify retrieval and display, not a new R run.
+No observed model is assigned to the new districts or constituencies.
+
 The same live browser suite checks shared typography at desktop and mobile widths
 across the landing page, learning search and player, onboarding, planning,
 settings, projections and action details/forms. It signs in through Keycloak,

@@ -15,19 +15,24 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from chart.model_registry.runtime import model_cache_dir
+from chart.model_registry.service import get_active_model_mapping
 from chart.risk.precision import precision_for_ci
 from chart.risk.schemas import MapResponse
 from chart.risk.service import load_map_view
+from chart.shared.db.models import AdminUnit, AppGeography, ModelRelease
 
 from . import dlnm
 from .schemas import (
     HeatOutlookResponse,
     MonthPart,
     OddsRatio,
+    ObservedCapability,
     Option,
+    OutlookCapabilities,
     OutlookMonth,
     OutlookPeriod,
     PeakSeason,
@@ -177,17 +182,27 @@ def published_options(
             documents = [found[0]]
             break
     if documents:
+        observed_selectors = []
+        if country_code == "KE" and outcome in OUTCOMES and _calibrated():
+            try:
+                observed_selectors = model_selector_options(outcome, outlook_release())
+            except FileNotFoundError:
+                # A partial model sync must not hide working projection tables.
+                pass
         options = {
             option["code"]: _selector_option(option)
             for doc in documents
             for option in doc["selectors"]
         }
+        # Projection handovers do not replace the calibrated observed scorer.
+        # Country settings must retain selectors from both independent sources.
+        options.update({option.code: option for option in observed_selectors})
         return PublishedOptions(
             selectors=list(options.values()),
             scenarios=sorted(
                 {row["scenario"] for doc in documents for row in doc["periods"]}
             ),
-            observed=any("observed" in doc.get("data_modes", []) for doc in documents),
+            observed=bool(observed_selectors),
         )
     if country_code != "KE" or outcome not in OUTCOMES:
         return None
@@ -211,6 +226,124 @@ def _calibrated() -> bool:
     """Whether the release can score observed months (``observed.py``)."""
 
     return (dlnm.release_dir(outlook_release()) / "calibration.json").is_file()
+
+
+def legacy_observed_supported(
+    session: Session, geography_id: str, outcome: str
+) -> bool:
+    """Only the existing Kenya country/county calibration can supply this view.
+
+    Neither a projection publication nor an ancestor's calibration extends
+    observed coverage to a district or constituency.
+    """
+
+    if outcome not in OUTCOMES or not _calibrated():
+        return False
+    path = dlnm.release_dir(outlook_release()) / "calibration.json"
+    try:
+        counties = _read(path, path.stat().st_mtime_ns)["counties"]
+        model_selector_options(outcome, outlook_release())
+        # The observed ratio conversion also reads the LBW reference prevalence.
+        dlnm.lbw_model(outlook_release())
+    except FileNotFoundError:
+        return False
+    covered = {
+        key
+        for key, item in counties.items()
+        if item.get("offset_c")
+        and (outcome == LBW_OUTCOME or item.get("u5_reference_tmax_c") is not None)
+    }
+    if geography_id != "geo-ke" and geography_id not in covered:
+        return False
+    query = select(AdminUnit.id).where(
+        AdminUnit.level == "county", AdminUnit.app_geography_id.in_(covered)
+    )
+    if geography_id != "geo-ke":
+        query = query.where(AdminUnit.app_geography_id == geography_id)
+    return session.scalar(query.limit(1)) is not None
+
+
+def legacy_observed_geography(
+    session: Session, geography_id: str, outcome: str
+) -> bool:
+    """The existing observed API accepts only Kenya and exact county records.
+
+    A county without calibration or input months may return an empty observed
+    response, as before; it must never borrow another place's estimate.
+    """
+
+    if outcome not in OUTCOMES:
+        return False
+    query = select(AdminUnit.id).where(
+        AdminUnit.level == "county", AdminUnit.app_geography_id.like("geo-ke-%")
+    )
+    if geography_id != "geo-ke":
+        query = query.where(AdminUnit.app_geography_id == geography_id)
+    return session.scalar(query.limit(1)) is not None
+
+
+def load_capabilities(
+    session: Session,
+    geography_id: str,
+    outcome: str,
+    *,
+    restriction: OutlookRestriction,
+    monthly_observed_enabled: bool,
+) -> OutlookCapabilities:
+    """Resolve observed and projection sources independently for this exact place."""
+
+    found = _document(geography_id, outcome)
+    geography = session.get(AppGeography, geography_id)
+    observed = ObservedCapability(
+        reason="No observed model is available for this place and outcome."
+    )
+    observed_enabled = False
+    if legacy_observed_supported(session, geography_id, outcome):
+        observed = ObservedCapability(source="outlook", release=outlook_release())
+        observed_enabled = restriction.allows("observed")
+    else:
+        unit_id = session.scalar(
+            select(AdminUnit.id).where(AdminUnit.app_geography_id == geography_id)
+        )
+        model = (
+            get_active_model_mapping(session, admin_unit_id=unit_id, outcome=outcome)
+            if unit_id is not None
+            else None
+        )
+        release = session.get(ModelRelease, model.release_id) if model else None
+        if model is not None and release is not None and release.status == "active":
+            contract = (model.input_spec or {}).get("input_contract") or {}
+            observed = ObservedCapability(
+                source="monthly",
+                release=model.release_id,
+                model_area_name=model.model_area_name,
+                batch_enabled=contract.get("batch_status")
+                != "blocked_pending_modeller_confirmation",
+            )
+            observed_enabled = monthly_observed_enabled
+    if (
+        found is None
+        and observed.source is None
+        and outcome in published_index().get(geography_id, {}).get("outcomes", [])
+    ):
+        # A missing projection file is a publication error, but must not take
+        # an independently available observed model off the dashboard.
+        raise OutlookNotAvailable(geography_id)
+    if observed.source is not None and not observed_enabled:
+        observed.reason = "Observed estimates are turned off in model settings."
+        observed.batch_enabled = False
+    modes = ["observed"] if observed_enabled else []
+    if found is not None and restriction.allows("projection"):
+        modes.append("projection")
+    return OutlookCapabilities(
+        published=found is not None,
+        data_modes=modes,
+        level=found[0]["level"] if found else geography.level if geography else None,
+        projection_release=(
+            found[0].get("release", outlook_release()) if found else None
+        ),
+        observed=observed,
+    )
 
 
 def model_selector_options(outcome: str, release: str) -> list[Option]:

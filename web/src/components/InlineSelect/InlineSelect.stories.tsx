@@ -17,6 +17,14 @@ const outcomes = [
 const meta: Meta<typeof InlineSelect> = {
   title: "Primitives/InlineSelect",
   component: InlineSelect,
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "Shared app dropdown: standard controls use 8px vertical and 12px horizontal padding with a 42px minimum height. Compact year/status controls use 4px by 8px padding and a 32px minimum height (40px on touch devices). Select and InlineSelect use the same menu and spacing.",
+      },
+    },
+  },
   args: { "aria-label": "Climate hazard", options: hazards, value: "heat" },
   render: function Render(args) {
     const [value, setValue] = useState(args.value);

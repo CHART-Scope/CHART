@@ -295,6 +295,14 @@ def main() -> int:
                         stdout=log,
                         stderr=subprocess.STDOUT,
                     )
+                subprocess.run(
+                    [sys.executable, "e2e/seed_observed.py"],
+                    cwd=ROOT,
+                    env=env,
+                    check=True,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                )
             with (evidence / "application.log").open("w") as log:
                 api = subprocess.Popen(
                     [

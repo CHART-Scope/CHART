@@ -203,9 +203,10 @@ def load_observed_map(
     if month is not None and month not in any_county:
         raise OutlookSelectionInvalid(month)
 
-    frame = load_map_view(
-        session, geography_id, None, outcome=outcome, with_values=False
-    )
+    # This scorer covers counties. A county can now have published
+    # constituencies, but those children have no observed calibration; keep the
+    # county frame rather than attaching county estimates to smaller places.
+    frame = load_map_view(session, KENYA, None, outcome=outcome, with_values=False)
     by_geography = {unit.app_geography_id: scored[unit.id] for unit in units}
     for area in frame.areas:
         value = by_geography.get(area.geography_id or "", {}).get(chosen or "")

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import require_current_user, can_read_geography_path
-from chart.model_settings.service import outlook_restriction
+from chart.model_settings.service import live_restriction, outlook_restriction
 from chart.risk.routes import _require_read_access as require_read_access
 from chart.risk.schemas import MapResponse
 from chart.risk.service import NoAdminUnitForGeography
@@ -17,17 +17,17 @@ from chart.shared.db.models import AppGeography
 from sqlalchemy import select
 
 from .observed import ObservedNotCalibrated, load_observed, load_observed_map
-from .schemas import HeatOutlookResponse, ObservedResponse
+from .schemas import HeatOutlookResponse, ObservedResponse, OutlookCapabilities
 from .service import (
     LBW_OUTCOME,
-    _document,
-    enabled_views,
     published_index,
     OutlookNotAvailable,
     OutlookSelectionInvalid,
     ViewTurnedOff,
     load_outlook,
     load_outlook_map,
+    load_capabilities,
+    legacy_observed_geography,
 )
 
 router = APIRouter(prefix="/heat-outlook", tags=["heat-outlook"])
@@ -40,25 +40,31 @@ def _restriction(geography_id: str, outcome: str):
     return outlook_restriction(outcome)
 
 
-@router.get("/{geography_id}/capabilities")
+@router.get("/{geography_id}/capabilities", response_model=OutlookCapabilities)
 def capabilities(
     geography_id: str,
     user: Annotated[CurrentUserContext, Depends(require_current_user)],
     outcome: str = LBW_OUTCOME,
-):
+) -> OutlookCapabilities:
     require_read_access(user, geography_id)
-    found = _document(geography_id, outcome)
-    if found is None:
-        if outcome in published_index().get(geography_id, {}).get("outcomes", []):
-            raise HTTPException(status_code=404, detail="OUTLOOK_NOT_PUBLISHED")
-        return {"published": False, "data_modes": []}
-    restriction = _restriction(geography_id, outcome)
-    modes = [
-        v
-        for v in found[0].get("data_modes", ["observed", "projection"])
-        if v in enabled_views(restriction)
-    ]
-    return {"published": True, "data_modes": modes, "level": found[0]["level"]}
+    with get_session_factory()() as session:
+        geography = session.get(AppGeography, geography_id)
+        country_code = geography.country_code if geography else "KE"
+        monthly = live_restriction(session, country_code, outcome)
+        try:
+            return load_capabilities(
+                session,
+                geography_id,
+                outcome,
+                restriction=outlook_restriction(outcome, country_code=country_code),
+                monthly_observed_enabled=(
+                    monthly is not None and "observed" in monthly.data_modes
+                ),
+            )
+        except OutlookNotAvailable as exc:
+            raise HTTPException(
+                status_code=404, detail="OUTLOOK_NOT_PUBLISHED"
+            ) from exc
 
 
 def _scoped_map(session, frame, user):
@@ -158,13 +164,10 @@ def read_observed(
 ) -> ObservedResponse:
     require_read_access(user, geography_id)
     restriction = _restriction(geography_id, outcome)
-    found = _document(geography_id, outcome)
-    if (found is None and geography_id in published_index()) or (
-        found is not None and "observed" not in found[0].get("data_modes", ["observed"])
-    ):
-        raise HTTPException(status_code=404, detail="OBSERVED_NOT_AVAILABLE")
     try:
         with get_session_factory()() as session:
+            if not legacy_observed_geography(session, geography_id, outcome):
+                raise OutlookNotAvailable(geography_id)
             return load_observed(
                 session,
                 geography_id,
@@ -175,7 +178,7 @@ def read_observed(
             )
     except ViewTurnedOff as exc:
         raise HTTPException(status_code=404, detail="VIEW_TURNED_OFF") from exc
-    except (OutlookNotAvailable, ObservedNotCalibrated) as exc:
+    except (OutlookNotAvailable, ObservedNotCalibrated, FileNotFoundError) as exc:
         raise HTTPException(status_code=404, detail="OBSERVED_NOT_AVAILABLE") from exc
     except OutlookSelectionInvalid as exc:
         raise HTTPException(
@@ -197,13 +200,10 @@ def read_observed_map(
 ) -> MapResponse:
     require_read_access(user, geography_id)
     restriction = _restriction(geography_id, outcome)
-    found = _document(geography_id, outcome)
-    if (found is None and geography_id in published_index()) or (
-        found is not None and "observed" not in found[0].get("data_modes", ["observed"])
-    ):
-        raise HTTPException(status_code=404, detail="OBSERVED_NOT_AVAILABLE")
     try:
         with get_session_factory()() as session:
+            if not legacy_observed_geography(session, geography_id, outcome):
+                raise OutlookNotAvailable(geography_id)
             frame = load_observed_map(
                 session,
                 geography_id,
@@ -219,6 +219,7 @@ def read_observed_map(
         OutlookNotAvailable,
         ObservedNotCalibrated,
         NoAdminUnitForGeography,
+        FileNotFoundError,
     ) as exc:
         raise HTTPException(status_code=404, detail="OBSERVED_NOT_AVAILABLE") from exc
     except OutlookSelectionInvalid as exc:

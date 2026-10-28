@@ -20,8 +20,12 @@ The registration transaction upserts geography records without creating active
 R-model assignments. No schema migration is needed for a new administrative
 level. Existing geography IDs and access-scope paths are preserved.
 
-The dashboard discovers published capabilities, offers configured levels and
-5/10/20-year periods, and disables observed estimates for uncalibrated releases.
+The dashboard discovers projection and observed sources independently and offers
+configured levels and 5/10/20-year periods. Installing a projection-only handover
+does not disable an existing observed source: Kenya retains its calibrated
+country/county scorer, and India retains exact-place active monthly model
+assignments. A district or constituency does not inherit an ancestor's observed
+model. Where no observed source exists, the disabled tab explains the limitation.
 Available new starting years are 2027 and five-year steps from 2031, with periods
 ending no later than 2100; supplied fixed periods remain available. Monthly
 temperature summaries and coefficient confidence intervals stay unavailable for
@@ -33,6 +37,17 @@ Run `make e2e` after changes. The real handover suite is under root `e2e/` and
 uses disposable PostGIS/Keycloak services, real HTTP authentication and browser
 navigation. Set `CHART_HANDOVER_ROOT` when source folders are elsewhere.
 Evidence is saved under `outputs/e2e/`; no production database is used.
+
+`GET /heat-outlook/{geography_id}/capabilities?outcome=...` requires the same
+authentication and geography permission as the data endpoints. `published` and
+`projection_release` identify the projection document. `data_modes` reports the
+views that the installed sources and country display settings enable together.
+`observed` contains `source` (`outlook` for the calibrated Kenya scorer, `monthly`
+for an exact active scoring assignment, or null), `release`, an unavailable
+`reason`, `model_area_name`, and `batch_enabled`. Monthly batch clearance comes
+from that assignment's input contract, independently of the projection catalog.
+No observed data is relabelled as belonging to the projection release. The
+projection document itself still declares only its own supported data modes.
 
 ## Earlier model-registry integration
 
@@ -301,7 +316,8 @@ often reaches a few counties first, and the national figure would otherwise
 stand on a handful. A county opens on the newest month Kenya can show, if it
 has it, so the map beside it is full; its own newer months stay selectable.
 The map accepts any month a county can score and shows the others as
-unavailable.
+unavailable. It retains the country frame of counties when opened from a county
+dashboard; newly published constituency boundaries do not inherit observed values.
 
 The display rules below apply to observed months as to projected ones.
 

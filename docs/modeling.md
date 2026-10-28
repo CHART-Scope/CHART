@@ -5,7 +5,8 @@
 The October 22 handovers provide low-birth-weight (LBW) and under-five mortality
 scenario outputs for Madhya Pradesh and Kenya. The outlook imports those
 outputs; it does not refit models or predict individual outcomes. Published
-outlooks take precedence in the dashboard where installed. The older R scoring
+outlooks supply the Projected view where installed. The Observed view selects
+its own existing calibrated scorer or active model assignment. The older scoring
 releases remain separate and are described below for reproducibility.
 
 | Outcome | Madhya Pradesh | Kenya | Exposure and baseline |
@@ -45,6 +46,11 @@ outcome-specific baseline; signed changes remain meaningful even where negative
 attributable burden is suppressed. These are scenario averages, not exact-year
 weather or death forecasts. Missing values are not replaced with zero.
 
+The Projected view shows a short scenario-average explanation beside the
+filters and seasonal tables under **Seasonal pattern and all periods**. Full
+methodology and source provenance remain in this documentation and the
+published outlook metadata; they are not displayed in a dashboard disclosure.
+
 ### Future ERA5 downscaling (not implemented)
 
 The extension point is the projection input/derivation stage, before publishing
@@ -63,6 +69,15 @@ provenance and verify numerical parity plus real application E2E coverage.
 Accuracy improvements must be measured, not assumed. New handover outlooks
 expose projections only until observed inputs are separately calibrated and
 validated; legacy Kenya ERA5 scoring is not relabelled as a new release.
+
+The dashboard can therefore show a newer projection release alongside older
+observed estimates, with the source release labelled for each view. Kenya uses
+its existing calibrated country/county DLNM. India uses an active model assigned
+to the exact selected place and outcome, retaining its batch-clearance and
+country display settings. India districts and Kenya constituencies without an
+observed model remain unavailable; they never use an ancestor's estimate as if
+it were local. Observed-source availability does not imply that climate input
+months have already been ingested or predictions prepared.
 
 ### Geography and installation
 

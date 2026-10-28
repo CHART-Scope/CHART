@@ -31,6 +31,13 @@ async function typography(locator: Locator, family: "Fira" | "Noto", size: numbe
   await expect(locator).toHaveCSS("font-size", `${size}px`);
 }
 
+async function dropdownSpacing(locator: Locator, compact = false) {
+  await expect(locator).toBeVisible();
+  await expect(locator).toHaveCSS("padding", compact ? "4px 8px" : "8px 12px");
+  await expect(locator).toHaveCSS("min-height", compact ? "32px" : "42px");
+  await expect(locator).toHaveCSS("column-gap", "8px");
+}
+
 async function capture(page: Page, name: string, workspace = false) {
   if (workspace) {
     await expect(page.locator('#app-shell-nav a[href="/plan"]')).toBeAttached();
@@ -128,17 +135,27 @@ async function publicLearningBounds(page: Page) {
 async function breadcrumbBounds(page: Page) {
   const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb", exact: true });
   await expect(breadcrumb).toBeVisible();
-  const bounds = await breadcrumb.boundingBox();
-  for (const child of await breadcrumb.locator(":scope > span").all()) {
-    const item = await child.boundingBox();
-    expect(item!.x).toBeGreaterThanOrEqual(bounds!.x - 1);
-    expect(item!.x + item!.width).toBeLessThanOrEqual(
-      Math.min(bounds!.x + bounds!.width, page.viewportSize()!.width) + 1,
-    );
-    expect(
-      await child.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
-    ).toBe(true);
-  }
+  // Route data can replace breadcrumb children after the container is visible.
+  // Re-read the whole layout until every original geometry assertion holds.
+  await expect(async () => {
+    const bounds = await breadcrumb.boundingBox();
+    expect(bounds).not.toBeNull();
+    const children = await breadcrumb.locator(":scope > span").all();
+    expect(children.length).toBeGreaterThan(0);
+    for (const child of children) {
+      const item = await child.boundingBox();
+      expect(item).not.toBeNull();
+      expect(item!.x).toBeGreaterThanOrEqual(bounds!.x - 1);
+      expect(item!.x + item!.width).toBeLessThanOrEqual(
+        Math.min(bounds!.x + bounds!.width, page.viewportSize()!.width) + 1,
+      );
+      expect(
+        await child.evaluate(
+          (element) => element.scrollWidth <= element.clientWidth + 1,
+        ),
+      ).toBe(true);
+    }
+  }).toPass({ timeout: 10_000 });
 }
 
 async function signIn(page: Page, username = "india-planner") {
@@ -245,6 +262,7 @@ for (const [name, width, height] of [
       15,
     );
     await typography(page.getByRole("combobox"), "Noto", 14);
+    await dropdownSpacing(page.getByRole("combobox"));
     await capture(page, `${name}-onboarding`);
 
     await signIn(page);
@@ -262,6 +280,7 @@ for (const [name, width, height] of [
     const hazard = page.getByRole("combobox", { name: "Choose the climate hazard" });
     await expect(hazard).toBeEnabled();
     await typography(hazard, "Noto", 14);
+    await dropdownSpacing(hazard);
     await hazard.click();
     await typography(
       page.getByRole("option", { name: "Extreme heat", exact: true }),
@@ -290,6 +309,7 @@ for (const [name, width, height] of [
     await expect(
       page.getByRole("button", { name: "Save Low birth weight" }),
     ).toBeVisible();
+    await dropdownSpacing(page.getByRole("combobox", { name: "Active context" }));
     const saved = page.waitForResponse(
       (response) =>
         response.url().includes("/model-settings/") &&
@@ -315,6 +335,9 @@ for (const [name, width, height] of [
       "Noto",
       14,
     );
+    await dropdownSpacing(
+      page.getByRole("combobox", { name: "District", exact: true }),
+    );
     const years = outlook.getByRole("button", { name: "5 years", exact: true });
     await typography(years, "Fira", 12);
     await years.click();
@@ -338,6 +361,7 @@ for (const [name, width, height] of [
     await typography(dialog.getByRole("heading", { level: 2 }), "Fira", 15);
     const status = dialog.getByRole("combobox", { name: "Action status" });
     await typography(status, "Noto", 12);
+    await dropdownSpacing(status, true);
     await status.click();
     await page.getByRole("option", { name: "In progress", exact: true }).click();
     await page.reload();
@@ -346,6 +370,12 @@ for (const [name, width, height] of [
     await dialog
       .getByRole("button", { name: "Assign to districts →", exact: true })
       .click();
+    const assignee = dialog.getByRole("combobox", { name: "Assign to", exact: true });
+    await typography(assignee, "Noto", 14);
+    await dropdownSpacing(assignee);
+    await assignee.click();
+    await page.getByRole("option", { name: "RCH Officer", exact: true }).click();
+    await expect(assignee).toContainText("RCH Officer");
     const notes = dialog.getByRole("textbox", { name: "Notes (optional)" });
     await typography(notes, "Noto", 12.5);
     await notes.fill("Typography check using disposable browser data.");
@@ -355,6 +385,7 @@ for (const [name, width, height] of [
       .click();
     await page.reload();
     await expect(dialog.getByRole("status")).toContainText("Assigned to");
+    await expect(dialog.getByRole("status")).toContainText("RCH Officer");
     await page.keyboard.press("Escape");
     await expect(dialog).not.toBeVisible();
 

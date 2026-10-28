@@ -1942,7 +1942,7 @@
         "tags": [
           "heat-outlook"
         ],
-        "summary": "Read published outlook coverage and enabled data modes",
+        "summary": "Read independent observed and projection availability",
         "operationId": "capabilities_heat_outlook__geography_id__capabilities_get",
         "security": [
           {
@@ -1972,10 +1972,12 @@
         ],
         "responses": {
           "200": {
-            "description": "Publication availability and enabled data modes, with the geography level when an outlook document is available.",
+            "description": "Enabled views with independent source releases and availability reasons.",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/OutlookCapabilities"
+                }
               }
             }
           },
@@ -1990,7 +1992,7 @@
             }
           }
         },
-        "description": "Reports whether the selected geography and outcome have a published outlook, the publication's geography level, and the data modes left enabled by country model settings. Requires a risk reader role and access to the geography path. October 2026 India and Kenya handover outlooks expose projection only; observed estimates remain unavailable until their inputs are separately calibrated and validated. An unsupported outcome returns published=false with no data modes. A document advertised by the publication index but missing from storage returns OUTLOOK_NOT_PUBLISHED instead of using a superseded release."
+        "description": "Resolves sources for the exact geography and outcome, subject to risk-reader roles, geography scope and country model settings. Published handover projections retain their own release. Observed may use the existing calibrated Kenya outlook scorer or an exact active monthly model assignment. The observed source identifies its release and batch support; unavailable or disabled views include a reason. No district or constituency inherits an ancestor's observed model. The new handovers are not relabelled as calibrated. Missing advertised projection files return OUTLOOK_NOT_PUBLISHED."
       }
     },
     "/heat-outlook/{geography_id}": {
@@ -2311,7 +2313,7 @@
             }
           }
         },
-        "description": "Scores one observed month for a Kenyan county (geo-ke-<county>), or the mean over Kenya's counties (geo-ke), with the modelling team's DLNM models, using the Copernicus ERA5 temperatures CHART has ingested. ERA5 is first moved onto the scale the models were fitted on by a fixed offset per county and calendar month. Low birth weight reads the birth month and the eight before it; under-five scores each day of the month on that day and the three before it and averages them. month (YYYY-MM) defaults to the newest month with complete inputs; selector is the pregnancy window or the age group. Requires a risk reader role and access to the geography path. The guides' display rules apply, so suppressed values arrive as null with the message to show in their place. This is the calibrated legacy Kenya scoring contract. Installed projection-only handovers return OBSERVED_NOT_AVAILABLE; they do not reuse legacy calibration or claim that future ERA5 downscaling has been implemented."
+        "description": "Scores one observed month for a Kenyan county (geo-ke-<county>), or the mean over Kenya's counties (geo-ke), with the modelling team's DLNM models, using the Copernicus ERA5 temperatures CHART has ingested. ERA5 is first moved onto the scale the models were fitted on by a fixed offset per county and calendar month. Low birth weight reads the birth month and the eight before it; under-five scores each day of the month on that day and the three before it and averages them. month (YYYY-MM) defaults to the newest month with complete inputs; selector is the pregnancy window or the age group. Requires a risk reader role and access to the geography path. The guides' display rules apply, so suppressed values arrive as null with the message to show in their place. The legacy observed release is selected independently of a newer projection publication. India monthly models use /risk/{geography_id}/monthly instead; unsupported finer geographies never inherit a county's calibrated estimate."
       }
     },
     "/heat-outlook/{geography_id}/observed/map": {
@@ -2403,7 +2405,7 @@
             }
           }
         },
-        "description": "Returns the counties of Kenya with their display geometry and each county's heat-attributable share for one observed month, scored as in the observed estimate. Requires a risk reader role and access to the geography path. Counties without complete ERA5 inputs carry missing_reason not_reported; suppressed shares carry no_excess. Returned areas are restricted to the caller's allowed geography paths. This map uses the calibrated legacy Kenya scoring contract; installed projection-only handovers return OBSERVED_NOT_AVAILABLE until separate calibration and validation support observed inputs."
+        "description": "Returns the counties of Kenya with their display geometry and each county's heat-attributable share for one observed month, scored as in the observed estimate. Requires a risk reader role and access to the geography path. Counties without complete ERA5 inputs carry missing_reason not_reported; suppressed shares carry no_excess. County requests retain the Kenya county frame even when their projection frame contains constituencies. Returned areas remain restricted to the caller's geography permissions."
       }
     },
     "/vra/indicators": {
@@ -7919,6 +7921,65 @@
         "title": "MonthlyTemperature",
         "description": "The month's maximum temperature, area-level, from ERA5.\n\nThe variable is maximum temperature; the monthly value is the mean of\nits daily values, which is what the model was fitted on and therefore\nwhat it consumes. The month's single hottest day is deliberately not\nused. The dashboard says \"maximum temperature\" rather than \"average\nmaximum temperature\", which reads as a contradiction - agreed on the\n17 Sep modelling call."
       },
+      "ObservedCapability": {
+        "properties": {
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "outlook",
+                  "monthly"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "model_area_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Area Name"
+          },
+          "batch_enabled": {
+            "type": "boolean",
+            "title": "Batch Enabled",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ObservedCapability"
+      },
       "ObservedEstimate": {
         "properties": {
           "side": {
@@ -8238,6 +8299,53 @@
           "label"
         ],
         "title": "Option"
+      },
+      "OutlookCapabilities": {
+        "properties": {
+          "published": {
+            "type": "boolean",
+            "title": "Published"
+          },
+          "data_modes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Data Modes"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "projection_release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projection Release"
+          },
+          "observed": {
+            "$ref": "#/components/schemas/ObservedCapability"
+          }
+        },
+        "type": "object",
+        "required": [
+          "published",
+          "data_modes",
+          "observed"
+        ],
+        "title": "OutlookCapabilities"
       },
       "OutlookMonth": {
         "properties": {

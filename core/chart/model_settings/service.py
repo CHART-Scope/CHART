@@ -200,7 +200,7 @@ def update_settings(
 def outlook_restriction(
     outcome: str, *, country_code: str = "KE", session_factory=None
 ) -> OutlookRestriction:
-    """The Kenya outlook options left on for one outcome."""
+    """The published projections and calibrated outlook options left on."""
 
     with (session_factory or get_session_factory())() as session:
         support = _support(session, country_code, outcome)

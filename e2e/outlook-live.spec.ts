@@ -49,6 +49,16 @@ async function expectVulnerabilityFrame(
   }
 }
 
+const methodologyNote =
+  "Published area tables retain the modeller's estimates and coefficient intervals. " +
+  "Additional periods use original approximately 0.5-degree projection grids: " +
+  "equal-month temporal averages and polygon-intersection area weights, separately " +
+  "for each climate model before calculating the ensemble mean and range. " +
+  "These grid estimates can differ from the area tables; they are not population " +
+  "weighted or downscaled. Coefficient confidence intervals and temperature summaries " +
+  "are unavailable for derived periods. Negative estimates are retained for audit " +
+  "but must not be displayed as attributable burden.";
+
 for (const [country, username, level] of [
   ["IN", "india-planner", "District"],
   ["KE", "kenya-planner", "Constituency"],
@@ -71,6 +81,12 @@ for (const [country, username, level] of [
     const outlook = page.getByTestId("heat-outlook");
     await expect(outlook).toBeVisible();
     await expect(
+      outlook.getByRole("tab", { name: "Observed", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      outlook.getByRole("status").filter({ hasText: "No observed model is available" }),
+    ).toBeVisible();
+    await expect(
       page.getByRole("combobox", { name: level, exact: true }),
     ).toBeVisible();
     const periods = outlook.getByRole("group", { name: "Period length", exact: true });
@@ -88,6 +104,22 @@ for (const [country, username, level] of [
           .or(outlook.getByRole("combobox", { name: "Time horizon", exact: true })),
       ).toBeVisible();
     }
+    await expect(outlook.getByTestId("outlook-estimate")).toBeVisible();
+    await expect(
+      outlook.locator("summary").filter({
+        hasText: /^Seasonal pattern and all periods$/,
+      }),
+    ).toBeVisible();
+    await expect(
+      outlook.locator("summary").filter({
+        hasText: /^Data and model details$/,
+      }),
+    ).toHaveCount(0);
+    await expect(outlook.getByText(methodologyNote, { exact: true })).toHaveCount(0);
+    await expect(outlook.getByText("handover://", { exact: false })).toHaveCount(0);
+    await expect(
+      outlook.getByText(/Projection release .* from the modelling team/),
+    ).toHaveCount(0);
     await page.screenshot({
       path: `${process.env.CHART_E2E_EVIDENCE}/${country}-projection.png`,
       fullPage: true,
