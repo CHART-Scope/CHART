@@ -296,14 +296,35 @@ def complete_job(
     job.updated_at = _now()
 
 
-def fail_job(session: Session, job_id: int, *, error_code: str) -> None:
-    job = session.get(ClimateIngestionJob, job_id)
+def fail_job(
+    session: Session,
+    job_id: int,
+    *,
+    error_code: str,
+    dagster_run_id: str | None = None,
+) -> None:
+    job = session.get(ClimateIngestionJob, job_id, with_for_update=True)
     if job is None:
+        return
+    # Recovery must not overwrite a result committed since the sensor read
+    # this job, or a job now owned by another run.
+    if dagster_run_id is not None and (
+        job.status != "running" or job.dagster_run_id != dagster_run_id
+    ):
         return
     job.status = "failed"
     job.stage = "failed"
     job.error_code = error_code
     job.updated_at = _now()
+
+
+def running_jobs(session: Session) -> list[ClimateIngestionJob]:
+    """Started pulls whose worker may have stopped without updating this row."""
+    return list(
+        session.scalars(
+            select(ClimateIngestionJob).where(ClimateIngestionJob.status == "running")
+        )
+    )
 
 
 def list_jobs(

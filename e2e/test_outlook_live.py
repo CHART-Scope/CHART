@@ -4,36 +4,8 @@ import json
 import os
 from pathlib import Path
 
-import httpx
 import pytest
 from sqlalchemy import create_engine, text
-
-
-@pytest.fixture(scope="module")
-def client():
-    with httpx.Client(base_url=os.environ["CHART_E2E_API"], timeout=90) as value:
-        yield value
-
-
-@pytest.fixture(scope="module")
-def tokens():
-    result = {}
-    for username in ("india-planner", "kenya-planner", "district-planner", "denied"):
-        response = httpx.post(
-            os.environ["CHART_E2E_IDENTITY"]
-            + "/realms/chart/protocol/openid-connect/token",
-            data={
-                "client_id": "chart-web",
-                "grant_type": "password",
-                "username": username,
-                "password": os.environ["CHART_E2E_PASSWORD"],
-            },
-        )
-        assert response.is_success, "Disposable identity login failed"
-        result[username] = {
-            "Authorization": "Bearer " + response.json()["access_token"]
-        }
-    return result
 
 
 @pytest.fixture(scope="module")
@@ -50,7 +22,7 @@ def test_served_openapi_matches_published_geography_contract(client):
     documented = Path(__file__).resolve().parents[1] / "docs/openapi/climate.json"
     assert schema == json.loads(documented.read_text())
     capability = schema["paths"]["/heat-outlook/{geography_id}/capabilities"]["get"]
-    assert "projection only" in capability["description"]
+    assert "No district or constituency inherits" in capability["description"]
     assert "OUTLOOK_NOT_PUBLISHED" in capability["description"]
     properties = schema["components"]["schemas"]["HeatOutlookResponse"]["properties"]
     assert properties["level"]["type"] == "string"
@@ -59,6 +31,10 @@ def test_served_openapi_matches_published_geography_contract(client):
     assert (
         "total"
         in schema["components"]["schemas"]["MonthPart"]["properties"]["side"]["enum"]
+    )
+    capabilities = schema["components"]["schemas"]["OutlookCapabilities"]
+    assert {"observed", "projection_release", "data_modes"} <= set(
+        capabilities["properties"]
     )
 
 
@@ -119,6 +95,14 @@ def test_period_selection_fine_geographies_and_missing_data(
         "published": True,
         "data_modes": ["projection"],
         "level": data["level"],
+        "projection_release": data["release"],
+        "observed": {
+            "source": None,
+            "release": None,
+            "reason": "No observed model is available for this place and outcome.",
+            "model_area_name": None,
+            "batch_enabled": False,
+        },
     }
     for duration in (5, 10, 20):
         period = next(
@@ -383,3 +367,374 @@ def test_missing_advertised_document_is_explicit_and_recovers(client, tokens):
         "/heat-outlook/geo-ke-constituency-changamwe", headers=tokens["kenya-planner"]
     )
     assert recovered.status_code == 200, recovered.text
+
+
+@pytest.mark.parametrize("outcome", ["lbw", "under_5_mortality"])
+def test_existing_kenya_observed_survives_new_projection_release(
+    client, tokens, geographies, outcome
+):
+    path = "/heat-outlook/geo-ke-kajiado"
+    headers = tokens["kenya-planner"]
+    capabilities = client.get(
+        path + "/capabilities", params={"outcome": outcome}, headers=headers
+    )
+    assert capabilities.status_code == 200, capabilities.text
+    support = capabilities.json()
+    assert set(support["data_modes"]) == {"observed", "projection"}
+    assert support["projection_release"] == "2026-10-22"
+    assert support["observed"]["source"] == "outlook"
+    assert support["observed"]["release"] == "v2_2026_10_06"
+    response = client.get(
+        path + "/observed",
+        params={"outcome": outcome, "month": "2026-09"},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["release"] == "v2_2026_10_06"
+    assert data["month"] == "2026-09"
+    assert data["estimate"] is not None
+    assert data["inputs"]
+    if outcome == "lbw":
+        # The supplied R validation case 1, through actual HTTP, auth and PostGIS.
+        assert data["estimate"]["value_percent"] == pytest.approx(21.27, abs=0.01)
+    projection = client.get(
+        path, params={"outcome": outcome, "period": "2027-2031"}, headers=headers
+    )
+    assert projection.status_code == 200, projection.text
+    assert projection.json()["release"] == "2026-10-22"
+    assert projection.json()["data_modes"] == ["projection"]
+    repeated = client.get(
+        path + "/observed",
+        params={"outcome": outcome, "month": "2026-09"},
+        headers=headers,
+    )
+    assert repeated.json() == data
+    mapped = client.get(
+        "/heat-outlook/geo-ke/observed/map",
+        params={"outcome": outcome, "month": "2026-09"},
+        headers=headers,
+    )
+    assert mapped.status_code == 200, mapped.text
+    assert any(
+        area["geography_id"] == "geo-ke-kajiado" for area in mapped.json()["areas"]
+    )
+    county_map = client.get(
+        path + "/observed/map",
+        params={"outcome": outcome, "month": "2026-09"},
+        headers=headers,
+    )
+    assert county_map.status_code == 200, county_map.text
+    areas = county_map.json()["areas"]
+    children = {geo["id"] for geo in geographies if geo["parentId"] == "geo-ke-kajiado"}
+    assert children
+    assert {area["geography_id"] for area in areas} == children
+    assert all(area["value_percent"] is None for area in areas)
+    assert all(area["missing_reason"] == "no_model" for area in areas)
+    county = next(
+        area
+        for area in mapped.json()["areas"]
+        if area["geography_id"] == "geo-ke-kajiado"
+    )
+    assert county["value_percent"] == data["estimate"]["value_percent"]
+
+
+@pytest.mark.parametrize("outcome", ["lbw", "under_5_mortality"])
+def test_existing_india_monthly_results_remain_separate_from_new_projection(
+    client, tokens, outcome
+):
+    place = "geo-in-madhya-pradesh-division-bhopal"
+    headers = tokens["india-planner"]
+    response = client.get(
+        f"/heat-outlook/{place}/capabilities",
+        params={"outcome": outcome},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    support = response.json()
+    assert set(support["data_modes"]) == {"observed", "projection"}
+    assert support["observed"]["source"] == "monthly"
+    assert support["observed"]["model_area_name"] == "Bhopal"
+    assert support["projection_release"] == "2026-10-22"
+    response = client.get(
+        f"/risk/{place}/monthly", params={"outcome": outcome}, headers=headers
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()["months"]["2026-09"]["prediction"]
+    assert result["model_release_id"] == support["observed"]["release"]
+    assert result["odds_ratio"] == (1.25 if outcome == "lbw" else 1.1)
+    engine = create_engine(os.environ["DATABASE_URL"])
+    with engine.connect() as connection:
+        persisted = connection.execute(
+            text(
+                "SELECT odds_ratio FROM prediction_result p JOIN admin_unit a ON a.id=p.admin_unit_id WHERE p.model_release_id=:release AND p.valid_month='2026-09-01' AND a.app_geography_id=:place"
+            ),
+            {"release": result["model_release_id"], "place": place},
+        ).scalar_one()
+        assert persisted == result["odds_ratio"]
+    engine.dispose()
+    # The Kenya observed engine must never manufacture Indian observed values.
+    assert (
+        client.get(
+            f"/heat-outlook/{place}/observed",
+            params={"outcome": outcome},
+            headers=headers,
+        ).status_code
+        == 404
+    )
+
+
+@pytest.mark.parametrize(
+    "place,user",
+    [
+        ("geo-in-madhya-pradesh-district-bhopal", "india-planner"),
+        ("geo-ke-constituency-changamwe", "kenya-planner"),
+    ],
+)
+def test_unsupported_observed_has_reason_and_never_uses_parent_model(
+    client, tokens, place, user
+):
+    for outcome in ("lbw", "under_5_mortality"):
+        response = client.get(
+            f"/heat-outlook/{place}/capabilities",
+            params={"outcome": outcome},
+            headers=tokens[user],
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["data_modes"] == ["projection"]
+        assert data["observed"]["source"] is None
+        assert data["observed"]["reason"]
+        assert (
+            client.get(
+                f"/heat-outlook/{place}/observed",
+                params={"outcome": outcome},
+                headers=tokens[user],
+            ).status_code
+            == 404
+        )
+
+
+@pytest.mark.parametrize(
+    "parent,child,user,other_user",
+    [
+        (
+            "geo-in-madhya-pradesh-division-gwalior",
+            "geo-in-madhya-pradesh-district-gwalior",
+            "india-planner",
+            "kenya-planner",
+        ),
+        (
+            "geo-ke-kajiado",
+            "geo-ke-constituency-kajiado-central",
+            "kenya-planner",
+            "india-planner",
+        ),
+    ],
+)
+@pytest.mark.parametrize("outcome", ["lbw", "under_5_mortality"])
+def test_observed_drilldown_keeps_boundaries_without_inheriting_parent_values(
+    client, tokens, geographies, parent, child, user, other_user, outcome
+):
+    params = {"outcome": outcome, "month": "2026-09"}
+    expected_children = {geo["id"] for geo in geographies if geo["parentId"] == parent}
+    assert child in expected_children
+    # A country-scoped leaf selection keeps its sibling map for comparison.
+    # The separate leaf-scope regression below must return only the allowed leaf.
+    for place in (parent, child):
+        path = f"/heat-outlook/{place}/observed/map"
+        response = client.get(path, params=params, headers=tokens[user])
+        assert response.status_code == 200, response.text
+        areas = response.json()["areas"]
+        assert {area["geography_id"] for area in areas} == expected_children
+        for area in areas:
+            assert area["geometry"]["type"] in {"Polygon", "MultiPolygon"}
+            assert area["geometry"]["coordinates"]
+            assert area["value_percent"] is None
+            assert area["missing_reason"] == "no_model"
+        assert client.get(path, params=params).status_code == 401
+        assert (
+            client.get(path, params=params, headers=tokens["denied"]).status_code == 403
+        )
+        assert (
+            client.get(path, params=params, headers=tokens[other_user]).status_code
+            == 403
+        )
+    assert (
+        client.get(
+            f"/heat-outlook/{child}/observed", params=params, headers=tokens[user]
+        ).status_code
+        == 404
+    )
+    # Parent availability remains independent from its uncalibrated children.
+    capability = client.get(
+        f"/heat-outlook/{parent}/capabilities",
+        params={"outcome": outcome},
+        headers=tokens[user],
+    )
+    assert capability.status_code == 200, capability.text
+    assert capability.json()["observed"]["source"] in {"monthly", "outlook"}
+
+
+def test_observed_boundary_only_map_still_isolates_leaf_scope(client, tokens):
+    path = "/heat-outlook/geo-in-madhya-pradesh-district-bhopal/observed/map"
+    response = client.get(path, headers=tokens["district-planner"])
+    assert response.status_code == 200, response.text
+    assert [area["geography_id"] for area in response.json()["areas"]] == [
+        "geo-in-madhya-pradesh-district-bhopal"
+    ]
+    assert response.json()["areas"][0]["value_percent"] is None
+    for place in (
+        "geo-in-madhya-pradesh-division-bhopal",
+        "geo-in-madhya-pradesh-district-rajgarh",
+    ):
+        assert (
+            client.get(
+                f"/heat-outlook/{place}/observed/map",
+                headers=tokens["district-planner"],
+            ).status_code
+            == 403
+        )
+
+
+def test_restored_observed_still_enforces_auth_and_scopes(client, tokens):
+    for suffix in ("/capabilities", "/observed", "/observed/map"):
+        path = "/heat-outlook/geo-ke-kajiado" + suffix
+        assert client.get(path).status_code == 401
+        assert client.get(path, headers=tokens["india-planner"]).status_code == 403
+        assert client.get(path, headers=tokens["denied"]).status_code == 403
+    for suffix in ("/capabilities", "/observed"):
+        path = "/heat-outlook/geo-in-madhya-pradesh-division-bhopal" + suffix
+        assert client.get(path, headers=tokens["district-planner"]).status_code == 403
+    path = "/risk/geo-in-madhya-pradesh-division-bhopal/monthly"
+    assert client.get(path).status_code == 401
+    assert client.get(path, headers=tokens["kenya-planner"]).status_code == 403
+
+
+def test_projection_publication_failure_does_not_disable_existing_observed(
+    client, tokens
+):
+    path = Path(os.environ["MODEL_CACHE_DIR"]) / "outlooks/geo-ke-kajiado/lbw.json"
+    original = path.read_bytes()
+    headers = tokens["kenya-planner"]
+    endpoint = "/heat-outlook/geo-ke-kajiado"
+    try:
+        path.unlink()
+        capabilities = client.get(endpoint + "/capabilities", headers=headers)
+        assert capabilities.status_code == 200, capabilities.text
+        assert capabilities.json()["data_modes"] == ["observed"]
+        assert capabilities.json()["published"] is False
+        assert client.get(endpoint, headers=headers).status_code == 404
+        response = client.get(endpoint + "/observed", headers=headers)
+        assert response.status_code == 200, response.text
+        assert response.json()["month"] == "2026-09"
+    finally:
+        path.write_bytes(original)
+    assert set(
+        client.get(endpoint + "/capabilities", headers=headers).json()["data_modes"]
+    ) == {"observed", "projection"}
+
+
+def test_incomplete_observations_are_not_replaced_by_projected_or_parent_values(
+    client, tokens
+):
+    engine = create_engine(os.environ["DATABASE_URL"])
+    statement = text(
+        "SELECT dc.id, dc.observed_days FROM district_climate dc JOIN admin_unit a ON a.id=dc.admin_unit_id WHERE a.app_geography_id='geo-ke-kajiado' AND dc.period_month='2026-09-01'"
+    )
+    with engine.begin() as connection:
+        row = connection.execute(statement).one()
+        connection.execute(
+            text("UPDATE district_climate SET observed_days=1 WHERE id=:id"),
+            {"id": row.id},
+        )
+    try:
+        response = client.get(
+            "/heat-outlook/geo-ke-kajiado/observed", headers=tokens["kenya-planner"]
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["month"] is None
+        assert response.json()["estimate"] is None
+        assert response.json()["available_months"] == []
+    finally:
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE district_climate SET observed_days=:days WHERE id=:id"),
+                {"id": row.id, "days": row.observed_days},
+            )
+        engine.dispose()
+    response = client.get(
+        "/heat-outlook/geo-ke-kajiado/observed", headers=tokens["kenya-planner"]
+    )
+    assert response.json()["month"] == "2026-09"
+
+
+@pytest.mark.parametrize(
+    "country,place,user",
+    [
+        ("KE", "geo-ke-kajiado", "kenya-planner"),
+        ("IN", "geo-in-madhya-pradesh-division-bhopal", "india-planner"),
+    ],
+)
+def test_observed_display_setting_remains_effective(
+    client, tokens, country, place, user
+):
+    headers = tokens[user]
+    original = client.get(
+        "/model-settings",
+        params={"country": country, "outcome": "lbw"},
+        headers=headers,
+    )
+    assert original.status_code == 200, original.text
+    values = original.json()["settings"]
+    assert "observed" in values["data_modes"]
+    disabled = {
+        **values,
+        "data_modes": [mode for mode in values["data_modes"] if mode != "observed"],
+    }
+    try:
+        saved = client.put(
+            f"/model-settings/{country}/lbw", json=disabled, headers=headers
+        )
+        assert saved.status_code == 200, saved.text
+        capabilities = client.get(
+            f"/heat-outlook/{place}/capabilities", headers=headers
+        ).json()
+        assert "observed" not in capabilities["data_modes"]
+        assert capabilities["observed"]["reason"]
+        if country == "KE":
+            assert (
+                client.get(
+                    f"/heat-outlook/{place}/observed", headers=headers
+                ).status_code
+                == 404
+            )
+        assert (
+            client.get(
+                f"/heat-outlook/{place}/observed/map", headers=headers
+            ).status_code
+            == 404
+        )
+        fine = (
+            "geo-ke-constituency-kajiado-central"
+            if country == "KE"
+            else "geo-in-madhya-pradesh-district-bhopal"
+        )
+        assert (
+            client.get(
+                f"/heat-outlook/{fine}/observed/map", headers=headers
+            ).status_code
+            == 404
+        )
+        assert client.get(f"/heat-outlook/{place}", headers=headers).status_code == 200
+    finally:
+        restored = client.put(
+            f"/model-settings/{country}/lbw", json=values, headers=headers
+        )
+        assert restored.status_code == 200, restored.text
+    assert (
+        "observed"
+        in client.get(f"/heat-outlook/{place}/capabilities", headers=headers).json()[
+            "data_modes"
+        ]
+    )

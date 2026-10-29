@@ -14,6 +14,7 @@ import io
 import json
 import logging
 import math
+from collections import Counter
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -53,6 +54,7 @@ from .schemas import (
     IngestionResult,
     Rejection,
     RunSummary,
+    ValueSchema,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,6 +69,10 @@ TEMPLATE_COLUMNS = (
     "source_name",
     "source_url",
     "notes",
+    "indicator_name",
+    "unit",
+    "expected_values",
+    "example_value",
 )
 REQUIRED_COLUMNS = ("area_code", "indicator_code", "value", "vintage")
 #: Monthly ERA5 variable summed or averaged over the latest 12 complete months.
@@ -78,10 +84,11 @@ WINDOW_MONTHS = 12
 
 
 class VraError(Exception):
-    def __init__(self, code: str, status_code: int) -> None:
+    def __init__(self, code: str, status_code: int, message: str | None = None) -> None:
         super().__init__(code)
         self.code = code
         self.status_code = status_code
+        self.message = message
 
 
 # --- catalogue -------------------------------------------------------------
@@ -128,7 +135,21 @@ def _catalogue(session: Session) -> list[VraIndicator]:
     return rows
 
 
+def _value_schemas() -> dict[str, ValueSchema]:
+    """Packaged rules are shared by guidance and validation, without DB drift."""
+    raw = json.loads(CATALOGUE_PATH.read_text(encoding="utf-8"))
+    return {
+        item["code"]: ValueSchema.model_validate(item["value_schema"])
+        for item in raw["indicators"]
+    }
+
+
+def _uploadable(indicator: VraIndicator) -> bool:
+    return indicator.route != "computed" and indicator.status != "dropped"
+
+
 def list_indicators(session: Session) -> list[IndicatorItem]:
+    rules = _value_schemas()
     return [
         IndicatorItem(
             code=row.code,
@@ -140,6 +161,8 @@ def list_indicators(session: Session) -> list[IndicatorItem]:
             route=row.route,
             status=row.status,
             rationale=row.rationale,
+            uploadable=_uploadable(row),
+            value_schema=rules[row.code],
         )
         for row in _catalogue(session)
     ]
@@ -301,21 +324,44 @@ def refresh_computed_hazard(session: Session, unit_ids: list[int]) -> None:
 # --- uploads ---------------------------------------------------------------
 
 
-def template_csv(session: Session, geography_id: str) -> str:
+def template_csv(
+    session: Session, geography_id: str, indicator_code: str | None = None
+) -> str:
     """One blank row per child area and indicator that is entered by hand."""
 
     _, areas = frame_areas(session, geography_id)
-    indicators = [
-        row
-        for row in _catalogue(session)
-        if row.route in ("upload", "manual") and row.status != "dropped"
-    ]
+    catalogue = _catalogue(session)
+    if indicator_code is None:
+        indicators = [row for row in catalogue if _uploadable(row)]
+    else:
+        indicators = [
+            row for row in catalogue if row.code == indicator_code and _uploadable(row)
+        ]
+        if not indicators:
+            raise VraError("VRA_TEMPLATE_INDICATOR_INVALID", 422)
+    rules = _value_schemas()
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
     writer.writerow(TEMPLATE_COLUMNS)
     for unit, _ in areas:
         for indicator in indicators:
-            writer.writerow([unit.code, unit.name, indicator.code, "", "", "", "", ""])
+            rule = rules[indicator.code]
+            writer.writerow(
+                [
+                    unit.code,
+                    unit.name,
+                    indicator.code,
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    indicator.name,
+                    indicator.unit,
+                    rule.expected_values,
+                    f"{rule.example:g}",
+                ]
+            )
     return out.getvalue()
 
 
@@ -323,9 +369,13 @@ def _check_row(
     row: dict[str, str],
     areas: dict[str, AdminUnit],
     indicators: dict[str, VraIndicator],
+    rules: dict[str, ValueSchema],
+    selected_indicator_code: str | None = None,
 ) -> tuple[str | None, float | None]:
     """A rejection reason, or None and the parsed value."""
 
+    if any("\x00" in value for value in row.values()):
+        return "CSV fields must not contain NUL characters", None
     area_code = (row.get("area_code") or "").strip().lower()
     indicator_code = (row.get("indicator_code") or "").strip()
     if area_code not in areas:
@@ -337,16 +387,43 @@ def _check_row(
         return f"indicator '{indicator_code}' is dropped from the catalogue", None
     if indicator.route == "computed":
         return f"indicator '{indicator_code}' is computed by CHART", None
+    if (
+        selected_indicator_code is not None
+        and indicator_code != selected_indicator_code
+    ):
+        return (
+            f"indicator_code '{indicator_code}' does not match the selected indicator "
+            f"'{selected_indicator_code}'; choose All indicators or use its template",
+            None,
+        )
+    supplied_unit = (row.get("unit") or "").strip()
+    if supplied_unit and supplied_unit != indicator.unit:
+        return (
+            f"unit '{supplied_unit}' does not match '{indicator_code}'; expected '{indicator.unit}'",
+            None,
+        )
     try:
         value = float((row.get("value") or "").strip())
     except ValueError:
         return f"value '{row.get('value')}' is not a number", None
     if not math.isfinite(value):
-        return f"value '{row.get('value')}' is not a number", None
-    if indicator.unit.startswith("%") and not 0 <= value <= 100:
-        return f"value {value:g} is outside 0-100 for a percentage", None
+        return f"value '{row.get('value')}' is not a number; enter a finite value", None
+    rule = rules[indicator_code]
+    if (
+        (rule.type == "binary" and value not in (0, 1))
+        or (rule.type == "integer" and not value.is_integer())
+        or (rule.minimum is not None and value < rule.minimum)
+        or (rule.maximum is not None and value > rule.maximum)
+    ):
+        return (
+            f"value {value:g} is invalid for '{indicator_code}'; expected {rule.expected_values}",
+            None,
+        )
     if not (row.get("vintage") or "").strip():
         return "vintage is required", None
+    for column, limit in (("vintage", 32), ("source_name", 256)):
+        if len((row.get(column) or "").strip()) > limit:
+            return f"{column} must be {limit} characters or fewer", None
     return None, value
 
 
@@ -356,40 +433,95 @@ def ingest_csv(
     text: str,
     file_name: str | None,
     user_id: str | None,
+    indicator_code: str | None = None,
 ) -> IngestionResult:
     """Validate an upload row by row and upsert the valid rows.
 
     Blank values are skipped. If no row is valid the ingestion is recorded as
-    failed and no value is written.
+    failed and no value is written. Unrecoverable CSV syntax errors reject the
+    entire file before any values or ingestion record are written. A selected
+    indicator restricts accepted rows without changing the other validation.
     """
 
     frame, area_rows = frame_areas(session, geography_id)
     areas = {unit.code.lower(): unit for unit, _ in area_rows}
     indicators = {row.code: row for row in _catalogue(session)}
-    reader = csv.DictReader(io.StringIO(text.lstrip("﻿")))
-    header = [name.strip() for name in reader.fieldnames or []]
-    if any(column not in header for column in REQUIRED_COLUMNS):
-        raise VraError("VRA_CSV_HEADER_INVALID", 422)
-    reader.fieldnames = header
+    if indicator_code is not None:
+        selected = indicators.get(indicator_code)
+        if selected is None or not _uploadable(selected):
+            raise VraError("VRA_TEMPLATE_INDICATOR_INVALID", 422)
+    rules = _value_schemas()
+    reader = csv.reader(io.StringIO(text.lstrip("﻿")), strict=True)
+    try:
+        header = [name.strip() for name in next(reader, [])]
+    except csv.Error as error:
+        raise VraError(
+            "VRA_CSV_HEADER_INVALID", 422, f"Row 1: malformed CSV header ({error})"
+        ) from error
+    problems = []
+    missing = [column for column in REQUIRED_COLUMNS if column not in header]
+    if missing:
+        problems.append(f"missing required columns: {', '.join(missing)}")
+    duplicates = sorted(
+        column for column, count in Counter(header).items() if count > 1
+    )
+    if duplicates:
+        problems.append(f"duplicate columns: {', '.join(duplicates)}")
+    unknown = sorted(set(header) - set(TEMPLATE_COLUMNS))
+    if unknown:
+        problems.append(
+            f"unexpected columns: {', '.join(repr(name) for name in unknown)}"
+        )
+    if problems:
+        raise VraError("VRA_CSV_HEADER_INVALID", 422, "Row 1: " + "; ".join(problems))
 
     accepted: list[tuple[VraIndicator, AdminUnit, float, dict[str, str]]] = []
     rejections: list[Rejection] = []
-    seen: set[tuple[str, str, str]] = set()
-    for line, row in enumerate(reader, start=2):
+    seen: dict[tuple[str, str, str], int] = {}
+    while True:
+        line = reader.line_num + 1
+        try:
+            values = next(reader)
+        except StopIteration:
+            break
+        except csv.Error as error:
+            raise VraError(
+                "VRA_CSV_INVALID",
+                422,
+                f"Row {line}: malformed CSV ({error}); correct quoting and retry. "
+                "The entire file was rejected; no values were saved.",
+            ) from error
+        if not values:
+            continue
+        if len(values) != len(header):
+            rejections.append(
+                Rejection(
+                    row=line,
+                    reason=(
+                        f"expected {len(header)} columns, found {len(values)}; "
+                        "quote values containing commas and keep every column"
+                    ),
+                )
+            )
+            continue
+        row = dict(zip(header, values))
         if not (row.get("value") or "").strip():
             continue
-        reason, value = _check_row(row, areas, indicators)
+        reason, value = _check_row(row, areas, indicators, rules, indicator_code)
         key = (
             (row.get("indicator_code") or "").strip(),
             (row.get("area_code") or "").strip().lower(),
             (row.get("vintage") or "").strip(),
         )
         if reason is None and key in seen:
-            reason = "duplicate of an earlier row (same area, indicator and vintage)"
+            reason = (
+                f"duplicate of row {seen[key]} (same area, indicator and vintage); "
+                "keep one value for this key"
+            )
         if reason is not None or value is None:
             rejections.append(Rejection(row=line, reason=reason or "invalid row"))
             continue
-        seen.add(key)
+        seen[key] = line
         accepted.append((indicators[key[0]], areas[key[1]], value, row))
 
     ingestion = VraIngestion(
@@ -788,6 +920,7 @@ def load_map(session: Session, geography_id: str) -> MapResponse:
 
 def load_coverage(session: Session, geography_id: str) -> CoverageResponse:
     frame, area_rows = frame_areas(session, geography_id)
+    rules = _value_schemas()
     unit_ids = [unit.id for unit, _ in area_rows]
     rows = session.scalars(
         select(VraIndicatorValue).where(VraIndicatorValue.admin_unit_id.in_(unit_ids))
@@ -816,8 +949,11 @@ def load_coverage(session: Session, geography_id: str) -> CoverageResponse:
                 code=row.code,
                 name=row.name,
                 component=row.component,
+                unit=row.unit,
                 route=row.route,
                 status=row.status,
+                uploadable=_uploadable(row),
+                value_schema=rules[row.code],
                 present=len(present.get(row.id, ())),
                 vintages=sorted(vintages.get(row.id, ())),
                 updated_at=updated.get(row.id),

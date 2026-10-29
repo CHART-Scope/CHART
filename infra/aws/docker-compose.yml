@@ -34,6 +34,9 @@ x-dagster-environment: &dagster-environment
   DAGSTER_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
   DAGSTER_POSTGRES_DB: chart_dagster
   CLIMATE_OUTPUT_DIR: /opt/chart/data/climate
+  # Retain raw grids across code-container replacements so new areas can be
+  # derived without downloading the same country and months again.
+  ERA5_CACHE_DIR: /opt/chart/data/climate/era5-cache
   ERA5_USE_FIXTURE: "0"
   CDSAPI_URL: ${CDSAPI_URL:-https://cds.climate.copernicus.eu/api}
   CDSAPI_KEY: ${CDSAPI_KEY:-}

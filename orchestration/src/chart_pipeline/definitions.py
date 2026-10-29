@@ -11,6 +11,8 @@ from pathlib import Path
 import dagster as dg
 from era5_heat import (
     AreaSpec,
+    CELL_CENTRE,
+    CELL_OVERLAP,
     compute_heat_series,
     compute_heat_series_for_areas,
     fixture_demo,
@@ -58,6 +60,7 @@ from chart.climate.ingestion_jobs import (
     fail_job,
     record_progress,
     reserve_queued_jobs,
+    running_jobs,
 )
 from chart.climate.service import ClimateServiceError
 from chart.shared.db.climate_load import (
@@ -299,6 +302,13 @@ def pull_country_climate(
                     code=unit.code,
                     name=unit.name,
                     geometry=_area_geometry(unit),
+                    # Existing fitted county/division calibration uses centre
+                    # weighting. Finer new units need cell-overlap coverage.
+                    aggregation_method=(
+                        CELL_OVERLAP
+                        if unit.level in {"district", "constituency"}
+                        else CELL_CENTRE
+                    ),
                 )
                 for unit in units
             ]
@@ -412,6 +422,27 @@ def pending_climate_ingestions_sensor(_context: dg.SensorEvaluationContext):
     contention this path exists to remove.
     """
     session_factory = get_session_factory()
+    with session_factory() as session:
+        running = [(job.id, job.dagster_run_id) for job in running_jobs(session)]
+    for job_id, run_id in running:
+        if not run_id:
+            continue
+        run = _context.instance.get_run_by_id(run_id)
+        if run is not None and run.status in (
+            dg.DagsterRunStatus.FAILURE,
+            dg.DagsterRunStatus.CANCELED,
+        ):
+            # A killed/native-crashed worker cannot execute the op's Python
+            # exception handler. Trust the scheduler's terminal state, not
+            # elapsed time: a legitimate CDS queue wait can be long.
+            with session_factory() as session:
+                fail_job(
+                    session,
+                    job_id,
+                    error_code="CLIMATE_PULL_INTERRUPTED",
+                    dagster_run_id=run_id,
+                )
+                session.commit()
     with session_factory() as session:
         jobs = reserve_queued_jobs(session, limit=1)
         pending = [(job.id, job.country_code, list(job.months or [])) for job in jobs]
@@ -1096,8 +1127,13 @@ def _write_observed_output(slug, df, meta, months: list[date]):
     outdir = Path(os.getenv("CLIMATE_OUTPUT_DIR", DEFAULT_OUTDIR))
     outdir.mkdir(parents=True, exist_ok=True)
     period_label = "_".join(month.strftime("%Y-%m") for month in sorted(months))
-    table_path = outdir / f"{slug}_era5_{period_label}.csv"
-    meta_path = outdir / f"{slug}_era5_{period_label}.json"
+    # Retain the previous derivation's source evidence when the same raw grid
+    # is processed for revised boundaries or a new aggregation method.
+    version = hashlib.sha256(
+        json.dumps(meta, sort_keys=True, default=str).encode()
+    ).hexdigest()[:16]
+    table_path = outdir / f"{slug}_era5_{period_label}_{version}.csv"
+    meta_path = outdir / f"{slug}_era5_{period_label}_{version}.json"
     write_table(df, table_path, "csv")
     write_json(meta, meta_path)
     return table_path, meta_path
@@ -1186,10 +1222,14 @@ def _prediction_lease_heartbeat(
 
 def _ensure_climate_storage_capacity() -> None:
     output_dir = Path(os.getenv("CLIMATE_OUTPUT_DIR", DEFAULT_OUTDIR))
-    output_dir.mkdir(parents=True, exist_ok=True)
     minimum_free_bytes = max(0, int(os.getenv("CLIMATE_MIN_FREE_BYTES", str(1024**3))))
-    if shutil.disk_usage(output_dir).free < minimum_free_bytes:
-        raise ClimateServiceError("CLIMATE_STORAGE_CAPACITY_LOW", 503)
+    locations = {output_dir}
+    if configured_cache := os.getenv("ERA5_CACHE_DIR"):
+        locations.add(Path(configured_cache).expanduser())
+    for location in locations:
+        location.mkdir(parents=True, exist_ok=True)
+        if shutil.disk_usage(location).free < minimum_free_bytes:
+            raise ClimateServiceError("CLIMATE_STORAGE_CAPACITY_LOW", 503)
 
 
 defs = dg.Definitions(

@@ -415,23 +415,20 @@ OPERATION_DOCUMENTATION: dict[
         },
     ),
     ("get", "/heat-outlook/{geography_id}/capabilities"): OperationDocumentation(
-        summary="Read published outlook coverage and enabled data modes",
+        summary="Read independent observed and projection availability",
         description=(
-            "Reports whether the selected geography and outcome have a published "
-            "outlook, the publication's geography level, and the data modes left "
-            "enabled by country model settings. Requires a risk reader role and "
-            "access to the geography path. October 2026 India and Kenya handover "
-            "outlooks expose projection only; observed estimates remain unavailable "
-            "until their inputs are separately calibrated and validated. An "
-            "unsupported outcome returns published=false with no data modes. A "
-            "document advertised by the publication index but missing from storage "
-            "returns OUTLOOK_NOT_PUBLISHED instead of using a superseded release."
+            "Resolves sources for the exact geography and outcome, subject to "
+            "risk-reader roles, geography scope and country model settings. "
+            "Published handover projections retain their own release. Observed "
+            "may use the existing calibrated Kenya outlook scorer or an exact "
+            "active monthly model assignment. The observed source identifies its "
+            "release and batch support; unavailable or disabled views include a "
+            "reason. No district or constituency inherits an ancestor's observed "
+            "model. The new handovers are not relabelled as calibrated. Missing "
+            "advertised projection files return OUTLOOK_NOT_PUBLISHED."
         ),
         success_responses={
-            "200": (
-                "Publication availability and enabled data modes, with the geography "
-                "level when an outlook document is available."
-            )
+            "200": "Enabled views with independent source releases and availability reasons."
         },
     ),
     ("get", "/heat-outlook/{geography_id}"): OperationDocumentation(
@@ -500,10 +497,10 @@ OPERATION_DOCUMENTATION: dict[
             "inputs; selector is the pregnancy window or the age group. Requires a "
             "risk reader role and access to the geography path. The guides' "
             "display rules apply, so suppressed values arrive as null with the "
-            "message to show in their place. This is the calibrated legacy Kenya "
-            "scoring contract. Installed projection-only handovers return "
-            "OBSERVED_NOT_AVAILABLE; they do not reuse legacy calibration or "
-            "claim that future ERA5 downscaling has been implemented."
+            "message to show in their place. The legacy observed release is "
+            "selected independently of a newer projection publication. India "
+            "monthly models use /risk/{geography_id}/monthly instead; unsupported "
+            "finer geographies never inherit a county's calibrated estimate."
         ),
         success_responses={
             "200": (
@@ -521,10 +518,9 @@ OPERATION_DOCUMENTATION: dict[
             "in the observed estimate. Requires a risk reader role and access to "
             "the geography path. Counties without complete ERA5 inputs carry "
             "missing_reason not_reported; suppressed shares carry no_excess. "
-            "Returned areas are restricted to the caller's allowed geography "
-            "paths. This map uses the calibrated legacy Kenya scoring contract; "
-            "installed projection-only handovers return OBSERVED_NOT_AVAILABLE "
-            "until separate calibration and validation support observed inputs."
+            "County requests retain the Kenya county frame even when their "
+            "projection frame contains constituencies. Returned areas remain "
+            "restricted to the caller's geography permissions."
         ),
         success_responses={
             "200": (

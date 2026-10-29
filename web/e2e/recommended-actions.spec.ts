@@ -133,7 +133,8 @@ test("status and district assignments persist and show on the cards", async ({
   // Districts above 10% start ticked: Sheopur, Satna, Betul, Khargone, Panna, Damoh.
   await expect(form.getByRole("checkbox", { checked: true })).toHaveCount(6);
   await form.getByRole("checkbox", { name: /Damoh/ }).uncheck();
-  await form.getByLabel("Assign to").selectOption("RCH Officer");
+  await form.getByRole("combobox", { name: "Assign to", exact: true }).click();
+  await page.getByRole("option", { name: "RCH Officer", exact: true }).click();
   await form.getByLabel("Due date").fill("2027-03-01");
   await form.getByRole("button", { name: "Assign to selected districts" }).click();
 

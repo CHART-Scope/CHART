@@ -281,20 +281,30 @@ def main() -> int:
                 metadata["publication_index_sha256"] = hashlib.sha256(
                     (publication / "index.json").read_bytes()
                 ).hexdigest()
-                for _ in range(2):
-                    subprocess.run(
-                        [
-                            sys.executable,
-                            "-m",
-                            "chart.heat_outlook.geography",
-                            str(publication),
-                        ],
-                        cwd=ROOT,
-                        env=env,
-                        check=True,
-                        stdout=log,
-                        stderr=subprocess.STDOUT,
-                    )
+                subprocess.run(
+                    [
+                        sys.executable,
+                        "-m",
+                        "pytest",
+                        "e2e/test_geography_upgrade_live.py",
+                        "-q",
+                        "--tb=short",
+                        f"--junitxml={evidence / 'upgrade-junit.xml'}",
+                    ],
+                    cwd=ROOT,
+                    env={**env, "CHART_E2E_PUBLICATION": str(publication)},
+                    check=True,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                )
+                subprocess.run(
+                    [sys.executable, "e2e/seed_observed.py"],
+                    cwd=ROOT,
+                    env=env,
+                    check=True,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                )
             with (evidence / "application.log").open("w") as log:
                 api = subprocess.Popen(
                     [
@@ -320,6 +330,10 @@ def main() -> int:
                             "-m",
                             "pytest",
                             "e2e/test_outlook_live.py",
+                            "e2e/test_geography_registration_live.py",
+                            "e2e/test_climate_recovery_live.py",
+                            "e2e/test_climate_granularity_live.py",
+                            "e2e/test_vra_schema_live.py",
                             "orchestration/tests/test_dagster_postgres_driver.py",
                             "-q",
                             "--tb=short",

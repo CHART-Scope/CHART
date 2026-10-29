@@ -12,6 +12,13 @@
   min-width: 0;
 }
 
+.embedded {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
 .eyebrow {
   margin: 0;
   font-family: var(--font-display);

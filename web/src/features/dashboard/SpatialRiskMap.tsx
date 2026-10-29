@@ -49,7 +49,12 @@ type Props = {
    * Where the values come from when not the live risk map, e.g. the Kenya
    * outlook tables. `key` must change whenever the selection changes.
    */
-  source?: { key: string; load: (accessToken: string) => Promise<MapResponse> };
+  source?: {
+    key: string;
+    /** Separate views may share outlines, but must not reuse each other's values. */
+    cacheScope?: string;
+    load: (accessToken: string) => Promise<MapResponse>;
+  };
   /**
    * How values read: classes, legend, wording. Defaults to the attributable
    * share's fixed percent bands; another measure (the vulnerability index)
@@ -173,7 +178,7 @@ export function SpatialRiskMap({
   // URL change updates the colours in place rather than blanking the map and
   // flashing its skeleton. A genuinely different country has no frame entry
   // and still gets the honest first-load placeholder.
-  const frameKey = `${userKey}:${geographyId}:${scale.id}`;
+  const frameKey = `${userKey}:${geographyId}:${scale.id}:${source?.cacheScope ?? "monthly"}`;
   const [result, setResult] = useState<{
     key: string;
     data: MapResponse;

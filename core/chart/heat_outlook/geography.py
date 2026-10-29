@@ -17,8 +17,51 @@ from shapely.geometry import shape
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from chart.shared.db.models import AdminUnit, AppGeography, CountryGeoConfig, Geography
+from chart.shared.db.models import (
+    ActiveModelAssignment,
+    AdminUnit,
+    AppGeography,
+    CountryGeoConfig,
+    Geography,
+    ModelRelease,
+)
 from chart.shared.db.session import get_session_factory
+
+
+def _protected_observed_boundaries(session: Session) -> set[int]:
+    """A projection publication cannot redefine an operational model's area."""
+    protected = set(
+        session.scalars(
+            select(ActiveModelAssignment.admin_unit_id)
+            .join(
+                ModelRelease, ModelRelease.id == ActiveModelAssignment.model_release_id
+            )
+            .where(ModelRelease.status == "active")
+        )
+    )
+    # Reuse the configured observed release without importing the API service
+    # during module initialization. These county offsets were fitted against
+    # the existing operational polygon/aggregation, not a new outlook edition.
+    from . import dlnm
+    from .service import outlook_release
+
+    calibration_path = dlnm.release_dir(outlook_release()) / "calibration.json"
+    if calibration_path.is_file():
+        calibration = json.loads(calibration_path.read_text())
+        counties = [
+            key
+            for key, item in calibration.get("counties", {}).items()
+            if item.get("offset_c")
+        ]
+        protected.update(
+            session.scalars(
+                select(AdminUnit.id).where(
+                    AdminUnit.level == "county",
+                    AdminUnit.app_geography_id.in_(counties),
+                )
+            )
+        )
+    return protected
 
 
 def register_geographies(session: Session, publication: Path) -> int:
@@ -43,6 +86,7 @@ def register_geographies(session: Session, publication: Path) -> int:
             raise ValueError(f"Invalid polygon: {place_id}")
         boundaries[place_id] = (feature, geometry.bounds)
     digest = hashlib.sha256(boundary_bytes).hexdigest()
+    protected_boundaries = _protected_observed_boundaries(session)
     pending = dict(index)
     count = 0
     while pending:
@@ -138,33 +182,37 @@ def register_geographies(session: Session, publication: Path) -> int:
                 place.external_code = str(
                     properties.get("external_code") or place.external_code or place_id
                 )
-                admin.bbox_west, admin.bbox_south, admin.bbox_east, admin.bbox_north = (
-                    bounds
-                )
-                admin.boundary_version = digest
-                admin.boundary_provenance = {
-                    "source": "modeller handover",
-                    "sha256": digest,
-                    "release": entry.get("release"),
-                    "geography_id": place_id,
-                }
-                session.flush()
-                geometry_json = json.dumps(feature["geometry"])
-                if session.get_bind().dialect.name == "postgresql":
-                    session.execute(
-                        update(AdminUnit)
-                        .where(AdminUnit.id == admin.id)
-                        .values(
-                            boundary=func.ST_Multi(
-                                func.ST_SetSRID(
-                                    func.ST_GeomFromGeoJSON(geometry_json), 4326
+                if admin.id not in protected_boundaries or admin.boundary is None:
+                    (
+                        admin.bbox_west,
+                        admin.bbox_south,
+                        admin.bbox_east,
+                        admin.bbox_north,
+                    ) = bounds
+                    admin.boundary_version = digest
+                    admin.boundary_provenance = {
+                        "source": "modeller handover",
+                        "sha256": digest,
+                        "release": entry.get("release"),
+                        "geography_id": place_id,
+                    }
+                    session.flush()
+                    geometry_json = json.dumps(feature["geometry"])
+                    if session.get_bind().dialect.name == "postgresql":
+                        session.execute(
+                            update(AdminUnit)
+                            .where(AdminUnit.id == admin.id)
+                            .values(
+                                boundary=func.ST_Multi(
+                                    func.ST_SetSRID(
+                                        func.ST_GeomFromGeoJSON(geometry_json), 4326
+                                    )
                                 )
                             )
                         )
-                    )
-                    session.expire(admin, ["boundary"])
-                else:
-                    admin.boundary = geometry_json
+                        session.expire(admin, ["boundary"])
+                    else:
+                        admin.boundary = geometry_json
             del pending[place_id]
             count += 1
             progressed = True

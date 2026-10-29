@@ -207,7 +207,18 @@ export async function fetchObservedRiskMap(
   return (await response.json()) as MapResponse;
 }
 
-export type OutlookCapabilities = { published: boolean; data_modes: OutlookView[] };
+export type OutlookCapabilities = {
+  published: boolean;
+  data_modes: OutlookView[];
+  projection_release?: string | null;
+  observed?: {
+    source: "outlook" | "monthly" | null;
+    release: string | null;
+    reason: string | null;
+    model_area_name: string | null;
+    batch_enabled: boolean;
+  };
+};
 
 export async function fetchOutlookCapabilities(
   geographyId: string,

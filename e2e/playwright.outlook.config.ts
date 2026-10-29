@@ -5,7 +5,13 @@ const port = new URL(origin).port;
 const output = process.env.CHART_E2E_EVIDENCE!;
 export default defineConfig({
   testDir: ".",
-  testMatch: ["outlook-live.spec.ts", "typography-live.spec.ts"],
+  testMatch: [
+    "outlook-live.spec.ts",
+    "observed-live.spec.ts",
+    "geography-navigation-live.spec.ts",
+    "vra-values-live.spec.ts",
+    "typography-live.spec.ts",
+  ],
   workers: 1,
   retries: 0,
   timeout: 90_000,

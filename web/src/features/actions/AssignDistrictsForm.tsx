@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
+import { Select } from "@/components/Select";
 
 import { districtFill, type PriorityDistrict } from "./actionCatalog";
 import styles from "./AssignDistrictsForm.module.css";
@@ -75,16 +76,15 @@ export function AssignDistrictsForm({ districts, initial, onCancel, onSave }: Pr
       <label className={styles.field} htmlFor={`${id}-assignee`}>
         Assign to
       </label>
-      <select
+      <Select
         id={`${id}-assignee`}
-        className={styles.input}
+        aria-label="Assign to"
+        className={styles.assignee}
+        fullWidth
         value={assignee}
-        onChange={(event) => setAssignee(event.target.value)}
-      >
-        {assignees.map((name) => (
-          <option key={name}>{name}</option>
-        ))}
-      </select>
+        onChange={setAssignee}
+        options={assignees.map((name) => ({ value: name, label: name }))}
+      />
 
       <label className={styles.field} htmlFor={`${id}-due`}>
         Due date

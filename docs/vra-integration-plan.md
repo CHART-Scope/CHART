@@ -1,7 +1,8 @@
 # Vulnerability and resilience assessment (VRA): data and integration plan
 
-Status: proposal for review (21 Oct 2026). A first slice is built (22 Oct
-2026); section 10 lists what exists and how it differs from this plan. Source: CEEW's draft
+Status: original proposal (21 Oct 2026), with implementation updates in
+sections 10–11 (latest 28 Oct 2026). Earlier sections describe the proposed
+scope, not a claim that every source or connector is implemented. Source: CEEW's draft
 indicator list (`CEEW - Draft Indiactor list_VRA.xlsx`, all eight sheets,
 including the hidden Sheet6, Sheet11, "Additional indicators" and "Trimmed
 indicators").
@@ -350,6 +351,84 @@ districts. Details: `core/chart/vra/README.md`.
   `chart_admin`. Assessments always cover the child areas of the selected
   geography, framed as on the dashboard map, with no country-specific code.
 - **E2E**: `core/tests/test_vra_api.py` in `make e2e-core`.
+
+## 11. CSV contracts, missing data and next sources (28 Oct 2026)
+
+The current app keeps the existing `vra-v1` calculation and configurable
+geography hierarchy. It now exposes a value schema for every indicator:
+unit, numeric type, inclusive bounds, an illustrative value and whether it
+can be uploaded. Settings → Data has one Upload CSV dialog: choose a template
+for all uploadable indicators or one selected indicator, preview the fields
+and rules, download it if needed, and select a CSV. **Validate and upload**
+explicitly validates and saves accepted rows; selecting a file alone does
+nothing. Results and rejected-row explanations remain in the dialog. A
+single-indicator selection also rejects nonblank rows for other indicators.
+The main coverage table keeps just coverage information. The blank
+rows contain the comparison frame's area codes; examples occupy a separate
+column and are never imported as observations.
+
+Uploads validate finite numbers, indicator-specific ranges, binary values,
+true counts, provided units, area membership and CSV structure. Blank values
+remain missing. Valid rows in a mixed file are saved with row-level errors
+for rejected values, and re-uploading an area/indicator/vintage replaces that
+fact. Broken CSV quoting rejects the entire file without saving a partial
+prefix; correct the indicated line and retry. Existing eight-column CSV files
+remain accepted. Geography permissions are checked against the resolved
+comparison frame as well as the requested area, including leaf URLs. These checks cannot
+establish that a percentage has the correct source population, year or
+boundary definition. The source must be reviewed for those properties.
+See [the module contract](https://github.com/CHART-Scope/CHART/blob/dev/core/chart/vra/README.md) for the exact API and
+validation behavior.
+
+The UI distinguishes missing values and unscored results from numeric zero.
+A relative score of zero is the lower end of the comparison scale; it can
+have a positive recorded value. Zero coverage means there is no usable input
+for that component. The local MP assessment inspected on 28 Oct had no
+scoreable indicators, so its zero coverage did not represent zero risk.
+Bhopal and Narmadapuram had nonzero raw heat values, but only those two
+divisions had complete October 2025–September 2026 windows; scoring requires
+at least three areas. The other eight divisions were missing one to three
+months, and no non-climate indicator values had been loaded. Completing those
+climate windows and supplying reviewed social/population inputs is necessary;
+rerunning unchanged inputs alone cannot resolve the gaps.
+Uploading data does not mutate a previous assessment: run it again after
+reviewing upload results. Heat indicators require a complete twelve-month
+observed climate window for each area.
+
+### Available source material
+
+The repository already contains
+[`mp_divisions_vra.csv`](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/vra/data/mp-divisions-v1/mp_divisions_vra.csv)
+with 27 indicators across ten divisions, built from Census 2011, NFHS-5
+2019–21 and the NITI MPI release. It is not automatically loaded. It supplies
+no hazard observations and is not an unqualified production dataset:
+
+- NFHS/MPI division aggregates use Census total-population weights instead
+  of each survey indicator's actual denominator; some suppressed observations
+  are excluded. Review the [source notes](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/vra/data/mp-divisions-v1/SOURCES.md).
+- The water/sanitation source measures population, while the current
+  catalogue labels households. Resolve those definitions before import;
+  passing numeric validation does not make them equivalent.
+- Survey and census boundaries differ from newer district boundaries. Do
+  not copy a division/county estimate into every child district/constituency
+  and present it as a local observation.
+
+### Recommended next integrations
+
+These are source candidates reviewed on 28 Oct, not implemented connectors:
+
+| Source | First useful inputs | Integration requirement |
+| --- | --- | --- |
+| [WorldPop API v2](https://api.worldpop.org/v2/) | Population totals/density and compatible age/sex shares for India and Kenya | Submit WGS84 polygons, poll the returned job, persist release/year/resolution and aggregation provenance. Basic access is documented without authentication but has request/area limits. Match age bins exactly: a 0–6 indicator cannot be taken directly from five-year groups. Distinguish modelled historical population from future projections. |
+| [KNBS Kenya DHS 2022](https://www.knbs.or.ke/reports/kdhs-2022/) and vetted India NFHS district tables | Health, nutrition, water, sanitation and capacity inputs | KNBS publishes county factsheets and estimates some indicators for all 47 counties. Start with validated tables; evaluate the [DHS API](https://api.dhsprogram.com/) where the same indicator and geography exist. County results do not establish constituency estimates. Reconcile denominator, suppression, survey vintage and boundary codes. |
+| [CHIRPS v3](https://www.chc.ucsb.edu/data/chirps3) | Rainfall and drought inputs where the VRA definition fits | Download versioned rainfall grids, compute defined indices, aggregate to registered polygons and retain source provenance. Daily fields are disaggregated from pentads, so validate daily extreme-rain thresholds before adopting them. This does not fill health or social indicators. |
+
+First fill reviewed exposure and social inputs and complete the existing heat
+window. A future connector should write through the same value/provenance
+contract with retry-safe keys, then produce a new assessment. No source
+discovery step should manufacture zeros for absent data or imply finer spatial
+reliability than its input supports. ERA5 downscaling remains future work as
+documented in [modelling](modeling.md).
 
 ## References
 

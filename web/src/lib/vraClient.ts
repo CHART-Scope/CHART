@@ -20,6 +20,14 @@ export type VraRoute = "computed" | "upload" | "manual" | "pull";
 export type VraStatus = "included" | "context" | "dropped";
 export type VraRiskClass = "low" | "moderate" | "high" | "very_high";
 
+export type VraValueSchema = {
+  type: "number" | "integer" | "binary";
+  minimum: number | null;
+  maximum: number | null;
+  example: number;
+  expected_values: string;
+};
+
 export type VraIndicator = {
   code: string;
   component: VraComponent;
@@ -30,6 +38,8 @@ export type VraIndicator = {
   route: VraRoute;
   status: VraStatus;
   rationale: string;
+  uploadable?: boolean;
+  value_schema?: VraValueSchema;
 };
 
 export type VraRun = {
@@ -115,6 +125,9 @@ export type VraCoverageIndicator = {
   present: number;
   vintages: string[];
   updated_at: string | null;
+  unit?: string;
+  uploadable?: boolean;
+  value_schema?: VraValueSchema;
 };
 
 export type VraCoverage = {
@@ -136,8 +149,9 @@ export class VraRequestError extends Error {
   constructor(
     readonly status: number,
     readonly code: string | null,
+    message?: string,
   ) {
-    super(vraErrorMessage(status, code));
+    super(message ?? vraErrorMessage(status, code));
   }
 }
 
@@ -149,7 +163,11 @@ const MESSAGES: Record<string, string> = {
   VRA_CSV_HEADER_INVALID:
     "The file's columns do not match the template. Download the template and fill that in.",
   VRA_CSV_NOT_UTF8: "The file is not UTF-8 text. Save it as CSV (UTF-8) and try again.",
+  VRA_CSV_INVALID:
+    "The CSV could not be read. Check its quoting and upload it again; no values were saved.",
   VRA_UPLOAD_TOO_LARGE: "The file is too large. Split it and upload the parts.",
+  VRA_TEMPLATE_INDICATOR_INVALID:
+    "This indicator cannot be uploaded. Choose an indicator from the template list.",
 };
 
 export function vraErrorMessage(status: number, code: string | null): string {
@@ -163,9 +181,22 @@ const base = (geographyId: string) =>
   `/api/chart/vra/${encodeURIComponent(geographyId)}`;
 
 async function readJson<T>(response: Response): Promise<T> {
-  if (!response.ok)
-    throw new VraRequestError(response.status, await readErrorCode(response));
+  if (!response.ok) throw await requestError(response);
   return (await response.json()) as T;
+}
+
+async function requestError(response: Response): Promise<VraRequestError> {
+  const body = (await response
+    .clone()
+    .json()
+    .catch(() => null)) as {
+    message?: unknown;
+  } | null;
+  return new VraRequestError(
+    response.status,
+    await readErrorCode(response),
+    typeof body?.message === "string" ? body.message : undefined,
+  );
 }
 
 type Options = { signal?: AbortSignal };
@@ -235,12 +266,15 @@ export async function fetchVraCoverage(
 export async function fetchVraTemplate(
   geographyId: string,
   accessToken: string | null | undefined,
+  indicatorCode?: string,
 ): Promise<string> {
-  const response = await authFetch(`${base(geographyId)}/template.csv`, {
+  const query = indicatorCode
+    ? `?${new URLSearchParams({ indicator_code: indicatorCode })}`
+    : "";
+  const response = await authFetch(`${base(geographyId)}/template.csv${query}`, {
     accessToken,
   });
-  if (!response.ok)
-    throw new VraRequestError(response.status, await readErrorCode(response));
+  if (!response.ok) throw await requestError(response);
   return response.text();
 }
 
@@ -250,8 +284,10 @@ export async function uploadVraValues(
   accessToken: string | null | undefined,
   csv: string,
   fileName: string,
+  indicatorCode?: string,
 ): Promise<VraUploadResult> {
   const query = new URLSearchParams({ file_name: fileName });
+  if (indicatorCode) query.set("indicator_code", indicatorCode);
   const response = await authFetch(`${base(geographyId)}/values?${query}`, {
     method: "POST",
     accessToken,

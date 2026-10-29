@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { type IconName } from "@/components/Icon";
 import { IconArray } from "@/components/IconArray";
@@ -16,6 +16,7 @@ import {
   OutlookNotPublished,
   type HeatOutlook,
   type ObservedRisk,
+  type OutlookCapabilities,
   type OutlookOption,
   type OutlookPart,
   type OutlookRatio,
@@ -55,6 +56,8 @@ const VIEW_TABS = [
 
 export type OutlookChoices = {
   view?: OutlookView;
+  /** Observed and projected releases can have different selector codes. */
+  observedSelector?: string;
   selector?: string;
   month?: string;
   scenario?: string;
@@ -77,11 +80,16 @@ type Props = {
   accessToken: string;
   outcome: string;
   outcomeLabel: string;
+  placeLabel?: string;
   dataModes?: OutlookView[];
+  observedCapability?: OutlookCapabilities["observed"];
+  projectionRelease?: string | null;
+  /** An explicitly assigned live model's existing monthly view. */
+  observedContent?: ReactNode;
   selection?: OutlookChoices;
   onSelectionChange?: (selection: OutlookChoices) => void;
   figure?: IconName;
-  onSelectArea?: (geographyId: string) => void;
+  onSelectArea?: (geographyId: string, selection: OutlookChoices) => void;
 };
 
 /**
@@ -97,8 +105,12 @@ export function HeatOutlookPanel({
   accessToken,
   outcome,
   outcomeLabel,
+  placeLabel,
   figure = "newborn",
   dataModes = ["observed", "projection"],
+  observedCapability,
+  projectionRelease,
+  observedContent,
   selection,
   onSelectionChange,
   onSelectArea,
@@ -107,27 +119,24 @@ export function HeatOutlookPanel({
   // and periods, while a different area keeps them for comparison.
   const [picked, setPicked] = useState<Choices & { outcome: string }>({ outcome });
   const choice: Choices = selection ?? (picked.outcome === outcome ? picked : {});
-  const choose = (next: Choices) => {
-    const merged = { ...choice, ...next };
-    setPicked({ ...merged, outcome });
-    onSelectionChange?.(merged);
-  };
   const [precisionOpen, setPrecisionOpen] = useState(false);
-  const { selector, month, scenario, period } = choice;
+  const { selector, observedSelector, month, scenario, period } = choice;
   const reference = choice.reference ?? "annual";
 
   const observedEnabled = dataModes.includes("observed");
+  const monthlyObserved = observedCapability?.source === "monthly";
+  const outlookObserved = observedEnabled && !monthlyObserved;
   const observed = useLoaded<ObservedRisk>(
     (signal) =>
-      observedEnabled
+      outlookObserved
         ? fetchObservedRisk(
             geographyId,
             accessToken,
-            { outcome, month, selector },
+            { outcome, month, selector: observedSelector },
             signal,
           )
         : Promise.reject(new OutlookNotPublished(geographyId)),
-    [geographyId, accessToken, outcome, month, selector, observedEnabled],
+    [geographyId, accessToken, outcome, month, observedSelector, outlookObserved],
   );
   const projectionEnabled = dataModes.includes("projection");
   const projected = useLoaded<HeatOutlook>(
@@ -143,36 +152,63 @@ export function HeatOutlookPanel({
     [geographyId, accessToken, outcome, scenario, period, selector, projectionEnabled],
   );
 
-  // A previous answer stays on screen (dimmed) while the next loads, but only
-  // for the same outcome: another outcome's windows and figures would be wrong
-  // here, and would leak its selector into this outcome's map request.
-  const observedData = observed.data?.outcome === outcome ? observed.data : null;
-  const projectedData = projected.data?.outcome === outcome ? projected.data : null;
+  // Never carry another place or outcome's figures into this selection.
+  const observedData =
+    outlookObserved &&
+    observed.data?.outcome === outcome &&
+    observed.data.geography_id === geographyId
+      ? observed.data
+      : null;
+  const projectedData =
+    projectionEnabled &&
+    projected.data?.outcome === outcome &&
+    projected.data.geography_id === geographyId
+      ? projected.data
+      : null;
 
-  // A view loading for the first time stays open, so the tabs do not flicker.
-  const observedOpen =
-    observedEnabled &&
-    (observed.state === "loading" ||
-      (observed.state === "ready" && observedData !== null));
   const projectedOpen =
-    projected.state === "loading" ||
-    (projected.state === "ready" && projectedData !== null);
+    projectionEnabled &&
+    (projected.state === "loading" ||
+      (projected.state === "ready" && projectedData !== null));
   // Observed is the default once it has a month to show; a place or setting
   // without it opens on the projection instead.
   const view: OutlookView =
-    (!observedEnabled ? "projection" : !projectionEnabled ? "observed" : choice.view) ??
-    (observedData && observedData.available_months.length > 0
-      ? "observed"
-      : observed.state === "loading"
+    choice.view ??
+    (!observedEnabled
+      ? "projection"
+      : !projectionEnabled ||
+          monthlyObserved ||
+          (observedData && observedData.available_months.length > 0) ||
+          observed.state === "loading"
         ? "observed"
         : projectedOpen
           ? "projection"
           : "observed");
+  const resolvedChoices: Choices = {
+    ...choice,
+    view,
+    // Responses may still contain the previous selection while a new one
+    // loads. Explicit URL choices must win when another control is changed.
+    month: month ?? observedData?.month ?? undefined,
+    observedSelector: observedSelector ?? observedData?.selector,
+    scenario: scenario ?? projectedData?.scenario,
+    period: period ?? projectedData?.period,
+    selector: selector ?? projectedData?.selector,
+    reference,
+  };
+  const choose = (next: Choices) => {
+    const merged = { ...resolvedChoices, ...next };
+    setPicked({ ...merged, outcome });
+    onSelectionChange?.(merged);
+  };
   const settled = view === "observed" ? observed : projected;
-  const busy = settled.state === "loading";
+  const showMonthlyObserved = view === "observed" && monthlyObserved && observedEnabled;
+  const busy = !showMonthlyObserved && settled.state === "loading";
 
   const place =
-    (view === "observed" ? observedData?.place : projectedData?.place) ?? "this place";
+    (view === "observed" ? observedData?.place : projectedData?.place) ??
+    placeLabel ??
+    "this place";
   const selectors =
     (view === "observed" ? observedData?.selectors : projectedData?.selectors) ?? [];
   const resolvedSelector =
@@ -189,7 +225,11 @@ export function HeatOutlookPanel({
     mapGeographyId,
     observed: observedData,
     projected: projectedData,
-    choice: { ...choice, reference },
+    choice: {
+      ...choice,
+      selector: view === "observed" ? observedSelector : selector,
+      reference,
+    },
   });
 
   if (dataModes.length === 0) {
@@ -199,6 +239,7 @@ export function HeatOutlookPanel({
           No outlook views are enabled for this outcome. Update the model settings to
           enable a published view.
         </p>
+        {observedCapability?.reason && <p>{observedCapability.reason}</p>}
       </section>
     );
   }
@@ -221,166 +262,192 @@ export function HeatOutlookPanel({
       <Tabs
         className={styles.viewTabs}
         ariaLabel="Outlook view"
-        items={VIEW_TABS.map((item) => ({
-          ...item,
-          disabled: item.value === "observed" ? !observedOpen : !projectedOpen,
-        }))}
+        items={VIEW_TABS}
         value={view}
         onChange={(next) => choose({ view: next })}
       />
 
-      {view === "projection" && observed.state === "error" && (
-        <p className={styles.note} role="alert">
-          Observed months could not load, so the projection is shown.
-        </p>
-      )}
-      {settled.state === "missing" && (
+      {view === "observed" && !observedEnabled && (
         <p className={styles.note} role="status">
+          {observedCapability?.reason ??
+            "Observed estimates are not available for this place and outcome."}
+        </p>
+      )}
+      {view === "projection" && !projectionEnabled && (
+        <p className={styles.note} role="status">
+          Projected estimates are unavailable for this place and outcome or turned off
+          in model settings.
+        </p>
+      )}
+      {!showMonthlyObserved && (
+        <p className={styles.note} data-testid="outlook-source">
           {view === "observed"
-            ? "Observed months are not available for this place."
-            : "No projection has been published for this place and outcome yet."}
-        </p>
-      )}
-      {settled.state === "error" && (
-        <p className={styles.note} role="alert">
-          {view === "observed"
-            ? "The observed estimate could not load."
-            : "The heat outlook could not load."}
+            ? `Observed · ERA5 with model release ${observedData?.release ?? observedCapability?.release ?? "not available"}`
+            : `Projected · Published model release ${projectedData?.release ?? projectionRelease ?? "loading"}`}
         </p>
       )}
 
-      {selectors.length > 0 && (
-        <div className={styles.controlBox} data-busy={busy || undefined}>
-          <ControlRow label={outcome === "lbw" ? "Pregnancy window" : "Age group"}>
-            <Select
-              aria-label={outcome === "lbw" ? "Pregnancy window" : "Age group"}
-              value={resolvedSelector}
-              options={selectors.map((option) => ({
-                value: option.code,
-                label: option.label,
-              }))}
-              onChange={(next) => choose({ selector: next, month: undefined })}
-            />
-          </ControlRow>
-          {view === "observed" && observedData && (
-            <ObservedControls
-              observed={observedData}
-              onMonth={(next) => choose({ month: next })}
-            />
+      {showMonthlyObserved ? (
+        observedContent
+      ) : (
+        <>
+          {view === "projection" && observed.state === "error" && (
+            <p className={styles.note} role="alert">
+              Observed months could not load, so the projection is shown.
+            </p>
           )}
-          {view === "projection" && projectedData && (
-            <ProjectedControls
-              outlook={projectedData}
-              reference={reference}
-              choose={choose}
-            />
-          )}
-        </div>
-      )}
-
-      {projectedData?.metadata_note && view === "projection" && (
-        <p className={styles.note} role="note">
-          {projectedData.metadata_note}
-        </p>
-      )}
-
-      {shown.note && (
-        <p className={styles.warning} role="note">
-          {shown.note}
-        </p>
-      )}
-
-      <div className={styles.results} data-busy={busy || undefined}>
-        <div className={base.riskLayout}>
-          <div className={base.estimate}>
-            {shown.percent !== null && shown.percent > 0 ? (
-              <div className={base.iconArrayWrap}>
-                <IconArray
-                  value={Math.max(1, Math.round(shown.percent))}
-                  figure={figure}
-                />
-              </div>
-            ) : (
-              <div className={base.emptyGrid} aria-hidden="true" />
+          {settled.state === "missing" &&
+            (view === "observed" ? observedEnabled : projectionEnabled) && (
+              <p className={styles.note} role="status">
+                {view === "observed"
+                  ? "Observed months are not available for this place."
+                  : "No projection has been published for this place and outcome yet."}
+              </p>
             )}
+          {settled.state === "error" && (
+            <p className={styles.note} role="alert">
+              {view === "observed"
+                ? "The observed estimate could not load."
+                : "The heat outlook could not load."}
+            </p>
+          )}
 
-            {(view === "observed" ? observedData : projectedData) && (
-              <div className={base.summary} data-testid="outlook-estimate">
-                <p className={base.eyebrow}>{place}</p>
-                <p className={base.stat}>
-                  {shown.percent !== null ? (
-                    <>
-                      <strong>{shown.percent.toFixed(1)}%</strong> of{" "}
-                      {outcomeLabel.toLowerCase()} cases in {place} may be attributed to
-                      heat {shown.when}
-                      {shown.range}.
-                    </>
-                  ) : (
-                    shown.message
-                  )}
-                </p>
-                {shown.change && <p className={styles.change}>{shown.change}</p>}
-                {shown.ratio && (
-                  <p className={styles.change} data-testid="outlook-ratio">
-                    {RATIO_LABEL[shown.ratio.kind]} {shown.ratio.value.toFixed(2)} (95%
-                    CI {shown.ratio.low.toFixed(2)}–{shown.ratio.high.toFixed(2)})
-                  </p>
-                )}
-                {shown.ratio && (
-                  <div className={base.precisionRow}>
-                    <span className={base.precisionLabel}>Precision:</span>
-                    <PrecisionBadge
-                      level={shown.ratio.precision}
-                      onClick={() => setPrecisionOpen(true)}
+          {selectors.length > 0 && (
+            <div className={styles.controlBox} data-busy={busy || undefined}>
+              <ControlRow label={outcome === "lbw" ? "Pregnancy window" : "Age group"}>
+                <Select
+                  aria-label={outcome === "lbw" ? "Pregnancy window" : "Age group"}
+                  value={resolvedSelector}
+                  options={selectors.map((option) => ({
+                    value: option.code,
+                    label: option.label,
+                  }))}
+                  onChange={(next) =>
+                    choose(
+                      view === "observed"
+                        ? { observedSelector: next, month: undefined }
+                        : { selector: next },
+                    )
+                  }
+                />
+              </ControlRow>
+              {view === "observed" && observedData && (
+                <ObservedControls
+                  observed={observedData}
+                  onMonth={(next) => choose({ month: next })}
+                />
+              )}
+              {view === "projection" && projectedData && (
+                <ProjectedControls
+                  outlook={projectedData}
+                  reference={reference}
+                  choose={choose}
+                />
+              )}
+            </div>
+          )}
+
+          {shown.note && (
+            <p className={styles.warning} role="note">
+              {shown.note}
+            </p>
+          )}
+
+          <div className={styles.results} data-busy={busy || undefined}>
+            <div className={base.riskLayout}>
+              <div className={base.estimate}>
+                {shown.percent !== null && shown.percent > 0 ? (
+                  <div className={base.iconArrayWrap}>
+                    <IconArray
+                      value={Math.max(1, Math.round(shown.percent))}
+                      figure={figure}
                     />
                   </div>
+                ) : (
+                  <div className={base.emptyGrid} aria-hidden="true" />
                 )}
-                {shown.thin && (
-                  <p className={base.modelScopeNote} role="note">
-                    {shown.thin}
-                  </p>
+
+                {(view === "observed" ? observedData : projectedData) && (
+                  <div className={base.summary} data-testid="outlook-estimate">
+                    <p className={base.eyebrow}>{place}</p>
+                    <p className={base.stat}>
+                      {shown.percent !== null ? (
+                        <>
+                          <strong>{shown.percent.toFixed(1)}%</strong> of{" "}
+                          {outcomeLabel.toLowerCase()} cases in {place} may be
+                          attributed to heat {shown.when}
+                          {shown.range}.
+                        </>
+                      ) : (
+                        shown.message
+                      )}
+                    </p>
+                    {shown.change && <p className={styles.change}>{shown.change}</p>}
+                    {shown.ratio && (
+                      <p className={styles.change} data-testid="outlook-ratio">
+                        {RATIO_LABEL[shown.ratio.kind]} {shown.ratio.value.toFixed(2)}{" "}
+                        (95% CI {shown.ratio.low.toFixed(2)}–
+                        {shown.ratio.high.toFixed(2)})
+                      </p>
+                    )}
+                    {shown.ratio && (
+                      <div className={base.precisionRow}>
+                        <span className={base.precisionLabel}>Precision:</span>
+                        <PrecisionBadge
+                          level={shown.ratio.precision}
+                          onClick={() => setPrecisionOpen(true)}
+                        />
+                      </div>
+                    )}
+                    {shown.thin && (
+                      <p className={base.modelScopeNote} role="note">
+                        {shown.thin}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
-          <div className={base.mapColumn}>
-            {/* Mounted once the view has resolved its month and selector, so
+              <div className={base.mapColumn}>
+                {/* Mounted once the view has resolved its month and selector, so
                 the first load asks for one map rather than one per guess. A
                 place with nothing to show keeps the map, so another place
                 can be picked from it. */}
-            {(view === "observed" ? observedData : projectedData) ||
-            settled.state !== "loading" ? (
-              <SpatialRiskMap
-                embedded
-                geographyId={mapGeographyId}
-                accessToken={accessToken}
-                outcome={outcome}
-                selectedGeographyId={geographyId}
-                onSelect={onSelectArea}
-                source={mapSource}
-              />
-            ) : (
-              <div className={styles.mapPlaceholder} aria-hidden="true" />
-            )}
+                {(view === "observed" ? observedData : projectedData) ||
+                settled.state !== "loading" ? (
+                  <SpatialRiskMap
+                    key={view}
+                    embedded
+                    geographyId={mapGeographyId}
+                    accessToken={accessToken}
+                    outcome={outcome}
+                    selectedGeographyId={geographyId}
+                    onSelect={(nextGeographyId) =>
+                      onSelectArea?.(nextGeographyId, resolvedChoices)
+                    }
+                    source={mapSource}
+                  />
+                ) : (
+                  <div className={styles.mapPlaceholder} aria-hidden="true" />
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {view === "observed" && observedData && (
-        <ObservedDetails observed={observedData} />
-      )}
-      {view === "projection" && projectedData && (
-        <details className={base.details}>
-          <summary>Seasonal pattern and all periods</summary>
-          <p className={styles.note}>{projectedData.reference_note}</p>
-          {projectedData.months.length > 0 && <TypicalMonths outlook={projectedData} />}
-          <PeriodSummary outlook={projectedData} />
-          <p className={styles.source}>
-            Projection release {projectedData.release} from the modelling team; no model
-            is run on request. Source: <code>{projectedData.source_uri}</code>
-          </p>
-        </details>
+          {view === "observed" && observedData && (
+            <ObservedDetails observed={observedData} />
+          )}
+          {view === "projection" && projectedData && (
+            <details className={base.details}>
+              <summary>Seasonal pattern and all periods</summary>
+              <p className={styles.note}>{projectedData.reference_note}</p>
+              {projectedData.months.length > 0 && (
+                <TypicalMonths outlook={projectedData} />
+              )}
+              <PeriodSummary outlook={projectedData} />
+            </details>
+          )}
+        </>
       )}
 
       <PrecisionInfoModal
@@ -406,7 +473,9 @@ function useLoaded<T>(
     const controller = new AbortController();
     setResult((current) => ({ data: current.data, state: "loading" }));
     load(controller.signal)
-      .then((data) => setResult({ data, state: "ready" }))
+      .then((data) => {
+        if (!controller.signal.aborted) setResult({ data, state: "ready" });
+      })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         setResult({
@@ -456,6 +525,7 @@ function useMapSource({
   return useMemo(
     () => ({
       key,
+      cacheScope: view,
       load: (token: string) =>
         view === "observed"
           ? fetchObservedRiskMap(mapGeographyId, token, selection)

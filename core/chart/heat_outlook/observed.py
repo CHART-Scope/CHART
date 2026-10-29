@@ -187,7 +187,7 @@ def load_observed_map(
     selector: str | None = None,
     restriction: OutlookRestriction | None = None,
 ) -> MapResponse:
-    """Counties shaded by their share for one observed month."""
+    """Frame the selected place; shade only exactly calibrated county areas."""
 
     if restriction is not None and not restriction.allows("observed"):
         raise ViewTurnedOff("observed")
@@ -203,8 +203,11 @@ def load_observed_map(
     if month is not None and month not in any_county:
         raise OutlookSelectionInvalid(month)
 
+    # Drill-down uses the same hierarchy as projections. Constituencies keep
+    # their own outlines and missing values; a county's calibrated estimate
+    # belongs only to that county, never to each of its children.
     frame = load_map_view(
-        session, geography_id, None, outcome=outcome, with_values=False
+        session, geography_id, chosen, outcome=outcome, with_values=False
     )
     by_geography = {unit.app_geography_id: scored[unit.id] for unit in units}
     for area in frame.areas:
@@ -213,7 +216,9 @@ def load_observed_map(
         area.value_percent = None
         area.on_training_support = None
         if value is None:
-            area.missing_reason = "not_reported"
+            area.missing_reason = (
+                "not_reported" if area.geography_id in by_geography else "no_model"
+            )
             continue
         estimate = _estimate(outcome, selector, [value], release)
         area.value_percent = estimate.value_percent
@@ -222,6 +227,21 @@ def load_observed_map(
         )
         area.odds_ratio = estimate.ratio.value if estimate.ratio else None
         area.on_training_support = not estimate.thin_data
+    frame.metric = "heat_attributable_share_observed_month"
+    return frame
+
+
+def load_observed_outline(
+    session: Session, geography_id: str, outcome: str, month: str | None
+) -> MapResponse:
+    """Keep unsupported places navigable without borrowing observed estimates."""
+    if outcome not in OUTCOMES:
+        raise OutlookNotAvailable(geography_id)
+    frame = load_map_view(
+        session, geography_id, month, outcome=outcome, with_values=False
+    )
+    for area in frame.areas:
+        area.missing_reason = "no_model"
     frame.metric = "heat_attributable_share_observed_month"
     return frame
 
