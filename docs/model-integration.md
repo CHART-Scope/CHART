@@ -252,16 +252,19 @@ stand out. The figures are described in [Observed months](#observed-months);
 
 | Control | Options | Default |
 | --- | --- | --- |
-| Scenario | The file's scenarios | SSP5-8.5 |
+| Scenario | The file's scenarios | SSP3-7.0, the project's planning scenario |
 | Time horizon | The file's 20-year periods; the first is the baseline (1981–2010 for LBW, 1991–2020 for under-five) | 2041–2060 |
-| Reference period | **Annual average**: the period summary (PARP for LBW, PAF for under-five) with its 95% CI and the change from the baseline. **Peak heat season**: the three consecutive months with the highest heat share in the typical-month table, with the climate-model range (the table has no CI per month) | Annual average |
+| Reference period | **Annual average**: the period summary (PARP for LBW, PAF for under-five) with its 95% CI and the change from the baseline. **Highest-risk months**: the three consecutive months with the highest heat share in the typical-month table, with the climate-model range (the table has no CI per month) | Annual average |
 
-The peak season is ranked by share, not by temperature. An LBW month is the
+The highest-risk months are ranked by share, not by temperature, so they are
+not the weather heat season. The panel states that season beside them, from
+`core/chart/climate/heat_seasons.json` (India: March–June, peaking in May;
+Kenya: December–March, peaking in February). An LBW month is the
 births of that month, exposed over the pregnancy before it, so the births heat
 affects most are not born in the hottest months: in Kajiado they are born in
 July to September, after the January–March heat. For under-five, with four-day
 lags, the two orders agree. Kenya as a whole has no typical-month table, so
-the peak season is not offered there.
+the highest-risk months are not offered there.
 
 One-, five- and ten-year horizons need monthly projections from the modelling
 team, which are not in this release; the panel says so under the controls.
@@ -374,7 +377,7 @@ its own Save.
 | Setting | Options come from | Default |
 | --- | --- | --- |
 | Pregnancy windows (LBW) or age groups (under-five) | The outlook file's selectors (`P`, `T1`–`T3`; the age groups), and each live release's validated windows (`window_1`–`window_3`) | LBW outlook: whole pregnancy only. Age groups and live windows: all on. Default selector: whole pregnancy / post-neonatal |
-| Scenarios, with one default | The outlook file's scenarios; SSP1-2.6, SSP3-7.0 and SSP5-8.5 for live places with a hot season | All on, SSP5-8.5 by default |
+| Scenarios, with one default | The outlook file's scenarios; SSP1-2.6, SSP3-7.0 and SSP5-8.5 for live places with a hot season | All on, SSP3-7.0 by default |
 | Data views | `observed` (Copernicus ERA5 months) for the Kenya outlook when its release has a calibration, and wherever a live release is active; `seasonal` (C3S forecast, up to 6 months) for live releases; `projection` (long-term scenarios) for the outlook and live places with a hot season | All on |
 
 The rules are enforced by the API (`PUT /model-settings/{country}/{outcome}`),

@@ -236,7 +236,7 @@ test("a failing observed request says so and leaves the projection usable", asyn
   await expect(outlook.getByTestId("outlook-estimate")).toContainText("11.1%");
 });
 
-test("the projected peak heat season ranks months by share, not temperature", async ({
+test("the projected highest-risk months rank by share, not temperature", async ({
   page,
 }) => {
   const api = await installKenya(page);
@@ -245,9 +245,18 @@ test("the projected peak heat season ranks months by share, not temperature", as
   await outlook.getByRole("tab", { name: "Projected" }).click();
 
   const reference = outlook.getByRole("group", { name: "Reference period" });
-  await reference.getByRole("button", { name: /Peak heat season \(Jul–Sep\)/ }).click();
+  // "Peak heat season" was read as the weather season; it is not one.
+  await expect(outlook.getByText(/Peak heat season/)).toHaveCount(0);
+  await expect(
+    outlook.getByText(
+      /Hot season \(Kenya Meteorological Department\): Dec–Mar, peaking in Feb\./,
+    ),
+  ).toBeVisible();
+  await reference
+    .getByRole("button", { name: /Highest-risk months \(Jul–Sep\)/ })
+    .click();
   await expect(outlook.getByTestId("outlook-estimate")).toContainText(
-    "in the peak heat season (Jul–Sep) of 2041–2060",
+    "in the highest-risk months (Jul–Sep) of 2041–2060",
   );
   await expect(outlook.getByTestId("outlook-estimate")).toContainText(
     "climate-model range",

@@ -173,11 +173,11 @@ e2e: e2e-orchestration e2e-core e2e-web e2e-era5 e2e-outlook
 # uploads, scores and reads assessments through the API.
 e2e-core:
 	mkdir -p outputs/e2e/core
-	$(VENV_PYTHON) -m pytest core/tests/test_kenya_observed_api.py core/tests/test_heat_outlook_api.py core/tests/test_prediction_requests.py core/tests/test_vra_api.py -q --junitxml=outputs/e2e/core/junit.xml
+	$(VENV_PYTHON) -m pytest core/tests/test_kenya_observed_api.py core/tests/test_heat_outlook_api.py core/tests/test_prediction_requests.py core/tests/test_vra_api.py e2e/test_core_package_data.py -q --junitxml=outputs/e2e/core/junit.xml
 
 e2e-orchestration:
 	mkdir -p outputs/e2e/orchestration
-	$(VENV_PYTHON) -m pytest orchestration/tests/test_climate_pull_failures.py orchestration/tests/test_dagster_postgres_driver.py orchestration/tests/test_prediction_job_executor.py -q --junitxml=outputs/e2e/orchestration/junit.xml
+	$(VENV_PYTHON) -m pytest orchestration/tests/test_climate_pull_failures.py orchestration/tests/test_dagster_postgres_driver.py orchestration/tests/test_prediction_job_executor.py orchestration/tests/test_recent_climate_top_up.py -q --junitxml=outputs/e2e/orchestration/junit.xml
 
 .PHONY: e2e-outlook
 e2e-outlook:

@@ -222,6 +222,8 @@ class AreaSpec:
     name: str
     geometry: dict
     aggregation_method: str = CELL_CENTRE
+    #: The area's own heatwave threshold; None uses the call's ``threshold_c``.
+    heatwave_threshold_c: float | None = None
 
 
 def compute_heat_series_for_areas(
@@ -338,8 +340,13 @@ def compute_heat_series_for_areas(
             continue
         daily = pd.concat(daily_parts[area.id]).sort_index()
         daily = daily[~daily.index.duplicated(keep="first")]
+        area_threshold_c = (
+            threshold_c
+            if area.heatwave_threshold_c is None
+            else area.heatwave_threshold_c
+        )
         frame = build_monthly_frame(
-            daily, district=area.name, threshold_c=threshold_c, min_run=min_run
+            daily, district=area.name, threshold_c=area_threshold_c, min_run=min_run
         )
         frame = frame[frame["month"].isin(requested_set)].reset_index(drop=True)
         frame = add_handoff_metadata(
@@ -352,7 +359,7 @@ def compute_heat_series_for_areas(
             generated_at=generated_at,
             window_start_year=year_list[0],
             window_end_year=year_list[-1],
-            threshold_c=threshold_c,
+            threshold_c=area_threshold_c,
             min_run=min_run,
         )
         daily = daily[
@@ -390,7 +397,7 @@ def compute_heat_series_for_areas(
                     "end_year": year_list[-1],
                     "n_years": year_list[-1] - year_list[0] + 1,
                 },
-                "heatwave": {"threshold_c": threshold_c, "min_run": min_run},
+                "heatwave": {"threshold_c": area_threshold_c, "min_run": min_run},
                 "shared_download": True,
                 "cache": cache_metadata,
                 "row_count": int(len(frame)),

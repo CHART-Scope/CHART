@@ -84,10 +84,22 @@ class OutlookPeriod(BaseModel):
     parts: list[PeriodPart]
 
 
+class OfficialHeatSeason(BaseModel):
+    """The country's heat season as its meteorological department defines it."""
+
+    label: str
+    months: list[int]
+    peak_month: int
+    source_name: str
+    source_uri: str
+
+
 class PeakSeason(BaseModel):
     """The three consecutive months of the period with the highest heat share.
 
-    For LBW the months are birth months. The share is the mean of the three
+    Ranked by health share, not temperature, so it is not the weather heat
+    season: for LBW the months are birth months, whose pregnancies were
+    exposed to the heat of earlier months. The share is the mean of the three
     months' typical-month shares; the range is the spread of the climate
     models, not a confidence interval.
     """
@@ -119,6 +131,7 @@ class HeatOutlookResponse(BaseModel):
     months: list[OutlookMonth]
     period_summary: list[OutlookPeriod]
     peak_season: PeakSeason | None = None
+    heat_season: OfficialHeatSeason | None = None
     data_modes: list[str] = ["observed", "projection"]
 
 

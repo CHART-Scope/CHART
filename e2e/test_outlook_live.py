@@ -87,6 +87,13 @@ def test_period_selection_fine_geographies_and_missing_data(
     assert data["geography_id"] == place["id"]
     assert data["data_modes"] == ["projection"]
     assert len(data["months"]) == 12
+    # SSP3-7.0 is the project's planning scenario, not SSP5-8.5.
+    assert data["scenario"] == "ssp370"
+    # The meteorological department's season (CHART partners, 2026-10-15).
+    season = data["heat_season"]
+    assert (season["months"], season["peak_month"]) == (
+        ([3, 4, 5, 6], 5) if country == "IN" else ([12, 1, 2, 3], 2)
+    )
     capability = client.get(
         path + "/capabilities", params={"outcome": outcome}, headers=tokens[user]
     )

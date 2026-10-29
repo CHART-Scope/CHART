@@ -67,6 +67,27 @@ local cache directory; deployed workers keep it at
 explicitly bypasses reuse. A cache hit retains the original raw-file hash and
 request provenance, and only the requested months are processed.
 
+Recent months are pulled before anyone asks. Every six hours the Dagster
+sensor `recent_climate_months_sensor` checks the two newest months ERA5 has
+published (it lands about six days after a month ends). When any deployed area
+of a country lacks one, it queues a country pull for the missing months, which
+the ingestion sensor runs like an operator's pull from Settings > Jobs. A
+country with a pull in flight is skipped, and a failed automatic pull is
+retried after 24 hours. A planner therefore reads last month from the database
+instead of waiting on a Copernicus download.
+
+Heatwave days follow each country's official definition in
+`core/chart/climate/heat_seasons.json`, provided by the CHART partners on
+2026-10-15. India uses the IMD plains threshold, Tmax of at least 40 °C. Kenya
+uses KMD's thresholds over three or more consecutive days: Nairobi 32 °C,
+Mombasa 36 °C, Kisumu 37 °C, and 38 °C for Turkana, Marsabit and Mandera.
+Other Kenyan counties keep CHART's 35 °C default, which is not an official
+threshold. IMD's 30 °C threshold for hilly regions is recorded but not yet
+applied, because no area is classified as hilly. Each run's metadata records
+the threshold it used. Months pulled before this change used 35 °C everywhere,
+so 12-month totals that mix old and new runs mix both definitions until those
+months are pulled again.
+
 After new district/constituency boundaries are registered, another country pull
 can derive their climate inputs from those grids. Fine areas use polygon-cell
 overlap weights; existing county/division methods stay unchanged. Acquisitions

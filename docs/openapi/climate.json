@@ -6414,6 +6414,16 @@
               }
             ]
           },
+          "heat_season": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OfficialHeatSeason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "data_modes": {
             "items": {
               "type": "string"
@@ -8334,6 +8344,43 @@
         ],
         "title": "OddsRatio"
       },
+      "OfficialHeatSeason": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "months": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Months"
+          },
+          "peak_month": {
+            "type": "integer",
+            "title": "Peak Month"
+          },
+          "source_name": {
+            "type": "string",
+            "title": "Source Name"
+          },
+          "source_uri": {
+            "type": "string",
+            "title": "Source Uri"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "months",
+          "peak_month",
+          "source_name",
+          "source_uri"
+        ],
+        "title": "OfficialHeatSeason",
+        "description": "The country's heat season as its meteorological department defines it."
+      },
       "Option": {
         "properties": {
           "code": {
@@ -8526,7 +8573,7 @@
           "gcm_max_percent"
         ],
         "title": "PeakSeason",
-        "description": "The three consecutive months of the period with the highest heat share.\n\nFor LBW the months are birth months. The share is the mean of the three\nmonths' typical-month shares; the range is the spread of the climate\nmodels, not a confidence interval."
+        "description": "The three consecutive months of the period with the highest heat share.\n\nRanked by health share, not temperature, so it is not the weather heat\nseason: for LBW the months are birth months, whose pregnancies were\nexposed to the heat of earlier months. The share is the mean of the three\nmonths' typical-month shares; the range is the spread of the climate\nmodels, not a confidence interval."
       },
       "PeriodPart": {
         "properties": {
