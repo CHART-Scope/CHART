@@ -4,6 +4,13 @@ Run `make e2e`. Existing compatibility suites run first; the new
 `make e2e-outlook` target exercises the real API, PostGIS, Keycloak login and
 browser without intercepted requests or authentication overrides.
 
+`make e2e-orchestration` also drives the recent-month top-up: the real Dagster
+sensors and job pull two missing ERA5 months for two Kenyan counties from a
+synthetic cached grid, apply each county's heatwave threshold, and leave
+evidence in `outputs/e2e/orchestration/recent-climate-top-up/`. `make e2e-core`
+builds the core wheel and checks it ships every runtime JSON file
+(`outputs/e2e/core/package-data.json`).
+
 Prerequisites: Docker with `chart-postgis:16` and
 `quay.io/keycloak/keycloak:26.6.1`, the repository Python and web dependencies,
 Playwright Chromium, and the four extracted modeller handovers in

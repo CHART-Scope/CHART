@@ -19,7 +19,7 @@ exposure record.
 | `month` | first day of month (date) |
 | `tmax_monthly_max_c` | absolute maximum daily Tmax in the month |
 | `tmax_monthly_mean_c` | mean of daily Tmax in the month |
-| `heatwave_days` | days that belong to a run of >=3 consecutive days with Tmax >= 35 C |
+| `heatwave_days` | days that belong to a run of >= `min_run` consecutive days with Tmax >= `threshold_c` (35 C and 3 days by default; CHART's country pulls pass each area's official threshold, see `core/chart/climate/heat_seasons.json`) |
 | `observed_days` | daily observations available in the month |
 | `expected_days` | expected number of days in the month |
 | `completeness_pct` | `observed_days / expected_days` |

@@ -18,6 +18,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from chart.climate.heat_seasons import heat_season
 from chart.model_registry.runtime import model_cache_dir
 from chart.model_registry.service import get_active_model_mapping
 from chart.risk.precision import precision_for_ci
@@ -35,6 +36,7 @@ from .schemas import (
     OutlookCapabilities,
     OutlookMonth,
     OutlookPeriod,
+    OfficialHeatSeason,
     PeakSeason,
     PeriodPart,
     Ratio,
@@ -51,7 +53,9 @@ SCENARIO_LABELS = {
     "ssp370": "SSP3-7.0 (medium-high emissions)",
     "ssp585": "SSP5-8.5 (high emissions)",
 }
-DEFAULT_SCENARIO = "ssp585"
+# SSP3-7.0 is the project's planning scenario; partners advise against
+# leading with SSP5-8.5.
+DEFAULT_SCENARIO = "ssp370"
 DEFAULT_PERIOD = "2041-2060"
 # Whole pregnancy for LBW and post-neonatal for under-five, as agreed with the
 # modeller (call of 2026-10-08): whole pregnancy has the clearest heat curve,
@@ -550,6 +554,7 @@ def load_outlook(
         months=_months(document, outcome, scenario, period, selector),
         period_summary=_period_summary(document, outcome, scenario, selector, baseline),
         peak_season=_peak_season(document, outcome, scenario, period, selector),
+        heat_season=_official_season(document.get("country_code", "KE")),
         data_modes=[
             v
             for v in document.get("data_modes", ["observed", "projection"])
@@ -706,6 +711,19 @@ def _peak_season(document, outcome, scenario, period, selector) -> PeakSeason | 
         gcm_max_percent=(
             mean("max") if visible and "country_code" not in document else None
         ),
+    )
+
+
+def _official_season(country_code: str) -> OfficialHeatSeason | None:
+    season = heat_season(country_code)
+    if season is None:
+        return None
+    return OfficialHeatSeason(
+        label=season.label,
+        months=list(season.months),
+        peak_month=season.peak_month,
+        source_name=season.source_name,
+        source_uri=season.source_uri,
     )
 
 

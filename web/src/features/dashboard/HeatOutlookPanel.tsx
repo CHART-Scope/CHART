@@ -602,7 +602,7 @@ function projectedFigure(
     return {
       ...EMPTY_FIGURE,
       percent: peak.part.value_percent,
-      when: `in the peak heat season (${peak.label}) of ${periodLabel}`,
+      when: `in the highest-risk months (${peak.label}) of ${periodLabel}`,
       range:
         peak.gcm_min_percent !== null && peak.gcm_max_percent !== null
           ? ` (climate-model range ${peak.gcm_min_percent.toFixed(1)} to ${peak.gcm_max_percent.toFixed(1)}%)`
@@ -799,8 +799,8 @@ function ProjectedControls({
             {
               value: "peak",
               label: outlook.peak_season
-                ? `Peak heat season (${outlook.peak_season.label})`
-                : "Peak heat season",
+                ? `Highest-risk months (${outlook.peak_season.label})`
+                : "Highest-risk months",
               disabled: !outlook.peak_season,
               title: outlook.peak_season
                 ? undefined
@@ -811,6 +811,7 @@ function ProjectedControls({
         />
       </ControlRow>
       <p className={styles.note}>
+        {seasonNote(outlook)}
         Projections average the selected years under a climate scenario. They do not
         predict the conditions in any individual year.
       </p>
@@ -861,6 +862,18 @@ function ObservedDetails({ observed }: { observed: ObservedRisk }) {
       </p>
     </details>
   );
+}
+
+function seasonNote(outlook: HeatOutlook): string {
+  const season = outlook.heat_season;
+  if (!season) return "";
+  const first = MONTHS[season.months[0] - 1];
+  const last = MONTHS[season.months[season.months.length - 1] - 1];
+  const exposure =
+    outlook.outcome === "lbw"
+      ? " Highest-risk months are birth months, so they follow the heat their pregnancies were exposed to."
+      : "";
+  return `${season.label} (${season.source_name}): ${first}–${last}, peaking in ${MONTHS[season.peak_month - 1]}.${exposure} `;
 }
 
 function TypicalMonths({ outlook }: { outlook: HeatOutlook }) {

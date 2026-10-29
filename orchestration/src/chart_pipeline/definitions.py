@@ -31,6 +31,7 @@ from seasonal_c3s import (
 from shapely.geometry import mapping
 
 from chart.climate.data_contract import MonthlyClimateRecord
+from chart.climate.heat_seasons import HeatwaveRule, heatwave_rule
 from chart.climate.input_windows import select_input_months, target_months
 from chart.climate.ingestion_leases import run_single_flight_ingestion
 from chart.climate.projection_adapter import (
@@ -58,6 +59,7 @@ from chart.climate.ingestion_jobs import (
     complete_job,
     country_envelope,
     fail_job,
+    queue_recent_month_top_ups,
     record_progress,
     reserve_queued_jobs,
     running_jobs,
@@ -296,6 +298,7 @@ def pull_country_climate(
                 session.commit()
                 raise ClimateServiceError("CLIMATE_NO_AREAS", 409)
             envelope = country_envelope(units)
+            heatwave = _heatwave_rule(config.country_code)
             areas = [
                 AreaSpec(
                     id=unit.id,
@@ -309,6 +312,7 @@ def pull_country_climate(
                         if unit.level in {"district", "constituency"}
                         else CELL_CENTRE
                     ),
+                    heatwave_threshold_c=heatwave.threshold_for(unit.app_geography_id),
                 )
                 for unit in units
             ]
@@ -333,7 +337,11 @@ def pull_country_climate(
         if not _cds_credentials_available():
             raise ClimateServiceError("CLIMATE_INGEST_NOT_CONFIGURED", 503)
         results = compute_heat_series_for_areas(
-            areas, bbox=envelope, target_months=tuple(months)
+            areas,
+            bbox=envelope,
+            target_months=tuple(months),
+            threshold_c=heatwave.threshold_c,
+            min_run=heatwave.min_run_days,
         )
         if not results:
             raise ClimateServiceError("CLIMATE_NO_GRID_CENTRES", 422)
@@ -872,14 +880,29 @@ def _load_fixture(
     return run_ids
 
 
+def _heatwave_rule(country_code: str | None) -> HeatwaveRule:
+    """The country's heatwave definition, or CHART's 35 deg C, 3-day default."""
+
+    return heatwave_rule(country_code or "") or HeatwaveRule(
+        threshold_c=35.0,
+        min_run_days=3,
+        area_thresholds_c={},
+        source_name="CHART default",
+        source_uri="",
+    )
+
+
 def _load_observed(context, place: dict, months: list[date], session_factory) -> int:
     if not _cds_credentials_available():
         raise ClimateServiceError("CLIMATE_INGEST_NOT_CONFIGURED", 503)
+    heatwave = _heatwave_rule(place.get("country_code"))
     df, meta, daily = compute_heat_series(
         district=place["name"],
         bbox=place["bbox"],
         geometry=place["geometry"],
         target_months=tuple(months),
+        threshold_c=heatwave.threshold_for(place.get("geography_id")),
+        min_run=heatwave.min_run_days,
     )
     csv_path, _ = _write_observed_output(place["code"], df, meta, months)
     with session_factory() as session:
@@ -1105,6 +1128,10 @@ def _place_snapshot(admin_unit: AdminUnit) -> dict:
         "geometry": geometry,
         "boundary_version": admin_unit.boundary_version or "unknown",
         "country_preset": admin_unit.geography.slug,
+        "geography_id": admin_unit.app_geography_id,
+        "country_code": (
+            admin_unit.app_geography.country_code if admin_unit.app_geography else None
+        ),
     }
 
 
@@ -1232,7 +1259,34 @@ def _ensure_climate_storage_capacity() -> None:
             raise ClimateServiceError("CLIMATE_STORAGE_CAPACITY_LOW", 503)
 
 
+@dg.sensor(
+    job=climate_ingestion_job,
+    minimum_interval_seconds=6 * 60 * 60,
+    default_status=dg.DefaultSensorStatus.RUNNING,
+)
+def recent_climate_months_sensor(_context: dg.SensorEvaluationContext):
+    """Queue a country pull when the newest published ERA5 month is missing.
+
+    Without it, a recent month reached the database only when a planner
+    asked for it and waited on Copernicus. The queued job is dispatched by
+    ``pending_climate_ingestions_sensor`` like an operator's pull.
+    """
+    with get_session_factory()() as session:
+        jobs = queue_recent_month_top_ups(session, today=date.today())
+        queued = [(job.country_code, list(job.months or [])) for job in jobs]
+        session.commit()
+    if not queued:
+        yield dg.SkipReason("Recent climate months are already held.")
+        return
+    _context.log.info("Queued climate top-ups: %s", queued)
+    yield dg.SkipReason(f"Queued {len(queued)} country pull(s) for dispatch.")
+
+
 defs = dg.Definitions(
     jobs=[prediction_request_job, climate_ingestion_job],
-    sensors=[pending_prediction_requests_sensor, pending_climate_ingestions_sensor],
+    sensors=[
+        pending_prediction_requests_sensor,
+        pending_climate_ingestions_sensor,
+        recent_climate_months_sensor,
+    ],
 )

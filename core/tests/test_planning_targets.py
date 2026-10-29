@@ -23,6 +23,7 @@ def test_next_heat_season_is_relative_and_limited_by_available_data() -> None:
         date(2027, 5, 1),
     )
     assert options.next_heat_season.planning_date == date(2027, 5, 1)
+    assert options.next_heat_season.source_uri.endswith("FAQ_heat_wave.pdf")
     assert not options.next_heat_season.available
     assert options.next_heat_season.available_from == date(2026, 12, 7)
     assert options.long_term_projection is not None

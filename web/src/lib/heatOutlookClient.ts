@@ -53,6 +53,15 @@ export type PeakSeason = {
   gcm_max_percent: number | null;
 };
 
+/** The country's heat season as its meteorological department defines it. */
+export type OfficialHeatSeason = {
+  label: string;
+  months: number[];
+  peak_month: number;
+  source_name: string;
+  source_uri: string;
+};
+
 /** The outlook views a country's model settings leave on. */
 export type OutlookView = "observed" | "projection";
 
@@ -81,6 +90,7 @@ export type HeatOutlook = {
     parts: OutlookPeriodPart[];
   }[];
   peak_season: PeakSeason | null;
+  heat_season?: OfficialHeatSeason | null;
   data_modes: OutlookView[];
 };
 

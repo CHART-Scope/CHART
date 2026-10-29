@@ -330,6 +330,17 @@ def test_peak_season_is_the_three_months_with_the_highest_share(client) -> None:
     assert body["data_modes"] == ["projection"]
 
 
+def test_outlook_carries_the_official_heat_season(client) -> None:
+    body = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw").json()
+
+    # The weather season (Kenya Meteorological Department) is reported beside,
+    # and distinct from, the months with the highest health share (Jul-Sep).
+    season = body["heat_season"]
+    assert season["months"] == [12, 1, 2, 3] and season["peak_month"] == 2
+    assert season["source_name"] == "Kenya Meteorological Department"
+    assert body["peak_season"]["months"] != season["months"][:3]
+
+
 def test_peak_season_map_and_suppressed_window(client, monkeypatch) -> None:
     enable_every_window(client)
     t3 = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw&selector=T3").json()
