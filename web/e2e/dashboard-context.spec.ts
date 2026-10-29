@@ -39,7 +39,7 @@ test("an old link to a state in its country frame opens the state", async ({
   );
   await expect(
     page.getByRole("combobox", { name: "Division", exact: true }),
-  ).toHaveText(/Whole state/);
+  ).toHaveText(/All divisions/);
 
   // A division asked for in the old frame is kept.
   await page.goto("/dashboard/geo-in?admin_unit=geo-in-mp-gwalior&outcome=lbw");
@@ -50,7 +50,7 @@ test("the state map and the division picker move together", async ({ page }) => 
   await installFakeApi(page);
   await page.goto("/dashboard/geo-in-mp?outcome=lbw&month=2026-08");
   const division = page.getByRole("combobox", { name: "Division", exact: true });
-  await expect(division).toHaveText(/Whole state/);
+  await expect(division).toHaveText(/All divisions/);
   // The whole state is drawn, every division its own shape: no country map.
   await expect(page.locator("svg [data-interactive]").first()).toBeVisible();
   const shapes = await page.locator("svg path[data-interactive]").count();
@@ -73,20 +73,23 @@ test("the state map and the division picker move together", async ({ page }) => 
     "true",
   );
 
-  // Back to the whole state, from the picker and from the map.
-  await choose(page, "Division", "Whole state");
+  // Back to the whole state, from the picker and the explicit parent control.
+  await choose(page, "Division", "All divisions");
   await page.waitForURL((url) => !url.searchParams.has("admin_unit"));
-  await expect(division).toHaveText(/Whole state/);
+  await expect(division).toHaveText(/All divisions/);
   await page
     .getByRole("button", { name: /^Gwalior/ })
     .first()
     .click();
   await page.waitForURL(/admin_unit=geo-in-mp-gwalior/);
   await page
-    .getByRole("button", { name: /^Gwalior/ })
-    .first()
+    .getByRole("navigation", { name: "Map navigation" })
+    .getByRole("button", { name: "Back to Madhya Pradesh", exact: true })
     .click();
   await page.waitForURL((url) => !url.searchParams.has("admin_unit"));
+  await expect(division).toHaveText(/All divisions/);
+  expect(new URL(page.url()).searchParams.get("month")).toBe("2026-08");
+  expect(new URL(page.url()).searchParams.get("view")).toBe("observed");
   await page.screenshot({
     path: "../outputs/e2e/web/dashboard-state-map.png",
     fullPage: true,

@@ -48,12 +48,13 @@ for (const [country, username, frame, place, observedRelease] of [
         panel.getByRole("combobox", { name: "Year", exact: true }),
       ).toHaveCSS("padding", "4px 8px");
       const selectedArea = panel.getByRole("button", {
-        name:
-          country === "KE"
-            ? /^Kajiado: [\d.]+% attributable$/
-            : /^Bhopal: [\d.]+% attributable$/,
+        name: country === "KE" ? /^Kajiado Central: / : /^Bhopal: /,
       });
       await expect(selectedArea).toBeVisible();
+      await expect(selectedArea).not.toHaveAttribute(
+        "aria-label",
+        /\d.*% attributable/,
+      );
       await page.screenshot({
         path: `${process.env.CHART_E2E_EVIDENCE}/${country}-${outcome}-observed.png`,
         fullPage: true,

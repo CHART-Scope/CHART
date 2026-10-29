@@ -17,15 +17,57 @@ database for local installation. `MODEL_CACHE_DIR` defaults to `pipelines/models
 if overridden, publish into its `outlooks/` child instead. The importer writes
 `index.json`, `boundaries.json`, per-place/outcome JSON and source provenance.
 The registration transaction upserts geography records without creating active
-R-model assignments. No schema migration is needed for a new administrative
-level. Existing geography IDs and access-scope paths are preserved.
+R-model assignments. Run the application's database migrations first: migration
+029 removes legacy fixed-level checks from upgraded installations. Subsequent
+administrative levels are configuration, with no per-level schema migration.
+Existing geography IDs and access-scope paths are preserved.
+Existing boundaries used by active observed models are preserved as well;
+registering new projection areas does not replace a calibrated county/division
+exposure boundary.
+
+### Installing the generated outlooks on the server
+
+Upload the generated `pipelines/models/outlooks/` directory contents to the
+configured model bucket's `outlooks/` prefix, preserving the geography folders.
+The runtime needs `boundaries.json`, `provenance.json`, `index.json` and every
+per-place/outcome JSON referenced by the index. It does not read the original
+OneDrive ZIPs. With the default deployment bucket:
+
+```bash
+aws s3 sync pipelines/models/outlooks/ s3://chart-predictive-models/outlooks/ \
+  --exclude index.json --region eu-west-2
+aws s3 cp pipelines/models/outlooks/index.json \
+  s3://chart-predictive-models/outlooks/index.json --region eu-west-2
+```
+
+Publish the index only after the other uploads succeed. Use the actual
+`MODEL_BUCKET` and `AWS_REGION` if the deployment overrides these defaults.
+Then, on the server running a compatible application release:
+
+```bash
+cd ~/chart-deploy/aws
+docker compose --env-file .env.prod run --rm chart-model-sync
+docker compose --env-file .env.prod exec chart-core \
+  chart-register-outlook-geographies /models/outlooks
+```
+
+The second command is required: the current deployment syncs the files but
+does not automatically register their district/constituency boundaries and
+hierarchy in the database. This does not activate observed models for new
+areas. Existing Kenya observed calibration is bundled in the core image;
+India's active R scoring artifacts use their separate manifest-defined S3
+paths. Uploading outlooks does not download ERA5 or deploy application fixes.
+
+### Available views
 
 The dashboard discovers projection and observed sources independently and offers
 configured levels and 5/10/20-year periods. Installing a projection-only handover
 does not disable an existing observed source: Kenya retains its calibrated
 country/county scorer, and India retains exact-place active monthly model
 assignments. A district or constituency does not inherit an ancestor's observed
-model. Where no observed source exists, the disabled tab explains the limitation.
+model. Both tabs remain selectable: where no observed source exists, Observed
+shows an explicit unavailable state and unshaded geographic outlines. Map
+drill-down and the visible parent button preserve the selected view and filters.
 Available new starting years are 2027 and five-year steps from 2031, with periods
 ending no later than 2100; supplied fixed periods remain available. Monthly
 temperature summaries and coefficient confidence intervals stay unavailable for

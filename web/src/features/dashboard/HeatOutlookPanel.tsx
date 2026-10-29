@@ -89,7 +89,7 @@ type Props = {
   selection?: OutlookChoices;
   onSelectionChange?: (selection: OutlookChoices) => void;
   figure?: IconName;
-  onSelectArea?: (geographyId: string) => void;
+  onSelectArea?: (geographyId: string, selection: OutlookChoices) => void;
 };
 
 /**
@@ -119,11 +119,6 @@ export function HeatOutlookPanel({
   // and periods, while a different area keeps them for comparison.
   const [picked, setPicked] = useState<Choices & { outcome: string }>({ outcome });
   const choice: Choices = selection ?? (picked.outcome === outcome ? picked : {});
-  const choose = (next: Choices) => {
-    const merged = { ...choice, ...next };
-    setPicked({ ...merged, outcome });
-    onSelectionChange?.(merged);
-  };
   const [precisionOpen, setPrecisionOpen] = useState(false);
   const { selector, observedSelector, month, scenario, period } = choice;
   const reference = choice.reference ?? "annual";
@@ -159,19 +154,18 @@ export function HeatOutlookPanel({
 
   // Never carry another place or outcome's figures into this selection.
   const observedData =
-    observed.data?.outcome === outcome && observed.data.geography_id === geographyId
+    outlookObserved &&
+    observed.data?.outcome === outcome &&
+    observed.data.geography_id === geographyId
       ? observed.data
       : null;
   const projectedData =
-    projected.data?.outcome === outcome && projected.data.geography_id === geographyId
+    projectionEnabled &&
+    projected.data?.outcome === outcome &&
+    projected.data.geography_id === geographyId
       ? projected.data
       : null;
 
-  const observedOpen =
-    observedEnabled &&
-    (monthlyObserved ||
-      observed.state === "loading" ||
-      (observed.state === "ready" && observedData !== null));
   const projectedOpen =
     projectionEnabled &&
     (projected.state === "loading" ||
@@ -179,16 +173,36 @@ export function HeatOutlookPanel({
   // Observed is the default once it has a month to show; a place or setting
   // without it opens on the projection instead.
   const view: OutlookView =
-    (!observedEnabled ? "projection" : !projectionEnabled ? "observed" : choice.view) ??
-    (monthlyObserved || (observedData && observedData.available_months.length > 0)
-      ? "observed"
-      : observed.state === "loading"
+    choice.view ??
+    (!observedEnabled
+      ? "projection"
+      : !projectionEnabled ||
+          monthlyObserved ||
+          (observedData && observedData.available_months.length > 0) ||
+          observed.state === "loading"
         ? "observed"
         : projectedOpen
           ? "projection"
           : "observed");
+  const resolvedChoices: Choices = {
+    ...choice,
+    view,
+    // Responses may still contain the previous selection while a new one
+    // loads. Explicit URL choices must win when another control is changed.
+    month: month ?? observedData?.month ?? undefined,
+    observedSelector: observedSelector ?? observedData?.selector,
+    scenario: scenario ?? projectedData?.scenario,
+    period: period ?? projectedData?.period,
+    selector: selector ?? projectedData?.selector,
+    reference,
+  };
+  const choose = (next: Choices) => {
+    const merged = { ...resolvedChoices, ...next };
+    setPicked({ ...merged, outcome });
+    onSelectionChange?.(merged);
+  };
   const settled = view === "observed" ? observed : projected;
-  const showMonthlyObserved = view === "observed" && monthlyObserved;
+  const showMonthlyObserved = view === "observed" && monthlyObserved && observedEnabled;
   const busy = !showMonthlyObserved && settled.state === "loading";
 
   const place =
@@ -248,21 +262,18 @@ export function HeatOutlookPanel({
       <Tabs
         className={styles.viewTabs}
         ariaLabel="Outlook view"
-        items={VIEW_TABS.map((item) => ({
-          ...item,
-          disabled: item.value === "observed" ? !observedOpen : !projectedOpen,
-        }))}
+        items={VIEW_TABS}
         value={view}
         onChange={(next) => choose({ view: next })}
       />
 
-      {!observedEnabled && (
+      {view === "observed" && !observedEnabled && (
         <p className={styles.note} role="status">
           {observedCapability?.reason ??
             "Observed estimates are not available for this place and outcome."}
         </p>
       )}
-      {!projectionEnabled && (
+      {view === "projection" && !projectionEnabled && (
         <p className={styles.note} role="status">
           Projected estimates are unavailable for this place and outcome or turned off
           in model settings.
@@ -285,13 +296,14 @@ export function HeatOutlookPanel({
               Observed months could not load, so the projection is shown.
             </p>
           )}
-          {settled.state === "missing" && (
-            <p className={styles.note} role="status">
-              {view === "observed"
-                ? "Observed months are not available for this place."
-                : "No projection has been published for this place and outcome yet."}
-            </p>
-          )}
+          {settled.state === "missing" &&
+            (view === "observed" ? observedEnabled : projectionEnabled) && (
+              <p className={styles.note} role="status">
+                {view === "observed"
+                  ? "Observed months are not available for this place."
+                  : "No projection has been published for this place and outcome yet."}
+              </p>
+            )}
           {settled.state === "error" && (
             <p className={styles.note} role="alert">
               {view === "observed"
@@ -404,12 +416,15 @@ export function HeatOutlookPanel({
                 {(view === "observed" ? observedData : projectedData) ||
                 settled.state !== "loading" ? (
                   <SpatialRiskMap
+                    key={view}
                     embedded
                     geographyId={mapGeographyId}
                     accessToken={accessToken}
                     outcome={outcome}
                     selectedGeographyId={geographyId}
-                    onSelect={onSelectArea}
+                    onSelect={(nextGeographyId) =>
+                      onSelectArea?.(nextGeographyId, resolvedChoices)
+                    }
                     source={mapSource}
                   />
                 ) : (
@@ -510,6 +525,7 @@ function useMapSource({
   return useMemo(
     () => ({
       key,
+      cacheScope: view,
       load: (token: string) =>
         view === "observed"
           ? fetchObservedRiskMap(mapGeographyId, token, selection)

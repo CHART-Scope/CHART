@@ -39,6 +39,11 @@ existing `POSTGRES_PASSWORD` when retaining an existing database volume.
 
 ## Model artifacts on S3
 
+For the October 2026 India/Kenya projections, upload the generated `outlooks/`
+tree and register its geography hierarchy after the model sync. Follow the
+[outlook installation commands](model-integration.md#installing-the-generated-outlooks-on-the-server).
+These JSON publications are separate from the R scoring artifacts below.
+
 Each model release consists of a checked-in manifest under
 `pipelines/models/<family>/` and its `.rds` files under the manifest's S3
 `base_uri`. Before starting the scorer, Compose syncs the configured bucket into
@@ -76,6 +81,12 @@ docker logs --tail 100 chart-core
 Database backups are created in `~/chart-deploy/aws/backups` before migrations
 and kept for 14 days. Postgres, models, climate outputs, Dagster state, and
 Caddy certificates use named Docker volumes.
+
+The climate worker sets `ERA5_CACHE_DIR=/opt/chart/data/climate/era5-cache` on
+the existing climate volume. Deploy the updated code and compose configuration
+to retain raw downloads across container replacements and reuse them for newly
+registered areas. This does not move caches from older ephemeral containers;
+missing acquisitions are downloaded on the next pull.
 
 ## Related
 

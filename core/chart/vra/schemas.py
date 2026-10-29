@@ -3,8 +3,17 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
+
+
+class ValueSchema(BaseModel):
+    type: Literal["number", "integer", "binary"]
+    minimum: float | None = None
+    maximum: float | None = None
+    example: float
+    expected_values: str
 
 
 class IndicatorItem(BaseModel):
@@ -17,6 +26,8 @@ class IndicatorItem(BaseModel):
     route: str
     status: str
     rationale: str
+    uploadable: bool
+    value_schema: ValueSchema
 
 
 class IndicatorList(BaseModel):
@@ -133,8 +144,11 @@ class CoverageIndicator(BaseModel):
     code: str
     name: str
     component: str
+    unit: str
     route: str
     status: str
+    uploadable: bool
+    value_schema: ValueSchema
     #: Child areas holding at least one value for this indicator.
     present: int
     vintages: list[str]

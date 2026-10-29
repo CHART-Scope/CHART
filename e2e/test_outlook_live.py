@@ -4,36 +4,8 @@ import json
 import os
 from pathlib import Path
 
-import httpx
 import pytest
 from sqlalchemy import create_engine, text
-
-
-@pytest.fixture(scope="module")
-def client():
-    with httpx.Client(base_url=os.environ["CHART_E2E_API"], timeout=90) as value:
-        yield value
-
-
-@pytest.fixture(scope="module")
-def tokens():
-    result = {}
-    for username in ("india-planner", "kenya-planner", "district-planner", "denied"):
-        response = httpx.post(
-            os.environ["CHART_E2E_IDENTITY"]
-            + "/realms/chart/protocol/openid-connect/token",
-            data={
-                "client_id": "chart-web",
-                "grant_type": "password",
-                "username": username,
-                "password": os.environ["CHART_E2E_PASSWORD"],
-            },
-        )
-        assert response.is_success, "Disposable identity login failed"
-        result[username] = {
-            "Authorization": "Bearer " + response.json()["access_token"]
-        }
-    return result
 
 
 @pytest.fixture(scope="module")
@@ -399,7 +371,7 @@ def test_missing_advertised_document_is_explicit_and_recovers(client, tokens):
 
 @pytest.mark.parametrize("outcome", ["lbw", "under_5_mortality"])
 def test_existing_kenya_observed_survives_new_projection_release(
-    client, tokens, outcome
+    client, tokens, geographies, outcome
 ):
     path = "/heat-outlook/geo-ke-kajiado"
     headers = tokens["kenya-planner"]
@@ -454,8 +426,16 @@ def test_existing_kenya_observed_survives_new_projection_release(
     )
     assert county_map.status_code == 200, county_map.text
     areas = county_map.json()["areas"]
-    assert not any("constituency" in area["geography_id"] for area in areas)
-    county = next(area for area in areas if area["geography_id"] == "geo-ke-kajiado")
+    children = {geo["id"] for geo in geographies if geo["parentId"] == "geo-ke-kajiado"}
+    assert children
+    assert {area["geography_id"] for area in areas} == children
+    assert all(area["value_percent"] is None for area in areas)
+    assert all(area["missing_reason"] == "no_model" for area in areas)
+    county = next(
+        area
+        for area in mapped.json()["areas"]
+        if area["geography_id"] == "geo-ke-kajiado"
+    )
     assert county["value_percent"] == data["estimate"]["value_percent"]
 
 
@@ -487,9 +467,9 @@ def test_existing_india_monthly_results_remain_separate_from_new_projection(
     with engine.connect() as connection:
         persisted = connection.execute(
             text(
-                "SELECT odds_ratio FROM prediction_result WHERE model_release_id=:release AND valid_month='2026-09-01'"
+                "SELECT odds_ratio FROM prediction_result p JOIN admin_unit a ON a.id=p.admin_unit_id WHERE p.model_release_id=:release AND p.valid_month='2026-09-01' AND a.app_geography_id=:place"
             ),
-            {"release": result["model_release_id"]},
+            {"release": result["model_release_id"], "place": place},
         ).scalar_one()
         assert persisted == result["odds_ratio"]
     engine.dispose()
@@ -532,6 +512,88 @@ def test_unsupported_observed_has_reason_and_never_uses_parent_model(
                 headers=tokens[user],
             ).status_code
             == 404
+        )
+
+
+@pytest.mark.parametrize(
+    "parent,child,user,other_user",
+    [
+        (
+            "geo-in-madhya-pradesh-division-gwalior",
+            "geo-in-madhya-pradesh-district-gwalior",
+            "india-planner",
+            "kenya-planner",
+        ),
+        (
+            "geo-ke-kajiado",
+            "geo-ke-constituency-kajiado-central",
+            "kenya-planner",
+            "india-planner",
+        ),
+    ],
+)
+@pytest.mark.parametrize("outcome", ["lbw", "under_5_mortality"])
+def test_observed_drilldown_keeps_boundaries_without_inheriting_parent_values(
+    client, tokens, geographies, parent, child, user, other_user, outcome
+):
+    params = {"outcome": outcome, "month": "2026-09"}
+    expected_children = {geo["id"] for geo in geographies if geo["parentId"] == parent}
+    assert child in expected_children
+    # A country-scoped leaf selection keeps its sibling map for comparison.
+    # The separate leaf-scope regression below must return only the allowed leaf.
+    for place in (parent, child):
+        path = f"/heat-outlook/{place}/observed/map"
+        response = client.get(path, params=params, headers=tokens[user])
+        assert response.status_code == 200, response.text
+        areas = response.json()["areas"]
+        assert {area["geography_id"] for area in areas} == expected_children
+        for area in areas:
+            assert area["geometry"]["type"] in {"Polygon", "MultiPolygon"}
+            assert area["geometry"]["coordinates"]
+            assert area["value_percent"] is None
+            assert area["missing_reason"] == "no_model"
+        assert client.get(path, params=params).status_code == 401
+        assert (
+            client.get(path, params=params, headers=tokens["denied"]).status_code == 403
+        )
+        assert (
+            client.get(path, params=params, headers=tokens[other_user]).status_code
+            == 403
+        )
+    assert (
+        client.get(
+            f"/heat-outlook/{child}/observed", params=params, headers=tokens[user]
+        ).status_code
+        == 404
+    )
+    # Parent availability remains independent from its uncalibrated children.
+    capability = client.get(
+        f"/heat-outlook/{parent}/capabilities",
+        params={"outcome": outcome},
+        headers=tokens[user],
+    )
+    assert capability.status_code == 200, capability.text
+    assert capability.json()["observed"]["source"] in {"monthly", "outlook"}
+
+
+def test_observed_boundary_only_map_still_isolates_leaf_scope(client, tokens):
+    path = "/heat-outlook/geo-in-madhya-pradesh-district-bhopal/observed/map"
+    response = client.get(path, headers=tokens["district-planner"])
+    assert response.status_code == 200, response.text
+    assert [area["geography_id"] for area in response.json()["areas"]] == [
+        "geo-in-madhya-pradesh-district-bhopal"
+    ]
+    assert response.json()["areas"][0]["value_percent"] is None
+    for place in (
+        "geo-in-madhya-pradesh-division-bhopal",
+        "geo-in-madhya-pradesh-district-rajgarh",
+    ):
+        assert (
+            client.get(
+                f"/heat-outlook/{place}/observed/map",
+                headers=tokens["district-planner"],
+            ).status_code
+            == 403
         )
 
 
@@ -647,6 +709,23 @@ def test_observed_display_setting_remains_effective(
                 ).status_code
                 == 404
             )
+        assert (
+            client.get(
+                f"/heat-outlook/{place}/observed/map", headers=headers
+            ).status_code
+            == 404
+        )
+        fine = (
+            "geo-ke-constituency-kajiado-central"
+            if country == "KE"
+            else "geo-in-madhya-pradesh-district-bhopal"
+        )
+        assert (
+            client.get(
+                f"/heat-outlook/{fine}/observed/map", headers=headers
+            ).status_code
+            == 404
+        )
         assert client.get(f"/heat-outlook/{place}", headers=headers).status_code == 200
     finally:
         restored = client.put(

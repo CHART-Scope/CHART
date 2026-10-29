@@ -8,6 +8,8 @@ export default defineConfig({
   testMatch: [
     "outlook-live.spec.ts",
     "observed-live.spec.ts",
+    "geography-navigation-live.spec.ts",
+    "vra-values-live.spec.ts",
     "typography-live.spec.ts",
   ],
   workers: 1,

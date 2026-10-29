@@ -16,7 +16,12 @@ from chart.shared.db.session import get_session_factory
 from chart.shared.db.models import AppGeography
 from sqlalchemy import select
 
-from .observed import ObservedNotCalibrated, load_observed, load_observed_map
+from .observed import (
+    ObservedNotCalibrated,
+    load_observed,
+    load_observed_map,
+    load_observed_outline,
+)
 from .schemas import HeatOutlookResponse, ObservedResponse, OutlookCapabilities
 from .service import (
     LBW_OUTCOME,
@@ -189,7 +194,7 @@ def read_observed(
 @router.get(
     "/{geography_id}/observed/map",
     response_model=MapResponse,
-    summary="Read Kenyan counties shaded by an observed month's heat share",
+    summary="Read an observed map at the selected geography level",
 )
 def read_observed_map(
     geography_id: str,
@@ -198,20 +203,35 @@ def read_observed_map(
     month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
     selector: Annotated[str | None, Query(max_length=32)] = None,
 ) -> MapResponse:
+    """Map the selected hierarchy, leaving uncalibrated areas explicitly empty.
+
+    County estimates never become constituency values. Places without an
+    observed scorer return outlines only, with null values and `no_model`;
+    their estimate endpoint remains unavailable. Country view settings and
+    geography permissions still apply.
+    """
     require_read_access(user, geography_id)
     restriction = _restriction(geography_id, outcome)
     try:
         with get_session_factory()() as session:
-            if not legacy_observed_geography(session, geography_id, outcome):
-                raise OutlookNotAvailable(geography_id)
-            frame = load_observed_map(
-                session,
-                geography_id,
-                outcome,
-                month=month,
-                selector=selector,
-                restriction=restriction,
-            )
+            if legacy_observed_geography(session, geography_id, outcome):
+                frame = load_observed_map(
+                    session,
+                    geography_id,
+                    outcome,
+                    month=month,
+                    selector=selector,
+                    restriction=restriction,
+                )
+            else:
+                geography = session.get(AppGeography, geography_id)
+                country_code = geography.country_code if geography else "KE"
+                monthly = live_restriction(session, country_code, outcome)
+                if not restriction.allows("observed") and (
+                    monthly is None or "observed" not in monthly.data_modes
+                ):
+                    raise ViewTurnedOff("observed")
+                frame = load_observed_outline(session, geography_id, outcome, month)
             return _scoped_map(session, frame, user)
     except ViewTurnedOff as exc:
         raise HTTPException(status_code=404, detail="VIEW_TURNED_OFF") from exc

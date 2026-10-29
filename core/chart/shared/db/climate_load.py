@@ -712,13 +712,11 @@ def load_era5_shared_download(
     results: dict[int, tuple[pd.DataFrame, dict, pd.Series]],
     csv_paths: dict[int, str],
 ) -> tuple[ClimateRun, int, int]:
-    """Write many areas' values against one climate run.
+    """Version an area derivation while retaining its raw acquisition identity.
 
-    One Copernicus download is one acquisition, so it is one ``climate_run``
-    with ``district_climate`` rows for every area derived from it. Nothing in
-    the schema ever required a run per admin unit - ``district_climate`` holds
-    a plain FK - and filing each area under its own run would claim as many
-    separate acquisitions as there are areas, which is not what happened.
+    Adding areas or changing boundaries/methods creates a new derived run, not
+    a new acquisition. Repeating the same derivation is idempotent. Previous
+    calibrated values and their provenance are never overwritten.
 
     Returns ``(run, monthly_rows, daily_rows)``. Areas whose frame fails audit
     are skipped and counted out rather than aborting the country: one bad
@@ -728,19 +726,13 @@ def load_era5_shared_download(
     if not results:
         raise ValueError("results must not be empty")
 
-    first_id = next(iter(results))
-    _, shared_meta, _ = results[first_id]
-    data_source = None
-    climate_run: ClimateRun | None = None
-    monthly_rows = 0
-    daily_rows = 0
-
-    for admin_unit_id, (frame, meta, daily) in results.items():
+    audited = []
+    for admin_unit_id, (frame, meta, daily) in sorted(results.items()):
         admin_unit = session.get(AdminUnit, admin_unit_id)
         if admin_unit is None:
             raise KeyError(f"unknown admin unit id: {admin_unit_id}")
         try:
-            records, input_hash, data_label = audit_era5_monthly_frame(
+            records, _, data_label = audit_era5_monthly_frame(
                 preset_slug=preset_slug,
                 admin_unit=admin_unit,
                 df=frame,
@@ -753,39 +745,93 @@ def load_era5_shared_download(
                 admin_unit.code,
             )
             continue
+        audited.append((admin_unit, frame, meta, daily, records, data_label))
+    if not audited:
+        raise ValueError("no area survived the audit; nothing was written")
+    # Input-window readers require one exact boundary edition and aggregation
+    # method per run. Keep those groups separate while sharing raw acquisition
+    # hashes; new fine-area rows cannot change existing calibrated inputs.
+    groups: dict[tuple, dict] = {}
+    for area, _, _, _, records, _ in audited:
+        first = records[0]
+        key = (
+            first.boundary_version,
+            first.aggregation_method,
+            first.downscaling_method,
+        )
+        groups.setdefault(key, {})[area.id] = results[area.id]
+    if len(groups) > 1:
+        first_run = None
+        total_monthly = total_daily = 0
+        for group in groups.values():
+            run, monthly_count, daily_count = load_era5_shared_download(
+                session, preset_slug=preset_slug, results=group, csv_paths=csv_paths
+            )
+            first_run = first_run or run
+            total_monthly += monthly_count
+            total_daily += daily_count
+        assert first_run is not None
+        return first_run, total_monthly, total_daily
+    shared_meta = audited[0][2]
 
+    def digest(payload: dict) -> str:
+        return hashlib.sha256(
+            json.dumps(
+                payload, sort_keys=True, separators=(",", ":"), default=str
+            ).encode()
+        ).hexdigest()
+
+    cache = shared_meta.get("cache") or []
+    if not cache or any(not item.get("sha256") for item in cache):
+        raise ValueError("ERA5_RAW_CONTENT_HASH_REQUIRED")
+    raw_hash = digest(
+        {
+            "dataset": shared_meta.get("dataset"),
+            "variable": shared_meta.get("variable"),
+            "objects": sorted({item["sha256"] for item in cache}),
+        }
+    )
+    area_derivations = [
+        {
+            "admin_unit_id": area.id,
+            "boundary_version": records[0].boundary_version,
+            "boundary_sha256": meta.get("boundary_sha256"),
+            "aggregation_method": records[0].aggregation_method,
+            "downscaling_method": records[0].downscaling_method,
+            "heatwave": meta.get("heatwave"),
+        }
+        for area, _, meta, _, records, _ in audited
+    ]
+    derivation_hash = digest({"areas": area_derivations})
+    run_hash = digest(
+        {
+            "contract": "chart-era5-area-derivation-v2",
+            "raw_acquisition_sha256": raw_hash,
+            "requested_months": shared_meta.get("requested_months"),
+            "areas_sha256": derivation_hash,
+        }
+    )
+    existing = session.scalar(
+        select(ClimateRun).where(ClimateRun.input_hash == run_hash)
+    )
+    if existing is not None:
+        _touch_data_source(existing.data_source)
+        return existing, 0, 0
+    data_source = None
+    climate_run: ClimateRun | None = None
+    monthly_rows = 0
+    daily_rows = 0
+
+    for admin_unit, frame, meta, daily, records, data_label in audited:
+        admin_unit_id = admin_unit.id
         if climate_run is None:
             geography = session.get(Geography, admin_unit.geography_id)
             if geography is None:
                 raise KeyError(f"unknown geography for admin unit: {admin_unit_id}")
             data_source = _get_or_create_era5_data_source(session, geography.id)
-            # The run's identity is the download, so it is hashed from the
-            # shared metadata rather than from whichever area happened to be
-            # written first.
-            run_hash = hashlib.sha256(
-                json.dumps(
-                    {
-                        "contract": "chart-era5-shared-download-v1",
-                        "bbox": shared_meta.get("bbox"),
-                        "cache": shared_meta.get("cache"),
-                        "requested_months": shared_meta.get("requested_months"),
-                        "dataset": shared_meta.get("dataset"),
-                        "variable": shared_meta.get("variable"),
-                    },
-                    sort_keys=True,
-                    separators=(",", ":"),
-                    default=str,
-                ).encode()
-            ).hexdigest()
-            existing = session.scalar(
-                select(ClimateRun).where(ClimateRun.input_hash == run_hash)
-            )
-            if existing is not None:
-                _touch_data_source(data_source)
-                return existing, 0, 0
             provenance = Provenance(
                 source_uri=csv_paths[admin_unit_id],
-                input_hash=run_hash,
+                input_hash=raw_hash,
                 license="Copernicus CDS terms",
             )
             session.add(provenance)
@@ -817,8 +863,8 @@ def load_era5_shared_download(
                 aggregation_version=records[0].aggregation_method,
                 downscaling_method=records[0].downscaling_method,
                 quality_status=records[0].quality_status,
-                raw_object_uri=csv_paths[admin_unit_id],
-                raw_object_hash=run_hash,
+                raw_object_uri=";".join(str(item["path"]) for item in cache),
+                raw_object_hash=raw_hash,
             )
             session.add(climate_run)
             session.flush()

@@ -191,7 +191,7 @@ test("switching the observed view off opens the dashboard on the projection", as
   });
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
   const outlook = panel(page);
-  await expect(outlook.getByRole("tab", { name: "Observed" })).toBeDisabled();
+  await expect(outlook.getByRole("tab", { name: "Observed" })).toBeEnabled();
   await expect(outlook.getByRole("tab", { name: "Projected" })).toHaveAttribute(
     "aria-selected",
     "true",
@@ -199,6 +199,19 @@ test("switching the observed view off opens the dashboard on the projection", as
   await expect(outlook.getByTestId("outlook-estimate")).toContainText(
     "11.1% of low birth weight cases in Kajiado",
   );
+  await outlook.getByRole("tab", { name: "Observed" }).click();
+  await expect(outlook.getByRole("tab", { name: "Observed" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(
+    outlook
+      .getByRole("status")
+      .filter({ hasText: "Observed estimates are not available" }),
+  ).toBeVisible();
+  await expect(outlook.getByTestId("outlook-estimate")).toHaveCount(0);
+  await outlook.getByRole("tab", { name: "Projected" }).click();
+  await expect(outlook.getByTestId("outlook-estimate")).toContainText("11.1%");
 });
 
 test("a failing observed request says so and leaves the projection usable", async ({
@@ -207,11 +220,20 @@ test("a failing observed request says so and leaves the projection usable", asyn
   await installKenya(page, true, ["/kenya"], { observedStatus: 500 });
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
   const outlook = panel(page);
-  await expect(outlook.getByRole("tab", { name: "Observed" })).toBeDisabled();
+  await expect(outlook.getByRole("tab", { name: "Observed" })).toBeEnabled();
   await expect(outlook.getByTestId("outlook-estimate")).toContainText("11.1%");
   await expect(outlook.getByRole("alert")).toHaveText(
     "Observed months could not load, so the projection is shown.",
   );
+  await outlook.getByRole("tab", { name: "Observed" }).click();
+  await expect(
+    outlook
+      .getByRole("alert")
+      .filter({ hasText: "The observed estimate could not load." }),
+  ).toBeVisible();
+  await expect(outlook.getByTestId("outlook-estimate")).toHaveCount(0);
+  await outlook.getByRole("tab", { name: "Projected" }).click();
+  await expect(outlook.getByTestId("outlook-estimate")).toContainText("11.1%");
 });
 
 test("the projected peak heat season ranks months by share, not temperature", async ({

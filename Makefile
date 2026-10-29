@@ -166,7 +166,7 @@ web-typecheck:
 # E2E suites. Each run leaves its evidence under outputs/e2e/: JUnit for the
 # Python suites, plus Playwright's HTML report and per-test trace, screenshot
 # and video.
-e2e: e2e-orchestration e2e-core e2e-web e2e-outlook
+e2e: e2e-orchestration e2e-core e2e-web e2e-era5 e2e-outlook
 
 # The Kenya API through HTTP and a database: the observed scorer against the
 # modeller's R validation cases, and the published outlook. The VRA suite
@@ -182,6 +182,11 @@ e2e-orchestration:
 .PHONY: e2e-outlook
 e2e-outlook:
 	$(VENV_PYTHON) e2e/run_outlook.py
+
+.PHONY: e2e-era5
+e2e-era5:
+	mkdir -p outputs/e2e/sandbox-climate-recovery/era5-cache
+	$(VENV_PYTHON) -m pytest e2e/test_era5_cache_live.py -q --junitxml=outputs/e2e/sandbox-climate-recovery/era5-cache/junit.xml
 
 e2e-web:
 	$(NPM) run e2e:web

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
+import { Button } from "@/components/Button";
 import { ScienceVideo } from "@/features/dashboard/ScienceVideo";
 import { useSession } from "@/features/auth/WorkspaceSession";
 import {
@@ -19,6 +20,11 @@ import { useModelCatalog } from "@/lib/useModelCatalog";
 import { type GeographyRecord } from "@/lib/planningClient";
 import { type OutlookChoices } from "@/features/dashboard/HeatOutlookPanel";
 import { resolveMonthlyRiskMonth } from "@/features/dashboard/HeatLbwLinkPanel";
+import {
+  dashboardHref,
+  readOutlookChoices,
+  type DashboardSearch,
+} from "@/features/dashboard/dashboardNavigation";
 
 import {
   fetchOutlookCapabilities,
@@ -29,7 +35,7 @@ import styles from "./page.module.css";
 
 type PageProps = {
   params: Promise<{ geo: string }>;
-  searchParams: Promise<{ admin_unit?: string; outcome?: string; month?: string }>;
+  searchParams: Promise<DashboardSearch>;
 };
 
 export default function DashboardGeoPage(props: PageProps) {
@@ -37,17 +43,14 @@ export default function DashboardGeoPage(props: PageProps) {
   const searchParams = use(props.searchParams);
   const adminUnit = searchParams.admin_unit ?? null;
   const outcome = searchParams.outcome ?? "lbw";
-  // The selected month lives in the URL beside admin_unit and outcome so a
-  // reload, a back button or a shared link all land on the same month. Held
-  // in component state it was lost on every refresh.
-  const month = searchParams.month ?? null;
+  const choices = useMemo(() => readOutlookChoices(searchParams), [searchParams]);
 
   return (
     <Dashboard
       geographyId={params.geo}
       adminUnit={adminUnit}
       outcome={outcome}
-      month={month}
+      choices={choices}
     />
   );
 }
@@ -56,25 +59,21 @@ function Dashboard({
   geographyId,
   adminUnit,
   outcome,
-  month,
+  choices,
 }: {
   geographyId: string;
   adminUnit: string | null;
   outcome: string;
-  month: string | null;
+  choices: OutlookChoices;
 }) {
   // The workspace layout restores the session and sends an account without a
   // planning area to /access-pending before this renders.
   const session = useSession();
   const router = useRouter();
   const [mapRefresh, setMapRefresh] = useState(0);
-  const [outlookSelection, setOutlookSelection] = useState<{
-    key: string;
-    value: OutlookChoices;
-  } | null>(null);
-  const outlookSelectionKey = `${geographyId}:${outcome}`;
-  // Geography changes inside the current map frame (state ↔ division,
-  // country ↔ county) should feel like direct manipulation. The URL remains
+  const month = choices.month ?? null;
+  // Selecting sibling districts/constituencies should feel like direct
+  // manipulation. The URL remains
   // the durable source of truth, but waiting for a Next navigation before
   // moving the outline made the map feel sluggish even though no new map data
   // was needed.
@@ -119,25 +118,19 @@ function Dashboard({
 
   useEffect(() => {
     if (!adminUnit || geographies.length === 0 || effectiveAdminUnit) return;
-    router.replace(
-      `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(outcome)}${month ? `&month=${encodeURIComponent(month)}` : ""}`,
-      { scroll: false },
-    );
+    router.replace(dashboardHref({ geographyId, outcome, choices }), { scroll: false });
   }, [
     adminUnit,
     effectiveAdminUnit,
     geographies.length,
     geographyId,
     outcome,
-    month,
+    choices,
     router,
   ]);
 
-  // Landing directly on a leaf geography (division / county with no children of
-  // its own) reuses the parent's dashboard scope so the sibling switcher is
-  // populated: Bhopal → MP?admin_unit=Bhopal, Kajiado → Kenya?admin_unit=Kajiado.
-  // Non-leaf places (a state that owns divisions, a country that owns counties)
-  // stay put — they already are the scope.
+  // A direct district/constituency link reuses its parent's map so siblings
+  // remain available. Places with children own their map frame.
   useEffect(() => {
     if (geographies.length === 0 || adminUnit) return;
     const current = geographies.find((geo) => geo.id === geographyId);
@@ -145,12 +138,25 @@ function Dashboard({
     const hasChildren = geographies.some((geo) => geo.parentId === current.id);
     if (hasChildren) return;
     const parent = geographies.find((geo) => geo.id === current.parentId);
-    if (!parent) return;
+    if (!parent || !canUseArea(parent, session.user.geographyScopes)) return;
     router.replace(
-      `/dashboard/${encodeURIComponent(parent.id)}?admin_unit=${encodeURIComponent(geographyId)}&outcome=${encodeURIComponent(outcome)}${month ? `&month=${encodeURIComponent(month)}` : ""}`,
+      dashboardHref({
+        geographyId: parent.id,
+        adminUnit: geographyId,
+        outcome,
+        choices,
+      }),
       { scroll: false },
     );
-  }, [geographies, geographyId, adminUnit, outcome, month, router]);
+  }, [
+    geographies,
+    geographyId,
+    adminUnit,
+    outcome,
+    choices,
+    router,
+    session.user.geographyScopes,
+  ]);
 
   // A country whose areas hold their own sub-areas (India: one state, ten
   // divisions) has no useful country view: open the state instead, keeping
@@ -172,19 +178,74 @@ function Dashboard({
     const state =
       deeper.find((area) => area.id === adminUnit || area.id === asked?.parentId) ??
       deeper[0];
-    const params = new URLSearchParams();
-    if (asked && asked.parentId === state.id) params.set("admin_unit", asked.id);
-    params.set("outcome", outcome);
-    if (month) params.set("month", month);
-    router.replace(`/dashboard/${encodeURIComponent(state.id)}?${params}`, {
-      scroll: false,
-    });
-  }, [geographies, geographyId, adminUnit, outcome, month, router]);
+    router.replace(
+      dashboardHref({
+        geographyId: state.id,
+        adminUnit: asked?.parentId === state.id ? asked.id : null,
+        outcome,
+        choices,
+      }),
+      { scroll: false },
+    );
+  }, [geographies, geographyId, adminUnit, outcome, choices, router]);
+
+  // Older links selected a division/county inside its parent's map. A place
+  // with children owns its frame. A leaf also keeps its own route if the user
+  // cannot read the parent; the API returns only the permitted outline.
+  useEffect(() => {
+    if (!effectiveAdminUnit) return;
+    const selected = geographies.find((geo) => geo.id === effectiveAdminUnit);
+    const frame = geographies.find((geo) => geo.id === geographyId);
+    const hasChildren = geographies.some((geo) => geo.parentId === effectiveAdminUnit);
+    const unreadableFrame =
+      selected &&
+      frame &&
+      canUseArea(selected, session.user.geographyScopes) &&
+      !canUseArea(frame, session.user.geographyScopes);
+    if (!hasChildren && !unreadableFrame) return;
+    router.replace(
+      dashboardHref({ geographyId: effectiveAdminUnit, outcome, choices }),
+      { scroll: false },
+    );
+  }, [
+    effectiveAdminUnit,
+    geographies,
+    geographyId,
+    outcome,
+    choices,
+    router,
+    session.user.geographyScopes,
+  ]);
 
   const currentGeography = geographies.find((geo) => geo.id === geographyId);
   const selectedGeographyId = displayedAdminUnit ?? geographyId;
   const effectiveGeography =
     geographies.find((geo) => geo.id === selectedGeographyId) ?? currentGeography;
+  const parentGeography = geographies.find(
+    // A country with no model of its own is a routing container; going back
+    // there would immediately redirect to the same state again.
+    (geo) => geo.id === effectiveGeography?.parentId && (geo.models?.length ?? 0) > 0,
+  );
+  const selectMapArea = (nextGeographyId: string, nextChoices = choices) => {
+    const picked = geographies.find((geo) => geo.id === nextGeographyId);
+    if (!picked || !canUseArea(picked, session.user.geographyScopes)) return;
+    const hasChildren = geographies.some((geo) => geo.parentId === picked.id);
+    const parent = geographies.find((geo) => geo.id === picked.parentId);
+    const frame =
+      !hasChildren && parent && canUseArea(parent, session.user.geographyScopes)
+        ? parent.id
+        : picked.id;
+    const nextAdmin = frame === picked.id ? null : picked.id;
+    if (frame === geographyId) setOptimisticAdminUnit(nextAdmin);
+    navigate(
+      dashboardHref({
+        geographyId: frame,
+        adminUnit: nextAdmin,
+        outcome,
+        choices: nextChoices,
+      }),
+    );
+  };
   const [capabilities, setCapabilities] = useState<{
     key: string;
     data?: OutlookCapabilities;
@@ -246,9 +307,14 @@ function Dashboard({
   useEffect(() => {
     if (catalog.length === 0 || selectedCatalog) return;
     router.replace(
-      `/dashboard/${encodeURIComponent(geographyId)}?outcome=${encodeURIComponent(catalog[0].outcome)}${month ? `&month=${encodeURIComponent(month)}` : ""}`,
+      dashboardHref({
+        geographyId,
+        adminUnit,
+        outcome: catalog[0].outcome,
+        choices: { ...choices, selector: undefined, observedSelector: undefined },
+      }),
     );
-  }, [catalog, geographyId, month, router, selectedCatalog]);
+  }, [catalog, geographyId, adminUnit, choices, router, selectedCatalog]);
 
   useEffect(() => {
     if (
@@ -261,7 +327,7 @@ function Dashboard({
       return;
     }
     router.replace(
-      `/dashboard/${encodeURIComponent(geographyId)}?admin_unit=${encodeURIComponent(districts[0].code)}&outcome=${encodeURIComponent(outcome)}${month ? `&month=${encodeURIComponent(month)}` : ""}`,
+      dashboardHref({ geographyId, adminUnit: districts[0].code, outcome, choices }),
       { scroll: false },
     );
   }, [
@@ -269,7 +335,7 @@ function Dashboard({
     effectiveAdminUnit,
     geographyId,
     outcome,
-    month,
+    choices,
     router,
     selectedCatalog,
     selectedModel,
@@ -293,18 +359,16 @@ function Dashboard({
       batchEnabled={batchEnabled}
       geographyId={selectedGeographyId}
       month={observedMonth}
-      onMonthChange={(nextMonth) => {
-        const params = new URLSearchParams();
-        if (adminUnit) params.set("admin_unit", adminUnit);
-        if (outcome) params.set("outcome", outcome);
-        if (nextMonth) params.set("month", nextMonth);
-        // push, not replace: choosing a month is a step the reader
-        // took, and replacing the entry meant Back left the
-        // dashboard entirely instead of walking the months visited.
-        navigate(`/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`, {
-          scroll: false,
-        });
-      }}
+      onMonthChange={(nextMonth) =>
+        navigate(
+          dashboardHref({
+            geographyId,
+            adminUnit,
+            outcome,
+            choices: { ...choices, month: nextMonth, view: "observed" },
+          }),
+        )
+      }
       accessToken={observedModelAvailable ? session.accessToken : undefined}
       canPrepare={
         observedModelAvailable &&
@@ -345,21 +409,9 @@ function Dashboard({
             ].includes(role),
           )
         }
-        onSelect={(nextGeography: string) => {
-          // Clicking the selected division again returns to the whole
-          // state, where the state has an estimate of its own.
-          const wholeState =
-            nextGeography === displayedAdminUnit &&
-            currentGeography?.models?.some((model) => model.outcome === outcome);
-          setOptimisticAdminUnit(wholeState ? null : nextGeography);
-          const params = new URLSearchParams();
-          if (!wholeState) params.set("admin_unit", nextGeography);
-          if (outcome) params.set("outcome", outcome);
-          if (month) params.set("month", month);
-          navigate(
-            `/dashboard/${encodeURIComponent(geographyId)}?${params.toString()}`,
-          );
-        }}
+        onSelect={(nextGeography) =>
+          selectMapArea(nextGeography, { ...choices, view: "observed" })
+        }
       />
     </HeatLbwLinkPanel>
   );
@@ -370,6 +422,21 @@ function Dashboard({
         <div className={styles.updating} role="status">
           Updating dashboard…
         </div>
+      )}
+      {parentGeography && canUseArea(parentGeography, session.user.geographyScopes) && (
+        <nav aria-label="Map navigation">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              navigate(
+                dashboardHref({ geographyId: parentGeography.id, outcome, choices }),
+              )
+            }
+          >
+            Back to {parentGeography.name}
+          </Button>
+        </nav>
       )}
       <DashboardContextBar
         geographyScopes={session.user.geographyScopes}
@@ -383,12 +450,17 @@ function Dashboard({
           outcome: nextOutcome,
         }) => {
           if (nextGeo === geographyId) setOptimisticAdminUnit(nextAdmin ?? null);
-          const params = new URLSearchParams();
-          if (nextAdmin) params.set("admin_unit", nextAdmin);
-          if (nextOutcome) params.set("outcome", nextOutcome);
-          if (month) params.set("month", month);
-          const query = params.toString() ? `?${params.toString()}` : "";
-          navigate(`/dashboard/${encodeURIComponent(nextGeo)}${query}`);
+          navigate(
+            dashboardHref({
+              geographyId: nextGeo,
+              adminUnit: nextAdmin,
+              outcome: nextOutcome,
+              choices:
+                nextOutcome === outcome
+                  ? choices
+                  : { ...choices, selector: undefined, observedSelector: undefined },
+            }),
+          );
         }}
       />
 
@@ -414,13 +486,16 @@ function Dashboard({
           ) : useOutlookPanel ? (
             // Published capabilities choose the view for every geography.
             <HeatOutlookPanel
-              selection={
-                outlookSelection?.key === outlookSelectionKey
-                  ? outlookSelection.value
-                  : undefined
-              }
-              onSelectionChange={(value) =>
-                setOutlookSelection({ key: outlookSelectionKey, value })
+              selection={choices}
+              onSelectionChange={(nextChoices) =>
+                navigate(
+                  dashboardHref({
+                    geographyId,
+                    adminUnit,
+                    outcome,
+                    choices: nextChoices,
+                  }),
+                )
               }
               dataModes={resolvedCapabilities.data?.data_modes}
               observedCapability={resolvedCapabilities.data?.observed}
@@ -433,20 +508,7 @@ function Dashboard({
               outcome={outcome}
               outcomeLabel={outcomeLabel}
               figure={iconArrayFigure(outcome)}
-              onSelectArea={(nextGeography: string) => {
-                const pickedArea = geographies.find((geo) => geo.id === nextGeography);
-                // Observed county coverage can frame siblings even when the
-                // projection frame has finer areas. Navigate to their real parent.
-                const nextFrame = pickedArea?.parentId ?? geographyId;
-                if (nextFrame === geographyId) setOptimisticAdminUnit(nextGeography);
-                const params = new URLSearchParams();
-                params.set("admin_unit", nextGeography);
-                if (outcome) params.set("outcome", outcome);
-                if (month) params.set("month", month);
-                navigate(
-                  `/dashboard/${encodeURIComponent(nextFrame)}?${params.toString()}`,
-                );
-              }}
+              onSelectArea={selectMapArea}
             />
           ) : observedModelAvailable || !resolvedCapabilities.data?.observed ? (
             observedPanel

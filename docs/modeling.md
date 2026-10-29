@@ -79,12 +79,37 @@ observed model remain unavailable; they never use an ancestor's estimate as if
 it were local. Observed-source availability does not imply that climate input
 months have already been ingested or predictions prepared.
 
+### ERA5 inputs for finer areas
+
+Country pulls can prepare district and constituency inputs from retained ERA5
+grids. These areas use polygon/grid-cell intersection areas measured in an
+equal-area projection (`polygon_cell_overlap_equal_area_v1`). A small polygon
+can therefore receive an area-weighted input even when it contains no grid-cell
+centre. Existing county/division calculations retain their established
+cell-centre, cosine-latitude method. Daily cell maxima are calculated before
+spatial aggregation; monthly summaries follow the same daily series. Requests
+include a native-cell margin for fine areas, and polygons extending beyond the
+actual grid footprint are rejected instead of reporting a partial-area average.
+
+This is spatial aggregation, not downscaling or a new fitted health model.
+Boundary editions, raw-file hashes and aggregation methods are recorded;
+different boundary/method groups have separate derived runs backed by the same
+raw acquisition. An identical repeat does not create duplicate climate facts.
+New boundaries invalidate old boundary-specific inputs until they are derived
+again. Registration preserves existing operational boundaries for exact active
+model assignments and calibrated Kenya counties, including their bounding boxes
+and provenance; a projection handover cannot silently change a calibrated
+observed input. Preparing these inputs does not activate a district or constituency
+Observed health estimate without a validated exact-place model and input
+contract. Its map remains available with no inferred or inherited health value.
+
 ### Geography and installation
 
 Place IDs, parent relationships and country-specific level labels are data in
 the existing geography tables. Published model coverage is separate from
-active scoring assignments. New levels require configured records and
-versioned boundaries, not a schema migration. The API validates selections
+active scoring assignments. Migration 029 removes fixed-level constraints left
+by older installations; thereafter new levels require configured records and
+versioned boundaries, not per-level schema migrations. The API validates selections
 against published rows and applies country settings and geography permissions.
 A single-parent administrative hierarchy does not represent overlapping
 watersheds or service areas; those would need explicit relationship semantics.

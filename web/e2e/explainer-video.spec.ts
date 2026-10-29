@@ -41,8 +41,8 @@ for (const width of [1440, 390]) {
     const requests = await serveVideo(page);
     await page.goto("/");
 
-    const section = page.getByRole("region", { name: "CHART in 80 seconds" });
-    const video = section.getByLabel("CHART explainer video");
+    const hero = page.locator("section[aria-labelledby='chart-landing-title']");
+    const video = hero.getByLabel("CHART explainer video");
     await video.scrollIntoViewIfNeeded();
     await expect(video).toBeVisible();
     await expect(video).toHaveAttribute("preload", "none");
@@ -60,7 +60,7 @@ for (const width of [1440, 390]) {
       .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
       .toBeGreaterThan(0.2);
     expect(requests.length).toBeGreaterThan(0);
-    await section.screenshot({ path: testInfo.outputPath("explainer.png") });
+    await video.screenshot({ path: testInfo.outputPath("explainer.png") });
   });
 }
 

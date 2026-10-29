@@ -123,9 +123,9 @@ test("an assessed state shows its map, its ranking and one area opened up", asyn
   const table = panel.getByRole("table", { name: `Indicators for ${topName}` });
   await expect(table.locator("thead th")).toHaveText([
     "Indicator",
-    "Value",
+    "Recorded value",
     "Vintage",
-    "Score",
+    "Relative score",
     "Contribution",
   ]);
   // Grouped by component, adaptive capacity named as its lack.
@@ -243,14 +243,17 @@ test("an admin uploads values, sees each rejected row, runs, and the page shows 
   await indicators.getByRole("button", { name: /^Exposure/ }).click();
   await expect(
     indicators.getByRole("row", { name: "Population density" }),
-  ).toContainText("0 of 10");
+  ).toContainText("No data");
   await expect(
     indicators.getByText("Nothing uploaded for this place yet."),
   ).toBeVisible();
 
   // The template: one row per division and uploadable indicator, values blank.
+  await indicators.getByRole("button", { name: "Upload CSV", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Upload indicator values" });
+  await expect(dialog.getByRole("combobox", { name: "Template" })).toBeFocused();
   const download = page.waitForEvent("download");
-  await indicators.getByRole("button", { name: "Download template" }).click();
+  await dialog.getByRole("button", { name: "Download template" }).click();
   const file = await download;
   expect(file.suggestedFilename()).toBe(`vra-template-${MP}.csv`);
   const template = (await readFile((await file.path()) as string, "utf8"))
@@ -271,14 +274,14 @@ test("an admin uploads values, sees each rejected row, runs, and the page shows 
     "sagar,Sagar Division,sens.elderly_share,6.1,,,,",
   ]);
   const accepted = csv.trim().split("\n").length - 1 - 4;
-  await indicators.getByLabel("Upload CSV file").setInputFiles({
+  await dialog.getByLabel("CSV file", { exact: true }).setInputFiles({
     name: "mp-indicators.csv",
     mimeType: "text/csv",
     buffer: Buffer.from(csv),
   });
-  const result = indicators
-    .getByRole("status")
-    .filter({ hasText: "mp-indicators.csv" });
+  expect(api.uploads).toHaveLength(0);
+  await dialog.getByRole("button", { name: "Validate and upload" }).click();
+  const result = dialog.getByRole("status").filter({ hasText: "mp-indicators.csv" });
   await expect(result).toContainText(
     `mp-indicators.csv: ${accepted} rows accepted, 4 rejected.`,
   );
@@ -297,6 +300,9 @@ test("an admin uploads values, sees each rejected row, runs, and the page shows 
     contentType: "text/csv",
   });
   expect(api.uploads[0].body).toBe(csv);
+  await expect(dialog.getByLabel("CSV file", { exact: true })).toHaveValue("");
+  await page.screenshot({ path: `${evidence}/upload-partial.png`, fullPage: true });
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
 
   // Coverage is read again: nine of ten divisions have exposure values.
   await expect(
@@ -309,19 +315,21 @@ test("an admin uploads values, sees each rejected row, runs, and the page shows 
     name: "mp-indicators.csv, Completed",
   });
   await expect(recent).toContainText(`${accepted} accepted · 4 rejected`);
-  await page.screenshot({ path: `${evidence}/upload-partial.png`, fullPage: true });
 
   // A file with no usable row is refused whole.
-  await indicators.getByLabel("Upload CSV file").setInputFiles({
+  await indicators.getByRole("button", { name: "Upload CSV", exact: true }).click();
+  await dialog.getByLabel("CSV file", { exact: true }).setInputFiles({
     name: "wrong.csv",
     mimeType: "text/csv",
     buffer: Buffer.from(
       "area_code,area_name,indicator_code,value,vintage,source_name,source_url,notes\natlantis,,exp.population_density,1,2011,,,\n",
     ),
   });
-  await expect(indicators.getByRole("alert")).toContainText(
+  await dialog.getByRole("button", { name: "Validate and upload" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
     "wrong.csv was not loaded: no row could be used.",
   );
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
   await expect(
     indicators.getByRole("listitem", { name: "wrong.csv, Failed" }),
   ).toBeVisible();
@@ -450,4 +458,18 @@ test("the page and the indicators card fit a phone without sideways scrolling", 
   await expect(card(page).getByRole("row", { name: "Anaemia in women" })).toBeVisible();
   await noSidewaysScroll(page);
   await page.screenshot({ path: `${evidence}/settings-phone.png`, fullPage: true });
+  await card(page).getByRole("button", { name: "Upload CSV", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Upload indicator values" });
+  await expect(dialog.getByRole("combobox", { name: "Template" })).toBeFocused();
+  await expect(dialog.getByRole("table", { name: "Template fields" })).toBeVisible();
+  await noSidewaysScroll(page);
+  expect(
+    await dialog.evaluate((element) => element.scrollWidth - element.clientWidth),
+  ).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: `${evidence}/upload-phone.png`, fullPage: true });
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    card(page).getByRole("button", { name: "Upload CSV", exact: true }),
+  ).toBeFocused();
 });

@@ -11,11 +11,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 
 import xarray as xr
 
 DATASET = "reanalysis-era5-single-levels"
 VARIABLE = "2m_temperature"
+_NETCDF_VALIDATION_LOCK = Lock()
 
 log = logging.getLogger(__name__)
 
@@ -88,6 +90,8 @@ class DownloadResult:
 
 
 def _default_cache_dir() -> Path:
+    if configured := os.environ.get("ERA5_CACHE_DIR"):
+        return Path(configured).expanduser()
     return Path(__file__).resolve().parent.parent.parent / ".cache"
 
 
@@ -116,12 +120,68 @@ def _cached_path_ok(path: Path) -> bool:
     if not path.exists() or path.stat().st_size == 0:
         return False
     try:
-        with xr.open_dataset(path) as _:
-            pass
+        # NetCDF/HDF5 native open/close calls are not thread-safe. Downloads
+        # remain concurrent, but their cache validation must not overlap.
+        with _NETCDF_VALIDATION_LOCK:
+            with xr.open_dataset(path):
+                pass
         return True
     except Exception as exc:  # corrupt cache file; ignore and re-download
         log.warning("cache file %s unreadable (%s); will re-download", path, exc)
         return False
+
+
+def _covering_cache(
+    cache_dir: Path, year: int, bbox: BBox, months: tuple[int, ...]
+) -> Path | None:
+    """Find a retained acquisition covering the complete requested extent/time."""
+    candidates = []
+    north, west, south, east = bbox
+    for metadata in cache_dir.glob("*.json"):
+        try:
+            document = json.loads(metadata.read_text())
+            request = document["request"]
+            n, w, s, e = map(float, request["area"])
+            if (
+                document.get("dataset") != DATASET
+                or request.get("variable") != VARIABLE
+                or int(request["year"]) != year
+                or not set(months).issubset({int(m) for m in request["month"]})
+                or not (n >= north and w <= west and s <= south and e >= east)
+            ):
+                continue
+            path = metadata.with_suffix(".nc")
+            if path.is_file():
+                candidates.append((path.stat().st_size, str(path), path))
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            continue
+    for _, _, path in sorted(candidates):
+        if _cached_path_ok(path):
+            return path
+    return None
+
+
+def download_metadata(result: DownloadResult) -> dict:
+    """Keep the actual raw acquisition identity when a smaller request reuses it."""
+    path = result.path
+    with path.open("rb") as stream:
+        sha256 = hashlib.file_digest(stream, "sha256").hexdigest()
+    metadata = {
+        "year": result.year,
+        "months": list(result.months),
+        "cache_hit": result.cache_hit,
+        "path": str(path),
+        "sha256": sha256,
+    }
+    sidecar = path.with_suffix(".json")
+    if sidecar.is_file():
+        try:
+            document = json.loads(sidecar.read_text())
+            metadata["source_request"] = document.get("request")
+            metadata["downloaded_at"] = document.get("downloaded_at")
+        except (OSError, ValueError, AttributeError):
+            log.warning("unreadable cache metadata: %s", sidecar)
+    return metadata
 
 
 def download_year(
@@ -149,6 +209,16 @@ def download_year(
             path=nc_path,
             cache_hit=True,
         )
+    if not no_cache and not refresh:
+        covering = _covering_cache(cache_dir, year, bbox, selected_months)
+        if covering is not None:
+            log.info(
+                "reusing covering cache: year=%d months=%s path=%s",
+                year,
+                selected_months,
+                covering,
+            )
+            return DownloadResult(year, selected_months, covering, True)
 
     request = build_request(year, bbox, selected_months)
     client = _make_client()

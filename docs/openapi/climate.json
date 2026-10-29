@@ -2322,6 +2322,7 @@
           "heat-outlook"
         ],
         "summary": "Read Kenyan counties shaded by an observed month's heat share",
+        "description": "Returns the counties of Kenya with their display geometry and each county's heat-attributable share for one observed month, scored as in the observed estimate. Requires a risk reader role and access to the geography path. Counties without complete ERA5 inputs carry missing_reason not_reported; suppressed shares carry no_excess. County requests retain the Kenya county frame even when their projection frame contains constituencies. Returned areas remain restricted to the caller's geography permissions.",
         "operationId": "read_observed_map_heat_outlook__geography_id__observed_map_get",
         "security": [
           {
@@ -2404,8 +2405,7 @@
               }
             }
           }
-        },
-        "description": "Returns the counties of Kenya with their display geometry and each county's heat-attributable share for one observed month, scored as in the observed estimate. Requires a risk reader role and access to the geography path. Counties without complete ERA5 inputs carry missing_reason not_reported; suppressed shares carry no_excess. County requests retain the Kenya county frame even when their projection frame contains constituencies. Returned areas remain restricted to the caller's geography permissions."
+        }
       }
     },
     "/vra/indicators": {
@@ -2657,6 +2657,23 @@
               "type": "string",
               "title": "Geography Id"
             }
+          },
+          {
+            "name": "indicator_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Indicator Code"
+            }
           }
         ],
         "responses": {
@@ -2714,6 +2731,23 @@
                 }
               ],
               "title": "File Name"
+            }
+          },
+          {
+            "name": "indicator_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Indicator Code"
             }
           }
         ],
@@ -5375,6 +5409,10 @@
             "type": "string",
             "title": "Component"
           },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
           "route": {
             "type": "string",
             "title": "Route"
@@ -5382,6 +5420,13 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "uploadable": {
+            "type": "boolean",
+            "title": "Uploadable"
+          },
+          "value_schema": {
+            "$ref": "#/components/schemas/ValueSchema"
           },
           "present": {
             "type": "integer",
@@ -5412,8 +5457,11 @@
           "code",
           "name",
           "component",
+          "unit",
           "route",
           "status",
+          "uploadable",
+          "value_schema",
           "present",
           "vintages",
           "updated_at"
@@ -6555,6 +6603,13 @@
           "rationale": {
             "type": "string",
             "title": "Rationale"
+          },
+          "uploadable": {
+            "type": "boolean",
+            "title": "Uploadable"
+          },
+          "value_schema": {
+            "$ref": "#/components/schemas/ValueSchema"
           }
         },
         "type": "object",
@@ -6567,7 +6622,9 @@
           "direction_to_risk",
           "route",
           "status",
-          "rationale"
+          "rationale",
+          "uploadable",
+          "value_schema"
         ],
         "title": "IndicatorItem"
       },
@@ -10869,6 +10926,56 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ValueSchema": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "number",
+              "integer",
+              "binary"
+            ],
+            "title": "Type"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "example": {
+            "type": "number",
+            "title": "Example"
+          },
+          "expected_values": {
+            "type": "string",
+            "title": "Expected Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "example",
+          "expected_values"
+        ],
+        "title": "ValueSchema"
       },
       "WhatIfRequest": {
         "properties": {

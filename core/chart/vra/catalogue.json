@@ -1,5 +1,5 @@
 {
-  "version": "vra-catalogue-2026-10",
+  "version": "vra-catalogue-2026-10-28",
   "source": "CEEW draft indicator list for the VRA (all sheets), with direction and placement fixes from docs/vra-integration-plan.md",
   "indicators": [
     {
@@ -12,7 +12,14 @@
       "route": "computed",
       "status": "included",
       "ceew_ref": null,
-      "rationale": "Computed by CHART from ERA5: sum of monthly heatwave days over the latest 12 complete months held for the area. Stands in for CEEW's hot-day indices until the percentile-based indices are pulled."
+      "rationale": "Computed by CHART from ERA5: sum of monthly heatwave days over the latest 12 complete months held for the area. Stands in for CEEW's hot-day indices until the percentile-based indices are pulled.",
+      "value_schema": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": null,
+        "example": 3,
+        "expected_values": "a whole number greater than or equal to 0"
+      }
     },
     {
       "code": "haz.tmax_monthly_max_12m",
@@ -24,7 +31,14 @@
       "route": "computed",
       "status": "included",
       "ceew_ref": null,
-      "rationale": "Computed by CHART from ERA5: mean of each month's hottest daily maximum over the latest 12 complete months. Higher peak temperatures mean greater heat stress."
+      "rationale": "Computed by CHART from ERA5: mean of each month's hottest daily maximum over the latest 12 complete months. Higher peak temperatures mean greater heat stress.",
+      "value_schema": {
+        "type": "number",
+        "minimum": null,
+        "maximum": null,
+        "example": 35.5,
+        "expected_values": "a temperature in °C (negative values allowed)"
+      }
     },
     {
       "code": "haz.flood_events",
@@ -36,7 +50,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Hazard #1",
-      "rationale": "Flooding can cripple health systems by inundating, damaging healthcare facilities, spreading waterborne diseases, and disrupting access to care."
+      "rationale": "Flooding can cripple health systems by inundating, damaging healthcare facilities, spreading waterborne diseases, and disrupting access to care.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 12.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "haz.flood_inundated_area",
@@ -48,7 +69,14 @@
       "route": "upload",
       "status": "dropped",
       "ceew_ref": "Hazard #2",
-      "rationale": "Captures the spatial extent of flooding. Dropped: CEEW suggests skipping it because a district is too coarse; flooding is concentrated in a few blocks."
+      "rationale": "Captures the spatial extent of flooding. Dropped: CEEW suggests skipping it because a district is too coarse; flooding is concentrated in a few blocks.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "haz.drought_events",
@@ -60,7 +88,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Hazard #3",
-      "rationale": "Drought-induced water scarcity may force populations to rely on unsafe or lower-quality water sources and constrain water for sanitation and hygiene."
+      "rationale": "Drought-induced water scarcity may force populations to rely on unsafe or lower-quality water sources and constrain water for sanitation and hygiene.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 12.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "haz.cyclone_events",
@@ -72,7 +107,14 @@
       "route": "upload",
       "status": "dropped",
       "ceew_ref": "Hazard (cyclone)",
-      "rationale": "Not applicable to inland areas such as Madhya Pradesh; kept in the catalogue so coastal frames can enable it."
+      "rationale": "Not applicable to inland areas such as Madhya Pradesh; kept in the catalogue so coastal frames can enable it.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 12.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "haz.extreme_hot_days_change",
@@ -84,7 +126,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Hazard #4",
-      "rationale": "Rising temperatures can intensify the hydrological cycle and alter the transmission and seasonality of climate-sensitive diseases, including diarrhoeal diseases, malaria, dengue and cholera, with children being particularly vulnerable to these impacts."
+      "rationale": "Rising temperatures can intensify the hydrological cycle and alter the transmission and seasonality of climate-sensitive diseases, including diarrhoeal diseases, malaria, dengue and cholera, with children being particularly vulnerable to these impacts.",
+      "value_schema": {
+        "type": "number",
+        "minimum": null,
+        "maximum": null,
+        "example": -2.5,
+        "expected_values": "a signed number (negative, zero or positive)"
+      }
     },
     {
       "code": "haz.very_hot_days_change",
@@ -96,7 +145,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Hazard #5",
-      "rationale": "Rising temperatures can intensify the hydrological cycle and alter the transmission and seasonality of climate-sensitive diseases, including diarrhoeal diseases, malaria, dengue and cholera, with children being particularly vulnerable to these impacts."
+      "rationale": "Rising temperatures can intensify the hydrological cycle and alter the transmission and seasonality of climate-sensitive diseases, including diarrhoeal diseases, malaria, dengue and cholera, with children being particularly vulnerable to these impacts.",
+      "value_schema": {
+        "type": "number",
+        "minimum": null,
+        "maximum": null,
+        "example": -2.5,
+        "expected_values": "a signed number (negative, zero or positive)"
+      }
     },
     {
       "code": "haz.warm_nights_change",
@@ -108,7 +164,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Hazard #6",
-      "rationale": "Warm nights indicate persistently elevated nighttime temperatures that prevent physiological recovery from daytime heat exposure, raising the risk of heat-related illness, cardiovascular and respiratory mortality."
+      "rationale": "Warm nights indicate persistently elevated nighttime temperatures that prevent physiological recovery from daytime heat exposure, raising the risk of heat-related illness, cardiovascular and respiratory mortality.",
+      "value_schema": {
+        "type": "number",
+        "minimum": null,
+        "maximum": null,
+        "example": -2.5,
+        "expected_values": "a signed number (negative, zero or positive)"
+      }
     },
     {
       "code": "haz.extreme_warm_nights_change",
@@ -120,7 +183,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Hazard #7",
-      "rationale": "Warm nights indicate persistently elevated nighttime temperatures that prevent physiological recovery from daytime heat exposure, raising the risk of heat-related illness, cardiovascular and respiratory mortality."
+      "rationale": "Warm nights indicate persistently elevated nighttime temperatures that prevent physiological recovery from daytime heat exposure, raising the risk of heat-related illness, cardiovascular and respiratory mortality.",
+      "value_schema": {
+        "type": "number",
+        "minimum": null,
+        "maximum": null,
+        "example": -2.5,
+        "expected_values": "a signed number (negative, zero or positive)"
+      }
     },
     {
       "code": "haz.heat_index_days",
@@ -132,7 +202,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Hazard #8",
-      "rationale": "The Heat Index combines air temperature and relative humidity to estimate the apparent temperature experienced by the human body; high values indicate greater physiological heat stress."
+      "rationale": "The Heat Index combines air temperature and relative humidity to estimate the apparent temperature experienced by the human body; high values indicate greater physiological heat stress.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 12.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "haz.projected_extreme_hot_days",
@@ -144,7 +221,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Hazard #10",
-      "rationale": "Projected trends in extreme events indicate how hazard intensity and frequency are likely to change under future climate scenarios, supporting anticipatory planning of health and WASH services."
+      "rationale": "Projected trends in extreme events indicate how hazard intensity and frequency are likely to change under future climate scenarios, supporting anticipatory planning of health and WASH services.",
+      "value_schema": {
+        "type": "number",
+        "minimum": null,
+        "maximum": null,
+        "example": -2.5,
+        "expected_values": "a signed number (negative, zero or positive)"
+      }
     },
     {
       "code": "haz.projected_warm_nights",
@@ -156,7 +240,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Hazard #11",
-      "rationale": "Projected trends in extreme events indicate how hazard intensity and frequency are likely to change under future climate scenarios, supporting anticipatory planning of health and WASH services."
+      "rationale": "Projected trends in extreme events indicate how hazard intensity and frequency are likely to change under future climate scenarios, supporting anticipatory planning of health and WASH services.",
+      "value_schema": {
+        "type": "number",
+        "minimum": null,
+        "maximum": null,
+        "example": -2.5,
+        "expected_values": "a signed number (negative, zero or positive)"
+      }
     },
     {
       "code": "haz.extremely_heavy_rain_days",
@@ -168,7 +259,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Hazard #12",
-      "rationale": "Heavy rainfall raises the likelihood of flooding and waterlogging, can damage health and WASH infrastructure, contaminate water sources and increase water-borne and vector-borne disease risk."
+      "rationale": "Heavy rainfall raises the likelihood of flooding and waterlogging, can damage health and WASH infrastructure, contaminate water sources and increase water-borne and vector-borne disease risk.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 12.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "haz.very_heavy_rain_days",
@@ -180,7 +278,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Hazard #13",
-      "rationale": "Heavy rainfall raises the likelihood of flooding and waterlogging, can damage health and WASH infrastructure, contaminate water sources and increase water-borne and vector-borne disease risk."
+      "rationale": "Heavy rainfall raises the likelihood of flooding and waterlogging, can damage health and WASH infrastructure, contaminate water sources and increase water-borne and vector-borne disease risk.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 12.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "haz.max_24h_rainfall",
@@ -192,7 +297,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Hazard #14",
-      "rationale": "The highest short-duration rainfall intensity in the area, indicating potential for flash floods, urban flooding and infrastructure damage that disrupt healthcare delivery."
+      "rationale": "The highest short-duration rainfall intensity in the area, indicating potential for flash floods, urban flooding and infrastructure damage that disrupt healthcare delivery.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 12.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "haz.projected_heavy_rain_days",
@@ -204,7 +316,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Hazard #15",
-      "rationale": "Projected changes in heavy rainfall days indicate shifts in rainfall-related hazards, including flooding and disruptions to healthcare infrastructure."
+      "rationale": "Projected changes in heavy rainfall days indicate shifts in rainfall-related hazards, including flooding and disruptions to healthcare infrastructure.",
+      "value_schema": {
+        "type": "number",
+        "minimum": null,
+        "maximum": null,
+        "example": -2.5,
+        "expected_values": "a signed number (negative, zero or positive)"
+      }
     },
     {
       "code": "haz.utci_heat_stress_days",
@@ -216,7 +335,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Adaptive capacity (note on WBGT/UTCI)",
-      "rationale": "For human-health thresholds, days of exceedance of a thermal comfort index such as UTCI are more relevant than air temperature alone."
+      "rationale": "For human-health thresholds, days of exceedance of a thermal comfort index such as UTCI are more relevant than air temperature alone.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 12.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "exp.population_density",
@@ -228,7 +354,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Exposure #1",
-      "rationale": "High population density accelerates the spread of infectious diseases, strains healthcare resources and increases exposure to environmental health risks."
+      "rationale": "High population density accelerates the spread of infectious diseases, strains healthcare resources and increases exposure to environmental health risks.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 250.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "exp.workers_share",
@@ -240,7 +373,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Exposure #2",
-      "rationale": "Labourers working outdoors and indoors face direct exposure to extreme weather such as heatwaves, heavy rains and cold spells. Expressed as a share so it does not measure district size."
+      "rationale": "Labourers working outdoors and indoors face direct exposure to extreme weather such as heatwaves, heavy rains and cold spells. Expressed as a share so it does not measure district size.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "exp.agri_workers_share",
@@ -252,7 +392,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Exposure #3",
-      "rationale": "Agricultural and allied workers face direct, prolonged outdoor exposure to heat, extreme weather and vector-borne disease, and their livelihoods are highly climate-sensitive."
+      "rationale": "Agricultural and allied workers face direct, prolonged outdoor exposure to heat, extreme weather and vector-borne disease, and their livelihoods are highly climate-sensitive.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "exp.construction_workers_share",
@@ -264,7 +411,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Exposure #4",
-      "rationale": "Construction workers face prolonged outdoor heat exposure with limited workplace protections, making them a priority occupational group for heat-health interventions."
+      "rationale": "Construction workers face prolonged outdoor heat exposure with limited workplace protections, making them a priority occupational group for heat-health interventions.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "exp.vet_facilities",
@@ -276,7 +430,14 @@
       "route": "manual",
       "status": "dropped",
       "ceew_ref": "Exposure #8",
-      "rationale": "Dropped: CEEW notes it need not be considered."
+      "rationale": "Dropped: CEEW notes it need not be considered.",
+      "value_schema": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": null,
+        "example": 3,
+        "expected_values": "a whole number greater than or equal to 0"
+      }
     },
     {
       "code": "sens.child_0_6_share",
@@ -288,7 +449,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #5",
-      "rationale": "Young children are physiologically more susceptible to heat stress, dehydration, respiratory and water-borne illness, and depend on caregivers and health services."
+      "rationale": "Young children are physiologically more susceptible to heat stress, dehydration, respiratory and water-borne illness, and depend on caregivers and health services.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.elderly_share",
@@ -300,7 +468,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #5",
-      "rationale": "Older adults have lower thermoregulatory capacity and weaker immune systems, making them more susceptible to climate-sensitive health impacts."
+      "rationale": "Older adults have lower thermoregulatory capacity and weaker immune systems, making them more susceptible to climate-sensitive health impacts.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.slum_population_share",
@@ -312,7 +487,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #6",
-      "rationale": "Informal settlements typically have poorer housing quality, drainage and basic services, heightening sensitivity to heat, flooding and disease outbreaks."
+      "rationale": "Informal settlements typically have poorer housing quality, drainage and basic services, heightening sensitivity to heat, flooding and disease outbreaks.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.women_20_49_share",
@@ -324,7 +506,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #7",
-      "rationale": "Women are disproportionately affected by climate-related health risks, particularly for maternal and reproductive health. Expressed as a share so it does not measure district size."
+      "rationale": "Women are disproportionately affected by climate-related health risks, particularly for maternal and reproductive health. Expressed as a share so it does not measure district size.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.adolescent_girls_share",
@@ -336,7 +525,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #8",
-      "rationale": "Adolescent girls are particularly vulnerable to climate-related disruptions affecting nutrition, menstrual hygiene, education, reproductive health and psychosocial well-being."
+      "rationale": "Adolescent girls are particularly vulnerable to climate-related disruptions affecting nutrition, menstrual hygiene, education, reproductive health and psychosocial well-being.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.disability_share",
@@ -348,7 +544,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #10",
-      "rationale": "Persons with disabilities often have specialised needs for mobility and may find it harder to evacuate or reach safe areas during floods and heatwaves."
+      "rationale": "Persons with disabilities often have specialised needs for mobility and may find it harder to evacuate or reach safe areas during floods and heatwaves.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.high_blood_sugar_women",
@@ -360,7 +563,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #11a",
-      "rationale": "Diabetes and uncontrolled blood sugar increase susceptibility to heat-related illness, cardiovascular complications, infections, and mortality during extreme weather events."
+      "rationale": "Diabetes and uncontrolled blood sugar increase susceptibility to heat-related illness, cardiovascular complications, infections, and mortality during extreme weather events.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.high_blood_sugar_men",
@@ -372,7 +582,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #11a",
-      "rationale": "Diabetes and uncontrolled blood sugar increase susceptibility to heat-related illness, cardiovascular complications, infections, and mortality during extreme weather events."
+      "rationale": "Diabetes and uncontrolled blood sugar increase susceptibility to heat-related illness, cardiovascular complications, infections, and mortality during extreme weather events.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.high_bp_women",
@@ -384,7 +601,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #11b",
-      "rationale": "Hypertension increases the risk of cardiovascular events, particularly during heatwaves and other climate-related stressors."
+      "rationale": "Hypertension increases the risk of cardiovascular events, particularly during heatwaves and other climate-related stressors.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.high_bp_men",
@@ -396,7 +620,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #11b",
-      "rationale": "Hypertension increases the risk of cardiovascular events, particularly during heatwaves and other climate-related stressors."
+      "rationale": "Hypertension increases the risk of cardiovascular events, particularly during heatwaves and other climate-related stressors.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.anaemia_women",
@@ -408,7 +639,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #11",
-      "rationale": "Anaemia reduces physical capacity and immune function, increasing vulnerability to heat stress, infectious diseases, pregnancy-related complications and other climate-sensitive outcomes."
+      "rationale": "Anaemia reduces physical capacity and immune function, increasing vulnerability to heat stress, infectious diseases, pregnancy-related complications and other climate-sensitive outcomes.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.child_stunting",
@@ -420,7 +658,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #12a",
-      "rationale": "Malnutrition weakens immune function and increases susceptibility to infectious diseases, heat stress and food insecurity; districts with a higher prevalence of child malnutrition are more sensitive to climate-related health impacts."
+      "rationale": "Malnutrition weakens immune function and increases susceptibility to infectious diseases, heat stress and food insecurity; districts with a higher prevalence of child malnutrition are more sensitive to climate-related health impacts.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.child_wasting",
@@ -432,7 +677,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #12b",
-      "rationale": "Malnutrition weakens immune function and increases susceptibility to infectious diseases, heat stress and food insecurity; districts with a higher prevalence of child malnutrition are more sensitive to climate-related health impacts."
+      "rationale": "Malnutrition weakens immune function and increases susceptibility to infectious diseases, heat stress and food insecurity; districts with a higher prevalence of child malnutrition are more sensitive to climate-related health impacts.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.child_underweight",
@@ -444,7 +696,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #12c",
-      "rationale": "Malnutrition weakens immune function and increases susceptibility to infectious diseases, heat stress and food insecurity; districts with a higher prevalence of child malnutrition are more sensitive to climate-related health impacts."
+      "rationale": "Malnutrition weakens immune function and increases susceptibility to infectious diseases, heat stress and food insecurity; districts with a higher prevalence of child malnutrition are more sensitive to climate-related health impacts.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.child_overweight",
@@ -456,7 +715,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #12d",
-      "rationale": "Malnutrition weakens immune function and increases susceptibility to infectious diseases, heat stress and food insecurity; districts with a higher prevalence of child malnutrition are more sensitive to climate-related health impacts."
+      "rationale": "Malnutrition weakens immune function and increases susceptibility to infectious diseases, heat stress and food insecurity; districts with a higher prevalence of child malnutrition are more sensitive to climate-related health impacts.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.infant_mortality",
@@ -468,7 +734,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #13",
-      "rationale": "Infants are physiologically more susceptible to heat stress, dehydration, diarrhoeal diseases and respiratory infections; a high infant mortality rate reflects underlying health, nutrition and WASH vulnerabilities."
+      "rationale": "Infants are physiologically more susceptible to heat stress, dehydration, diarrhoeal diseases and respiratory infections; a high infant mortality rate reflects underlying health, nutrition and WASH vulnerabilities.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 12.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "sens.groundwater_extraction_stage",
@@ -480,7 +753,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #14",
-      "rationale": "Groundwater is a major source of water for WASH services; extraction beyond safe limits threatens the quantity and quality of water available."
+      "rationale": "Groundwater is a major source of water for WASH services; extraction beyond safe limits threatens the quantity and quality of water available.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 112.5,
+        "expected_values": "a non-negative percentage; values above 100 are allowed"
+      }
     },
     {
       "code": "sens.flood_susceptibility",
@@ -492,7 +772,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #1",
-      "rationale": "Areas highly susceptible to flooding are more likely to experience inundation of homes, health facilities and WASH infrastructure. CEEW 30 m landscape susceptibility analysis, reduced to the share of the area in the high or very high class."
+      "rationale": "Areas highly susceptible to flooding are more likely to experience inundation of homes, health facilities and WASH infrastructure. CEEW 30 m landscape susceptibility analysis, reduced to the share of the area in the high or very high class.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.heat_susceptibility",
@@ -504,7 +791,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #2",
-      "rationale": "Landscapes with limited vegetation and dense built-up area experience higher local temperatures, raising heat stress and water demand. CEEW 30 m landscape susceptibility analysis, reduced to the share of the area in the high or very high class."
+      "rationale": "Landscapes with limited vegetation and dense built-up area experience higher local temperatures, raising heat stress and water demand. CEEW 30 m landscape susceptibility analysis, reduced to the share of the area in the high or very high class.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.drought_susceptibility",
@@ -516,7 +810,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #4",
-      "rationale": "Drought-prone landscapes face recurrent water scarcity, increasing sensitivity to water-borne diseases, malnutrition and livelihood loss. CEEW 30 m landscape susceptibility analysis, reduced to the share of the area in the high or very high class."
+      "rationale": "Drought-prone landscapes face recurrent water scarcity, increasing sensitivity to water-borne diseases, malnutrition and livelihood loss. CEEW 30 m landscape susceptibility analysis, reduced to the share of the area in the high or very high class.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.roads_flood_susceptibility",
@@ -528,7 +829,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sensitivity #15",
-      "rationale": "Roads susceptible to flooding are likely to be cut off during heavy rainfall, limiting access to healthcare, evacuation routes and essential supplies."
+      "rationale": "Roads susceptible to flooding are likely to be cut off during heavy rainfall, limiting access to healthcare, evacuation routes and essential supplies.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.forest_cover_change",
@@ -540,7 +848,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Sensitivity #16",
-      "rationale": "Forests regulate local temperature, moderate runoff and support water recharge; loss of forest cover heightens sensitivity to heat, flooding and water quality degradation. A gain lowers risk."
+      "rationale": "Forests regulate local temperature, moderate runoff and support water recharge; loss of forest cover heightens sensitivity to heat, flooding and water quality degradation. A gain lowers risk.",
+      "value_schema": {
+        "type": "number",
+        "minimum": null,
+        "maximum": null,
+        "example": -2.5,
+        "expected_values": "a signed number (negative, zero or positive)"
+      }
     },
     {
       "code": "sens.green_space_per_person",
@@ -552,7 +867,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Sensitivity #17",
-      "rationale": "Green spaces reduce urban heat, improve air quality and support drainage; a higher value indicates lower sensitivity."
+      "rationale": "Green spaces reduce urban heat, improve air quality and support drainage; a higher value indicates lower sensitivity.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 12.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "sens.malaria_incidence",
@@ -564,7 +886,14 @@
       "route": "manual",
       "status": "included",
       "ceew_ref": "Adaptive capacity #13",
-      "rationale": "Directly climate-sensitive (temperature and rainfall driven). Filed under adaptive capacity in the draft sheet; it is a sensitivity. District data is held by programme officers."
+      "rationale": "Directly climate-sensitive (temperature and rainfall driven). Filed under adaptive capacity in the draft sheet; it is a sensitivity. District data is held by programme officers.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 12.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "sens.hiv_prevalence",
@@ -576,7 +905,14 @@
       "route": "upload",
       "status": "dropped",
       "ceew_ref": "Sensitivity #12",
-      "rationale": "Dropped: CEEW's own comment; 2019 district data is banded and has low relevance to heat."
+      "rationale": "Dropped: CEEW's own comment; 2019 district data is banded and has low relevance to heat.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "sens.cyclone_susceptibility",
@@ -588,7 +924,14 @@
       "route": "upload",
       "status": "dropped",
       "ceew_ref": "Sensitivity #3",
-      "rationale": "Not applicable to inland areas such as Madhya Pradesh; kept in the catalogue so coastal frames can enable it."
+      "rationale": "Not applicable to inland areas such as Madhya Pradesh; kept in the catalogue so coastal frames can enable it.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.women_10yr_schooling",
@@ -600,7 +943,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Adaptive capacity #2",
-      "rationale": "Education improves health literacy, awareness of climate-related health risks, uptake of preventive measures, and ability to access and interpret early warning information. Educated women also contribute to better household preparedness and health-seeking behaviour."
+      "rationale": "Education improves health literacy, awareness of climate-related health risks, uptake of preventive measures, and ability to access and interpret early warning information. Educated women also contribute to better household preparedness and health-seeking behaviour.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.men_10yr_schooling",
@@ -612,7 +962,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Adaptive capacity #3",
-      "rationale": "Education improves health literacy, awareness of climate-related health risks, uptake of preventive measures, and ability to access and interpret early warning information."
+      "rationale": "Education improves health literacy, awareness of climate-related health risks, uptake of preventive measures, and ability to access and interpret early warning information.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.full_vaccination",
@@ -624,7 +981,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Adaptive capacity #6",
-      "rationale": "High vaccination coverage reflects strong primary healthcare and reduces susceptibility to infectious diseases that may increase after floods and extreme rainfall."
+      "rationale": "High vaccination coverage reflects strong primary healthcare and reduces susceptibility to infectious diseases that may increase after floods and extreme rainfall.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.health_insurance",
@@ -636,7 +1000,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Adaptive capacity #7",
-      "rationale": "Health insurance reduces financial barriers to healthcare, enabling timely treatment during climate-related illnesses and emergencies."
+      "rationale": "Health insurance reduces financial barriers to healthcare, enabling timely treatment during climate-related illnesses and emergencies.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.oop_delivery_public",
@@ -648,7 +1019,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Adaptive capacity #1",
-      "rationale": "High out-of-pocket expenditure can discourage timely healthcare seeking and increase financial hardship during climate-related health emergencies."
+      "rationale": "High out-of-pocket expenditure can discourage timely healthcare seeking and increase financial hardship during climate-related health emergencies.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 2500,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "ac.improved_water_source",
@@ -660,7 +1038,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Adaptive capacity #9",
-      "rationale": "Reliable access to safe drinking water reduces vulnerability to water-borne diseases and enhances resilience during droughts, floods and heatwaves."
+      "rationale": "Reliable access to safe drinking water reduces vulnerability to water-borne diseases and enhances resilience during droughts, floods and heatwaves.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.improved_sanitation",
@@ -672,7 +1057,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Adaptive capacity #10",
-      "rationale": "Improved sanitation reduces exposure to water-borne and faecal-oral diseases, particularly during flooding and heavy rainfall events."
+      "rationale": "Improved sanitation reduces exposure to water-borne and faecal-oral diseases, particularly during flooding and heavy rainfall events.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.clean_cooking_fuel",
@@ -684,7 +1076,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": null,
-      "rationale": "Clean cooking fuel reflects household living standards (a component of India's multidimensional poverty index) and reduces indoor air pollution exposure."
+      "rationale": "Clean cooking fuel reflects household living standards (a component of India's multidimensional poverty index) and reduces indoor air pollution exposure.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.vehicle_ownership",
@@ -696,7 +1095,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Adaptive capacity #4",
-      "rationale": "Ownership of private transport reflects household economic capacity and mobility, enabling faster evacuation and access to healthcare after climate-related disasters."
+      "rationale": "Ownership of private transport reflects household economic capacity and mobility, enabling faster evacuation and access to healthcare after climate-related disasters.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.destitute_households",
@@ -708,7 +1114,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Adaptive capacity (destitute households)",
-      "rationale": "Indicates extreme poverty: households with almost no economic buffer to cope with or recover from a hazard."
+      "rationale": "Indicates extreme poverty: households with almost no economic buffer to cope with or recover from a hazard.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.phone_internet_access",
@@ -720,7 +1133,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Adaptive capacity #5",
-      "rationale": "Access to mobile and wireline technology enables receipt of early warnings and health advisories and communication with health services during climate-related events."
+      "rationale": "Access to mobile and wireline technology enables receipt of early warnings and health advisories and communication with health services during climate-related events.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.health_facilities_per_100k",
@@ -732,7 +1152,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Exposure #5–6",
-      "rationale": "The higher the number of functional health facilities, the greater the preparedness to respond to health concerns during a disaster. Moved from exposure to adaptive capacity, as its own rationale implies."
+      "rationale": "The higher the number of functional health facilities, the greater the preparedness to respond to health concerns during a disaster. Moved from exposure to adaptive capacity, as its own rationale implies.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 12.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "ac.health_workforce_gap",
@@ -744,7 +1171,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Adaptive capacity #8",
-      "rationale": "Adequately staffed facilities determine the capacity to respond to increased demand during extreme weather and outbreaks; a larger gap means less capacity."
+      "rationale": "Adequately staffed facilities determine the capacity to respond to increased demand during extreme weather and outbreaks; a larger gap means less capacity.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.school_tap_water",
@@ -756,7 +1190,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Adaptive capacity #11",
-      "rationale": "Safe water in schools and anganwadis supports child health, hygiene and continuity of essential services during climate extremes."
+      "rationale": "Safe water in schools and anganwadis supports child health, hygiene and continuity of essential services during climate extremes.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.school_toilet_water",
@@ -768,7 +1209,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Adaptive capacity #12",
-      "rationale": "Safe water in schools and anganwadis supports child health, hygiene and continuity of essential services during climate extremes."
+      "rationale": "Safe water in schools and anganwadis supports child health, hygiene and continuity of essential services during climate extremes.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ac.heat_illness_surveillance",
@@ -780,7 +1228,14 @@
       "route": "manual",
       "status": "included",
       "ceew_ref": "Adaptive capacity #16",
-      "rationale": "Surveillance of heat-related illness and mortality enables timely detection and public health action, strengthening capacity to respond to heat."
+      "rationale": "Surveillance of heat-related illness and mortality enables timely detection and public health action, strengthening capacity to respond to heat.",
+      "value_schema": {
+        "type": "binary",
+        "minimum": 0,
+        "maximum": 1,
+        "example": 1,
+        "expected_values": "0 (No) or 1 (Yes)"
+      }
     },
     {
       "code": "ac.heat_action_plan",
@@ -792,7 +1247,14 @@
       "route": "manual",
       "status": "included",
       "ceew_ref": "Adaptive capacity #18",
-      "rationale": "Heat action plans provide a framework for early warning, awareness, coordination and healthcare preparedness, reducing heat-related morbidity and mortality."
+      "rationale": "Heat action plans provide a framework for early warning, awareness, coordination and healthcare preparedness, reducing heat-related morbidity and mortality.",
+      "value_schema": {
+        "type": "binary",
+        "minimum": 0,
+        "maximum": 1,
+        "example": 1,
+        "expected_values": "0 (No) or 1 (Yes)"
+      }
     },
     {
       "code": "ac.road_density",
@@ -804,7 +1266,14 @@
       "route": "pull",
       "status": "included",
       "ceew_ref": "Adaptive capacity #20",
-      "rationale": "A dense road network improves connectivity to healthcare, enables faster evacuation and emergency response, and supports recovery after climate-related events."
+      "rationale": "A dense road network improves connectivity to healthcare, enables faster evacuation and emergency response, and supports recovery after climate-related events.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": null,
+        "example": 12.5,
+        "expected_values": "a number greater than or equal to 0"
+      }
     },
     {
       "code": "ac.multidimensional_poverty",
@@ -816,7 +1285,14 @@
       "route": "upload",
       "status": "included",
       "ceew_ref": "Sheet6 (MPI)",
-      "rationale": "India's national MPI covers health, education and standard of living across 12 indicators; higher deprivation means less capacity to cope."
+      "rationale": "India's national MPI covers health, education and standard of living across 12 indicators; higher deprivation means less capacity to cope.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ctx.dmhp_coverage",
@@ -828,7 +1304,14 @@
       "route": "upload",
       "status": "context",
       "ceew_ref": "Adaptive capacity #19",
-      "rationale": "Strengthens access to decentralised mental healthcare after climate-related disasters. State-level, so shown as context rather than scored."
+      "rationale": "Strengthens access to decentralised mental healthcare after climate-related disasters. State-level, so shown as context rather than scored.",
+      "value_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "example": 42.5,
+        "expected_values": "a percentage from 0-100 (enter 42.5 for 42.5%)"
+      }
     },
     {
       "code": "ctx.state_health_adaptation_plan",
@@ -840,7 +1323,14 @@
       "route": "upload",
       "status": "context",
       "ceew_ref": "Adaptive capacity #21",
-      "rationale": "Sector-specific health adaptation plans reflect institutional preparedness. State-level, so shown as context rather than scored."
+      "rationale": "Sector-specific health adaptation plans reflect institutional preparedness. State-level, so shown as context rather than scored.",
+      "value_schema": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": null,
+        "example": 3,
+        "expected_values": "a whole number greater than or equal to 0"
+      }
     },
     {
       "code": "ac.sentinel_hospitals",
@@ -852,7 +1342,14 @@
       "route": "manual",
       "status": "dropped",
       "ceew_ref": "Adaptive capacity #15",
-      "rationale": "Dropped: only a handful per state, so no spread between districts."
+      "rationale": "Dropped: only a handful per state, so no spread between districts.",
+      "value_schema": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": null,
+        "example": 3,
+        "expected_values": "a whole number greater than or equal to 0"
+      }
     },
     {
       "code": "ac.one_health_units",
@@ -864,7 +1361,14 @@
       "route": "manual",
       "status": "dropped",
       "ceew_ref": "Adaptive capacity #17",
-      "rationale": "Dropped: CEEW notes it can be removed."
+      "rationale": "Dropped: CEEW notes it can be removed.",
+      "value_schema": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": null,
+        "example": 3,
+        "expected_values": "a whole number greater than or equal to 0"
+      }
     }
   ]
 }

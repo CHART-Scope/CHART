@@ -119,7 +119,16 @@ test("a place without published tables says so, and other countries keep the liv
   await installKenya(page, false, ["/kenya"], { observedStatus: 404 });
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
   await expect(page.getByText("Observed months are not available")).toBeVisible();
-  await expect(panel(page).getByRole("tab", { name: "Projected" })).toBeDisabled();
+  await expect(panel(page).getByRole("tab", { name: "Projected" })).toBeEnabled();
+  await panel(page).getByRole("tab", { name: "Projected" }).click();
+  await expect(
+    panel(page).getByText(
+      "No projection has been published for this place and outcome yet.",
+    ),
+  ).toBeVisible();
+  await expect(panel(page).getByTestId("outlook-estimate")).toHaveCount(0);
+  await panel(page).getByRole("tab", { name: "Observed" }).click();
+  await expect(page.getByText("Observed months are not available")).toBeVisible();
 
   await installFakeApi(page);
   await page.goto("/dashboard/geo-in-mp?admin_unit=geo-in-mp-bhopal&outcome=lbw");

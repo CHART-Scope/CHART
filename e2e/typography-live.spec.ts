@@ -132,6 +132,108 @@ async function publicLearningBounds(page: Page) {
   }
 }
 
+async function landingMedia(page: Page, name: string, mediaRequests: string[]) {
+  const homeLinks = page.getByRole("link", { name: "CHART home", exact: true });
+  await expect(homeLinks).toHaveCount(2);
+  for (const brand of await homeLinks.all()) {
+    await expect(brand).toHaveCSS("font-size", "18px");
+    await typography(brand.getByText("CHART", { exact: true }), "Fira", 17.1);
+  }
+  const hero = page.locator("section[aria-labelledby='chart-landing-title']");
+  const video = hero.getByLabel("CHART explainer video");
+  const preview = page.getByRole("figure", { name: "CHART dashboard previews" });
+  await expect(video).toBeVisible();
+  await expect(video).toHaveAttribute("preload", "none");
+  await expect(video).toHaveJSProperty("controls", true);
+  await expect(page.getByText("CHART in 80 seconds", { exact: true })).toHaveCount(0);
+  await expect(preview).toBeVisible();
+  const position = await video.evaluate((element) => {
+    const image = document.querySelector(
+      'figure[aria-label="CHART dashboard previews"]',
+    )!;
+    const before = Boolean(
+      element.compareDocumentPosition(image) & Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    const videoBounds = element.getBoundingClientRect();
+    const imageBounds = image.getBoundingClientRect();
+    return {
+      before,
+      videoBottom: videoBounds.bottom,
+      imageTop: imageBounds.top,
+      aspect: videoBounds.width / videoBounds.height,
+    };
+  });
+  expect(position.before).toBe(true);
+  expect(position.imageTop).toBeGreaterThanOrEqual(position.videoBottom);
+  expect(position.aspect).toBeCloseTo(16 / 9, 1);
+  await expect(hero.getByRole("heading", { level: 1 })).toHaveCSS(
+    "line-height",
+    "36.4px",
+  );
+  await typography(hero.getByText(/CHART helps local governments/), "Noto", 14);
+  await expect(hero.getByText(/CHART helps local governments/)).toHaveCSS(
+    "line-height",
+    "22.4px",
+  );
+  await typography(hero.getByText("Climate × health", { exact: true }), "Fira", 11);
+  await expect(hero.getByText("Climate × health", { exact: true })).toHaveCSS(
+    "letter-spacing",
+    "0.66px",
+  );
+  await typography(
+    page
+      .getByRole("group", { name: "Choose dashboard preview" })
+      .getByRole("button", { name: "Dashboard", exact: true }),
+    "Noto",
+    12,
+  );
+  const radius = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--radius-card").trim(),
+  );
+  await expect(video).toHaveCSS("border-radius", radius);
+  expect(mediaRequests).toEqual([]);
+  const source = await video.locator("source").getAttribute("src");
+  expect(source).toMatch(/^https:\/\//);
+  const poster = await video.getAttribute("poster");
+  const posterResponse = await page.request.get(poster!);
+  expect(posterResponse.status()).toBe(200);
+  expect(posterResponse.headers()["content-type"]).toContain("image/jpeg");
+  await hero.screenshot({ path: `${evidence}/typography-${name}-landing-media.png` });
+  const mediaResponse = page.waitForResponse(
+    (response) => response.url() === source && response.ok(),
+  );
+  // Use the actual public video without request interception or a test clip.
+  await video.evaluate(async (element: HTMLVideoElement) => {
+    element.muted = true;
+    await element.play();
+  });
+  const response = await mediaResponse;
+  expect([200, 206]).toContain(response.status());
+  await expect
+    .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
+    .toBeGreaterThan(0.2);
+  await video.evaluate((element: HTMLVideoElement) => element.pause());
+  await expect(page).toHaveURL(/\/$/);
+  writeFileSync(
+    `${evidence}/landing-media-${name}.json`,
+    JSON.stringify(
+      {
+        viewport: page.viewportSize(),
+        ...position,
+        source,
+        mediaStatus: response.status(),
+        mediaRequests: mediaRequests.length,
+        currentTime: await video.evaluate(
+          (element: HTMLVideoElement) => element.currentTime,
+        ),
+        publicAccess: true,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
 async function breadcrumbBounds(page: Page) {
   const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb", exact: true });
   await expect(breadcrumb).toBeVisible();
@@ -203,6 +305,11 @@ for (const [name, width, height] of [
   }) => {
     test.setTimeout(240_000);
     await page.setViewportSize({ width, height });
+    const mediaRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().endsWith("/media/chart-explainer-16x9.mp4"))
+        mediaRequests.push(request.url());
+    });
     await page.goto("/");
     await typography(page.getByRole("heading", { level: 1 }), "Fira", 28);
     await typography(
@@ -215,6 +322,7 @@ for (const [name, width, height] of [
       "Fira",
       15,
     );
+    await landingMedia(page, name, mediaRequests);
     await capture(page, `${name}-landing`);
 
     await page.goto("/learning");

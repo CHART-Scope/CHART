@@ -10,6 +10,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from starlette.concurrency import run_in_threadpool
+from starlette.responses import JSONResponse
 
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import (
@@ -23,7 +24,7 @@ from chart.risk.routes import (
     risk_reader_roles,
 )
 from chart.risk.schemas import MapResponse
-from chart.risk.service import NoAdminUnitForGeography
+from chart.risk.service import NoAdminUnitForGeography, resolve_map_frame
 from chart.shared.db.session import get_session_factory
 
 from . import service
@@ -44,6 +45,22 @@ CurrentUser = Annotated[CurrentUserContext, Depends(require_current_user)]
 def _require_admin(user: CurrentUserContext, geography_id: str) -> None:
     require_any_role(user, {"chart_admin"})
     require_geography_access(user, _resolve_place_path(geography_id))
+    _require_frame_scope(user, geography_id)
+
+
+def _require_reader(user: CurrentUserContext, geography_id: str) -> None:
+    _require_read_access(user, geography_id)
+    _require_frame_scope(user, geography_id)
+
+
+def _require_frame_scope(user: CurrentUserContext, geography_id: str) -> None:
+    """A leaf comparison includes siblings, so its parent must be in scope."""
+    with get_session_factory()() as session:
+        try:
+            frame = resolve_map_frame(session, geography_id)
+        except NoAdminUnitForGeography as exc:
+            raise HTTPException(status_code=404, detail="GEOGRAPHY_NOT_FOUND") from exc
+        require_geography_access(user, frame.path)
 
 
 def _call(fn, *args):
@@ -55,6 +72,11 @@ def _call(fn, *args):
         except NoAdminUnitForGeography as exc:
             raise HTTPException(status_code=404, detail="GEOGRAPHY_NOT_FOUND") from exc
         except service.VraError as exc:
+            if exc.message is not None:
+                return JSONResponse(
+                    status_code=exc.status_code,
+                    content={"error": exc.code, "message": exc.message},
+                )
             raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
 
 
@@ -72,7 +94,7 @@ def read_indicators(user: CurrentUser) -> IndicatorList:
     summary="Read the latest assessment of a frame's child areas",
 )
 def read_assessment(geography_id: str, user: CurrentUser) -> AssessmentResponse:
-    _require_read_access(user, geography_id)
+    _require_reader(user, geography_id)
     return _call(service.load_assessment, geography_id)
 
 
@@ -82,7 +104,7 @@ def read_assessment(geography_id: str, user: CurrentUser) -> AssessmentResponse:
     summary="Read the frame's areas shaded by VRA risk",
 )
 def read_map(geography_id: str, user: CurrentUser) -> MapResponse:
-    _require_read_access(user, geography_id)
+    _require_reader(user, geography_id)
     return _call(service.load_map, geography_id)
 
 
@@ -94,7 +116,7 @@ def read_map(geography_id: str, user: CurrentUser) -> MapResponse:
 def read_area(
     geography_id: str, area_geography_id: str, user: CurrentUser
 ) -> AreaDetailResponse:
-    _require_read_access(user, geography_id)
+    _require_reader(user, geography_id)
     return _call(service.load_area, geography_id, area_geography_id)
 
 
@@ -113,9 +135,13 @@ def read_coverage(geography_id: str, user: CurrentUser) -> CoverageResponse:
     summary="Download a blank upload template for the frame's areas (admin)",
     response_class=Response,
 )
-def read_template(geography_id: str, user: CurrentUser) -> Response:
+def read_template(
+    geography_id: str,
+    user: CurrentUser,
+    indicator_code: Annotated[str | None, Query(max_length=128)] = None,
+) -> Response:
     _require_admin(user, geography_id)
-    body = _call(service.template_csv, geography_id)
+    body = _call(service.template_csv, geography_id, indicator_code)
     return Response(
         content=body,
         media_type="text/csv",
@@ -141,6 +167,7 @@ async def upload_values(
     request: Request,
     user: CurrentUser,
     file_name: Annotated[str | None, Query(max_length=256)] = None,
+    indicator_code: Annotated[str | None, Query(max_length=128)] = None,
 ) -> IngestionResult:
     await run_in_threadpool(_require_admin, user, geography_id)
     raw = await request.body()
@@ -151,7 +178,13 @@ async def upload_values(
     except UnicodeDecodeError as exc:
         raise HTTPException(status_code=422, detail="VRA_CSV_NOT_UTF8") from exc
     return await run_in_threadpool(
-        _call, service.ingest_csv, geography_id, text, file_name, user.user_id
+        _call,
+        service.ingest_csv,
+        geography_id,
+        text,
+        file_name,
+        user.user_id,
+        indicator_code,
     )
 
 

@@ -114,19 +114,11 @@ export function Login({
                 Request access <Icon name="arrow-right" size={16} />
               </a>
             </div>
+            <ExplainerVideo className={styles.heroVideo} />
+          </section>
+          <div className={styles.dashboardPreview}>
             <DashboardPreview />
-          </section>
-          <section className={styles.explainer} aria-labelledby="explainer-title">
-            <div>
-              <p className={styles.eyebrow}>Watch</p>
-              <h2 id="explainer-title">CHART in 80 seconds</h2>
-              <p className={styles.lede}>
-                Why heat puts mothers and young children at risk, why that risk depends
-                on place, and how CHART turns evidence into action.
-              </p>
-            </div>
-            <ExplainerVideo className={styles.explainerVideo} />
-          </section>
+          </div>
           <section className={styles.toolkit} aria-labelledby="toolkit-title">
             <h2 id="toolkit-title">Explore the CHART toolkit</h2>
             <div className={styles.cards}>

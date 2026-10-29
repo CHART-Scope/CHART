@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import json
 import os
 import time
 from collections.abc import Callable, Sequence
@@ -13,8 +15,22 @@ from pathlib import Path
 import pandas as pd
 import xarray as xr
 
-from .aggregate import build_monthly_frame, to_daily_tmax_c
-from .cds_client import DATASET, VARIABLE, BBox, download_years, validate_bbox
+from .aggregate import (
+    CELL_CENTRE,
+    CELL_OVERLAP,
+    aggregate_daily_tmax_c,
+    build_monthly_frame,
+    daily_tmax_grid_c,
+    to_daily_tmax_c,
+)
+from .cds_client import (
+    DATASET,
+    VARIABLE,
+    BBox,
+    download_metadata,
+    download_years,
+    validate_bbox,
+)
 from .districts import PRESETS, District
 from .fixtures import fixture_demo
 from .provenance import add_handoff_metadata
@@ -29,6 +45,8 @@ __all__ = [
     "BBox",
     "DATASET",
     "VARIABLE",
+    "CELL_CENTRE",
+    "CELL_OVERLAP",
 ]
 
 log = logging.getLogger(__name__)
@@ -36,6 +54,25 @@ log = logging.getLogger(__name__)
 
 def _default_end_year() -> int:
     return datetime.now(timezone.utc).year - 1
+
+
+def _requested_grid(
+    ds: xr.Dataset, months: tuple[int, ...], bbox: BBox | None = None
+) -> xr.Dataset:
+    """A wider cached download must not change a smaller request's inputs."""
+    time_dim = next(key for key in ("time", "valid_time") if key in ds.coords)
+    ds = ds.sel({time_dim: ds[time_dim].dt.month.isin(months)})
+    if bbox is not None:
+        north, west, south, east = bbox
+        lat = next(key for key in ("latitude", "lat", "y") if key in ds.coords)
+        lon = next(key for key in ("longitude", "lon", "x") if key in ds.coords)
+        ds = ds.sel(
+            {
+                lat: (ds[lat] >= south) & (ds[lat] <= north),
+                lon: (ds[lon] >= west) & (ds[lon] <= east),
+            }
+        )
+    return ds
 
 
 def compute_heat_series(
@@ -106,6 +143,7 @@ def compute_heat_series(
         with xr.open_dataset(d.path) as ds:
             # Optional Expert Analytics downscaling belongs here. Keep it off until
             # McQueens confirms the method, and always retain the original source file.
+            ds = _requested_grid(ds, d.months, bbox if geometry is None else None)
             prepared = grid_transform(ds) if grid_transform is not None else ds
             daily_parts.append(to_daily_tmax_c(prepared, geometry=geometry))
     daily = pd.concat(daily_parts).sort_index()
@@ -157,15 +195,7 @@ def compute_heat_series(
             "n_years": end_year - start_year + 1,
         },
         "heatwave": {"threshold_c": threshold_c, "min_run": min_run},
-        "cache": [
-            {
-                "year": d.year,
-                "months": list(d.months),
-                "cache_hit": d.cache_hit,
-                "path": str(d.path),
-            }
-            for d in downloads
-        ],
+        "cache": [download_metadata(d) for d in downloads],
         "row_count": int(len(df)),
         "runtime_s": round(time.monotonic() - t_start, 2),
         "generated_at": generated_at,
@@ -191,6 +221,7 @@ class AreaSpec:
     code: str
     name: str
     geometry: dict
+    aggregation_method: str = CELL_CENTRE
 
 
 def compute_heat_series_for_areas(
@@ -208,10 +239,9 @@ def compute_heat_series_for_areas(
 ) -> dict[int, tuple[pd.DataFrame, dict, pd.Series]]:
     """Download one grid covering ``bbox``, then derive every area from it.
 
-    The sibling of :func:`compute_heat_series`, and the reason it can exist is
-    that the aggregation was never tied to the download's extent:
-    ``to_daily_tmax_c`` masks whatever grid it is handed to the cell centres
-    inside a polygon, so one country-sized grid serves every area in it.
+    Each area declares its spatial aggregation. Existing calibrated areas keep
+    the cell-centre method; finer areas can use polygon/cell overlap weights.
+    Both use the same retained country-sized raw grid.
 
     Why this matters: Copernicus charges in queue time, not bytes. A month of
     one county is ~600 kB but waits a median 215s in the queue, so asking per
@@ -219,9 +249,9 @@ def compute_heat_series_for_areas(
     that requests expired before a worker reached them. One request per
     country-year replaces roughly 635 of them for the coverage we hold today.
 
-    Returns one entry per area whose geometry actually intersects the grid.
-    An area that does not is omitted rather than returned empty, so the caller
-    can report it instead of writing a row of nothing.
+    Returns one entry per area with the spatial coverage its method requires.
+    Overlap areas require the full polygon, while existing centre aggregation
+    requires at least one centre. Missing areas are omitted, never filled.
     """
 
     if not areas:
@@ -244,10 +274,21 @@ def compute_heat_series_for_areas(
     if not 1 <= worker_count <= 8:
         raise ValueError("max_workers must be between 1 and 8")
 
+    acquisition_bbox = bbox
+    if any(area.aggregation_method == CELL_OVERLAP for area in areas):
+        # CDS clips by grid-cell centres. Include one native ERA5 cell around
+        # the requested outline so every intersecting footprint is available.
+        north, west, south, east = bbox
+        acquisition_bbox = (
+            min(90.0, north + 0.25),
+            max(-180.0, west - 0.25),
+            max(-90.0, south - 0.25),
+            min(180.0, east + 0.25),
+        )
     t_start = time.monotonic()
     downloads = download_years(
         year_list,
-        bbox,
+        acquisition_bbox,
         cache_dir=cache_dir,
         months_by_year=months_by_year,
         no_cache=no_cache,
@@ -255,6 +296,7 @@ def compute_heat_series_for_areas(
         max_workers=worker_count,
     )
     generated_at = datetime.now(timezone.utc).isoformat()
+    cache_metadata = [download_metadata(item) for item in downloads]
     requested_set = set(requested_months)
 
     # Daily series per area, built by reading each downloaded year once and
@@ -265,19 +307,23 @@ def compute_heat_series_for_areas(
     skipped: dict[int, str] = {}
     for item in downloads:
         with xr.open_dataset(item.path) as ds:
+            ds = _requested_grid(ds, item.months)
             prepared = grid_transform(ds) if grid_transform is not None else ds
+            daily_grid = daily_tmax_grid_c(prepared).load()
             for area in areas:
                 if area.id in skipped:
                     continue
                 try:
                     daily_parts[area.id].append(
-                        to_daily_tmax_c(prepared, geometry=area.geometry)
+                        aggregate_daily_tmax_c(
+                            daily_grid,
+                            geometry=area.geometry,
+                            aggregation_method=area.aggregation_method,
+                        )
                     )
                 except ValueError as error:
-                    # An area smaller than a grid cell can contain no cell
-                    # centre. That is a real limitation of the data, not a
-                    # failure of the download, so record it and carry on with
-                    # the rest rather than losing the whole country.
+                    # Missing spatial coverage or invalid geometry must not
+                    # invent zero temperatures or lose the other areas.
                     skipped[area.id] = str(error)
 
     results: dict[int, tuple[pd.DataFrame, dict, pd.Series]] = {}
@@ -285,7 +331,7 @@ def compute_heat_series_for_areas(
     for area in areas:
         if area.id in skipped or not daily_parts[area.id]:
             log.warning(
-                "era5: %s produced no grid centres (%s)",
+                "era5: %s could not be aggregated (%s)",
                 area.code,
                 skipped.get(area.id, "no data"),
             )
@@ -315,9 +361,8 @@ def compute_heat_series_for_areas(
                 for ts in daily.index
             ]
         ]
-        # Each area keeps its own name and its own bbox in `meta`, because the
-        # loader hashes `meta` into the run's input_hash - a shared one would
-        # file every area under a description of the wrong place.
+        # Raw acquisition metadata is shared. Area geometry and aggregation
+        # remain explicit so reprocessing has a distinct derived-run identity.
         results[area.id] = (
             frame,
             {
@@ -327,8 +372,14 @@ def compute_heat_series_for_areas(
                 "data_status": "observed_reanalysis",
                 "district": area.name,
                 "bbox": list(bbox),
+                "acquisition_bbox": list(acquisition_bbox),
                 "bbox_order": "north,west,south,east",
-                "aggregation_method": "polygon_cell_center_coslat_v1",
+                "aggregation_method": area.aggregation_method,
+                "boundary_sha256": hashlib.sha256(
+                    json.dumps(
+                        area.geometry, sort_keys=True, separators=(",", ":")
+                    ).encode()
+                ).hexdigest(),
                 "downscaling_method": (
                     "expert_analytics_pending" if grid_transform is not None else "none"
                 ),
@@ -341,15 +392,7 @@ def compute_heat_series_for_areas(
                 },
                 "heatwave": {"threshold_c": threshold_c, "min_run": min_run},
                 "shared_download": True,
-                "cache": [
-                    {
-                        "year": item.year,
-                        "months": list(item.months),
-                        "cache_hit": item.cache_hit,
-                        "path": str(item.path),
-                    }
-                    for item in downloads
-                ],
+                "cache": cache_metadata,
                 "row_count": int(len(frame)),
                 "runtime_s": runtime_s,
                 "generated_at": generated_at,

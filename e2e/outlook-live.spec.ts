@@ -8,6 +8,7 @@ async function expectVulnerabilityFrame(
   response: Response,
   frame: Place,
   areas: Place[],
+  aggregate: string,
 ) {
   expect(response.status()).toBe(200);
   const assessment = await response.json();
@@ -28,7 +29,7 @@ async function expectVulnerabilityFrame(
   await expect(places).toBeVisible();
   await expect(
     places.getByRole("combobox", { name: areas[0].levelLabel, exact: true }),
-  ).toContainText(`Whole ${frame.levelLabel.toLowerCase()}`);
+  ).toContainText(aggregate);
   await expect(
     page.getByRole("combobox", { name: "Climate hazard", exact: true }),
   ).toHaveCount(0);
@@ -82,10 +83,13 @@ for (const [country, username, level] of [
     await expect(outlook).toBeVisible();
     await expect(
       outlook.getByRole("tab", { name: "Observed", exact: true }),
-    ).toBeDisabled();
+    ).toBeEnabled();
+    await outlook.getByRole("tab", { name: "Observed", exact: true }).click();
     await expect(
       outlook.getByRole("status").filter({ hasText: "No observed model is available" }),
     ).toBeVisible();
+    await expect(outlook.getByTestId("outlook-estimate")).toHaveCount(0);
+    await outlook.getByRole("tab", { name: "Projected", exact: true }).click();
     await expect(
       page.getByRole("combobox", { name: level, exact: true }),
     ).toBeVisible();
@@ -152,20 +156,80 @@ for (const [country, username, level] of [
     const frame =
       country === "IN" ? children[0] : geographies.find((geo) => geo.id === rootId)!;
     const areas = geographies.filter((geo) => geo.parentId === frame.id);
-    await expectVulnerabilityFrame(page, await firstAssessment, frame, areas);
+    const aggregate = country === "IN" ? "All divisions" : "All counties";
+    await expectVulnerabilityFrame(
+      page,
+      await firstAssessment,
+      frame,
+      areas,
+      aggregate,
+    );
 
     const reloadedAssessment = nextAssessment();
     await page.reload();
-    await expectVulnerabilityFrame(page, await reloadedAssessment, frame, areas);
+    await expectVulnerabilityFrame(
+      page,
+      await reloadedAssessment,
+      frame,
+      areas,
+      aggregate,
+    );
 
     // The sidebar entry also resolves through defaultFrame/defaultAreaForFamily.
     const defaultAssessment = nextAssessment();
     await page.goto("/vulnerability");
-    await expectVulnerabilityFrame(page, await defaultAssessment, frame, areas);
+    await expectVulnerabilityFrame(
+      page,
+      await defaultAssessment,
+      frame,
+      areas,
+      aggregate,
+    );
     await page.screenshot({
       path: `${process.env.CHART_E2E_EVIDENCE}/${country}-vulnerability-frame.png`,
       fullPage: true,
     });
+
+    // The same shared picker names the finer level in VRA and clears only the
+    // selected area when its aggregate option is chosen.
+    const fineFrame = geographies.find((geo) => geo.id === place.parentId)!;
+    const fineAreas = geographies.filter((geo) => geo.parentId === fineFrame.id);
+    const fineAggregate = country === "IN" ? "All districts" : "All constituencies";
+    const fineAssessment = nextAssessment();
+    await page.goto(`/vulnerability/${fineFrame.id}`);
+    await expectVulnerabilityFrame(
+      page,
+      await fineAssessment,
+      fineFrame,
+      fineAreas,
+      fineAggregate,
+    );
+    const finePicker = page.getByRole("combobox", { name: level, exact: true });
+    const selectedArea = fineAreas.find((area) => area.id === place.id)!;
+    await finePicker.click();
+    await page.getByRole("option", { name: selectedArea.name, exact: true }).click();
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === `/vulnerability/${fineFrame.id}` &&
+        url.searchParams.get("area") === selectedArea.id,
+    );
+    await expect(finePicker).toContainText(selectedArea.name);
+    await finePicker.click();
+    await expect(
+      page.getByRole("option", { name: fineAggregate, exact: true }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: `${process.env.CHART_E2E_EVIDENCE}/${country}-vra-aggregate-menu.png`,
+      animations: "disabled",
+    });
+    await page.getByRole("option", { name: fineAggregate, exact: true }).click();
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === `/vulnerability/${fineFrame.id}` &&
+        !url.searchParams.has("area"),
+    );
+    await expect(finePicker).toContainText(fineAggregate);
+    await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
 
     const outside = fixtures[country === "IN" ? "KE" : "IN"];
     const denied = page.waitForResponse(

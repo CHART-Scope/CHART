@@ -30,7 +30,10 @@ from chart.shared.db.models import (
 from chart.shared.db.session import get_session_factory
 
 ROOT = Path(__file__).resolve().parents[1]
-INDIA = "geo-in-madhya-pradesh-division-bhopal"
+INDIA = {
+    "geo-in-madhya-pradesh-division-bhopal": "Bhopal",
+    "geo-in-madhya-pradesh-division-gwalior": "Gwalior",
+}
 KENYA = "geo-ke-kajiado"
 
 
@@ -39,7 +42,7 @@ def main() -> None:
         units = {
             unit.app_geography_id: unit
             for unit in session.scalars(
-                select(AdminUnit).where(AdminUnit.app_geography_id.in_([INDIA, KENYA]))
+                select(AdminUnit).where(AdminUnit.app_geography_id.in_([*INDIA, KENYA]))
             )
         }
         source = DataSource(name=ERA5_DATA_SOURCE_NAME, kind="reanalysis")
@@ -70,7 +73,7 @@ def main() -> None:
         ).open() as f:
             case = next(csv.DictReader(f))
         for month in range(1, 10):
-            for place in (INDIA, KENYA):
+            for place in (*INDIA, KENYA):
                 days = monthrange(2026, month)[1]
                 # Reproduce R validation case 1 on the model's scale for Kenya.
                 value = (
@@ -141,47 +144,48 @@ def main() -> None:
             )
             session.add(prior)
             session.flush()
-            session.add_all(
-                [
-                    ModelAreaMapping(
-                        model_release_id=release.id,
-                        admin_unit_id=units[INDIA].id,
-                        model_area_key="Bhopal",
-                        model_file=manifest["model_files"][0]["filename"],
-                    ),
-                    ActiveModelAssignment(
-                        admin_unit_id=units[INDIA].id,
-                        module="prediction",
-                        outcome=release.outcome,
-                        model_release_id=release.id,
-                    ),
-                ]
-            )
-            for month in (8, 9):
-                session.add(
-                    PredictionResult(
-                        admin_unit_id=units[INDIA].id,
-                        outcome=release.outcome,
-                        model_release_id=prior.id if month == 8 else release.id,
-                        valid_month=date(2026, month, 1),
-                        scenario="seas5_ensemble",
-                        horizon="m1",
-                        pregnancy_window=1 if release.outcome == "lbw" else 0,
-                        odds_ratio=1.25 if release.outcome == "lbw" else 1.1,
-                        ci95_low=1.05,
-                        ci95_high=1.5,
-                        attributable_fraction_milli=(
-                            200 if release.outcome == "lbw" else 91
+            for place, model_area in INDIA.items():
+                session.add_all(
+                    [
+                        ModelAreaMapping(
+                            model_release_id=release.id,
+                            admin_unit_id=units[place].id,
+                            model_area_key=model_area,
+                            model_file=manifest["model_files"][0]["filename"],
                         ),
-                        reference_temperature_c=27.0,
-                        reference_kind="editorial",
-                        model_version=release.version,
-                        model_artifact_sha256=manifest["model_files"][0]["sha256"],
-                        exposure_values_c=[30.0]
-                        * (3 if release.outcome == "lbw" else 4),
-                        data_label=DataLabel.reanalysis,
-                    )
+                        ActiveModelAssignment(
+                            admin_unit_id=units[place].id,
+                            module="prediction",
+                            outcome=release.outcome,
+                            model_release_id=release.id,
+                        ),
+                    ]
                 )
+                for month in (8, 9):
+                    session.add(
+                        PredictionResult(
+                            admin_unit_id=units[place].id,
+                            outcome=release.outcome,
+                            model_release_id=prior.id if month == 8 else release.id,
+                            valid_month=date(2026, month, 1),
+                            scenario="seas5_ensemble",
+                            horizon="m1",
+                            pregnancy_window=1 if release.outcome == "lbw" else 0,
+                            odds_ratio=1.25 if release.outcome == "lbw" else 1.1,
+                            ci95_low=1.05,
+                            ci95_high=1.5,
+                            attributable_fraction_milli=(
+                                200 if release.outcome == "lbw" else 91
+                            ),
+                            reference_temperature_c=27.0,
+                            reference_kind="editorial",
+                            model_version=release.version,
+                            model_artifact_sha256=manifest["model_files"][0]["sha256"],
+                            exposure_values_c=[30.0]
+                            * (3 if release.outcome == "lbw" else 4),
+                            data_label=DataLabel.reanalysis,
+                        )
+                    )
     print("Persisted disposable observed fixtures for Kenya and India")
 
 

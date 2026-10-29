@@ -41,6 +41,45 @@ Dagster owns execution, retries, logs, and run history. FastAPI owns request
 validation and HTTP responses. Postgres owns durable state. Redis is not part
 of this path.
 
+### Country climate pulls
+
+Settings → Data queues a separate country-wide ERA5 pull. Its saved
+`climate_ingestion_job` records progress, and the climate sensor starts the
+Dagster run. The sensor also reconciles running jobs whose exact Dagster run
+has failed or been canceled. This covers native crashes and killed workers
+that cannot execute Python's error handler: the app shows
+`CLIMATE_PULL_INTERRUPTED` and permits a new request through **Retry**.
+Reconciliation preserves completed results and another run's ownership. An
+old timestamp alone never fails a pull, because Copernicus can queue a valid
+request for a long time. A stopped sensor must be restored before it can
+reconcile anything.
+
+ERA5 year downloads can run concurrently. Their NetCDF cache validation
+serializes native file opening and closing within each worker process;
+overlapping validation could otherwise reject valid files or crash in the
+native library. The real cached-download CLI regression is part of `make e2e`
+and verifies saved monthly outputs without contacting Copernicus.
+
+The download cache also reuses a valid saved grid when its recorded request
+covers the requested country bounds and months. `ERA5_CACHE_DIR` overrides the
+local cache directory; deployed workers keep it at
+`/opt/chart/data/climate/era5-cache` on the persistent climate volume. Refresh
+explicitly bypasses reuse. A cache hit retains the original raw-file hash and
+request provenance, and only the requested months are processed.
+
+After new district/constituency boundaries are registered, another country pull
+can derive their climate inputs from those grids. Fine areas use polygon-cell
+overlap weights; existing county/division methods stay unchanged. Acquisitions
+include one native grid-cell margin when fine areas are present. The actual
+grid footprint must cover each fine polygon completely; partial coverage is
+reported as missing rather than normalized into an estimate. Daily grid maxima
+are shared across areas. Derived runs are grouped by boundary version,
+aggregation method and downscaling method so existing model input checks still
+apply. Run identity includes the area set, geometry hashes, selected months and
+raw content: new areas are processed rather than being discarded as a duplicate
+download, and identical repeats do not duplicate persisted rows. This prepares
+climate inputs only; it does not enable unvalidated observed health models.
+
 ## Climate and model handoff
 
 ```mermaid

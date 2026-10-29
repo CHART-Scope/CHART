@@ -7,8 +7,10 @@ It is composed of three cards, all reading the same selection.
 
 ## The selection
 
-Everything on the page derives from four things in the URL: the geography, an
-optional `admin_unit`, the `outcome`, and the `month`.
+The URL records the geography, optional `admin_unit`, `outcome`, `month`, and
+`view` (`observed` or `projection`). Projected choices also retain `scenario`,
+`period`, `selector`, and `reference`; the observed group uses
+`observed_selector`.
 
 ```
 /dashboard/geo-in-madhya-pradesh?admin_unit=geo-in-madhya-pradesh-division-bhopal&outcome=lbw&month=2026-08
@@ -17,6 +19,13 @@ optional `admin_unit`, the `outcome`, and the `month`.
 They live in the URL rather than in component state so a reload, the back
 button and a shared link all land on the same view. Changing any of them
 re-reads every card.
+
+Each geography dropdown names its own level: **All divisions**, **All districts**,
+**All counties**, or **All constituencies**. Choosing this first option clears
+the child selection and returns to the current parent's map and available
+results, retaining the other filters. The vulnerability page uses the same
+place selectors. Routing-only roots such as India do not offer an aggregate
+option when they lead directly to their supported state.
 
 Which pregnancy windows or age groups, scenarios and data views the cards
 offer is set per country and outcome under Settings → Workspace → Model
@@ -29,6 +38,14 @@ of the selected area, broadest first — `Kenya › Garissa`, or
 `India › Madhya Pradesh › Bhopal Division`. It follows the sub-area picker, and
 consecutive repeats collapse, so a country-level view shows `Kenya` once rather
 than `Kenya › Kenya`.
+
+Clicking an area with children opens its child map: Madhya Pradesh → division →
+district, or Kenya → county → constituency. **Back to …** returns to the parent
+map. Map navigation retains the outcome, view and compatible filters, as do
+reload and browser history. Both view tabs remain selectable at finer levels.
+Where an observed model is unavailable, the dashboard explains this and keeps
+the geographic outlines visible with no health values; going back restores the
+parent's available observed view.
 
 ## The cards
 

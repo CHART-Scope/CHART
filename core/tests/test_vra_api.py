@@ -17,6 +17,8 @@ unscored as insufficient data.
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import os
 from collections.abc import Iterator
@@ -498,23 +500,34 @@ def test_reupload_updates_in_place_and_new_vintage_is_used(as_user, factory) -> 
 def test_template_lists_every_area_and_hand_entered_indicator(as_user) -> None:
     client = as_user(ADMIN)
     indicators = client.get("/vra/indicators").json()["items"]
-    expected = [
-        i["code"]
-        for i in indicators
-        if i["route"] in ("upload", "manual") and i["status"] != "dropped"
-    ]
+    expected = [i["code"] for i in indicators if i["uploadable"]]
 
     response = client.get(f"/vra/{MP}/template.csv")
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
-    lines = response.text.strip().split("\n")
-    assert (
-        lines[0]
-        == "area_code,area_name,indicator_code,value,vintage,source_name,source_url,notes"
+    rows = list(csv.DictReader(io.StringIO(response.text)))
+    assert list(rows[0]) == [
+        "area_code",
+        "area_name",
+        "indicator_code",
+        "value",
+        "vintage",
+        "source_name",
+        "source_url",
+        "notes",
+        "indicator_name",
+        "unit",
+        "expected_values",
+        "example_value",
+    ]
+    assert len(rows) == len(DIVISIONS) * len(expected)
+    assert rows[0]["area_code"] == "bhopal"
+    assert rows[0]["indicator_code"] == expected[0]
+    assert all(row["value"] == row["vintage"] == "" for row in rows)
+    assert all(
+        row["unit"] and row["expected_values"] and row["example_value"] for row in rows
     )
-    assert len(lines) == 1 + len(DIVISIONS) * len(expected)
-    assert lines[1] == f"bhopal,Bhopal,{expected[0]},,,,,"
 
 
 # --- computed hazard -------------------------------------------------------

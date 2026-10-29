@@ -93,6 +93,7 @@ export function DashboardContextBar({
     }
     const pickers = [];
     let parent = activeFamily.root;
+    const defaultArea = defaultAreaForFamily(activeFamily, geographies);
     const visited = new Set<string>();
     while (!visited.has(parent.id)) {
       visited.add(parent.id);
@@ -115,6 +116,10 @@ export function DashboardContextBar({
         children,
         selected: selected?.id ?? "",
         label: children[0].levelLabel,
+        // A routing-only root (India) opens its supported state; it has no
+        // aggregate view to return to through an "All states" option.
+        canSelectAll:
+          parent.id !== activeFamily.root.id || defaultArea?.id === parent.id,
       });
       if (!selected) break;
       parent = selected;
@@ -222,7 +227,7 @@ export function DashboardContextBar({
         </label>
       )}
 
-      {geographyPickers.map(({ parent, children, selected, label }) => (
+      {geographyPickers.map(({ parent, children, selected, label, canSelectAll }) => (
         <InlineSelect
           key={parent.id}
           menu
@@ -231,7 +236,7 @@ export function DashboardContextBar({
           value={selected}
           onChange={(next) => handlePlaceChange(next, parent.id)}
           options={[
-            { value: "", label: `Whole ${parent.levelLabel.toLowerCase()}` },
+            ...(canSelectAll ? [{ value: "", label: allAreasLabel(label) }] : []),
             ...children.map((child) => ({ value: child.id, label: child.name })),
           ]}
         />
@@ -265,6 +270,13 @@ export function DashboardContextBar({
 }
 
 const NO_CATALOG: ModelCatalogEntry[] = [];
+
+function allAreasLabel(levelLabel: string): string {
+  const level = levelLabel.trim().toLowerCase();
+  if (!level) return "All areas";
+  const plural = /[^aeiou]y$/.test(level) ? `${level.slice(0, -1)}ies` : `${level}s`;
+  return `All ${plural}`;
+}
 
 function dedupe<T>(items: T[], key: (item: T) => string): T[] {
   const seen = new Set<string>();
