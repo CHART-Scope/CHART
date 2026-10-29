@@ -377,7 +377,7 @@ remain accepted. Geography permissions are checked against the resolved
 comparison frame as well as the requested area, including leaf URLs. These checks cannot
 establish that a percentage has the correct source population, year or
 boundary definition. The source must be reviewed for those properties.
-See [the module contract](../core/chart/vra/README.md) for the exact API and
+See [the module contract](https://github.com/CHART-Scope/CHART/blob/dev/core/chart/vra/README.md) for the exact API and
 validation behavior.
 
 The UI distinguishes missing values and unscored results from numeric zero.
@@ -398,14 +398,14 @@ observed climate window for each area.
 ### Available source material
 
 The repository already contains
-[`mp_divisions_vra.csv`](../pipelines/vra/data/mp-divisions-v1/mp_divisions_vra.csv)
+[`mp_divisions_vra.csv`](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/vra/data/mp-divisions-v1/mp_divisions_vra.csv)
 with 27 indicators across ten divisions, built from Census 2011, NFHS-5
 2019–21 and the NITI MPI release. It is not automatically loaded. It supplies
 no hazard observations and is not an unqualified production dataset:
 
 - NFHS/MPI division aggregates use Census total-population weights instead
   of each survey indicator's actual denominator; some suppressed observations
-  are excluded. Review the [source notes](../pipelines/vra/data/mp-divisions-v1/SOURCES.md).
+  are excluded. Review the [source notes](https://github.com/CHART-Scope/CHART/blob/dev/pipelines/vra/data/mp-divisions-v1/SOURCES.md).
 - The water/sanitation source measures population, while the current
   catalogue labels households. Resolve those definitions before import;
   passing numeric validation does not make them equivalent.
