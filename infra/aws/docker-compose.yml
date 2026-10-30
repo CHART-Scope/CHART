@@ -130,7 +130,7 @@ services:
         else
           public_flag="";
         fi;
-        aws s3 sync "s3://$$MODEL_BUCKET/" /models/ --exclude "archive/*" --exclude "media/*" $$public_flag
+        aws s3 sync "s3://$$MODEL_BUCKET/" /models/ --exclude "archive/*" --exclude "media/*" --exclude "era5-cache/*" $$public_flag
 
   chart-lbw:
     image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-lbw:${IMAGE_TAG:-dev}

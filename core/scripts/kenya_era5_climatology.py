@@ -24,7 +24,7 @@ from era5_heat import AreaSpec, compute_heat_series_for_areas
 from geoalchemy2.shape import to_shape
 from shapely.geometry import mapping
 
-from chart.climate.ingestion_jobs import areas_for_country, country_envelope
+from chart.climate.country_pull import configured_areas, country_envelope
 from chart.shared.db.session import get_session_factory
 
 YEARS = range(2011, 2021)
@@ -34,7 +34,7 @@ def main(argv: list[str]) -> None:
     output = Path(argv[1])
     with get_session_factory()() as session:
         units = [
-            unit for unit in areas_for_country(session, "KE") if unit.level == "county"
+            unit for unit in configured_areas(session, "KE") if unit.level == "county"
         ]
         envelope = country_envelope(units)
         areas = [

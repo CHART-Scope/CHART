@@ -1,7 +1,6 @@
 import hashlib
 import json
 import os
-import shutil
 import threading
 from calendar import monthrange
 from contextlib import contextmanager
@@ -10,11 +9,7 @@ from pathlib import Path
 
 import dagster as dg
 from era5_heat import (
-    AreaSpec,
-    CELL_CENTRE,
-    CELL_OVERLAP,
     compute_heat_series,
-    compute_heat_series_for_areas,
     fixture_demo,
 )
 from era5_heat.io import output_paths, write_json, write_table
@@ -31,7 +26,14 @@ from seasonal_c3s import (
 from shapely.geometry import mapping
 
 from chart.climate.data_contract import MonthlyClimateRecord
-from chart.climate.heat_seasons import HeatwaveRule, heatwave_rule
+from chart.climate.country_pull import (
+    cds_credentials_available,
+    country_heatwave_rule,
+    ensure_climate_storage_capacity,
+    pull_country_months,
+    write_observed_output,
+)
+from chart.climate.history import BackfillReport, score_observed
 from chart.climate.input_windows import select_input_months, target_months
 from chart.climate.ingestion_leases import run_single_flight_ingestion
 from chart.climate.projection_adapter import (
@@ -54,13 +56,10 @@ from chart.climate.requests import (
     set_prediction_request_stage,
 )
 from chart.climate.ingestion_jobs import (
-    areas_for_country,
     claim_job,
     complete_job,
-    country_envelope,
     fail_job,
     queue_recent_month_top_ups,
-    record_progress,
     reserve_queued_jobs,
     running_jobs,
 )
@@ -68,10 +67,9 @@ from chart.climate.service import ClimateServiceError
 from chart.shared.db.climate_load import (
     load_era5_daily_series,
     load_era5_monthly_frame,
-    load_era5_shared_download,
     load_monthly_climate_records,
 )
-from chart.shared.db.models import AdminUnit, Geography
+from chart.shared.db.models import AdminUnit
 from chart.shared.db.session import get_session_factory
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -286,110 +284,53 @@ def pull_country_climate(
     session_factory = get_session_factory()
     try:
         months = [date.fromisoformat(f"{item}-01") for item in config.months]
-
         with session_factory() as session:
             job = claim_job(session, config.job_id, dagster_run_id=context.run_id)
             if job is None:
                 context.log.info("Job %s is not ours to run", config.job_id)
                 return
-            units = areas_for_country(session, config.country_code)
-            if not units:
-                fail_job(session, config.job_id, error_code="CLIMATE_NO_AREAS")
-                session.commit()
-                raise ClimateServiceError("CLIMATE_NO_AREAS", 409)
-            envelope = country_envelope(units)
-            heatwave = _heatwave_rule(config.country_code)
-            areas = [
-                AreaSpec(
-                    id=unit.id,
-                    code=unit.code,
-                    name=unit.name,
-                    geometry=_area_geometry(unit),
-                    # Existing fitted county/division calibration uses centre
-                    # weighting. Finer new units need cell-overlap coverage.
-                    aggregation_method=(
-                        CELL_OVERLAP
-                        if unit.level in {"district", "constituency"}
-                        else CELL_CENTRE
-                    ),
-                    heatwave_threshold_c=heatwave.threshold_for(unit.app_geography_id),
-                )
-                for unit in units
-            ]
-            geography = session.get(Geography, units[0].geography_id)
-            if geography is None:
-                raise ValueError(
-                    f"admin unit {units[0].id} points at missing geography "
-                    f"{units[0].geography_id}"
-                )
-            preset_slug = geography.slug
             session.commit()
-
-        context.log.info(
-            "Pulling %s: one grid (N,W,S,E)=%s for %d months, %d areas",
-            config.country_code,
-            tuple(round(value, 2) for value in envelope),
-            len(months),
-            len(areas),
+        outcome = pull_country_months(
+            session_factory, config.country_code, months, log=context.log.info
         )
-
-        _ensure_climate_storage_capacity()
-        if not _cds_credentials_available():
-            raise ClimateServiceError("CLIMATE_INGEST_NOT_CONFIGURED", 503)
-        results = compute_heat_series_for_areas(
-            areas,
-            bbox=envelope,
-            target_months=tuple(months),
-            threshold_c=heatwave.threshold_c,
-            min_run=heatwave.min_run_days,
-        )
-        if not results:
-            raise ClimateServiceError("CLIMATE_NO_GRID_CENTRES", 422)
-
         with session_factory() as session:
-            record_progress(session, config.job_id, stage="writing")
-            session.commit()
-
-        csv_paths: dict[int, str] = {}
-        for area in areas:
-            if area.id not in results:
-                continue
-            frame, meta, _ = results[area.id]
-            path, _ = _write_observed_output(area.code, frame, meta, months)
-            csv_paths[area.id] = str(path)
-
-        with session_factory() as session:
-            run, monthly_rows, daily_rows = load_era5_shared_download(
-                session,
-                preset_slug=preset_slug,
-                results=results,
-                csv_paths=csv_paths,
-            )
             complete_job(
                 session,
                 config.job_id,
-                climate_run_id=run.id,
-                areas_done=len(results),
+                climate_run_id=outcome.climate_run_id,
+                areas_done=outcome.areas_done,
             )
             session.commit()
         context.log.info(
-            "Pulled %s from one download: run=%s, %d areas, %d monthly rows, "
-            "%d daily rows",
+            "Pulled %s: run=%s, %d/%d areas, %d monthly rows, %d daily rows; "
+            "no coverage: %s",
             config.country_code,
-            run.id,
-            len(results),
-            monthly_rows,
-            daily_rows,
+            outcome.climate_run_id,
+            outcome.areas_done,
+            outcome.areas_total,
+            outcome.monthly_rows,
+            outcome.daily_rows,
+            outcome.skipped or "none",
+        )
+        # New months are scored now, so no one waits for them on a click.
+        scoring = BackfillReport(country_code=config.country_code)
+        score_observed(
+            session_factory,
+            config.country_code,
+            months,
+            scoring,
+            log=context.log.info,
         )
         context.log_event(
             dg.AssetMaterialization(
                 asset_key=["climate", "country_pull"],
                 metadata={
                     "country": config.country_code,
-                    "areas": len(results),
-                    "monthly_rows": monthly_rows,
-                    "daily_rows": daily_rows,
-                    "climate_run_id": run.id,
+                    "areas": outcome.areas_done,
+                    "monthly_rows": outcome.monthly_rows,
+                    "daily_rows": outcome.daily_rows,
+                    "climate_run_id": outcome.climate_run_id,
+                    "scored": scoring.scored,
                 },
             )
         )
@@ -402,14 +343,6 @@ def pull_country_climate(
             )
             session.commit()
         raise
-
-
-def _area_geometry(unit) -> dict:
-    """GeoJSON for an admin unit, whichever backend stored it."""
-    boundary = unit.boundary
-    if isinstance(boundary, str):
-        return json.loads(boundary)
-    return mapping(to_shape(boundary))
 
 
 @dg.job(description="Download one country's climate grid and derive its areas.")
@@ -566,7 +499,7 @@ def _prepare_required_climate(
     projection_scenario: str | None = None,
     projection_period: str | None = None,
 ) -> dict:
-    _ensure_climate_storage_capacity()
+    ensure_climate_storage_capacity()
     session_factory = get_session_factory()
     with session_factory() as session:
         admin_unit = session.get(AdminUnit, admin_unit_id)
@@ -880,22 +813,10 @@ def _load_fixture(
     return run_ids
 
 
-def _heatwave_rule(country_code: str | None) -> HeatwaveRule:
-    """The country's heatwave definition, or CHART's 35 deg C, 3-day default."""
-
-    return heatwave_rule(country_code or "") or HeatwaveRule(
-        threshold_c=35.0,
-        min_run_days=3,
-        area_thresholds_c={},
-        source_name="CHART default",
-        source_uri="",
-    )
-
-
 def _load_observed(context, place: dict, months: list[date], session_factory) -> int:
-    if not _cds_credentials_available():
+    if not cds_credentials_available():
         raise ClimateServiceError("CLIMATE_INGEST_NOT_CONFIGURED", 503)
-    heatwave = _heatwave_rule(place.get("country_code"))
+    heatwave = country_heatwave_rule(place.get("country_code"))
     df, meta, daily = compute_heat_series(
         district=place["name"],
         bbox=place["bbox"],
@@ -904,7 +825,7 @@ def _load_observed(context, place: dict, months: list[date], session_factory) ->
         threshold_c=heatwave.threshold_for(place.get("geography_id")),
         min_run=heatwave.min_run_days,
     )
-    csv_path, _ = _write_observed_output(place["code"], df, meta, months)
+    csv_path, _ = write_observed_output(place["code"], df, meta, months)
     with session_factory() as session:
         run = load_era5_monthly_frame(
             session,
@@ -937,7 +858,7 @@ def _load_seasonal(
     source_as_of: datetime,
     session_factory,
 ) -> int:
-    if not _cds_credentials_available():
+    if not cds_credentials_available():
         raise ClimateServiceError("CLIMATE_INGEST_NOT_CONFIGURED", 503)
     issue_month = latest_seasonal_issue_month(source_as_of)
     target_path = (
@@ -1150,22 +1071,6 @@ def _write_provider_output(slug, df, meta, start_year, end_year):
     return table_path, meta_path
 
 
-def _write_observed_output(slug, df, meta, months: list[date]):
-    outdir = Path(os.getenv("CLIMATE_OUTPUT_DIR", DEFAULT_OUTDIR))
-    outdir.mkdir(parents=True, exist_ok=True)
-    period_label = "_".join(month.strftime("%Y-%m") for month in sorted(months))
-    # Retain the previous derivation's source evidence when the same raw grid
-    # is processed for revised boundaries or a new aggregation method.
-    version = hashlib.sha256(
-        json.dumps(meta, sort_keys=True, default=str).encode()
-    ).hexdigest()[:16]
-    table_path = outdir / f"{slug}_era5_{period_label}_{version}.csv"
-    meta_path = outdir / f"{slug}_era5_{period_label}_{version}.json"
-    write_table(df, table_path, "csv")
-    write_json(meta, meta_path)
-    return table_path, meta_path
-
-
 def _selected_row_needs_live_refresh(row, source_as_of: datetime) -> bool:
     _, run, _, _ = row
     if run.data_label.value == "sample" or run.quality_status == "sample":
@@ -1194,15 +1099,6 @@ def _acquisition_identity(
         "months": sorted(month.isoformat() for month in months),
         **values,
     }
-
-
-def _cds_credentials_available() -> bool:
-    if os.getenv("CDSAPI_KEY"):
-        return True
-    credentials_file = Path(
-        os.getenv("CDSAPI_RC", Path.home() / ".cdsapirc")
-    ).expanduser()
-    return credentials_file.is_file()
 
 
 @contextmanager
@@ -1245,18 +1141,6 @@ def _prediction_lease_heartbeat(
     finally:
         stop.set()
         thread.join(timeout=2)
-
-
-def _ensure_climate_storage_capacity() -> None:
-    output_dir = Path(os.getenv("CLIMATE_OUTPUT_DIR", DEFAULT_OUTDIR))
-    minimum_free_bytes = max(0, int(os.getenv("CLIMATE_MIN_FREE_BYTES", str(1024**3))))
-    locations = {output_dir}
-    if configured_cache := os.getenv("ERA5_CACHE_DIR"):
-        locations.add(Path(configured_cache).expanduser())
-    for location in locations:
-        location.mkdir(parents=True, exist_ok=True)
-        if shutil.disk_usage(location).free < minimum_free_bytes:
-            raise ClimateServiceError("CLIMATE_STORAGE_CAPACITY_LOW", 503)
 
 
 @dg.sensor(
