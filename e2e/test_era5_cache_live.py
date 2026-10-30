@@ -51,6 +51,7 @@ def test_parallel_cached_era5_pull_persists_monthly_results(tmp_path: Path) -> N
     environment = os.environ.copy()
     # Any unexpected cache miss must not contact CDS with real credentials.
     environment["CDSAPI_URL"] = "http://127.0.0.1:1/no-network-expected"
+    environment["ERA5_MIRROR_URL"] = ""
     environment["CDSAPI_KEY"] = "disposable-cache-test"
     record = {
         "revision": subprocess.check_output(

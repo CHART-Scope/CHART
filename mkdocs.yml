@@ -67,6 +67,7 @@ nav:
   - Installation setup: installation-setup.md
   - Architecture:
       - System requirements and capacity: system-architecture-and-requirements.md
+      - Observed climate data: observed-climate.md
   - Infrastructure:
       - AWS sandbox deployment: aws-sandbox.md
   - Python core:

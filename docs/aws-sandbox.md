@@ -39,6 +39,23 @@ existing `POSTGRES_PASSWORD` when retaining an existing database volume.
 
 ## Model artifacts on S3
 
+Load observed climate history once per country after the outlooks are
+installed and registered, from `~/chart-deploy/aws`. The Dagster code container
+holds the Copernicus key and the ERA5 cache volume:
+
+```bash
+docker compose --env-file .env.prod exec -T chart-dagster-code \
+  python -m chart.climate.history backfill --country IN --years 20
+docker compose --env-file .env.prod exec -T chart-dagster-code \
+  python -m chart.climate.history verify --country IN --years 20
+```
+
+Repeat for `KE`. The sandbox keeps 20 years; the command is safe to re-run and
+only downloads what is missing. Afterwards a maintainer with bucket write
+access can share the retained grids so other installations skip the
+Copernicus queue: copy `/opt/chart/data/climate/era5-cache` from the host and
+run `make climate-mirror-publish ERA5_CACHE_DIR=<copy>`.
+
 For the October 2026 India/Kenya projections, upload the generated `outlooks/`
 tree and register its geography hierarchy after the model sync. Follow the
 [outlook installation commands](model-integration.md#installing-the-generated-outlooks-on-the-server).

@@ -316,13 +316,12 @@ def load_capabilities(
         )
         release = session.get(ModelRelease, model.release_id) if model else None
         if model is not None and release is not None and release.status == "active":
-            contract = (model.input_spec or {}).get("input_contract") or {}
+            # Stored results, read in the same view as Kenya's observed months
+            # (``observed_stored``): nothing is scored when a place opens.
             observed = ObservedCapability(
-                source="monthly",
+                source="outlook",
                 release=model.release_id,
                 model_area_name=model.model_area_name,
-                batch_enabled=contract.get("batch_status")
-                != "blocked_pending_modeller_confirmation",
             )
             observed_enabled = monthly_observed_enabled
     if (

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import hashlib
+import math
 import json
 import os
 import time
@@ -276,17 +277,17 @@ def compute_heat_series_for_areas(
     if not 1 <= worker_count <= 8:
         raise ValueError("max_workers must be between 1 and 8")
 
-    acquisition_bbox = bbox
-    if any(area.aggregation_method == CELL_OVERLAP for area in areas):
-        # CDS clips by grid-cell centres. Include one native ERA5 cell around
-        # the requested outline so every intersecting footprint is available.
-        north, west, south, east = bbox
-        acquisition_bbox = (
-            min(90.0, north + 0.25),
-            max(-180.0, west - 0.25),
-            max(-90.0, south - 0.25),
-            min(180.0, east + 0.25),
-        )
+    # CDS clips by grid-cell centres. One native ERA5 cell around the outline,
+    # snapped outward to the 0.25 deg grid, makes every intersecting footprint
+    # available (overlap areas, and centre areas too small to hold a centre),
+    # and keeps the request - so its cache key - stable as areas are added.
+    north, west, south, east = bbox
+    acquisition_bbox = (
+        min(90.0, math.ceil(north * 4) / 4 + 0.25),
+        max(-180.0, math.floor(west * 4) / 4 - 0.25),
+        max(-90.0, math.floor(south * 4) / 4 - 0.25),
+        min(180.0, math.ceil(east * 4) / 4 + 0.25),
+    )
     t_start = time.monotonic()
     downloads = download_years(
         year_list,
@@ -307,6 +308,7 @@ def compute_heat_series_for_areas(
     # data and forty-seven.
     daily_parts: dict[int, list[pd.Series]] = {area.id: [] for area in areas}
     skipped: dict[int, str] = {}
+    methods: dict[int, str] = {}
     for item in downloads:
         with xr.open_dataset(item.path) as ds:
             ds = _requested_grid(ds, item.months)
@@ -315,14 +317,27 @@ def compute_heat_series_for_areas(
             for area in areas:
                 if area.id in skipped:
                     continue
+                method = methods.get(area.id, area.aggregation_method)
                 try:
-                    daily_parts[area.id].append(
-                        aggregate_daily_tmax_c(
+                    try:
+                        series = aggregate_daily_tmax_c(
                             daily_grid,
                             geometry=area.geometry,
-                            aggregation_method=area.aggregation_method,
+                            aggregation_method=method,
                         )
-                    )
+                    except ValueError as error:
+                        # An area smaller than one grid cell (Mombasa, Vihiga)
+                        # holds no centre; weight the cells it overlaps instead.
+                        if str(error) != "ERA5_AREA_HAS_NO_GRID_CENTRES":
+                            raise
+                        method = CELL_OVERLAP
+                        series = aggregate_daily_tmax_c(
+                            daily_grid,
+                            geometry=area.geometry,
+                            aggregation_method=method,
+                        )
+                    methods[area.id] = method
+                    daily_parts[area.id].append(series)
                 except ValueError as error:
                     # Missing spatial coverage or invalid geometry must not
                     # invent zero temperatures or lose the other areas.
@@ -381,7 +396,7 @@ def compute_heat_series_for_areas(
                 "bbox": list(bbox),
                 "acquisition_bbox": list(acquisition_bbox),
                 "bbox_order": "north,west,south,east",
-                "aggregation_method": area.aggregation_method,
+                "aggregation_method": methods.get(area.id, area.aggregation_method),
                 "boundary_sha256": hashlib.sha256(
                     json.dumps(
                         area.geometry, sort_keys=True, separators=(",", ":")

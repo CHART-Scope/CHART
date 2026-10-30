@@ -7,6 +7,9 @@ import json
 import logging
 import os
 import secrets
+import shutil
+import urllib.error
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -161,6 +164,38 @@ def _covering_cache(
     return None
 
 
+#: A public copy of retained acquisitions, laid out like the cache directory
+#: (``<key>.nc`` beside ``<key>.json``). An identical request is read from it
+#: instead of waiting in the Copernicus queue. ``ERA5_MIRROR_URL=`` disables it.
+DEFAULT_MIRROR_URL = (
+    "https://chart-predictive-models.s3.eu-west-2.amazonaws.com/era5-cache"
+)
+
+
+def _fetch_mirror(key: str, nc_path: Path, meta_path: Path) -> bool:
+    """Copy ``key`` from the mirror into the cache; False when it is not there."""
+    base = os.environ.get("ERA5_MIRROR_URL", DEFAULT_MIRROR_URL).rstrip("/")
+    if not base:
+        return False
+    partial = nc_path.with_name(f".{nc_path.name}.{secrets.token_hex(8)}.partial")
+    try:
+        with urllib.request.urlopen(f"{base}/{key}.json", timeout=30) as response:
+            sidecar = response.read()
+        with urllib.request.urlopen(f"{base}/{key}.nc", timeout=60) as response:
+            with partial.open("wb") as stream:
+                shutil.copyfileobj(response, stream)
+        if not _cached_path_ok(partial):
+            return False
+        os.replace(partial, nc_path)
+        _atomic_write_text(meta_path, sidecar.decode())
+        return True
+    except (urllib.error.URLError, OSError, ValueError) as error:
+        log.debug("mirror miss for %s: %s", key, error)
+        return False
+    finally:
+        partial.unlink(missing_ok=True)
+
+
 def download_metadata(result: DownloadResult) -> dict:
     """Keep the actual raw acquisition identity when a smaller request reuses it."""
     path = result.path
@@ -219,6 +254,10 @@ def download_year(
                 covering,
             )
             return DownloadResult(year, selected_months, covering, True)
+
+    if not no_cache and not refresh and _fetch_mirror(key, nc_path, meta_path):
+        log.info("mirror hit: year=%d months=%s key=%s", year, selected_months, key)
+        return DownloadResult(year, selected_months, nc_path, True)
 
     request = build_request(year, bbox, selected_months)
     client = _make_client()

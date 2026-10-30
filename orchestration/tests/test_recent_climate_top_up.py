@@ -1,19 +1,25 @@
-"""End to end: recent ERA5 months reach the database before anyone asks.
+"""End to end: every configured place holds its observed climate history.
 
-The top-up sensor finds the deployed areas missing a recent month and queues
-one country pull; the dispatch sensor and the real Dagster job then derive
-every area from a retained ERA5 grid and persist the months. The grid is a
-synthetic, cached NetCDF fixture, so no Copernicus request is made. Each
-area's heatwave days use its own official threshold (``heat_seasons.json``).
+The places come from the published model configuration (the outlook index),
+the list the dashboard's pickers offer. A history backfill and the automatic
+top-up both derive every listed place from one retained ERA5 grid per
+country-year and persist it; a registered place the configuration does not
+list is never pulled. The grid is a synthetic cached NetCDF fixture, so no
+Copernicus request is made. Each place's heatwave days use its own official
+threshold (``heat_seasons.json``).
 """
 
 from __future__ import annotations
 
 import json
+import math
+import subprocess
+import threading
 from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-import subprocess
 from unittest.mock import patch
 
 import dagster as dg
@@ -25,6 +31,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from chart.climate import history
 from chart.climate.ingestion_jobs import (
     TOP_UP_REQUESTER,
     queue_recent_month_top_ups,
@@ -35,7 +42,6 @@ from chart.shared.db.models import (
     AdminUnit,
     AppGeography,
     ClimateIngestionJob,
-    ClimateRun,
     DistrictClimate,
     Geography,
 )
@@ -48,15 +54,24 @@ from era5_heat.cds_client import cache_key
 
 ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE = ROOT / "outputs/e2e/orchestration/recent-climate-top-up"
-#: North, west, south, east: the two counties' envelope.
-ENVELOPE = (-1.0, 36.0, -1.5, 37.0)
 #: Every hour at 33 deg C: above Nairobi's 32 deg C threshold, below the
-#: 35 deg C CHART default other Kenyan counties use.
+#: 35 deg C CHART default and Mombasa's 36 deg C.
 TMAX_K = 306.15
+#: (slug, west, north, east, south, in the model configuration)
+PLACES = (
+    ("nairobi", 36.0, -1.0, 36.5, -1.5, True),
+    ("kajiado", 36.5, -1.0, 37.0, -1.5, True),
+    # Smaller than one 0.25 deg cell and holding no cell centre.
+    ("mombasa", 36.3, -1.3, 36.4, -1.4, True),
+    # Registered with a boundary but not offered by the configuration.
+    ("unlisted", 36.6, -1.1, 36.9, -1.4, False),
+)
+#: The countries' snapped download box: one cell beyond the configured places.
+ACQUISITION = (-0.75, 35.75, -1.75, 37.25)
 
 
-def _square(west: float, east: float) -> str:
-    ring = [[west, -1.0], [east, -1.0], [east, -1.5], [west, -1.5], [west, -1.0]]
+def _polygon(west: float, north: float, east: float, south: float) -> str:
+    ring = [[west, north], [east, north], [east, south], [west, south], [west, north]]
     return json.dumps({"type": "MultiPolygon", "coordinates": [[ring]]})
 
 
@@ -70,24 +85,34 @@ def session_factory(tmp_path, monkeypatch):
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     monkeypatch.setenv("ERA5_CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.setenv("CLIMATE_OUTPUT_DIR", str(tmp_path / "outputs"))
+    monkeypatch.setenv("MODEL_CACHE_DIR", str(tmp_path / "models"))
     # A cache miss must fail loudly rather than reach Copernicus.
     monkeypatch.setenv("CDSAPI_URL", "http://127.0.0.1:1/no-network-expected")
     monkeypatch.setenv("CDSAPI_KEY", "disposable-top-up-test")
+    monkeypatch.setenv("ERA5_MIRROR_URL", "")
+    index = tmp_path / "models/outlooks/index.json"
+    index.parent.mkdir(parents=True)
+    index.write_text(
+        json.dumps(
+            {
+                f"geo-ke-{slug}": {"country_code": "KE", "level": "county"}
+                for slug, *_, listed in PLACES
+                if listed
+            }
+        )
+    )
     with factory() as session:
         geography = Geography(slug="kenya", country="Kenya", name="Kenya")
         session.add(geography)
         session.flush()
-        for slug, name, west, east in (
-            ("nairobi", "Nairobi", 36.0, 36.5),
-            ("kajiado", "Kajiado", 36.5, 37.0),
-        ):
+        for slug, west, north, east, south, _ in PLACES:
             session.add(
                 AppGeography(
                     id=f"geo-ke-{slug}",
                     country_code="KE",
                     level="county",
                     level_label="County",
-                    name=name,
+                    name=slug.title(),
                     path=f"/kenya/{slug}",
                 )
             )
@@ -98,11 +123,11 @@ def session_factory(tmp_path, monkeypatch):
                     app_geography_id=f"geo-ke-{slug}",
                     level="county",
                     code=slug,
-                    name=name,
-                    boundary=_square(west, east),
-                    bbox_north=-1.0,
+                    name=slug.title(),
+                    boundary=_polygon(west, north, east, south),
+                    bbox_north=north,
                     bbox_west=west,
-                    bbox_south=-1.5,
+                    bbox_south=south,
                     bbox_east=east,
                 )
             )
@@ -114,6 +139,7 @@ def session_factory(tmp_path, monkeypatch):
 def _cache_grid(cache: Path, months: list[date]) -> None:
     """The retained hourly grid a country pull of ``months`` reads."""
     cache.mkdir(parents=True, exist_ok=True)
+    north, west, south, east = ACQUISITION
     for year in sorted({month.year for month in months}):
         chosen = tuple(month.month for month in months if month.year == year)
         hours = pd.DatetimeIndex(
@@ -123,25 +149,23 @@ def _cache_grid(cache: Path, months: list[date]) -> None:
                 for hour in range(monthrange(year, month)[1] * 24)
             ]
         )
+        lats = np.arange(north, south - 0.01, -0.25)
+        lons = np.arange(west, east + 0.01, 0.25)
         dataset = xr.Dataset(
             {
                 "t2m": (
                     ("valid_time", "latitude", "longitude"),
-                    np.full((len(hours), 3, 5), TMAX_K),
+                    np.full((len(hours), len(lats), len(lons)), TMAX_K),
                 )
             },
-            coords={
-                "valid_time": hours,
-                "latitude": [-1.0, -1.25, -1.5],
-                "longitude": [36.0, 36.25, 36.5, 36.75, 37.0],
-            },
+            coords={"valid_time": hours, "latitude": lats, "longitude": lons},
         )
         dataset.t2m.attrs["units"] = "K"
-        dataset.to_netcdf(cache / f"{cache_key(year, ENVELOPE, chosen)}.nc")
+        dataset.to_netcdf(cache / f"{cache_key(year, ACQUISITION, chosen)}.nc")
         dataset.close()
 
 
-def _held(factory) -> dict[tuple[str, date], tuple[float, int, dict]]:
+def _held(factory) -> dict[tuple[str, date], dict[str, float]]:
     with factory() as session:
         rows = session.execute(
             select(
@@ -149,13 +173,10 @@ def _held(factory) -> dict[tuple[str, date], tuple[float, int, dict]]:
                 DistrictClimate.period_month,
                 DistrictClimate.variable,
                 DistrictClimate.value,
-                ClimateRun.id,
-            )
-            .join(AdminUnit, AdminUnit.id == DistrictClimate.admin_unit_id)
-            .join(ClimateRun, ClimateRun.id == DistrictClimate.climate_run_id)
+            ).join(AdminUnit, AdminUnit.id == DistrictClimate.admin_unit_id)
         ).all()
     out: dict = {}
-    for code, month, variable, value, _run in rows:
+    for code, month, variable, value in rows:
         out.setdefault((code, month), {})[variable] = value
     return out
 
@@ -173,7 +194,7 @@ def _evidence(name: str, record: dict) -> None:
     )
 
 
-def test_missing_recent_months_are_pulled_with_each_areas_threshold(
+def test_missing_recent_months_are_pulled_with_each_places_threshold(
     session_factory, tmp_path
 ):
     months = recent_complete_months(date.today(), count=2)
@@ -186,9 +207,10 @@ def test_missing_recent_months_are_pulled_with_each_areas_threshold(
     assert len(queued) == 1 and isinstance(queued[0], dg.SkipReason)
     with session_factory() as session:
         (job,) = session.scalars(select(ClimateIngestionJob)).all()
-        assert job.country_code == "KE"
-        assert job.requested_by_user_id == TOP_UP_REQUESTER
+        assert (job.country_code, job.requested_by_user_id) == ("KE", TOP_UP_REQUESTER)
         assert job.months == [month.strftime("%Y-%m") for month in months]
+        # Only the configured places count towards the pull.
+        assert job.areas_total == 3
 
     (request,) = pending_climate_ingestions_sensor(
         dg.build_sensor_context(instance=instance)
@@ -200,32 +222,25 @@ def test_missing_recent_months_are_pulled_with_each_areas_threshold(
 
     held = _held(session_factory)
     record = {
-        "test": "missing_recent_months_are_pulled_with_each_areas_threshold",
-        "fixture": "Synthetic cached ERA5 grid, 33 C every hour, two Kenyan counties",
+        "test": "missing_recent_months_are_pulled_with_each_places_threshold",
+        "fixture": "Synthetic cached ERA5 grid, 33 C every hour, four Kenyan places",
         "months": months,
         "held": {f"{code} {month}": values for (code, month), values in held.items()},
     }
     _evidence("pull", record)
     for month in months:
         days = monthrange(month.year, month.month)[1]
-        nairobi, kajiado = held[("nairobi", month)], held[("kajiado", month)]
-        assert nairobi["tmax_monthly_mean_c"] == pytest.approx(33.0)
         # Nairobi's official threshold is 32 deg C: every day is a heatwave day.
-        assert nairobi["heatwave_days"] == days
+        assert held[("nairobi", month)]["heatwave_days"] == days
         # Kajiado has no official threshold, so CHART's 35 deg C applies.
-        assert kajiado["heatwave_days"] == 0
+        assert held[("kajiado", month)]["heatwave_days"] == 0
+        # Mombasa holds no cell centre; its overlapping cells are used instead.
+        assert held[("mombasa", month)]["tmax_monthly_mean_c"] == pytest.approx(33.0)
+    assert not any(code == "unlisted" for code, _ in held)
 
     with session_factory() as session:
         job = session.scalars(select(ClimateIngestionJob)).one()
-        assert job.status == "completed"
-        thresholds = (
-            sorted(
-                json.loads(path.read_text())["heatwave"]["threshold_c"]
-                for path in (tmp_path / "outputs").rglob("*.json")
-                if "heatwave" in json.loads(path.read_text())
-            )
-            or None
-        )
+        assert (job.status, job.areas_done) == ("completed", 3)
 
     # Once held, the next evaluation queues nothing.
     again = list(
@@ -234,12 +249,85 @@ def test_missing_recent_months_are_pulled_with_each_areas_threshold(
     assert again[0].skip_message == "Recent climate months are already held."
     with session_factory() as session:
         assert len(session.scalars(select(ClimateIngestionJob)).all()) == 1
-    record["thresholds_written"] = thresholds
     record["result"] = "passed"
     _evidence("pull", record)
 
 
-def test_failed_top_up_waits_before_retrying(session_factory):
+def test_backfill_fills_every_configured_place_once(session_factory, tmp_path):
+    months = history.history_months(1, date.today())
+    _cache_grid(tmp_path / "cache", months)
+    logs: list[str] = []
+
+    report = history.backfill("KE", 1, session_factory=session_factory, log=logs.append)
+
+    assert report.coverage is not None and report.coverage.complete
+    assert report.coverage.places == 3
+    assert report.pulled_years == sorted({month.year for month in months})
+    held = _held(session_factory)
+    assert {code for code, _ in held} == {"nairobi", "kajiado", "mombasa"}
+    assert len(held) == 3 * len(months)
+    rows = len(held)
+
+    # A second run finds nothing missing and downloads nothing.
+    repeat = history.backfill("KE", 1, session_factory=session_factory, log=logs.append)
+    assert repeat.pulled_years == [] and repeat.coverage.complete
+    assert len(_held(session_factory)) == rows
+    _evidence(
+        "backfill",
+        {
+            "test": "backfill_fills_every_configured_place_once",
+            "months": [months[0], months[-1]],
+            "places": report.coverage.places,
+            "place_months": rows,
+            "log": logs,
+            "result": "passed",
+        },
+    )
+
+
+def test_backfill_reads_the_public_mirror_before_copernicus(
+    session_factory, tmp_path, monkeypatch
+):
+    """A new installation fetches retained grids from the mirror, not the queue."""
+    months = history.history_months(1, date.today())
+    mirror = tmp_path / "mirror"
+    _cache_grid(mirror, months)
+    for grid in mirror.glob("*.nc"):
+        grid.with_suffix(".json").write_text(json.dumps({"request": "fixture"}))
+    handler = partial(SimpleHTTPRequestHandler, directory=str(mirror))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        monkeypatch.setenv(
+            "ERA5_MIRROR_URL", f"http://127.0.0.1:{server.server_address[1]}"
+        )
+        report = history.backfill("KE", 1, session_factory=session_factory, log=print)
+    finally:
+        server.shutdown()
+    assert report.coverage is not None and report.coverage.complete
+    # The grids now sit in the local cache, so later pulls need no network.
+    assert sorted(path.name for path in (tmp_path / "cache").glob("*.nc")) == sorted(
+        path.name for path in mirror.glob("*.nc")
+    )
+    _evidence(
+        "mirror",
+        {
+            "test": "backfill_reads_the_public_mirror_before_copernicus",
+            "grids": sorted(path.name for path in mirror.glob("*.nc")),
+            "places": report.coverage.places,
+            "result": "passed",
+        },
+    )
+
+
+def test_history_starts_in_january_years_back() -> None:
+    months = history.history_months(2, date(2026, 10, 30))
+    assert (months[0], months[-1]) == (date(2024, 1, 1), date(2026, 9, 1))
+    assert len(months) == 33 and math.isclose(len(months) / 12, 2.75)
+
+
+def test_recent_top_up_waits_before_repeating(session_factory):
     months = recent_complete_months(date.today(), count=2)
     now = datetime.now(timezone.utc)
     with session_factory() as session:
@@ -247,17 +335,16 @@ def test_failed_top_up_waits_before_retrying(session_factory):
             ClimateIngestionJob(
                 country_code="KE",
                 months=[month.strftime("%Y-%m") for month in months],
-                status="failed",
-                stage="failed",
-                error_code="CLIMATE_INGEST_NOT_CONFIGURED",
+                status="completed",
+                stage="completed",
                 requested_by_user_id=TOP_UP_REQUESTER,
                 completed_at=now - timedelta(hours=2),
             )
         )
         session.commit()
 
+        # The months are still missing, but the last automatic pull was recent.
         assert queue_recent_month_top_ups(session, today=now.date(), now=now) == []
-        # A day later the same gap is tried again.
         later = now + timedelta(hours=23)
         retried = queue_recent_month_top_ups(session, today=later.date(), now=later)
         session.commit()
@@ -265,8 +352,8 @@ def test_failed_top_up_waits_before_retrying(session_factory):
     _evidence(
         "retry",
         {
-            "test": "failed_top_up_waits_before_retrying",
-            "failed_at": now - timedelta(hours=2),
+            "test": "recent_top_up_waits_before_repeating",
+            "last_pull_at": now - timedelta(hours=2),
             "retried_at": later,
             "result": "passed",
         },

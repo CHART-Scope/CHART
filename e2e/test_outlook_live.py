@@ -460,7 +460,9 @@ def test_existing_india_monthly_results_remain_separate_from_new_projection(
     assert response.status_code == 200, response.text
     support = response.json()
     assert set(support["data_modes"]) == {"observed", "projection"}
-    assert support["observed"]["source"] == "monthly"
+    # Stored results use Kenya's observed view; nothing is scored on a click.
+    assert support["observed"]["source"] == "outlook"
+    assert support["observed"]["batch_enabled"] is False
     assert support["observed"]["model_area_name"] == "Bhopal"
     assert support["projection_release"] == "2026-10-22"
     response = client.get(
@@ -480,15 +482,32 @@ def test_existing_india_monthly_results_remain_separate_from_new_projection(
         ).scalar_one()
         assert persisted == result["odds_ratio"]
     engine.dispose()
-    # The Kenya observed engine must never manufacture Indian observed values.
-    assert (
-        client.get(
-            f"/heat-outlook/{place}/observed",
-            params={"outcome": outcome},
-            headers=headers,
-        ).status_code
-        == 404
+    # The observed view serves India's own stored result, never Kenya's DLNM.
+    observed = client.get(
+        f"/heat-outlook/{place}/observed",
+        params={"outcome": outcome},
+        headers=headers,
     )
+    assert observed.status_code == 200, observed.text
+    body = observed.json()
+    assert body["release"] == result["model_release_id"]
+    assert body["month"] == "2026-09" and "2026-09" in body["available_months"]
+    assert body["estimate"]["ratio"]["value"] == result["odds_ratio"]
+    assert body["estimate"]["value_percent"] == (
+        result["attributable_fraction_milli"] / 10
+        if result["attributable_fraction_milli"] >= 0
+        else None
+    )
+    mapped = client.get(
+        "/heat-outlook/geo-in-madhya-pradesh/observed/map",
+        params={"outcome": outcome, "month": "2026-09"},
+        headers=headers,
+    )
+    assert mapped.status_code == 200, mapped.text
+    division = next(
+        area for area in mapped.json()["areas"] if area["geography_id"] == place
+    )
+    assert division["value_percent"] == body["estimate"]["value_percent"]
 
 
 @pytest.mark.parametrize(
