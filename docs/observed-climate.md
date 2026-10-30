@@ -77,8 +77,13 @@ load: one two-year round took between 50 seconds and 28 minutes.
 | 2 years | 33 | 28 min (India, including scoring) | 168 MB | 224 MB | 0.46 M |
 | 5 years | 69 | 45–60 min more | 316 MB | 367 MB | 0.90 M |
 | 10 years | 129 | 95 min more | 560 MB | 606 MB | 1.63 M |
-| 20 years | 249 | see below | see below | see below | see below |
+| 20 years | 249 | 3 h 15 min – 3 h 25 min more | 1,046 MB | 1,091 MB | 3.09 M |
 
+- From nothing to 20 years for both countries took about **6 hours** of wall
+  time with the two countries running side by side (12:56 to 19:18 UTC,
+  including two rounds lost to a deployment restart). `verify` then reported
+  all 63 India places and all 337 Kenya places holding all 249 months
+  (January 2006 to September 2026).
 - Raw ERA5 per year: about **20 MB** for Madhya Pradesh and **29 MB** for Kenya.
 - Database: about **290 bytes per daily row** including indexes; 400 places
   produce about 146,000 daily rows per year.

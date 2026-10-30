@@ -101,7 +101,8 @@ Grids are read from CHART's public mirror when it holds them; otherwise they
 come from the Copernicus Climate Data Store, which needs a free account and its
 API key in `~/.cdsapirc` ([how to](https://cds.climate.copernicus.eu/how-to-api)).
 Measured on the sandbox, two years for India took 28 minutes and needed about
-200 MB; ten years for both countries about three hours and 1.2 GB. Times are
+200 MB; twenty years for both countries about six hours and 2.2 GB (ERA5 cache
+plus database). Times are
 mostly Copernicus queue time. After that, the six-hourly top-up keeps the
 newest months current. Architecture, timings and storage:
 [Observed climate data](observed-climate.md).

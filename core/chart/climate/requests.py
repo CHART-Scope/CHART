@@ -137,12 +137,17 @@ def submit_prediction(
     # stored result is keyed on place, outcome, release, month, scenario and
     # horizon - not on who asked - so a colleague's computed month answers
     # instantly instead of queueing a fresh ERA5 pull.
+    windows: set[int] = {
+        window or 0
+        for window in scoring_windows(request, place.model.validated_pregnancy_windows)
+    }
     stored = _stored_result_for(
         session_factory,
         admin_unit_id=place.admin_unit.id,
         outcome=request.outcome,
         model_release_id=place.model.release_id,
         request=request,
+        windows=windows,
     )
     if stored is not None:
         return stored
@@ -161,6 +166,7 @@ def submit_prediction(
         admin_unit_id=place.admin_unit.id,
         model_release_id=place.model.release_id,
         request=request,
+        windows=windows,
     )
     if live is not None:
         return live
@@ -809,18 +815,22 @@ def _store_prediction_result(
                 "prediction_result refused for request %s: %s", record.id, problem
             )
             return
-        upsert_prediction_result(
-            session,
-            result=result,
-            admin_unit_id=record.admin_unit_id,
-            outcome=_outcome_from_record(record),
-            model_release_id=release_id,
-            valid_month=record.planning_date,
-            model_artifact_sha256=record.model_artifact_sha256,
-            reference_kind=reference_kind,
-            climate_input_window_id=record.climate_input_window_id,
-            prediction_request_id=record.id,
-        )
+        # Every scored pregnancy window is its own row, so each window the
+        # dashboard offers reads its own result.
+        for prediction in result.predictions or [result.prediction]:
+            upsert_prediction_result(
+                session,
+                result=result,
+                prediction=prediction,
+                admin_unit_id=record.admin_unit_id,
+                outcome=_outcome_from_record(record),
+                model_release_id=release_id,
+                valid_month=record.planning_date,
+                model_artifact_sha256=record.model_artifact_sha256,
+                reference_kind=reference_kind,
+                climate_input_window_id=record.climate_input_window_id,
+                prediction_request_id=record.id,
+            )
     except Exception:  # noqa: BLE001 - must not fail an otherwise good run
         logger.exception(
             "prediction_result write failed for request %s; the prediction is "
@@ -835,8 +845,12 @@ def _live_request_for(
     admin_unit_id: int,
     model_release_id: str,
     request: PredictRequest,
+    windows: set[int],
 ) -> PredictResponse | PredictionAcceptedResponse | None:
     """An existing request for this grain that still counts, if there is one.
+
+    It must also cover every requested pregnancy window: a request for window
+    1 does not answer one for windows 1-3.
 
     "Counts" means waiting, queued or running - work that will produce the
     answer - or completed with a payload. A failed request is deliberately not
@@ -882,13 +896,24 @@ def _live_request_for(
                 continue
             if record.status == "completed" and record.result_payload is not None:
                 try:
-                    return PredictResponse.model_validate(record.result_payload)
+                    done = PredictResponse.model_validate(record.result_payload)
                 except ValidationError:
                     # A payload whose shape has drifted is not a usable
                     # answer; queue the work again rather than reaching
                     # further back for an even older one.
                     return None
-            return _accepted(record)
+                covered = {
+                    item.pregnancy_window or 0
+                    for item in done.predictions or [done.prediction]
+                }
+                if windows <= covered:
+                    return done
+                continue
+            asked = set(
+                PredictRequest.model_validate(payload).selected_pregnancy_windows()
+            )
+            if set(request.selected_pregnancy_windows()) <= asked:
+                return _accepted(record)
         return None
 
 
@@ -899,16 +924,19 @@ def _stored_result_for(
     outcome: str,
     model_release_id: str,
     request: PredictRequest,
+    windows: set[int],
 ) -> PredictResponse | None:
     """The completed request behind an existing result for this grain, if any.
 
     Returns the original ``PredictResponse`` rather than rebuilding one from
     the stored columns, so a repeat caller gets byte-identical climate
-    provenance and availability detail to the first.
+    provenance and availability detail to the first. Every requested
+    pregnancy window must be stored: a month held for window 1 does not
+    answer a request for windows 1-3.
     """
 
     with session_factory() as session:
-        row = session.scalar(
+        rows = session.scalars(
             select(PredictionResult).where(
                 PredictionResult.admin_unit_id == admin_unit_id,
                 PredictionResult.outcome == outcome,
@@ -918,6 +946,11 @@ def _stored_result_for(
                 == _resolve_scenario_label(request.projection_scenario),
                 PredictionResult.horizon == resolve_horizon(request.planning_target),
             )
+        ).all()
+        if not windows <= {stored.pregnancy_window for stored in rows}:
+            return None
+        row = next(
+            (stored for stored in rows if stored.pregnancy_window in windows), None
         )
         if row is None or row.prediction_request_id is None:
             return None
