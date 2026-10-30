@@ -169,6 +169,10 @@ def submit_prediction(
         windows=windows,
     )
     if live is not None:
+        if isinstance(live, PredictResponse):
+            # A completed run computed these windows; make sure each one is
+            # stored too (earlier versions stored only the primary window).
+            _store_completed_result(session_factory, live)
         return live
 
     record = _get_or_create_request(
@@ -763,6 +767,16 @@ def complete_prediction_request(
         request_id=request_id,
         session_factory=session_factory,
     )
+
+
+def _store_completed_result(session_factory, result: PredictResponse) -> None:
+    """Write any window of a completed request's result that is not stored."""
+    with session_factory() as session:
+        record = session.get(PredictionRequestRecord, result.request_id)
+        if record is None:
+            return
+        _store_prediction_result(session, record, result)
+        session.commit()
 
 
 def _store_prediction_result(

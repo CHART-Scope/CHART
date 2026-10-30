@@ -667,6 +667,18 @@ def test_a_month_stored_for_one_window_is_scored_for_the_others(
     repeat, calls = run(every, "dagster-repeat")
     assert calls == 0 and isinstance(repeat, PredictResponse)
 
+    # A completed run whose extra windows were never stored (the old write
+    # path kept only the primary) is stored from its result, not re-scored.
+    with session_factory() as session:
+        for row in session.scalars(
+            select(PredictionResult).where(PredictionResult.pregnancy_window != 3)
+        ):
+            session.delete(row)
+        session.commit()
+    restored, calls = run(every, "dagster-restore")
+    assert calls == 0 and isinstance(restored, PredictResponse)
+    assert stored_windows() == {3: 1.08, 2: 1.15, 1: 1.12}
+
 
 def test_state_mapping_rejects_unvalidated_pregnancy_windows(
     session_factory,
