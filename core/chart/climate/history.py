@@ -48,6 +48,8 @@ YEARS_PER_ROUND = max(1, int(os.getenv("ERA5_DOWNLOAD_WORKERS", "2")))
 #: The R models read up to three months before the scored month, so the
 #: first months of the history cannot be scored from it.
 SCORING_LEAD_MONTHS = 3
+#: A month whose scoring continues on the Dagster queue, not a failure.
+QUEUED = "queued"
 
 
 @dataclass
@@ -235,7 +237,9 @@ def score_observed(
             if isinstance(response, PredictResponse):
                 report.scored += 1
             else:
-                report.unscored[key] = "queued"
+                # Another request for this month is in flight, or the inline
+                # attempt was handed to Dagster; either way it completes there.
+                report.unscored[key] = QUEUED
     log(f"{country_code}: {report.scored} stored, {len(report.unscored)} not scored")
 
 
@@ -262,7 +266,8 @@ def main(argv: list[str] | None = None) -> int:
         scored = BackfillReport(country_code=country)
         score_observed(factory, country, months[SCORING_LEAD_MONTHS:], scored)
         print(json.dumps(asdict(scored), indent=2, default=str))
-        return 0 if not scored.unscored else 1
+        failed = {k: v for k, v in scored.unscored.items() if v != QUEUED}
+        return 0 if not failed else 1
     else:
         with get_session_factory()() as session:
             result = coverage(
