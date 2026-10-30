@@ -183,7 +183,7 @@ def score_observed(
     from .schemas import PredictRequest, PredictResponse
 
     with factory() as session:
-        assigned = session.execute(
+        rows = session.execute(
             select(AdminUnit.app_geography_id, ActiveModelAssignment.outcome)
             .join(
                 ActiveModelAssignment,
@@ -194,10 +194,11 @@ def score_observed(
         ).all()
         # Kenya's counties are shown by the calibrated scorer, which reads the
         # stored climate directly; scoring them through R would go unread.
-        assigned = [
+        assigned: list[tuple[str, str]] = [
             (geography_id, outcome)
-            for geography_id, outcome in assigned
-            if not legacy_observed_supported(session, geography_id, outcome)
+            for geography_id, outcome in rows
+            if geography_id
+            and not legacy_observed_supported(session, geography_id, outcome)
         ]
     if not assigned:
         log(f"{country_code}: no live observed model to score")
