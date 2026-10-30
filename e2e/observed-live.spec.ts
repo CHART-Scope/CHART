@@ -35,13 +35,15 @@ for (const [country, username, frame, place, observedRelease] of [
           ? "lbw-mp-1.0.1-compact-review"
           : "under5-mortality-mp-0.1.0-review");
       await expect(panel.getByTestId("outlook-source")).toContainText(release);
+      // Both countries share the compact observed view and month strip.
+      const estimate = panel.getByTestId("outlook-estimate");
+      await expect(estimate).toContainText("Sep 2026");
+      await expect(panel.getByTestId("monthly-risk")).toHaveCount(0);
       if (country === "IN") {
-        const monthly = panel.getByTestId("monthly-risk");
-        await expect(monthly).toContainText("September 2026");
-        await expect(monthly).toContainText(outcome === "lbw" ? "20%" : "9%");
-        await expect(monthly).not.toContainText("waiting to begin");
-      } else {
-        await expect(panel.getByTestId("outlook-estimate")).toContainText("Sep 2026");
+        // India's stored result, unchanged: 20% (LBW) or 9% (under five).
+        await expect(estimate).toContainText(
+          outcome === "lbw" ? /20(\.0)?%/ : /9(\.0)?%/,
+        );
       }
       await expect(panel.getByRole("heading", { level: 2 })).toHaveCount(2);
       await expect(
@@ -79,12 +81,13 @@ for (const [country, username, frame, place, observedRelease] of [
       await observed.click();
       await expect(panel.getByTestId("outlook-source")).toContainText(release);
       if (country === "IN") {
-        await expect(panel.getByTestId("monthly-risk")).toContainText("September 2026");
+        await expect(panel.getByTestId("outlook-estimate")).toContainText("Sep 2026");
+        // A month scored by an earlier release names that release.
         await page.goto(dashboard.replace("month=2026-09", "month=2026-08"));
         await expect(panel.getByTestId("outlook-source")).toContainText(
           `e2e-prior-${outcome}`,
         );
-        await expect(panel.getByTestId("monthly-risk")).toContainText("August 2026");
+        await expect(panel.getByTestId("outlook-estimate")).toContainText("Aug 2026");
         await page.goto(dashboard);
         await expect(panel.getByTestId("outlook-source")).toContainText(release);
       }

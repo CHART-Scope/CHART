@@ -26,7 +26,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from chart.heat_outlook.service import published_index
+from chart.heat_outlook.service import legacy_observed_supported, published_index
 from chart.shared.db.models import (
     ActiveModelAssignment,
     AdminUnit,
@@ -192,8 +192,15 @@ def score_observed(
             .where(AdminUnit.app_geography_id.like(f"geo-{country_code.lower()}-%"))
             .order_by(AdminUnit.app_geography_id, ActiveModelAssignment.outcome)
         ).all()
+        # Kenya's counties are shown by the calibrated scorer, which reads the
+        # stored climate directly; scoring them through R would go unread.
+        assigned = [
+            (geography_id, outcome)
+            for geography_id, outcome in assigned
+            if not legacy_observed_supported(session, geography_id, outcome)
+        ]
     if not assigned:
-        log(f"{country_code}: no live observed model is assigned; nothing to score")
+        log(f"{country_code}: no live observed model to score")
         return
     log(f"{country_code}: scoring {len(assigned)} area-outcomes x {len(months)} months")
     for geography_id, outcome in assigned:

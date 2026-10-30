@@ -231,21 +231,6 @@ def load_observed_map(
     return frame
 
 
-def load_observed_outline(
-    session: Session, geography_id: str, outcome: str, month: str | None
-) -> MapResponse:
-    """Keep unsupported places navigable without borrowing observed estimates."""
-    if outcome not in OUTCOMES:
-        raise OutlookNotAvailable(geography_id)
-    frame = load_map_view(
-        session, geography_id, month, outcome=outcome, with_values=False
-    )
-    for area in frame.areas:
-        area.missing_reason = "no_model"
-    frame.metric = "heat_attributable_share_observed_month"
-    return frame
-
-
 def _default_month(
     session: Session,
     geography_id: str,

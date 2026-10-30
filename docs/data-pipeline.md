@@ -81,6 +81,14 @@ estimates are then scored through the normal request path for every modelled
 area and month, skipping the first three months whose model inputs precede
 the history. `verify` lists any place-month still missing.
 
+The dashboard shows both countries' observed months in one view. Kenya's
+counties are scored on read by the calibrated DLNM. India's places with a live
+model are read from their stored results (`chart.heat_outlook.observed_stored`)
+through the same `/heat-outlook/{place}/observed` and `/observed/map`
+endpoints, so opening a division, changing the month or switching outcome
+never scores or downloads anything. Each month names the release that scored
+it. A place without a stored month shows it as not reported.
+
 Before asking Copernicus, the downloader looks in the local cache and then in
 the public mirror `ERA5_MIRROR_URL` (default
 `https://chart-predictive-models.s3.eu-west-2.amazonaws.com/era5-cache`; set it
