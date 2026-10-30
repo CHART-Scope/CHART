@@ -310,6 +310,9 @@ services:
     volumes:
       - chart-dagster-storage:/opt/dagster/storage
       - chart-climate-data:/opt/chart/data/climate
+      # The model configuration (outlooks/index.json) decides which places a
+      # climate pull derives.
+      - chart-lbw-model:/models:ro
     command:
       [
         "dagster",

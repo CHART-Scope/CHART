@@ -26,6 +26,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from chart.heat_outlook.service import published_index
 from chart.shared.db.models import (
     ActiveModelAssignment,
     AdminUnit,
@@ -135,8 +136,10 @@ def backfill(
     missing_years = sorted(
         {int(month[:4]) for place in gaps.missing.values() for month in place}
     )
+    source = "model configuration" if published_index() else "every registered place"
     log(
-        f"{country_code}: {gaps.places} places, {months[0]:%Y-%m}..{months[-1]:%Y-%m};"
+        f"{country_code}: {gaps.places} places ({source}),"
+        f" {months[0]:%Y-%m}..{months[-1]:%Y-%m};"
         f" years to pull: {missing_years or 'none'}"
     )
     for start in range(0, len(missing_years), YEARS_PER_ROUND):
