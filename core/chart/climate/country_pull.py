@@ -167,11 +167,13 @@ def pull_country_months(
     if not results:
         raise ClimateServiceError("CLIMATE_NO_GRID_CENTRES", 422)
 
-    csv_paths = {
-        area.id: str(write_observed_output(area.code, *results[area.id][:2], months)[0])
-        for area in areas
-        if area.id in results
-    }
+    csv_paths: dict[int, str] = {}
+    for area in areas:
+        if area.id in results:
+            frame, meta, _ = results[area.id]
+            csv_paths[area.id] = str(
+                write_observed_output(area.code, frame, meta, months)[0]
+            )
     with session_factory() as session:
         run, monthly_rows, daily_rows = load_era5_shared_download(
             session, preset_slug=preset_slug, results=results, csv_paths=csv_paths

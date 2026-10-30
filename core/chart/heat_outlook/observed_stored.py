@@ -10,10 +10,17 @@ share one dashboard experience and nothing is scored when a place is opened.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from chart.model_registry.service import get_active_model_mapping
+from chart.model_settings.service import (
+    LIVE_WINDOW_LABELS,
+    LIVE_WINDOW_PREFIX,
+    LiveRestriction,
+)
 from chart.risk.precision import precision_for_ci
 from chart.risk.monthly_predictions import load_monthly_predictions
 from chart.risk.schemas import MapResponse, MonthlyPrediction
@@ -35,17 +42,52 @@ from .service import (
     _shown,
 )
 
-#: The one window the stored monthly results report (see
-#: ``chart.risk.monthly_predictions.MONTHLY_PREGNANCY_WINDOWS``).
-SELECTORS = {
-    LBW_OUTCOME: Option(code="window_1", label="Last three months of pregnancy"),
-}
 ALL_AGES = Option(code="all", label="Children under five")
+
+
+@dataclass(frozen=True)
+class StoredSelection:
+    """The windows a place offers, and the one shown."""
+
+    options: list[Option]
+    code: str
+    #: Stored ``pregnancy_window`` values for the shown option.
+    windows: tuple[int, ...]
+
+
+def stored_selection(
+    outcome: str,
+    validated: tuple[int, ...],
+    restriction: LiveRestriction | None,
+    requested: str | None,
+) -> StoredSelection:
+    """LBW offers each validated window the country settings leave on."""
+    if outcome != LBW_OUTCOME or not validated:
+        if requested not in (None, ALL_AGES.code):
+            raise OutlookSelectionInvalid(requested)
+        return StoredSelection([ALL_AGES], ALL_AGES.code, (0,))
+    allowed = restriction.windows if restriction is not None else frozenset(validated)
+    windows = sorted((w for w in validated if w in allowed), reverse=True)
+    if not windows:
+        raise OutlookSelectionInvalid(requested or "")
+    options = [
+        Option(code=f"{LIVE_WINDOW_PREFIX}{w}", label=LIVE_WINDOW_LABELS[w])
+        for w in windows
+    ]
+    default = restriction.default_window if restriction is not None else None
+    chosen = requested or (
+        f"{LIVE_WINDOW_PREFIX}{default}" if default in windows else options[-1].code
+    )
+    if chosen not in {option.code for option in options}:
+        raise OutlookSelectionInvalid(chosen)
+    return StoredSelection(
+        options, chosen, (int(chosen.removeprefix(LIVE_WINDOW_PREFIX)),)
+    )
 
 
 def live_model_release(
     session: Session, geography_id: str, outcome: str
-) -> tuple[AdminUnit, str, str | None] | None:
+) -> tuple[AdminUnit, str, str | None, tuple[int, ...]] | None:
     """The place's admin unit and active live release, when it has one."""
     unit = session.scalar(
         select(AdminUnit).where(AdminUnit.app_geography_id == geography_id)
@@ -58,7 +100,12 @@ def live_model_release(
     release = session.get(ModelRelease, model.release_id)
     if release is None or release.status != "active":
         return None
-    return unit, model.release_id, model.model_area_name
+    return (
+        unit,
+        model.release_id,
+        model.model_area_name,
+        tuple(model.validated_pregnancy_windows),
+    )
 
 
 def load_stored_observed(
@@ -67,18 +114,21 @@ def load_stored_observed(
     outcome: str,
     *,
     month: str | None = None,
-    data_modes: list[str],
+    selector: str | None = None,
+    restriction: LiveRestriction | None = None,
 ) -> ObservedResponse:
     found = live_model_release(session, geography_id, outcome)
     if found is None:
         raise OutlookNotAvailable(geography_id)
-    unit, release, model_area = found
-    stored = load_monthly_predictions(session, unit.id, None, None, outcome)
+    unit, release, model_area, validated = found
+    selection = stored_selection(outcome, validated, restriction, selector)
+    stored = load_monthly_predictions(
+        session, unit.id, None, None, outcome, windows=selection.windows
+    )
     available = sorted(stored)
     if month is not None and month not in available:
         raise OutlookSelectionInvalid(month)
     chosen = month or (available[-1] if available else None)
-    selector = SELECTORS.get(outcome, ALL_AGES)
     geography = session.get(AppGeography, geography_id)
     return ObservedResponse(
         geography_id=geography_id,
@@ -88,8 +138,8 @@ def load_stored_observed(
         # The release that scored the shown month, which may predate the
         # active one; the active release when no month is stored yet.
         release=stored[chosen].model_release_id if chosen else release,
-        selectors=[selector],
-        selector=selector.code,
+        selectors=selection.options,
+        selector=selection.code,
         selector_note=None,
         month=chosen,
         available_months=available,
@@ -110,12 +160,21 @@ def load_stored_observed(
             "Estimates are computed when the month's climate is loaded and "
             "stored; the dashboard reads them."
         ),
-        data_modes=data_modes,
+        data_modes=sorted(
+            (restriction.data_modes if restriction else frozenset({"observed"}))
+            & {"observed", "projection"}
+        ),
     )
 
 
 def load_stored_observed_map(
-    session: Session, geography_id: str, outcome: str, month: str | None
+    session: Session,
+    geography_id: str,
+    outcome: str,
+    month: str | None,
+    *,
+    selector: str | None = None,
+    restriction: LiveRestriction | None = None,
 ) -> MapResponse:
     """Shade each area with its own stored estimate; others stay empty."""
     frame = load_map_view(
@@ -128,10 +187,17 @@ def load_stored_observed_map(
             if area.geography_id
             else None
         )
-        if found is not None:
-            by_area[area.geography_id or ""] = load_monthly_predictions(
-                session, found[0].id, None, None, outcome
-            )
+        if found is None:
+            continue
+        try:
+            selection = stored_selection(outcome, found[3], restriction, selector)
+        except OutlookSelectionInvalid:
+            # This area does not offer the chosen window; it shows none.
+            by_area[area.geography_id or ""] = {}
+            continue
+        by_area[area.geography_id or ""] = load_monthly_predictions(
+            session, found[0].id, None, None, outcome, windows=selection.windows
+        )
     chosen = month or max(
         (key for rows in by_area.values() for key in rows), default=None
     )
@@ -160,10 +226,9 @@ def load_stored_observed_map(
 
 
 def _estimate(outcome: str, row: MonthlyPrediction) -> ObservedEstimate:
-    selector = SELECTORS.get(outcome, ALL_AGES).code
     shown = _shown(
         outcome,
-        selector,
+        ALL_AGES.code,
         "heat",
         row.attributable_fraction_milli / 10,
         None,

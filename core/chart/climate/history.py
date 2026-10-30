@@ -21,6 +21,7 @@ import os
 import sys
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
+from typing import cast
 from datetime import date
 
 from sqlalchemy import select
@@ -179,8 +180,11 @@ def score_observed(
     """
     # Imported here: the request path loads the model registry and scoring
     # clients, which pulling climate does not need.
+    from chart.heat_outlook.observed_stored import live_model_release
+    from chart.heat_outlook.service import LBW_OUTCOME
+
     from .requests import submit_prediction
-    from .schemas import PredictRequest, PredictResponse
+    from .schemas import PredictRequest, PredictResponse, PregnancyWindow
 
     with factory() as session:
         rows = session.execute(
@@ -194,17 +198,25 @@ def score_observed(
         ).all()
         # Kenya's counties are shown by the calibrated scorer, which reads the
         # stored climate directly; scoring them through R would go unread.
-        assigned: list[tuple[str, str]] = [
-            (geography_id, outcome)
-            for geography_id, outcome in rows
-            if geography_id
-            and not legacy_observed_supported(session, geography_id, outcome)
-        ]
+        # Every validated pregnancy window is stored, so the dashboard can
+        # offer whichever the country settings leave on.
+        assigned: list[tuple[str, str, tuple[PregnancyWindow, ...] | None]] = []
+        for geography_id, outcome in rows:
+            if not geography_id or legacy_observed_supported(
+                session, geography_id, outcome
+            ):
+                continue
+            found = live_model_release(session, geography_id, outcome)
+            validated = cast(
+                tuple[PregnancyWindow, ...],
+                found[3] if found and outcome == LBW_OUTCOME else (),
+            )
+            assigned.append((geography_id, outcome, validated or None))
     if not assigned:
         log(f"{country_code}: no live observed model to score")
         return
     log(f"{country_code}: scoring {len(assigned)} area-outcomes x {len(months)} months")
-    for geography_id, outcome in assigned:
+    for geography_id, outcome, stages in assigned:
         for month in months:
             key = f"{geography_id} {outcome} {month:%Y-%m}"
             try:
@@ -213,6 +225,7 @@ def score_observed(
                         geography_id=geography_id,
                         planning_date=month,
                         outcome=outcome,
+                        pregnancy_windows=stages,
                     ),
                     session_factory=factory,
                 )
@@ -228,7 +241,7 @@ def score_observed(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m chart.climate.history")
-    parser.add_argument("command", choices=["backfill", "verify"])
+    parser.add_argument("command", choices=["backfill", "verify", "score"])
     parser.add_argument("--country", required=True, help="ISO code, e.g. IN or KE")
     parser.add_argument("--years", type=int, default=2)
     parser.add_argument(
@@ -242,6 +255,14 @@ def main(argv: list[str] | None = None) -> int:
         report = backfill(country, args.years, score=not args.no_score)
         result = report.coverage
         print(json.dumps(asdict(report), indent=2, default=str))
+    elif args.command == "score":
+        # Score the stored months only, e.g. after a model or window change.
+        factory = get_session_factory()
+        months = history_months(args.years, date.today())
+        scored = BackfillReport(country_code=country)
+        score_observed(factory, country, months[SCORING_LEAD_MONTHS:], scored)
+        print(json.dumps(asdict(scored), indent=2, default=str))
+        return 0 if not scored.unscored else 1
     else:
         with get_session_factory()() as session:
             result = coverage(

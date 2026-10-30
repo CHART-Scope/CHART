@@ -87,7 +87,11 @@ model are read from their stored results (`chart.heat_outlook.observed_stored`)
 through the same `/heat-outlook/{place}/observed` and `/observed/map`
 endpoints, so opening a division, changing the month or switching outcome
 never scores or downloads anything. Each month names the release that scored
-it. A place without a stored month shows it as not reported.
+it. A place without a stored month shows it as not reported. For low birth
+weight every pregnancy window validated for the place and left on in Settings
+is offered (Settings' default window first), because the backfill stores all
+validated windows; `python -m chart.climate.history score --country IN
+--years N` re-scores stored months after a model or window change.
 
 Before asking Copernicus, the downloader looks in the local cache and then in
 the public mirror `ERA5_MIRROR_URL` (default

@@ -76,15 +76,15 @@ def capabilities(
             ) from exc
 
 
-def _live_modes(session, geography_id: str, outcome: str) -> list[str]:
-    """The views a live model's country settings leave on; observed or refused."""
+def _live_observed(session, geography_id: str, outcome: str):
+    """The country's live-model settings, when they leave observed months on."""
     geography = session.get(AppGeography, geography_id)
     monthly = live_restriction(
         session, geography.country_code if geography else "IN", outcome
     )
     if monthly is None or "observed" not in monthly.data_modes:
         raise ViewTurnedOff("observed")
-    return sorted(monthly.data_modes & {"observed", "projection"})
+    return monthly
 
 
 def _scoped_map(session, frame, user):
@@ -194,7 +194,8 @@ def read_observed(
                     geography_id,
                     outcome,
                     month=month,
-                    data_modes=_live_modes(session, geography_id, outcome),
+                    selector=selector,
+                    restriction=_live_observed(session, geography_id, outcome),
                 )
             return load_observed(
                 session,
@@ -254,7 +255,14 @@ def read_observed_map(
                     monthly is None or "observed" not in monthly.data_modes
                 ):
                     raise ViewTurnedOff("observed")
-                frame = load_stored_observed_map(session, geography_id, outcome, month)
+                frame = load_stored_observed_map(
+                    session,
+                    geography_id,
+                    outcome,
+                    month,
+                    selector=selector,
+                    restriction=monthly,
+                )
             return _scoped_map(session, frame, user)
     except ViewTurnedOff as exc:
         raise HTTPException(status_code=404, detail="VIEW_TURNED_OFF") from exc
