@@ -327,26 +327,37 @@ def download_years(
     max_workers: int = 3,
     dataset: str = DATASET,
 ) -> list[DownloadResult]:
-    """Download many years concurrently. Order in result matches input order."""
-    by_year: dict[int, DownloadResult] = {}
+    """Download many years concurrently, in input order.
+
+    ERA5 takes a whole year per request. ERA5-Land, at 0.1 deg, exceeds the
+    Copernicus cost limit for a year of hourly data over a country, so it is
+    requested one month at a time; each month is its own cache entry.
+    """
+    jobs: list[tuple[int, tuple[int, ...] | None]] = []
+    for year in years:
+        months = (months_by_year or {}).get(year)
+        if dataset == LAND_DATASET:
+            jobs.extend((year, (month,)) for month in _normalize_months(months))
+        else:
+            jobs.append((year, months))
+    results: dict[int, DownloadResult] = {}
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         futures = {
             ex.submit(
                 download_year,
-                y,
+                year,
                 bbox,
                 cache_dir,
-                months=(months_by_year or {}).get(y),
+                months=months,
                 no_cache=no_cache,
                 refresh=refresh,
                 dataset=dataset,
-            ): y
-            for y in years
+            ): index
+            for index, (year, months) in enumerate(jobs)
         }
         for fut in as_completed(futures):
-            res = fut.result()
-            by_year[res.year] = res
-    return [by_year[y] for y in years]
+            results[futures[fut]] = fut.result()
+    return [results[index] for index in range(len(jobs))]
 
 
 def _atomic_write_text(path: Path, value: str) -> None:

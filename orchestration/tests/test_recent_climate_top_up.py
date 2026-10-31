@@ -151,8 +151,15 @@ def _cache_grid(
     """The retained hourly grid a country pull of ``months`` reads."""
     cache.mkdir(parents=True, exist_ok=True)
     north, west, south, east = acquisition
+    # ERA5 is requested a year at a time, ERA5-Land a month at a time.
+    requests: list[tuple[int, tuple[int, ...]]] = []
     for year in sorted({month.year for month in months}):
-        chosen = tuple(month.month for month in months if month.year == year)
+        held = tuple(month.month for month in months if month.year == year)
+        if dataset_name == "reanalysis-era5-land":
+            requests.extend((year, (number,)) for number in held)
+        else:
+            requests.append((year, held))
+    for year, chosen in requests:
         hours = pd.DatetimeIndex(
             [
                 datetime(year, month, 1) + timedelta(hours=hour)
