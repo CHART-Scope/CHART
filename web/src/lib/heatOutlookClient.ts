@@ -302,3 +302,62 @@ export async function fetchPopulation(
   if (!response.ok) throw new Error("Population could not load.");
   return (await response.json()) as PopulationMap;
 }
+
+export type ForecastMonth = {
+  month: string;
+  tmax_c: number | null;
+  tmax_low_c: number | null;
+  tmax_high_c: number | null;
+  value_percent: number | null;
+  low_percent: number | null;
+  high_percent: number | null;
+};
+
+export type PlaceForecast = {
+  geography_id: string;
+  outcome: string;
+  issue: string;
+  selector: string | null;
+  selectors: string[];
+  months: ForecastMonth[];
+  systems: string[];
+  source: string;
+  source_uri: string;
+  method: string;
+};
+
+export type ForecastMap = MapResponse & {
+  issue: string;
+  months: string[];
+  ranges: Record<string, [number | null, number | null]>;
+  tmax_c: Record<string, number>;
+};
+
+/** The next six months for one place, from the C3S multi-system forecast. */
+export async function fetchForecast(
+  geographyId: string,
+  outcome: string,
+): Promise<PlaceForecast> {
+  const response = await authFetch(
+    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/forecast?outcome=${outcome}`,
+    { auth: false },
+  );
+  if (!response.ok) throw new Error("The forecast could not load.");
+  return (await response.json()) as PlaceForecast;
+}
+
+/** The frame's areas shaded by one forecast month's heat share. */
+export async function fetchForecastMap(
+  geographyId: string,
+  outcome: string,
+  month?: string | null,
+): Promise<ForecastMap> {
+  const params = new URLSearchParams({ outcome });
+  if (month) params.set("month", month);
+  const response = await authFetch(
+    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/forecast/map?${params}`,
+    { auth: false },
+  );
+  if (!response.ok) throw new Error("The forecast map could not load.");
+  return (await response.json()) as ForecastMap;
+}

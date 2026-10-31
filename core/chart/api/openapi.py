@@ -565,6 +565,38 @@ OPERATION_DOCUMENTATION: dict[
             )
         },
     ),
+    ("get", "/heat-outlook/{geography_id}/forecast"): OperationDocumentation(
+        summary="Read a place's six-month seasonal forecast and heat shares",
+        description=(
+            "Returns the next six months for one place from the Copernicus C3S "
+            "multi-system seasonal forecast: each month's forecast mean daily "
+            "maximum (the place's ERA5 normal plus the area-weighted anomaly) and "
+            "the heat-attributable share scored with the place's model, with the "
+            "coolest and warmest forecast system as the range. Built once per C3S "
+            "issue; readable without sign-in when public read is enabled."
+        ),
+        success_responses={
+            "200": (
+                "The issue, the forecast systems, and for each coming month the "
+                "temperature and share with their ranges."
+            )
+        },
+    ),
+    ("get", "/heat-outlook/{geography_id}/forecast/map"): OperationDocumentation(
+        summary="Read a frame's areas shaded by a forecast month's heat share",
+        description=(
+            "Returns the frame's areas with display geometry, each shaded by its "
+            "own forecast heat share for one of the next six months (default the "
+            "first), with its range across forecast systems and forecast "
+            "temperature. Areas without a forecast are marked, never zeroed."
+        ),
+        success_responses={
+            "200": (
+                "The frame's areas with the month's forecast share, ranges and "
+                "temperatures, and the issue's months."
+            )
+        },
+    ),
     ("get", "/vra/indicators"): OperationDocumentation(
         summary="List the vulnerability and resilience indicator catalogue",
         description=(

@@ -39,6 +39,28 @@ labelled "Days ≥ 40 °C", because IMD's full heatwave definition also needs
 on each area's mean daily maximum, so a single hot spot inside a large area
 can be missed.
 
+## Next six months
+
+The **Forecast heat share** layer and each place's **Next 6 months** panel come
+from the Copernicus C3S multi-system seasonal forecast (nine centres: ECMWF,
+Météo-France, DWD, CMCC, NCEP, UK Met Office, JMA, ECCC, BOM), the best
+available source for the coming months: 1° grid, issued on the 10th of each
+month, six months ahead. Raw forecast temperatures carry each system's bias,
+so CHART uses C3S's maximum-temperature **anomalies** (each system against its
+1993–2016 hindcast normal) and adds them to the place's own ERA5 normal for the
+calendar month (2006–2016), so forecasts sit on the scale the models read.
+The central value is the mean of systems; the range is the coolest and
+warmest system. Each place's months are scored with its own models: Kenya's
+calibrated national curves (counties and constituencies; under-five by
+shifting each 2006–2016 year's daily series by the forecast's departure from
+normal), India's live models (districts with their division's; under-five
+with the forecast repeated over its lags, the release's interactive
+profile). `python -m chart.climate.seasonal_forecast build --country KE`
+builds an issue; the Dagster `seasonal_forecast_sensor` checks daily and
+rebuilds both countries when C3S publishes a new issue. Beyond six months
+forecast skill is too low to show; the projections start in the next
+five-year period.
+
 ## Population
 
 The **Population** layer shades people per km² for everyone, children under

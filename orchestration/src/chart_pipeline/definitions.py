@@ -1166,11 +1166,50 @@ def recent_climate_months_sensor(_context: dg.SensorEvaluationContext):
     yield dg.SkipReason(f"Queued {len(queued)} country pull(s) for dispatch.")
 
 
+#: Countries whose six-month forecast is kept current.
+FORECAST_COUNTRIES = ("IN", "KE")
+
+
+@dg.op
+def refresh_seasonal_forecasts(context: dg.OpExecutionContext) -> None:
+    """Build each country's six-month forecast for the newest C3S issue."""
+    from chart.climate.seasonal_forecast import build, latest_issue, needs_build
+
+    issue = latest_issue()
+    for country in FORECAST_COUNTRIES:
+        if needs_build(country, issue):
+            build(country, issue, log=context.log.info)
+
+
+@dg.job
+def seasonal_forecast_job() -> None:
+    refresh_seasonal_forecasts()
+
+
+@dg.sensor(
+    job=seasonal_forecast_job,
+    minimum_interval_seconds=24 * 60 * 60,
+    default_status=dg.DefaultSensorStatus.RUNNING,
+)
+def seasonal_forecast_sensor(_context: dg.SensorEvaluationContext):
+    """Once a day: when C3S has published a newer issue than the one saved,
+    rebuild and rescore the next six months for every place."""
+    from chart.climate.seasonal_forecast import latest_issue, needs_build
+
+    issue = latest_issue()
+    missing = [country for country in FORECAST_COUNTRIES if needs_build(country, issue)]
+    if not missing:
+        yield dg.SkipReason(f"Forecasts for {issue:%Y-%m} are current.")
+        return
+    yield dg.RunRequest(run_key=f"seasonal-{issue:%Y-%m}")
+
+
 defs = dg.Definitions(
-    jobs=[prediction_request_job, climate_ingestion_job],
+    jobs=[prediction_request_job, climate_ingestion_job, seasonal_forecast_job],
     sensors=[
         pending_prediction_requests_sensor,
         pending_climate_ingestions_sensor,
         recent_climate_months_sensor,
+        seasonal_forecast_sensor,
     ],
 )

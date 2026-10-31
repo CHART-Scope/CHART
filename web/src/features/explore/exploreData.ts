@@ -16,7 +16,13 @@ export type ExplorePlace = {
 };
 
 export type ExploreLayer =
-  "observed" | "projection" | "tmax" | "heat_days" | "population" | "vulnerability";
+  | "observed"
+  | "forecast"
+  | "projection"
+  | "tmax"
+  | "heat_days"
+  | "population"
+  | "vulnerability";
 
 export const POPULATION_MEASURES = [
   { code: "total", label: "Everyone" },

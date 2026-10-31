@@ -9,6 +9,8 @@ import { rememberReturnPath } from "@/lib/authClient";
 import type { MapResponse } from "@/lib/dashboardClient";
 import {
   fetchClimateLayer,
+  fetchForecast,
+  fetchForecastMap,
   fetchPopulation,
   fetchHeatOutlook,
   fetchHeatOutlookMap,
@@ -18,6 +20,8 @@ import {
   type ClimateLayerMap,
   type HeatOutlook,
   type ObservedRisk,
+  type ForecastMap,
+  type PlaceForecast,
   type PopulationMap,
   type PopulationMeasure,
 } from "@/lib/heatOutlookClient";
@@ -100,6 +104,11 @@ const LAYERS: { code: ExploreLayer; label: string; hint: string }[] = [
     hint: "India: days whose maximum reached 40 °C (IMD's threshold; its full heatwave definition also needs 4.5 °C above normal, which this count does not test). Kenya: days in runs of 3 or more at or above the county's KMD threshold (Nairobi 32 °C, Mombasa 36, Kisumu 37, Turkana, Marsabit and Mandera 38; 35 °C elsewhere). From ERA5-Land; context only.",
   },
   {
+    code: "forecast",
+    label: "Forecast heat share",
+    hint: "The next six months from the Copernicus C3S multi-system seasonal forecast (nine centres): each place's ERA5 normal for the month plus the forecast anomaly, scored with the same models as the observed months. The range is the coolest and warmest forecast system.",
+  },
+  {
     code: "projection",
     label: "Projected heat share",
     hint: "Average share linked to heat in a future period under an emissions scenario.",
@@ -128,6 +137,7 @@ function outcomeNoun(outcome: string): string {
 /** Where each group of layers starts, so historical and projected read apart. */
 const LAYER_GROUP_START: Partial<Record<ExploreLayer, string>> = {
   observed: "Historical · Copernicus ERA5 reanalysis",
+  forecast: "Next 6 months · Copernicus C3S forecasts",
   projection: "Projections · climate models",
   population: "Context",
 };
@@ -207,6 +217,13 @@ const climateRead = (geo: string, layer: ClimateLayer, month?: string | null) =>
   cached(`climate|${geo}|${layer}|${month ?? ""}`, () =>
     fetchClimateLayer(geo, null, layer, month),
   );
+
+const forecastMapRead = (geo: string, outcome: string, month?: string | null) =>
+  cached(`forecast-map|${geo}|${outcome}|${month ?? ""}`, () =>
+    fetchForecastMap(geo, outcome, month),
+  );
+const forecastRead = (geo: string, outcome: string) =>
+  cached(`forecast|${geo}|${outcome}`, () => fetchForecast(geo, outcome));
 
 const populationRead = (geo: string, measure: PopulationMeasure) =>
   cached(`population|${geo}|${measure}`, () => fetchPopulation(geo, measure));
@@ -337,6 +354,60 @@ export function ExploreApp() {
     };
   }, [state.frame]);
 
+  // The forecast's months, from the frame's first forecast map.
+  const forecastKey = `${state.frame}|${state.outcome}`;
+  const [forecastInfo, setForecastInfo] = useState<{
+    key: string;
+    months: string[];
+    issue: string | null;
+  } | null>(null);
+  useEffect(() => {
+    if (state.layer !== "forecast") return;
+    let cancelled = false;
+    forecastMapRead(state.frame, state.outcome)
+      .then((response) => {
+        if (cancelled) return;
+        if (response.month)
+          prime(
+            `forecast-map|${state.frame}|${state.outcome}|${response.month}`,
+            response,
+          );
+        setForecastInfo({
+          key: forecastKey,
+          months: response.months,
+          issue: response.issue,
+        });
+      })
+      .catch(
+        () =>
+          !cancelled && setForecastInfo({ key: forecastKey, months: [], issue: null }),
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, [forecastKey, state.frame, state.outcome, state.layer]);
+  const forecastMonths = forecastInfo?.key === forecastKey ? forecastInfo.months : [];
+  const forecastMonth =
+    state.month && forecastMonths.includes(state.month)
+      ? state.month
+      : (forecastMonths[0] ?? null);
+
+  // The focused place's six months, for its panel.
+  const [placeForecast, setPlaceForecast] = useState<{
+    key: string;
+    data: PlaceForecast | null;
+  } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const key = `${focusId}|${state.outcome}`;
+    forecastRead(focusId, state.outcome)
+      .then((data) => !cancelled && setPlaceForecast({ key, data }))
+      .catch(() => !cancelled && setPlaceForecast({ key, data: null }));
+    return () => {
+      cancelled = true;
+    };
+  }, [focusId, state.outcome]);
+
   const climateView = CLIMATE_LAYERS.includes(state.layer);
   const climateKey = `${state.frame}|${state.layer}`;
   useEffect(() => {
@@ -419,6 +490,13 @@ export function ExploreApp() {
   // The map: one read, made once its month or period is known.
   const mapRead: { key: string; load: () => Promise<MapResponse> } | null = (() => {
     const { frame: geo, outcome, layer } = state;
+    if (layer === "forecast") {
+      if (!forecastMonth) return null;
+      return {
+        key: `forecast-map|${geo}|${outcome}|${forecastMonth}`,
+        load: () => forecastMapRead(geo, outcome, forecastMonth),
+      };
+    }
     if (layer === "population")
       return {
         key: `population|${geo}|${state.people}`,
@@ -678,23 +756,32 @@ export function ExploreApp() {
                     <span className={styles.layerValue}>
                       {item.code === "observed"
                         ? formatPercent(observed?.estimate?.value_percent)
-                        : item.code === "projection"
+                        : item.code === "forecast"
                           ? formatPercent(
-                              outlook?.period_summary
-                                .find((row) => row.period === period)
-                                ?.parts.find((part) => part.side === "heat")
-                                ?.value_percent,
+                              placeForecast?.data?.months.find(
+                                (row) =>
+                                  row.month ===
+                                  (forecastMonth ??
+                                    placeForecast.data?.months[0]?.month),
+                              )?.value_percent,
                             )
-                          : item.code === state.layer &&
-                              focusArea?.value_percent != null
-                            ? item.code === "tmax"
-                              ? `${focusArea.value_percent.toFixed(1)} °C`
-                              : item.code === "heat_days"
-                                ? `${Math.round(focusArea.value_percent)} d`
-                                : item.code === "population"
-                                  ? `${formatCount(focusArea.value_percent)}/km²`
-                                  : (focusArea.value_percent / 100).toFixed(2)
-                            : ""}
+                          : item.code === "projection"
+                            ? formatPercent(
+                                outlook?.period_summary
+                                  .find((row) => row.period === period)
+                                  ?.parts.find((part) => part.side === "heat")
+                                  ?.value_percent,
+                              )
+                            : item.code === state.layer &&
+                                focusArea?.value_percent != null
+                              ? item.code === "tmax"
+                                ? `${focusArea.value_percent.toFixed(1)} °C`
+                                : item.code === "heat_days"
+                                  ? `${Math.round(focusArea.value_percent)} d`
+                                  : item.code === "population"
+                                    ? `${formatCount(focusArea.value_percent)}/km²`
+                                    : (focusArea.value_percent / 100).toFixed(2)
+                              : ""}
                     </span>
                   </label>
                 </Fragment>
@@ -771,6 +858,32 @@ export function ExploreApp() {
                   )
                 </p>
               )}
+            </section>
+          )}
+
+          {state.layer === "forecast" && forecastMonths.length > 0 && (
+            <section className={styles.section}>
+              <h2>Forecast month</h2>
+              <div className={styles.months} role="group" aria-label="Forecast month">
+                {forecastMonths.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={forecastMonth === key}
+                    data-season={
+                      season?.months.includes(Number(key.slice(5, 7))) || undefined
+                    }
+                    onClick={() => update({ month: key })}
+                  >
+                    {MONTH_LABELS[Number(key.slice(5, 7)) - 1]} {key.slice(2, 4)}
+                  </button>
+                ))}
+              </div>
+              <p className={styles.seasonNote}>
+                Copernicus C3S forecast issued{" "}
+                {forecastInfo?.issue ? monthLabel(forecastInfo.issue) : ""}; refreshed
+                every month.
+              </p>
             </section>
           )}
 
@@ -861,6 +974,69 @@ export function ExploreApp() {
               year={observedMonth?.slice(0, 4) ?? null}
             />
           </div>
+
+          {placeForecast?.data &&
+            placeForecast.key === `${focusId}|${state.outcome}` && (
+              <section className={styles.section} data-testid="explore-forecast">
+                <h2>
+                  Next 6 months <span className={styles.muted}>· forecast</span>
+                </h2>
+                <ul className={styles.forecastList}>
+                  {placeForecast.data.months.map((row) => {
+                    const top = Math.max(
+                      1,
+                      ...placeForecast.data!.months.map(
+                        (item) => item.high_percent ?? 0,
+                      ),
+                    );
+                    return (
+                      <li
+                        key={row.month}
+                        data-current={row.month === forecastMonth || undefined}
+                      >
+                        <span>{monthLabel(row.month)}</span>
+                        <span
+                          className={styles.forecastBar}
+                          title="Range across forecast systems"
+                        >
+                          <i
+                            className={styles.forecastRange}
+                            style={{
+                              left: `${((row.low_percent ?? 0) / top) * 100}%`,
+                              width: `${(((row.high_percent ?? 0) - (row.low_percent ?? 0)) / top) * 100}%`,
+                            }}
+                          />
+                          <i
+                            className={styles.forecastPoint}
+                            style={{
+                              left: `${((row.value_percent ?? 0) / top) * 100}%`,
+                            }}
+                          />
+                        </span>
+                        <strong>{formatPercent(row.value_percent)}</strong>
+                        <small>
+                          {row.tmax_c !== null ? `${row.tmax_c.toFixed(1)}°` : ""}
+                        </small>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className={styles.muted}>
+                  Share of {outcomeNoun(state.outcome).replace("of ", "")} linked to
+                  heat in each coming month, with the range across{" "}
+                  {placeForecast.data.systems.length} forecast systems, and the forecast
+                  mean daily maximum.{" "}
+                  <a
+                    href={placeForecast.data.source_uri}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Copernicus C3S
+                  </a>
+                  , issued {monthLabel(placeForecast.data.issue)}.
+                </p>
+              </section>
+            )}
 
           {focusPeople && peopleCounts && (
             <section className={styles.section} data-testid="explore-people">
@@ -961,16 +1137,39 @@ export function ExploreApp() {
             onOpen={open}
             onHover={prefetch}
             figure={
-              state.layer === "observed" || state.layer === "projection"
+              state.layer === "observed" ||
+              state.layer === "projection" ||
+              state.layer === "forecast"
                 ? exposedFigure(state.outcome)
                 : null
             }
+            note={
+              state.layer === "forecast"
+                ? (area) => {
+                    const forecast = map as ForecastMap | null;
+                    const range = forecast?.ranges?.[area.geography_id ?? ""];
+                    const tmax = forecast?.tmax_c?.[area.geography_id ?? ""];
+                    return [
+                      range && range[0] !== null && range[1] !== null
+                        ? `Range ${formatPercent(range[0])}–${formatPercent(range[1])} across systems`
+                        : null,
+                      tmax !== undefined
+                        ? `Forecast mean daily max ${tmax.toFixed(1)} °C`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+                  }
+                : undefined
+            }
             caption={
-              state.layer === "observed"
-                ? `${outcomeNoun(state.outcome)} · ${month ? monthLabel(month) : ""}`
-                : state.layer === "projection"
-                  ? `${outcomeNoun(state.outcome)} · ${outlookInfo?.periods.find((p) => p.code === period)?.label ?? ""}${scenario ? `, ${tiers.get(scenario)?.toLowerCase()} emissions` : ""}`
-                  : null
+              state.layer === "forecast"
+                ? `${outcomeNoun(state.outcome)} · ${forecastMonth ? monthLabel(forecastMonth) : ""} forecast`
+                : state.layer === "observed"
+                  ? `${outcomeNoun(state.outcome)} · ${month ? monthLabel(month) : ""}`
+                  : state.layer === "projection"
+                    ? `${outcomeNoun(state.outcome)} · ${outlookInfo?.periods.find((p) => p.code === period)?.label ?? ""}${scenario ? `, ${tiers.get(scenario)?.toLowerCase()} emissions` : ""}`
+                    : null
             }
             people={(area) => {
               const found = peopleCounts?.counts[area.geography_id ?? ""];
@@ -1019,6 +1218,9 @@ export function ExploreApp() {
                 ? monthLabel(month)
                 : ""}
               {climateView ? " · Copernicus ERA5-Land" : ""}
+              {state.layer === "forecast" && forecastMonth
+                ? `${monthLabel(forecastMonth)} · Copernicus C3S forecast`
+                : ""}
               {state.layer === "projection" && period
                 ? `${outlookInfo?.periods.find((p) => p.code === period)?.label ?? period}${scenario ? ` · ${tiers.get(scenario)} emissions (${sspLabel(scenario)})` : ""}`
                 : ""}

@@ -62,6 +62,8 @@ type Props = {
   figure?: IconName | null;
   /** A line under the value, e.g. "of births · Sep 2026". */
   caption?: string | null;
+  /** A per-area line, e.g. a forecast's range across systems. */
+  note?: (area: MapArea) => string | null;
   /** The area's people, from WorldPop, when known. */
   people?: (area: MapArea) => {
     total: number;
@@ -85,6 +87,7 @@ export function ExploreMap({
   frameView = "selection",
   figure,
   caption,
+  note,
   people,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
@@ -358,6 +361,9 @@ export function ExploreMap({
               {caption && <small className={styles.tooltipCaption}>{caption}</small>}
             </span>
           </span>
+          {note?.(hover.area) && (
+            <span className={styles.tooltipRank}>{note(hover.area)}</span>
+          )}
           {rank && <span className={styles.tooltipRank}>{rank}</span>}
           {(() => {
             const found = people?.(hover.area);

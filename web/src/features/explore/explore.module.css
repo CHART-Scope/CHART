@@ -1111,3 +1111,52 @@
     transform: rotate(360deg);
   }
 }
+
+.forecastList {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.forecastList li {
+  display: grid;
+  grid-template-columns: 64px 1fr 42px 32px;
+  gap: 6px;
+  align-items: center;
+}
+
+.forecastList li[data-current] {
+  font-weight: 600;
+}
+
+.forecastList small {
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+.forecastBar {
+  position: relative;
+  height: 10px;
+  background: var(--color-grey-light);
+  border-radius: 5px;
+}
+
+.forecastRange {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  background: var(--color-seq-2);
+  border-radius: 3px;
+}
+
+.forecastPoint {
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 10px;
+  margin-left: -1px;
+  background: var(--color-maroon);
+}

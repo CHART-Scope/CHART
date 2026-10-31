@@ -424,6 +424,94 @@ test("population shows density on the map and counts for the place", async ({
   });
 });
 
+test("the next six months: forecast map, months and the place's range", async ({
+  page,
+}) => {
+  const { api } = await openExplore(
+    page,
+    "frame=geo-ke&place=geo-ke-kajiado&outcome=lbw",
+  );
+  const months = ["2026-10", "2026-11", "2026-12", "2027-01", "2027-02", "2027-03"];
+  api.on(/^\/api\/chart\/heat-outlook\/geo-ke\/forecast\/map$/, (route, url) => {
+    const month = url.searchParams.get("month") ?? months[0];
+    return json(route, {
+      ...fixtures.mapFrame,
+      outcome: "lbw",
+      month,
+      metric: "heat_attributable_share_forecast_month",
+      issue: "2026-10",
+      months,
+      ranges: Object.fromEntries(
+        fixtures.mapFrame.areas.map((area) => [area.geography_id, [8, 16]]),
+      ),
+      tmax_c: Object.fromEntries(
+        fixtures.mapFrame.areas.map((area) => [area.geography_id, 29.4]),
+      ),
+      areas: fixtures.mapFrame.areas.map((area, index) => ({
+        ...area,
+        value_percent: month === "2026-11" ? 20 : 10 + (index % 5),
+        missing_reason: null,
+      })),
+    });
+  });
+  api.on(/^\/api\/chart\/heat-outlook\/geo-ke-kajiado\/forecast$/, (route) =>
+    json(route, {
+      geography_id: "geo-ke-kajiado",
+      outcome: "lbw",
+      issue: "2026-10",
+      selector: "P",
+      selectors: ["P"],
+      systems: ["ecmwf 51", "ukmo 610", "dwd 22"],
+      source: "Copernicus C3S multi-system seasonal forecast",
+      source_uri:
+        "https://cds.climate.copernicus.eu/datasets/seasonal-postprocessed-single-levels",
+      method: "normal plus anomaly",
+      months: months.map((month, index) => ({
+        month,
+        tmax_c: 28 + index / 2,
+        tmax_low_c: 27.5 + index / 2,
+        tmax_high_c: 28.6 + index / 2,
+        value_percent: 12 + index,
+        low_percent: 9 + index,
+        high_percent: 15 + index,
+      })),
+    }),
+  );
+  await page.reload();
+
+  // The place's six coming months, each with its range, whatever the layer.
+  const panel = page.getByTestId("explore-forecast");
+  await expect(panel.getByRole("listitem")).toHaveCount(6);
+  await expect(panel).toContainText("Oct 2026");
+  await expect(panel).toContainText("12.0%");
+  await expect(panel).toContainText("3 forecast systems");
+  await expect(panel.getByRole("link", { name: "Copernicus C3S" })).toBeVisible();
+
+  // The forecast layer sits in its own group, with its six months.
+  await expect(
+    page.getByText("Next 6 months · Copernicus C3S forecasts"),
+  ).toBeVisible();
+  await page.getByRole("radio", { name: /^Forecast heat share/ }).check();
+  const chips = page.getByRole("group", { name: "Forecast month" }).getByRole("button");
+  await expect(chips).toHaveCount(6);
+  await expect(page.getByTestId("explore-legend")).toContainText(
+    "Oct 2026 · Copernicus C3S forecast",
+  );
+  await chips.filter({ hasText: "Nov 26" }).click();
+  await expect(page).toHaveURL(/layer=forecast.*month=2026-11/);
+  await expect
+    .poll(() =>
+      api.requests.some((item) =>
+        item.includes("forecast/map?outcome=lbw&month=2026-11"),
+      ),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: "../outputs/e2e/web/explore-forecast.png",
+    fullPage: true,
+  });
+});
+
 test("the first map load says so, then clears", async ({ page }) => {
   await page.route("**/heat-outlook/geo-ke/observed/map**", async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 1200));

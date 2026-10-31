@@ -27,6 +27,12 @@ from chart.population.service import (
     load_population_map,
 )
 
+from .forecast import (
+    ForecastMap,
+    ForecastResponse,
+    load_forecast,
+    load_forecast_map,
+)
 from .climate_layer import ClimateLayerResponse, load_climate_layer
 from .observed_stored import (
     live_model_release,
@@ -337,3 +343,56 @@ def read_population(
             return _scoped_map(session, frame, user)
     except (NoAdminUnitForGeography, PopulationNotAvailable) as exc:
         raise HTTPException(status_code=404, detail="POPULATION_NOT_AVAILABLE") from exc
+
+
+@router.get(
+    "/{geography_id}/forecast",
+    response_model=ForecastResponse,
+    summary="Read a place's six-month seasonal forecast and estimates",
+)
+def read_forecast(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
+    outcome: str = LBW_OUTCOME,
+    selector: Annotated[str | None, Query(max_length=32)] = None,
+) -> ForecastResponse:
+    """The next six months from the C3S multi-system forecast: the place's
+    forecast temperature and heat share for each month, with the coolest and
+    warmest system as the range."""
+    require_read_access(user, geography_id)
+    try:
+        with get_session_factory()() as session:
+            return load_forecast(session, geography_id, outcome, selector)
+    except OutlookNotAvailable as exc:
+        raise HTTPException(status_code=404, detail="FORECAST_NOT_AVAILABLE") from exc
+    except OutlookSelectionInvalid as exc:
+        raise HTTPException(
+            status_code=422, detail="OUTLOOK_SELECTION_INVALID"
+        ) from exc
+
+
+@router.get(
+    "/{geography_id}/forecast/map",
+    response_model=ForecastMap,
+    summary="Read a frame's areas shaded by a forecast month's heat share",
+)
+def read_forecast_map(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
+    outcome: str = LBW_OUTCOME,
+    month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+    selector: Annotated[str | None, Query(max_length=32)] = None,
+) -> ForecastMap:
+    """Each area's forecast heat share for one month (default the first), with
+    its range across forecast systems and its forecast temperature."""
+    require_read_access(user, geography_id)
+    try:
+        with get_session_factory()() as session:
+            frame = load_forecast_map(session, geography_id, outcome, month, selector)
+            return _scoped_map(session, frame, user)
+    except (OutlookNotAvailable, NoAdminUnitForGeography) as exc:
+        raise HTTPException(status_code=404, detail="FORECAST_NOT_AVAILABLE") from exc
+    except OutlookSelectionInvalid as exc:
+        raise HTTPException(
+            status_code=422, detail="OUTLOOK_SELECTION_INVALID"
+        ) from exc
