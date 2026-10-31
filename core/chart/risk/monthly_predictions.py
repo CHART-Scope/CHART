@@ -50,6 +50,8 @@ def load_monthly_predictions(
     user_id: str | None,
     month: str | None,
     outcome: str = DEFAULT_OUTCOME,
+    *,
+    windows: tuple[int, ...] = MONTHLY_PREGNANCY_WINDOWS,
 ) -> dict[str, MonthlyPrediction]:
     """Stored predictions for one place and outcome, keyed ``YYYY-MM``.
 
@@ -82,7 +84,7 @@ def load_monthly_predictions(
             # projection, or sample data is a real prediction, but it is not the
             # observed month this card reports.
             PredictionResult.data_label == DataLabel.reanalysis,
-            PredictionResult.pregnancy_window.in_(MONTHLY_PREGNANCY_WINDOWS),
+            PredictionResult.pregnancy_window.in_(windows),
         )
     )
     if month is not None:

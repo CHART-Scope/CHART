@@ -13,6 +13,7 @@
     "build-storybook": "NODE_PATH=$PWD/node_modules:$PWD/../node_modules storybook build"
   },
   "dependencies": {
+    "maplibre-gl": "^5.24.0",
     "next": "^16.2.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

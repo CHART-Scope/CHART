@@ -35,6 +35,7 @@ from chart.inference import LbwScore
 from chart.shared.db.base import Base
 from chart.shared.db.climate_load import load_monthly_climate_records
 from chart.shared.db.models import (
+    PredictionResult,
     AdminUnit,
     AppGeography,
     ClimateInputMonthRecord,
@@ -603,6 +604,80 @@ def test_one_planning_request_scores_all_three_pregnancy_stages(
     assert public_status.result is not None
     assert [item.pregnancy_window for item in public_status.result.predictions] == [1]
     assert public_status.result.prediction.pregnancy_window == 1
+
+
+def test_a_month_stored_for_one_window_is_scored_for_the_others(
+    session_factory,
+) -> None:
+    """Regression: a month held for window 1 answered a request for windows 1-3.
+
+    The stored-result check ignored the pregnancy window and only the primary
+    window was written, so windows 2 and 3 were never scored or stored and the
+    dashboard's window choice showed nothing for them.
+    """
+
+    def score_for_stage(*_args, pregnancy_window: int, **_kwargs):
+        return _score().__class__(
+            **{
+                **_score().__dict__,
+                "pregnancy_window": pregnancy_window,
+                "odds_ratio": {3: 1.08, 2: 1.15, 1: 1.12}[pregnancy_window],
+            }
+        )
+
+    def stored_windows() -> dict[int, float]:
+        with session_factory() as session:
+            return {
+                row.pregnancy_window: row.odds_ratio
+                for row in session.scalars(select(PredictionResult))
+            }
+
+    def run(request: PredictRequest, owner: str):
+        with patch(
+            "chart.climate.service.score_lbw_model", side_effect=score_for_stage
+        ) as score:
+            response = submit_prediction(request, session_factory=session_factory)
+            if isinstance(response, PredictionAcceptedResponse):
+                token = _claim(session_factory, response.request_id, owner)
+                prepare_prediction_input(
+                    response.request_id,
+                    live=False,
+                    lease_token=token,
+                    session_factory=session_factory,
+                    now=TEST_NOW,
+                )
+                response = complete_prediction_request(
+                    response.request_id,
+                    lease_token=token,
+                    session_factory=session_factory,
+                )
+        return response, score.call_count
+
+    _seed_three_climate_months(session_factory)
+    _, calls = run(_request(), "dagster-final-window")
+    assert calls == 1 and set(stored_windows()) == {1}
+
+    every = _request().model_copy(update={"pregnancy_windows": (3, 2, 1)})
+    result, calls = run(every, "dagster-all-windows")
+    assert calls == 3
+    assert [item.pregnancy_window for item in result.predictions] == [3, 2, 1]
+    assert stored_windows() == {3: 1.08, 2: 1.15, 1: 1.12}
+
+    # Now every window is stored, the same request is answered without scoring.
+    repeat, calls = run(every, "dagster-repeat")
+    assert calls == 0 and isinstance(repeat, PredictResponse)
+
+    # A completed run whose extra windows were never stored (the old write
+    # path kept only the primary) is stored from its result, not re-scored.
+    with session_factory() as session:
+        for row in session.scalars(
+            select(PredictionResult).where(PredictionResult.pregnancy_window != 3)
+        ):
+            session.delete(row)
+        session.commit()
+    restored, calls = run(every, "dagster-restore")
+    assert calls == 0 and isinstance(restored, PredictResponse)
+    assert stored_windows() == {3: 1.08, 2: 1.15, 1: 1.12}
 
 
 def test_state_mapping_rejects_unvalidated_pregnancy_windows(

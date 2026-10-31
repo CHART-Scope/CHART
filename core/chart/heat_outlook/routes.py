@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import require_current_user, can_read_geography_path
+from chart.auth.service import can_read_geography_path, require_reader
 from chart.model_settings.service import live_restriction, outlook_restriction
 from chart.risk.routes import _require_read_access as require_read_access
 from chart.risk.schemas import MapResponse
@@ -20,7 +20,12 @@ from .observed import (
     ObservedNotCalibrated,
     load_observed,
     load_observed_map,
-    load_observed_outline,
+)
+from .climate_layer import ClimateLayerResponse, load_climate_layer
+from .observed_stored import (
+    live_model_release,
+    load_stored_observed,
+    load_stored_observed_map,
 )
 from .schemas import HeatOutlookResponse, ObservedResponse, OutlookCapabilities
 from .service import (
@@ -48,7 +53,7 @@ def _restriction(geography_id: str, outcome: str):
 @router.get("/{geography_id}/capabilities", response_model=OutlookCapabilities)
 def capabilities(
     geography_id: str,
-    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
     outcome: str = LBW_OUTCOME,
 ) -> OutlookCapabilities:
     require_read_access(user, geography_id)
@@ -72,6 +77,17 @@ def capabilities(
             ) from exc
 
 
+def _live_observed(session, geography_id: str, outcome: str):
+    """The country's live-model settings, when they leave observed months on."""
+    geography = session.get(AppGeography, geography_id)
+    monthly = live_restriction(
+        session, geography.country_code if geography else "IN", outcome
+    )
+    if monthly is None or "observed" not in monthly.data_modes:
+        raise ViewTurnedOff("observed")
+    return monthly
+
+
 def _scoped_map(session, frame, user):
     paths = dict(session.execute(select(AppGeography.id, AppGeography.path)).all())
     frame.areas = [
@@ -90,7 +106,7 @@ def _scoped_map(session, frame, user):
 )
 def read_heat_outlook(
     geography_id: str,
-    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
     outcome: str = LBW_OUTCOME,
     scenario: Annotated[str | None, Query(max_length=16)] = None,
     period: Annotated[str | None, Query(max_length=16)] = None,
@@ -123,7 +139,7 @@ def read_heat_outlook(
 )
 def read_heat_outlook_map(
     geography_id: str,
-    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
     outcome: str = LBW_OUTCOME,
     scenario: Annotated[str | None, Query(max_length=16)] = None,
     period: Annotated[str | None, Query(max_length=16)] = None,
@@ -162,7 +178,7 @@ def read_heat_outlook_map(
 )
 def read_observed(
     geography_id: str,
-    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
     outcome: str = LBW_OUTCOME,
     month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
     selector: Annotated[str | None, Query(max_length=32)] = None,
@@ -172,7 +188,16 @@ def read_observed(
     try:
         with get_session_factory()() as session:
             if not legacy_observed_geography(session, geography_id, outcome):
-                raise OutlookNotAvailable(geography_id)
+                if live_model_release(session, geography_id, outcome) is None:
+                    raise OutlookNotAvailable(geography_id)
+                return load_stored_observed(
+                    session,
+                    geography_id,
+                    outcome,
+                    month=month,
+                    selector=selector,
+                    restriction=_live_observed(session, geography_id, outcome),
+                )
             return load_observed(
                 session,
                 geography_id,
@@ -198,7 +223,7 @@ def read_observed(
 )
 def read_observed_map(
     geography_id: str,
-    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
     outcome: str = LBW_OUTCOME,
     month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
     selector: Annotated[str | None, Query(max_length=32)] = None,
@@ -231,7 +256,14 @@ def read_observed_map(
                     monthly is None or "observed" not in monthly.data_modes
                 ):
                     raise ViewTurnedOff("observed")
-                frame = load_observed_outline(session, geography_id, outcome, month)
+                frame = load_stored_observed_map(
+                    session,
+                    geography_id,
+                    outcome,
+                    month,
+                    selector=selector,
+                    restriction=monthly,
+                )
             return _scoped_map(session, frame, user)
     except ViewTurnedOff as exc:
         raise HTTPException(status_code=404, detail="VIEW_TURNED_OFF") from exc
@@ -242,6 +274,36 @@ def read_observed_map(
         FileNotFoundError,
     ) as exc:
         raise HTTPException(status_code=404, detail="OBSERVED_NOT_AVAILABLE") from exc
+    except OutlookSelectionInvalid as exc:
+        raise HTTPException(
+            status_code=422, detail="OUTLOOK_SELECTION_INVALID"
+        ) from exc
+
+
+@router.get(
+    "/{geography_id}/climate",
+    response_model=ClimateLayerResponse,
+    summary="Read ERA5-Land temperature or heatwave days for the frame's areas",
+)
+def read_climate_layer(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
+    layer: Annotated[str, Query(pattern=r"^(tmax|heat_days)$")] = "tmax",
+    month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+) -> ClimateLayerResponse:
+    """A context layer for the map: the monthly mean of daily maximum
+    temperature, or heatwave days at each country's official threshold, from
+    ERA5-Land. Not an input to any health estimate; `available_months` lists
+    the months held."""
+    require_read_access(user, geography_id)
+    try:
+        with get_session_factory()() as session:
+            frame = load_climate_layer(session, geography_id, layer, month)
+            return _scoped_map(session, frame, user)
+    except NoAdminUnitForGeography as exc:
+        raise HTTPException(
+            status_code=404, detail="CLIMATE_LAYER_NOT_AVAILABLE"
+        ) from exc
     except OutlookSelectionInvalid as exc:
         raise HTTPException(
             status_code=422, detail="OUTLOOK_SELECTION_INVALID"

@@ -43,7 +43,9 @@ help:
 	@printf "Climate / orchestration\n"
 	@printf "  make lbw-run            Run the R prediction model on :8000\n"
 	@printf "  make era5-fixture       Write MVP fixture CSV to data/climate (no Dagster)\n"
-	@printf "  make climate-migrate    Run Alembic for climate spine tables\n\n"
+	@printf "  make climate-migrate    Run Alembic for climate spine tables\n"
+	@printf "  make climate-backfill COUNTRY=IN YEARS=2  Load observed climate history\n"
+	@printf "  make climate-verify COUNTRY=IN YEARS=2    List places missing months\n\n"
 	@printf "Chart repository commands\n"
 	@printf "  make chart-repo         Start repository Postgres, then run Payload on :3300\n"
 	@printf "  make chart-repo-db      Start repository Postgres only\n"
@@ -173,7 +175,7 @@ e2e: e2e-orchestration e2e-core e2e-web e2e-era5 e2e-outlook
 # uploads, scores and reads assessments through the API.
 e2e-core:
 	mkdir -p outputs/e2e/core
-	$(VENV_PYTHON) -m pytest core/tests/test_kenya_observed_api.py core/tests/test_heat_outlook_api.py core/tests/test_prediction_requests.py core/tests/test_vra_api.py e2e/test_core_package_data.py -q --junitxml=outputs/e2e/core/junit.xml
+	$(VENV_PYTHON) -m pytest core/tests/test_kenya_observed_api.py core/tests/test_heat_outlook_api.py core/tests/test_prediction_requests.py core/tests/test_vra_api.py core/tests/test_india_observed_stored_api.py e2e/test_core_package_data.py -q --junitxml=outputs/e2e/core/junit.xml
 
 e2e-orchestration:
 	mkdir -p outputs/e2e/orchestration
@@ -483,6 +485,27 @@ docs-build: docs-prepare
 	else \
 		$(MAKE) docs-install && $(VENV_PYTHON) -m mkdocs build --strict; \
 	fi
+
+# Observed climate history for every place the model configuration lists.
+# Reads the public ERA5 mirror first, then Copernicus (needs ~/.cdsapirc).
+# India's observed estimates are scored too, so `make lbw-run` must be up.
+COUNTRY ?= IN
+YEARS ?= 2
+# era5 feeds the health models; era5-land is the sharper map layer only.
+PRODUCT ?= era5
+.PHONY: climate-backfill climate-verify climate-mirror-publish
+CLIMATE_HISTORY_ENV = DATABASE_URL="$(CHART_DATABASE_URL)" \
+	MODEL_CACHE_DIR="$(CHART_MODEL_CACHE_DIR)" \
+	INFERENCE_LBW_BASE_URL="$${INFERENCE_LBW_BASE_URL:-http://127.0.0.1:8000}"
+climate-backfill: climate-migrate
+	$(CLIMATE_HISTORY_ENV) $(VENV_PYTHON) -m chart.climate.history backfill --country $(COUNTRY) --years $(YEARS) --product $(PRODUCT)
+
+climate-verify:
+	$(CLIMATE_HISTORY_ENV) $(VENV_PYTHON) -m chart.climate.history verify --country $(COUNTRY) --years $(YEARS) --product $(PRODUCT)
+
+# Maintainers only: share retained ERA5 grids so other installs skip the queue.
+climate-mirror-publish:
+	aws s3 sync $${ERA5_CACHE_DIR:-$(ERA5_DIR)/.cache} s3://chart-predictive-models/era5-cache/ --exclude "*.partial" --exclude ".*" --region eu-west-2
 
 climate-migrate: climate-install postgres-wait
 	PYTHON_BIN="$(VENV_PYTHON)" DATABASE_URL="$(CHART_DATABASE_URL)" \

@@ -24,6 +24,8 @@ x-python-environment: &python-environment
   # The default hour read as "stuck" on the dashboard; a running job renews
   # its lease every minute, so ten minutes only shortens the dead wait.
   PREDICTION_LEASE_SECONDS: "600"
+  # Published estimates readable without signing in (docs/explore.md).
+  CHART_PUBLIC_READ: ${CHART_PUBLIC_READ:-false}
 
 x-dagster-environment: &dagster-environment
   <<: *python-environment
@@ -130,7 +132,7 @@ services:
         else
           public_flag="";
         fi;
-        aws s3 sync "s3://$$MODEL_BUCKET/" /models/ --exclude "archive/*" --exclude "media/*" $$public_flag
+        aws s3 sync "s3://$$MODEL_BUCKET/" /models/ --exclude "archive/*" --exclude "media/*" --exclude "era5-cache/*" $$public_flag
 
   chart-lbw:
     image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-lbw:${IMAGE_TAG:-dev}
@@ -310,6 +312,9 @@ services:
     volumes:
       - chart-dagster-storage:/opt/dagster/storage
       - chart-climate-data:/opt/chart/data/climate
+      # The model configuration (outlooks/index.json) decides which places a
+      # climate pull derives.
+      - chart-lbw-model:/models:ro
     command:
       [
         "dagster",

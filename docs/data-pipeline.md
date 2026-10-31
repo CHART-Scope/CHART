@@ -67,13 +67,46 @@ local cache directory; deployed workers keep it at
 explicitly bypasses reuse. A cache hit retains the original raw-file hash and
 request provenance, and only the requested months are processed.
 
+Observed history is loaded once per country with
+`python -m chart.climate.history backfill --country IN --years N`
+(`make climate-backfill`). The places are the published model configuration
+(`MODEL_CACHE_DIR/outlooks/index.json`), the list the dashboard's pickers
+offer, so every place at every level is filled and no territory without a
+place is downloaded. Whole calendar years are requested so each request, and
+its cache entry, stays the same whichever places were missing it; downloads
+are padded by one grid cell and snapped to the 0.25° grid for the same reason.
+An area too small to hold an ERA5 cell centre (Mombasa, Vihiga) uses the cells
+it overlaps instead, and its run records that method. India's observed
+estimates are then scored through the normal request path for every modelled
+area and month, skipping the first three months whose model inputs precede
+the history. `verify` lists any place-month still missing.
+
+The dashboard shows both countries' observed months in one view. Kenya's
+counties are scored on read by the calibrated DLNM. India's places with a live
+model are read from their stored results (`chart.heat_outlook.observed_stored`)
+through the same `/heat-outlook/{place}/observed` and `/observed/map`
+endpoints, so opening a division, changing the month or switching outcome
+never scores or downloads anything. Each month names the release that scored
+it. A place without a stored month shows it as not reported. For low birth
+weight every pregnancy window validated for the place and left on in Settings
+is offered (Settings' default window first), because the backfill stores all
+validated windows; `python -m chart.climate.history score --country IN
+--years N` re-scores stored months after a model or window change.
+
+Before asking Copernicus, the downloader looks in the local cache and then in
+the public mirror `ERA5_MIRROR_URL` (default
+`https://chart-predictive-models.s3.eu-west-2.amazonaws.com/era5-cache`; set it
+empty to disable). Mirrored files keep their cache keys and request sidecars,
+so provenance is unchanged. The server's model sync skips that prefix.
+
 Recent months are pulled before anyone asks. Every six hours the Dagster
 sensor `recent_climate_months_sensor` checks the two newest months ERA5 has
-published (it lands about six days after a month ends). When any deployed area
-of a country lacks one, it queues a country pull for the missing months, which
-the ingestion sensor runs like an operator's pull from Settings > Jobs. A
-country with a pull in flight is skipped, and a failed automatic pull is
-retried after 24 hours. A planner therefore reads last month from the database
+published (it lands about six days after a month ends). When any configured
+place of a country lacks one, it queues a country pull for the missing months,
+which the ingestion sensor runs like an operator's pull from Settings > Jobs,
+and then scores the new months. A country with a pull in flight is skipped,
+and an automatic pull is not repeated within 24 hours of the last one, so a
+place the grid cannot cover does not trigger a pull every evaluation. A planner therefore reads last month from the database
 instead of waiting on a Copernicus download.
 
 Heatwave days follow each country's official definition in

@@ -25,7 +25,7 @@ for (const width of [1440, 390]) {
       "CHART — Climate & health adaptation and resilience Toolkit",
     );
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
-      "Climate & health adaptation and resilience Toolkit",
+      "See how heat affects mothers and children, place by place",
     );
     await expect(
       page.getByRole("button", { name: "Sign in", exact: true }),
@@ -41,6 +41,20 @@ for (const width of [1440, 390]) {
     await expect(
       navigation.getByRole("link", { name: "Learning Hub", exact: true }),
     ).toHaveAttribute("href", "/learning");
+    // Anyone can open the published estimates; signing in is for planning.
+    await expect(
+      navigation.getByRole("link", { name: "Explore the map", exact: true }),
+    ).toHaveAttribute("href", "/explore");
+    await expect(
+      page.locator("main").getByRole("link", { name: "Explore the map" }),
+    ).toHaveAttribute("href", "/explore");
+    await expect(
+      page.getByRole("heading", { name: "Three questions CHART answers" }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: `../outputs/e2e/web/landing-${width}.png`,
+      fullPage: true,
+    });
     await expect(
       navigation.getByRole("button", { name: /Solutions Repository/ }),
     ).toBeDisabled();

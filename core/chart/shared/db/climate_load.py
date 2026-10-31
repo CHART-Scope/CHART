@@ -179,25 +179,37 @@ def _touch_data_source(data_source: DataSource) -> None:
     data_source.last_refreshed_at = datetime.now(timezone.utc)
 
 
-def _get_or_create_era5_data_source(session: Session, geography_id: int) -> DataSource:
+#: Data-source records per product: name, product id and version label.
+ERA5_PRODUCTS = {
+    "reanalysis-era5-single-levels": (
+        ERA5_DATA_SOURCE_NAME,
+        "ERA5 hourly data on single levels",
+    ),
+    "reanalysis-era5-land": ("Copernicus ERA5-Land", "ERA5-Land hourly data"),
+}
+
+
+def _get_or_create_era5_data_source(
+    session: Session,
+    geography_id: int,
+    product: str = "reanalysis-era5-single-levels",
+) -> DataSource:
+    name, version = ERA5_PRODUCTS[product]
     data_source = session.scalar(
         select(DataSource).where(
-            DataSource.name == ERA5_DATA_SOURCE_NAME,
+            DataSource.name == name,
             DataSource.geography_id == geography_id,
         )
     )
     if data_source is None:
         data_source = DataSource(
-            name=ERA5_DATA_SOURCE_NAME,
+            name=name,
             kind="reanalysis",
             provider="Copernicus Climate Change Service",
-            product="reanalysis-era5-single-levels",
-            version="ERA5 hourly data on single levels",
+            product=product,
+            version=version,
             access_method="cds_api",
-            source_uri=(
-                "https://cds.climate.copernicus.eu/datasets/"
-                "reanalysis-era5-single-levels"
-            ),
+            source_uri=f"https://cds.climate.copernicus.eu/datasets/{product}",
             license="Copernicus Licence",
             cadence="monthly",
             geography_id=geography_id,
@@ -206,13 +218,10 @@ def _get_or_create_era5_data_source(session: Session, geography_id: int) -> Data
         session.flush()
     else:
         data_source.provider = "Copernicus Climate Change Service"
-        data_source.product = "reanalysis-era5-single-levels"
-        data_source.version = "ERA5 hourly data on single levels"
+        data_source.product = product
+        data_source.version = version
         data_source.access_method = "cds_api"
-        data_source.source_uri = (
-            "https://cds.climate.copernicus.eu/datasets/"
-            "reanalysis-era5-single-levels"
-        )
+        data_source.source_uri = f"https://cds.climate.copernicus.eu/datasets/{product}"
         data_source.license = "Copernicus Licence"
     return data_source
 
@@ -711,8 +720,15 @@ def load_era5_shared_download(
     preset_slug: str,
     results: dict[int, tuple[pd.DataFrame, dict, pd.Series]],
     csv_paths: dict[int, str],
+    variable_prefix: str = "",
+    with_daily: bool = True,
+    resolution: str = "ERA5 0.25 deg shared-area aggregate",
 ) -> tuple[ClimateRun, int, int]:
     """Version an area derivation while retaining its raw acquisition identity.
+
+    ``variable_prefix`` files a context product (ERA5-Land, ``land_``) under
+    its own variable names, so nothing that scores the health models, which
+    read the exact ERA5 names, can pick it up.
 
     Adding areas or changing boundaries/methods creates a new derived run, not
     a new acquisition. Repeating the same derivation is idempotent. Previous
@@ -765,7 +781,13 @@ def load_era5_shared_download(
         total_monthly = total_daily = 0
         for group in groups.values():
             run, monthly_count, daily_count = load_era5_shared_download(
-                session, preset_slug=preset_slug, results=group, csv_paths=csv_paths
+                session,
+                preset_slug=preset_slug,
+                results=group,
+                csv_paths=csv_paths,
+                variable_prefix=variable_prefix,
+                with_daily=with_daily,
+                resolution=resolution,
             )
             first_run = first_run or run
             total_monthly += monthly_count
@@ -828,7 +850,11 @@ def load_era5_shared_download(
             geography = session.get(Geography, admin_unit.geography_id)
             if geography is None:
                 raise KeyError(f"unknown geography for admin unit: {admin_unit_id}")
-            data_source = _get_or_create_era5_data_source(session, geography.id)
+            data_source = _get_or_create_era5_data_source(
+                session,
+                geography.id,
+                str(shared_meta.get("dataset") or "reanalysis-era5-single-levels"),
+            )
             provenance = Provenance(
                 source_uri=csv_paths[admin_unit_id],
                 input_hash=raw_hash,
@@ -847,7 +873,7 @@ def load_era5_shared_download(
                 source_license=records[0].source_license,
                 input_hash=run_hash,
                 scenario=None,
-                resolution="ERA5 0.25 deg shared-area aggregate",
+                resolution=resolution,
                 data_label=data_label,
                 window_start_year=shared_meta.get("window", {}).get("start_year"),
                 window_end_year=shared_meta.get("window", {}).get("end_year"),
@@ -878,7 +904,7 @@ def load_era5_shared_download(
                         admin_unit_id=admin_unit.id,
                         climate_run_id=climate_run.id,
                         period_month=record.period_month,
-                        variable=variable,
+                        variable=f"{variable_prefix}{variable}",
                         value=float(row[variable]),
                         agg_method=record.aggregation_method,
                         unit=unit,
@@ -899,13 +925,14 @@ def load_era5_shared_download(
                     )
                 )
                 monthly_rows += 1
-        daily_rows += load_era5_daily_series(
-            session,
-            admin_unit_id=admin_unit.id,
-            climate_run_id=climate_run.id,
-            daily=daily,
-            agg_method=str(meta.get("aggregation_method") or "bbox_coslat_mean_v1"),
-        )
+        if with_daily:
+            daily_rows += load_era5_daily_series(
+                session,
+                admin_unit_id=admin_unit.id,
+                climate_run_id=climate_run.id,
+                daily=daily,
+                agg_method=str(meta.get("aggregation_method") or "bbox_coslat_mean_v1"),
+            )
 
     if climate_run is None:
         raise ValueError("no area survived the audit; nothing was written")
