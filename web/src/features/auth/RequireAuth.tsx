@@ -7,6 +7,7 @@ import {
   getStoredAuthSession,
   isAuthSessionEnded,
   restoreAuthSession,
+  rememberReturnPath,
   startKeycloakSignIn,
   subscribeAuthSession,
   type AuthSession,
@@ -75,6 +76,7 @@ export function RequireAuth({
   function redirect() {
     if (redirected.current) return;
     redirected.current = true;
+    rememberReturnPath(`${window.location.pathname}${window.location.search}`);
     startKeycloakSignIn();
   }
 

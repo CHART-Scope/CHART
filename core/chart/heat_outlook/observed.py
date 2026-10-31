@@ -27,13 +27,16 @@ reduction the India under-five path uses.
 from __future__ import annotations
 
 import json
+import logging
+import threading
+import time
 from calendar import monthrange
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from functools import lru_cache
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from chart.risk.schemas import MapResponse
@@ -64,6 +67,7 @@ from .service import (
     _shown,
     enabled_views,
     model_selector_options,
+    _calibrated,
     outlook_release,
 )
 
@@ -315,6 +319,64 @@ def _score_units(
     selector: str,
     release: str,
 ) -> dict[int, dict[str, CountyMonth]]:
+    """Each county's scored months, from the cache when its climate is unchanged.
+
+    Scoring is pure given the stored ERA5 and the release, and expensive:
+    under-five scores every day of every county's history (about 350,000 DLNM
+    evaluations for twenty years of Kenya), which took longer than the proxy
+    allows. Results are kept per county until a new ERA5 run is stored.
+    """
+    version = (id(session.get_bind()), _climate_version(session))
+    keys = {unit.id: (unit.id, outcome, selector, release, version) for unit in units}
+    with _CACHE_LOCK:
+        missing = [unit for unit in units if keys[unit.id] not in _SCORED]
+    if missing:
+        # One computation per request shape; concurrent callers wait for it.
+        with _COMPUTE_LOCK:
+            with _CACHE_LOCK:
+                missing = [unit for unit in missing if keys[unit.id] not in _SCORED]
+            if missing:
+                fresh = _compute_scores(session, missing, outcome, selector, release)
+                with _CACHE_LOCK:
+                    if any(key[4] != version for key in _SCORED):
+                        # A new climate version retires every older entry.
+                        for stale in [k for k in _SCORED if k[4] != version]:
+                            del _SCORED[stale]
+                    for unit in missing:
+                        _SCORED[keys[unit.id]] = fresh.get(unit.id, {})
+    with _CACHE_LOCK:
+        return {unit.id: _SCORED[keys[unit.id]] for unit in units}
+
+
+_SCORED: dict[tuple, dict[str, CountyMonth]] = {}
+_CACHE_LOCK = threading.Lock()
+_COMPUTE_LOCK = threading.Lock()
+logger = logging.getLogger(__name__)
+
+
+def _climate_version(session: Session) -> int:
+    """The newest observed ERA5 run; ERA5-Land context runs do not count."""
+    return (
+        session.scalar(
+            select(func.max(ClimateRun.id)).where(
+                ClimateRun.data_label.in_(OBSERVED_LABELS),
+                or_(
+                    ClimateRun.resolution.is_(None),
+                    ~ClimateRun.resolution.like("ERA5-Land%"),
+                ),
+            )
+        )
+        or 0
+    )
+
+
+def _compute_scores(
+    session: Session,
+    units: list[AdminUnit],
+    outcome: str,
+    selector: str,
+    release: str,
+) -> dict[int, dict[str, CountyMonth]]:
     cal = calibration(release)
     if outcome == LBW_OUTCOME:
         monthly = _monthly_tmax(session, [unit.id for unit in units])
@@ -327,6 +389,44 @@ def _score_units(
         unit.id: _score_u5(daily.get(unit.id, {}), cal, unit, selector, release)
         for unit in units
     }
+
+
+def warm_observed_cache(session_factory, *, interval_seconds: float = 600) -> None:
+    """Keep Kenya's default observed views scored, so no visitor waits for it.
+
+    Runs forever in a daemon thread: scores every county for each outcome's
+    default selector, then rechecks every ``interval_seconds`` and rescores
+    only after a new ERA5 run (the cache key changes).
+    """
+    while True:
+        try:
+            if _calibrated():
+                release = outlook_release()
+                with session_factory() as session:
+                    units = _units(session, KENYA, LBW_OUTCOME)
+                    for outcome, selector in DEFAULT_SELECTOR.items():
+                        started = time.monotonic()
+                        _score_units(session, units, outcome, selector, release)
+                        logger.info(
+                            "observed cache warm: %s/%s in %.1fs",
+                            outcome,
+                            selector,
+                            time.monotonic() - started,
+                        )
+        except Exception:  # noqa: BLE001 - warming must never stop the API
+            logger.exception("observed cache warm failed; retrying later")
+        time.sleep(interval_seconds)
+
+
+def start_observed_cache_warmer(session_factory) -> threading.Thread:
+    thread = threading.Thread(
+        target=warm_observed_cache,
+        args=(session_factory,),
+        name="observed-cache-warmer",
+        daemon=True,
+    )
+    thread.start()
+    return thread
 
 
 def _score_lbw(

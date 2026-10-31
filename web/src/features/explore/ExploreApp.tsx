@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { dashboardHref } from "@/features/dashboard/dashboardNavigation";
+import { rememberReturnPath } from "@/lib/authClient";
 import type { MapResponse } from "@/lib/dashboardClient";
 import {
   fetchClimateLayer,
@@ -10,17 +12,28 @@ import {
   fetchHeatOutlookMap,
   fetchObservedRisk,
   fetchObservedRiskMap,
+  type ClimateLayer,
+  type ClimateLayerMap,
   type HeatOutlook,
   type ObservedRisk,
 } from "@/lib/heatOutlookClient";
-import { listGeographies } from "@/lib/planningClient";
+import {
+  listGeographies,
+  listRecommendedActions,
+  type RecommendedAction,
+} from "@/lib/planningClient";
 import { fetchVraMap } from "@/lib/vraClient";
 
+import { ActionsDrawer, isHeatAction } from "./ActionsDrawer";
 import { ExploreMap } from "./ExploreMap";
+import { PlaceSearch } from "./PlaceSearch";
+import { SeasonalLine, type CyclePoint } from "./SeasonalLine";
+import { cached, prime } from "./exploreCache";
 import {
   CLIMATE_LAYERS,
   COUNTRIES,
   MONTH_LABELS,
+  countryOf,
   OUTCOMES,
   bandsFor,
   children,
@@ -30,7 +43,9 @@ import {
   monthsByYear,
   periodLength,
   periodsOfLength,
+  scenarioTiers,
   seasonLabel,
+  sspLabel,
   type ExploreLayer,
   type ExplorePlace,
 } from "./exploreData";
@@ -40,6 +55,11 @@ import styles from "./explore.module.css";
  * The public, map-first view of CHART. Everything here is a read of stored,
  * published estimates: opening a place, a month or a projection never
  * downloads or scores anything, so it needs no account.
+ *
+ * Each read is made once (exploreCache) and only when every choice it
+ * depends on is known, so a view loads in one step instead of loading with
+ * defaults and again with the real month or period. Shown values stay until
+ * their replacement arrives, so the map and panel never blank.
  */
 
 type State = {
@@ -63,7 +83,7 @@ const LAYERS: { code: ExploreLayer; label: string; hint: string }[] = [
   {
     code: "projection",
     label: "Projected heat share",
-    hint: "Average share linked to heat in a future period under a climate scenario.",
+    hint: "Average share linked to heat in a future period under an emissions scenario.",
   },
   {
     code: "tmax",
@@ -114,18 +134,68 @@ function writeState(state: State) {
   window.history.replaceState(null, "", `/explore?${params}`);
 }
 
+// One key per published read; see exploreCache.
+const observedRead = (geo: string, outcome: string, month?: string | null) =>
+  cached(`observed|${geo}|${outcome}|${month ?? ""}`, () =>
+    fetchObservedRisk(geo, null, { outcome, month: month ?? undefined }),
+  );
+const outlookRead = (
+  geo: string,
+  outcome: string,
+  period?: string | null,
+  scenario?: string | null,
+) =>
+  cached(`outlook|${geo}|${outcome}|${period ?? ""}|${scenario ?? ""}`, () =>
+    fetchHeatOutlook(geo, null, {
+      outcome,
+      period: period ?? undefined,
+      scenario: scenario ?? undefined,
+    }),
+  );
+const climateRead = (geo: string, layer: ClimateLayer, month?: string | null) =>
+  cached(`climate|${geo}|${layer}|${month ?? ""}`, () =>
+    fetchClimateLayer(geo, null, layer, month),
+  );
+
+/** The first of the frame and its children that has the read. */
+async function firstAvailable<T>(ids: string[], read: (id: string) => Promise<T>) {
+  for (const id of ids.slice(0, 5)) {
+    try {
+      return await read(id);
+    } catch {
+      // try the next place
+    }
+  }
+  return null;
+}
+
+type FrameInfo = {
+  key: string;
+  outlook: HeatOutlook | null;
+  months: string[];
+  newest: string | null;
+};
+
 export function ExploreApp() {
   const [state, setState] = useState<State>(() => readState());
   const [places, setPlaces] = useState<ExplorePlace[]>([]);
   const [map, setMap] = useState<MapResponse | null>(null);
   const [mapLoading, setMapLoading] = useState(true);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [frameOutlook, setFrameOutlook] = useState<HeatOutlook | null>(null);
-  const [months, setMonths] = useState<string[]>([]);
-  const [climateMonths, setClimateMonths] = useState<string[]>([]);
-  const [observed, setObserved] = useState<ObservedRisk | null>(null);
-  const [outlook, setOutlook] = useState<HeatOutlook | null>(null);
-  const [query, setQuery] = useState("");
+  const [frameInfo, setFrameInfo] = useState<FrameInfo | null>(null);
+  const [climateInfo, setClimateInfo] = useState<{
+    key: string;
+    months: string[];
+    newest: string | null;
+  } | null>(null);
+  const [focusData, setFocusData] = useState<{
+    key: string;
+    observed: ObservedRisk | null;
+    outlook: HeatOutlook | null;
+    baseline: HeatOutlook | null;
+  } | null>(null);
+  const [actions, setActions] = useState<RecommendedAction[]>([]);
+  const [showActions, setShowActions] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
 
   const update = useCallback((patch: Partial<State>) => {
@@ -150,6 +220,13 @@ export function ExploreApp() {
         ),
       )
       .catch(() => setPlaces([]));
+    cached("actions", () => listRecommendedActions({ limit: 100 }))
+      .then((items) =>
+        setActions(
+          [...items].sort((a, b) => Number(isHeatAction(b)) - Number(isHeatAction(a))),
+        ),
+      )
+      .catch(() => setActions([]));
   }, []);
 
   const placeById = useMemo(() => new Map(places.map((p) => [p.id, p])), [places]);
@@ -157,186 +234,255 @@ export function ExploreApp() {
   const focusId = state.selected ?? state.frame;
   const focus = placeById.get(focusId);
   const trail = useMemo(() => lineage(places, focusId), [places, focusId]);
+  const childIds = useMemo(
+    () => children(places, state.frame).map((place) => place.id),
+    [places, state.frame],
+  );
 
-  // The frame's outlook gives the periods, scenarios and heat season; the
-  // first child with one stands in when the frame itself has none.
+  // What the frame offers: periods, scenarios and season (outlook), and the
+  // observed months. The frame itself, or its first child with them.
+  const frameKey = `${state.frame}|${state.outcome}`;
   useEffect(() => {
     let cancelled = false;
-    const candidates = [state.frame, ...children(places, state.frame).map((p) => p.id)];
-    (async () => {
-      for (const id of candidates.slice(0, 5)) {
-        try {
-          const found = await fetchHeatOutlook(id, null, {
-            outcome: state.outcome,
-            scenario: state.scenario ?? undefined,
-            period: state.period ?? undefined,
-          });
-          if (!cancelled) setFrameOutlook(found);
-          return;
-        } catch {
-          // try the next place
-        }
-      }
-      if (!cancelled) setFrameOutlook(null);
-    })();
+    const ids = [state.frame, ...childIds];
+    Promise.all([
+      firstAvailable(ids, (id) => outlookRead(id, state.outcome)),
+      firstAvailable(ids, (id) => observedRead(id, state.outcome)),
+    ]).then(([outlook, observed]) => {
+      if (cancelled) return;
+      setFrameInfo({
+        key: frameKey,
+        outlook,
+        months: observed?.available_months ?? [],
+        newest: observed?.month ?? observed?.available_months.at(-1) ?? null,
+      });
+    });
     return () => {
       cancelled = true;
     };
-  }, [state.frame, state.outcome, state.period, state.scenario, places]);
+  }, [frameKey, state.frame, state.outcome, childIds]);
 
-  // Months held for the frame (or, failing that, its first scored child).
+  const climateView = CLIMATE_LAYERS.includes(state.layer);
+  const climateKey = `${state.frame}|${state.layer}`;
   useEffect(() => {
+    if (!climateView) return;
     let cancelled = false;
-    const candidates = [state.frame, ...children(places, state.frame).map((p) => p.id)];
-    (async () => {
-      for (const id of candidates.slice(0, 5)) {
-        try {
-          const found = await fetchObservedRisk(id, null, { outcome: state.outcome });
-          if (cancelled) return;
-          setMonths(found.available_months);
-          if (!state.month || !found.available_months.includes(state.month)) {
-            update({ month: found.month ?? found.available_months.at(-1) ?? null });
-          }
-          return;
-        } catch {
-          // try the next place
-        }
-      }
-      if (!cancelled) setMonths([]);
-    })();
+    const layer = state.layer as ClimateLayer;
+    climateRead(state.frame, layer)
+      .then((response) => {
+        if (cancelled) return;
+        // The newest month is the same read under its own name.
+        if (response.month)
+          prime(`climate|${state.frame}|${layer}|${response.month}`, response);
+        setClimateInfo({
+          key: climateKey,
+          months: response.available_months,
+          newest: response.month,
+        });
+      })
+      .catch(
+        () =>
+          !cancelled && setClimateInfo({ key: climateKey, months: [], newest: null }),
+      );
     return () => {
       cancelled = true;
     };
-    // state.month is read, not depended on: a month change keeps the list.
-  }, [state.frame, state.outcome, places, update]);
+  }, [climateView, climateKey, state.frame, state.layer]);
+
+  const frameReady = frameInfo?.key === frameKey;
+  const outlookInfo = frameReady ? frameInfo.outlook : null;
+  const observedMonths = frameReady ? frameInfo.months : [];
+  const observedMonth =
+    state.month && observedMonths.includes(state.month)
+      ? state.month
+      : frameReady
+        ? frameInfo.newest
+        : null;
+  const climateReady = climateInfo?.key === climateKey;
+  const climateMonths = climateReady ? climateInfo.months : [];
+  // A month chosen on another layer carries over when this one holds it.
+  const climateMonth =
+    state.month && climateMonths.includes(state.month)
+      ? state.month
+      : observedMonth && climateMonths.includes(observedMonth)
+        ? observedMonth
+        : climateReady
+          ? climateInfo.newest
+          : null;
+  const month = climateView ? climateMonth : observedMonth;
 
   const baselineCode =
-    frameOutlook?.period_summary.find((row) => row.is_baseline)?.period ?? null;
+    outlookInfo?.period_summary.find((row) => row.is_baseline)?.period ?? null;
   const lengths = [
     ...new Set(
-      (frameOutlook?.periods ?? [])
+      (outlookInfo?.periods ?? [])
         .filter((item) => item.code !== baselineCode)
         .map((item) => periodLength(item.code)),
     ),
   ].sort((a, b) => a - b);
   const periodChoices = periodsOfLength(
-    (frameOutlook?.periods ?? []).map((item) => ({ ...item, period: item.code })),
+    (outlookInfo?.periods ?? []).map((item) => ({ ...item, period: item.code })),
     state.length,
     baselineCode,
   );
   const period =
-    state.period ??
-    (frameOutlook && periodChoices.some((item) => item.code === frameOutlook.period)
-      ? frameOutlook.period
+    (state.period && periodChoices.some((item) => item.code === state.period)
+      ? state.period
+      : null) ??
+    (outlookInfo && periodChoices.some((item) => item.code === outlookInfo.period)
+      ? outlookInfo.period
       : (periodChoices.find((item) => item.code !== baselineCode)?.code ?? null));
-  const scenario = state.scenario ?? frameOutlook?.scenario ?? null;
+  const scenario =
+    (state.scenario &&
+    outlookInfo?.scenarios.some((item) => item.code === state.scenario)
+      ? state.scenario
+      : null) ??
+    outlookInfo?.scenario ??
+    null;
+  const tiers = scenarioTiers((outlookInfo?.scenarios ?? []).map((item) => item.code));
+
+  // The map: one read, made once its month or period is known.
+  const mapRead: { key: string; load: () => Promise<MapResponse> } | null = (() => {
+    const { frame: geo, outcome, layer } = state;
+    if (layer === "vulnerability")
+      return { key: `vra|${geo}`, load: () => fetchVraMap(geo, null) };
+    if (climateView) {
+      if (!climateMonth) return null;
+      return {
+        key: `climate-map|${geo}|${layer}|${climateMonth}`,
+        load: () => climateRead(geo, layer as ClimateLayer, climateMonth),
+      };
+    }
+    if (!frameReady) return null;
+    if (layer === "projection") {
+      if (!period) return null;
+      return {
+        key: `outlook-map|${geo}|${outcome}|${period}|${scenario ?? ""}`,
+        load: () =>
+          fetchHeatOutlookMap(geo, null, {
+            outcome,
+            period,
+            scenario: scenario ?? undefined,
+          }),
+      };
+    }
+    return {
+      key: `observed-map|${geo}|${outcome}|${observedMonth ?? ""}`,
+      load: () =>
+        fetchObservedRiskMap(geo, null, { outcome, month: observedMonth ?? undefined }),
+    };
+  })();
+  const mapKey = mapRead?.key ?? null;
+  const mapReadRef = useRef(mapRead);
+  mapReadRef.current = mapRead;
 
   useEffect(() => {
+    const read = mapReadRef.current;
+    if (!read) {
+      setMapLoading(true);
+      return;
+    }
     let cancelled = false;
     setMapLoading(true);
-    setMapError(null);
-    const climate = CLIMATE_LAYERS.includes(state.layer);
-    const load = climate
-      ? // Ask for the chosen month while this layer's months are unknown (a
-        // shared link); a month it does not hold falls back to its newest.
-        fetchClimateLayer(
-          state.frame,
-          null,
-          state.layer as "tmax" | "heat_days",
-          !climateMonths.length || climateMonths.includes(state.month ?? "")
-            ? state.month
-            : null,
-        )
-          .catch(() =>
-            fetchClimateLayer(state.frame, null, state.layer as "tmax" | "heat_days"),
-          )
-          .then((response) => {
-            if (!cancelled) {
-              setClimateMonths(response.available_months);
-              if (response.month && response.month !== state.month)
-                update({ month: response.month });
-            }
-            return response;
-          })
-      : state.layer === "vulnerability"
-        ? fetchVraMap(state.frame, null)
-        : state.layer === "projection"
-          ? fetchHeatOutlookMap(state.frame, null, {
-              outcome: state.outcome,
-              period: period ?? undefined,
-              scenario: scenario ?? undefined,
-            })
-          : fetchObservedRiskMap(state.frame, null, {
-              outcome: state.outcome,
-              month: state.month ?? undefined,
-            });
-    load
+    cached(read.key, read.load)
       .then((response) => {
-        if (!cancelled) setMap(response);
+        if (cancelled) return;
+        setMap(response);
+        setMapError(null);
       })
       .catch(() => {
-        if (!cancelled) {
-          setMap(null);
-          setMapError(
-            state.layer === "vulnerability"
-              ? "No vulnerability assessment is published for this area yet."
-              : CLIMATE_LAYERS.includes(state.layer)
-                ? "No ERA5-Land months are loaded for this area yet."
-                : "No published estimates for this area and choice.",
-          );
-        }
+        if (cancelled) return;
+        setMap(null);
+        setMapError(
+          state.layer === "vulnerability"
+            ? "No vulnerability assessment is published for this area yet."
+            : climateView
+              ? "No ERA5-Land months are loaded for this area yet."
+              : "No published estimates for this area and choice.",
+        );
       })
-      .finally(() => {
-        if (!cancelled) setMapLoading(false);
-      });
+      .finally(() => !cancelled && setMapLoading(false));
     return () => {
       cancelled = true;
     };
-    // climateMonths is read to validate the month, not to refetch.
-  }, [state.frame, state.layer, state.outcome, state.month, period, scenario, update]);
+  }, [mapKey, state.layer, climateView]);
 
-  // The focused place's own estimate, seasonal cycle and projected change.
+  // The focused place: its month, seasonal cycle and change over periods.
+  const focusKey = `${focusId}|${state.outcome}|${observedMonth ?? ""}|${period ?? ""}|${scenario ?? ""}`;
+  const focusReady = frameReady;
+  const loadFocus = useCallback(
+    (id: string) => {
+      const observed = observedMonth
+        ? observedRead(id, state.outcome, observedMonth).catch(() =>
+            observedRead(id, state.outcome),
+          )
+        : observedRead(id, state.outcome);
+      return Promise.all([
+        observed.catch(() => null),
+        outlookRead(id, state.outcome, period, scenario).catch(() => null),
+        baselineCode
+          ? outlookRead(id, state.outcome, baselineCode, scenario).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+    },
+    [state.outcome, observedMonth, period, scenario, baselineCode],
+  );
   useEffect(() => {
+    if (!focusReady) return;
     let cancelled = false;
-    setObserved(null);
-    setOutlook(null);
-    fetchObservedRisk(focusId, null, {
-      outcome: state.outcome,
-      month: state.month ?? undefined,
-    })
-      .then((found) => !cancelled && setObserved(found))
-      .catch(() => !cancelled && setObserved(null));
-    fetchHeatOutlook(focusId, null, {
-      outcome: state.outcome,
+    loadFocus(focusId).then(([observed, outlook, baseline]) => {
+      if (!cancelled) setFocusData({ key: focusKey, observed, outlook, baseline });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [focusReady, focusKey, focusId, loadFocus]);
+
+  // Hovering an area fetches its details, so the click that follows is instant.
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prefetch = useCallback(
+    (id: string | null) => {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+      if (!id || !focusReady) return;
+      hoverTimer.current = setTimeout(() => void loadFocus(id), 150);
+    },
+    [focusReady, loadFocus],
+  );
+
+  const observed = focusData?.observed ?? null;
+  const outlook = focusData?.outlook ?? null;
+  const focusStale = focusData?.key !== focusKey;
+  const bands = bandsFor(state.layer);
+  const season = (outlook ?? outlookInfo)?.heat_season ?? null;
+  const years = useMemo(
+    () => monthsByYear(climateView ? climateMonths : observedMonths),
+    [climateView, climateMonths, observedMonths],
+  );
+  const year = month?.slice(0, 4) ?? [...years.keys()].at(-1) ?? null;
+  const focusArea = map?.areas.find((area) => area.geography_id === focusId);
+  const planHref = dashboardHref({
+    geographyId: state.frame,
+    adminUnit: state.selected,
+    outcome: state.outcome,
+    choices: {
+      view: state.layer === "projection" ? "projection" : "observed",
+      month: observedMonth ?? undefined,
       period: period ?? undefined,
       scenario: scenario ?? undefined,
-    })
-      .then((found) => !cancelled && setOutlook(found))
-      .catch(() => !cancelled && setOutlook(null));
-    return () => {
-      cancelled = true;
-    };
-  }, [focusId, state.outcome, state.month, period, scenario]);
-
-  const bands = bandsFor(state.layer);
-  const season = (outlook ?? frameOutlook)?.heat_season ?? null;
-  const climateView = CLIMATE_LAYERS.includes(state.layer);
-  const shownMonths = climateView ? climateMonths : months;
-  const years = useMemo(() => monthsByYear(shownMonths), [shownMonths]);
-  const focusArea = map?.areas.find((area) => area.geography_id === focusId);
-  const year = state.month?.slice(0, 4) ?? [...years.keys()].at(-1) ?? null;
-  const matches = query.trim()
-    ? places
-        .filter((place) =>
-          place.name.toLowerCase().includes(query.trim().toLowerCase()),
-        )
-        .slice(0, 8)
-    : [];
+    },
+  });
+  const heatActions = actions.filter(isHeatAction);
 
   const open = (id: string) => {
     const hasChildren = children(places, id).length > 0;
     update(hasChildren ? { frame: id, selected: null } : { selected: id });
   };
+  const pickPlace = (place: ExplorePlace) =>
+    update(
+      place.parentId
+        ? { frame: place.parentId, selected: place.id }
+        : { frame: place.id, selected: null },
+    );
 
   return (
     <div className={styles.shell}>
@@ -344,50 +490,13 @@ export function ExploreApp() {
         <Link href="/" className={styles.brand}>
           CHART
         </Link>
-        <nav className={styles.nav} aria-label="Main">
-          <span className={styles.navActive} aria-current="page">
-            Explore
-          </span>
-          <Link href="/learning">Learning hub</Link>
-        </nav>
-        <div className={styles.search}>
-          <input
-            type="search"
-            placeholder="Search a district, county or constituency"
-            aria-label="Search places"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          {matches.length > 0 && (
-            <ul className={styles.searchResults} role="listbox">
-              {matches.map((place) => (
-                <li key={place.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuery("");
-                      const parent = place.parentId ?? place.id;
-                      update(
-                        children(places, place.id).length > 0
-                          ? { frame: place.id, selected: null }
-                          : { frame: parent, selected: place.id },
-                      );
-                    }}
-                  >
-                    {place.name}
-                    <small>{place.levelLabel}</small>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <PlaceSearch places={places} frameId={state.frame} onPick={pickPlace} />
         <div className={styles.countries} role="group" aria-label="Country">
           {COUNTRIES.map((country) => (
             <button
               key={country.code}
               type="button"
-              aria-pressed={frame?.countryCode === country.code}
+              aria-pressed={countryOf(frame)?.code === country.code}
               onClick={() =>
                 update({
                   frame: country.start,
@@ -401,9 +510,13 @@ export function ExploreApp() {
             </button>
           ))}
         </div>
-        <Link href="/auth/signin" className={styles.signIn}>
+        <a
+          href="/auth/signin"
+          className={styles.signIn}
+          onClick={() => rememberReturnPath(planHref)}
+        >
           Sign in to plan
-        </Link>
+        </a>
       </header>
 
       <div className={styles.body}>
@@ -413,6 +526,7 @@ export function ExploreApp() {
               <button
                 key={place.id}
                 type="button"
+                aria-current={index === trail.length - 1 ? "location" : undefined}
                 onClick={() =>
                   index === trail.length - 1 && state.selected
                     ? undefined
@@ -473,7 +587,13 @@ export function ExploreApp() {
                               ?.parts.find((part) => part.side === "heat")
                               ?.value_percent,
                           )
-                        : ""}
+                        : item.code === state.layer && focusArea?.value_percent != null
+                          ? item.code === "tmax"
+                            ? `${focusArea.value_percent.toFixed(1)} °C`
+                            : item.code === "heat_days"
+                              ? `${Math.round(focusArea.value_percent)} d`
+                              : (focusArea.value_percent / 100).toFixed(2)
+                          : ""}
                   </span>
                 </label>
               ))}
@@ -520,14 +640,13 @@ export function ExploreApp() {
                 {MONTH_LABELS.map((label, index) => {
                   const key = `${year}-${String(index + 1).padStart(2, "0")}`;
                   const held = (years.get(year ?? "") ?? []).includes(key);
-                  const inSeason = season?.months.includes(index + 1);
                   return (
                     <button
                       key={label}
                       type="button"
                       disabled={!held}
-                      aria-pressed={state.month === key}
-                      data-season={inSeason || undefined}
+                      aria-pressed={month === key}
+                      data-season={season?.months.includes(index + 1) || undefined}
                       onClick={() => update({ month: key })}
                     >
                       {label}
@@ -545,7 +664,7 @@ export function ExploreApp() {
             </section>
           )}
 
-          {state.layer === "projection" && frameOutlook && (
+          {state.layer === "projection" && outlookInfo && (
             <section className={styles.section}>
               {lengths.length > 1 && (
                 <>
@@ -581,36 +700,66 @@ export function ExploreApp() {
                   </button>
                 ))}
               </div>
-              <h2>Emissions scenario</h2>
-              <div className={styles.segmented} role="group" aria-label="Scenario">
-                {frameOutlook.scenarios.map((item) => (
+              <h2>Emissions</h2>
+              <div className={styles.scenarios} role="group" aria-label="Scenario">
+                {outlookInfo.scenarios.map((item) => (
                   <button
                     key={item.code}
                     type="button"
                     aria-pressed={item.code === scenario}
+                    title={item.label}
                     onClick={() => update({ scenario: item.code })}
                   >
-                    {item.label.replace(/ \(.*\)/, "")}
+                    {tiers.get(item.code)}
+                    <small>{sspLabel(item.code)}</small>
                   </button>
                 ))}
               </div>
             </section>
           )}
 
-          <PlaceSummary
-            observed={observed}
-            outlook={outlook}
-            period={period}
-            length={state.length}
-            month={state.month}
-            seasonMonths={season?.months ?? []}
-          />
+          <div aria-busy={focusStale} className={focusStale ? styles.stale : undefined}>
+            <PlaceSummary
+              observed={observed}
+              outlook={outlook}
+              baseline={focusData?.baseline ?? null}
+              period={period}
+              length={state.length}
+              month={observedMonth}
+              seasonMonths={season?.months ?? []}
+              scenarioWord={scenario ? (tiers.get(scenario) ?? null) : null}
+              scenarioCode={scenario}
+            />
+          </div>
+
+          <section className={styles.section} data-testid="explore-act">
+            <h2>Act on it</h2>
+            <p className={styles.muted}>
+              {heatActions.length} actions in the repository reduce heat risk. Pick the
+              ones that fit {focus?.name ?? "this place"} and build a plan.
+            </p>
+            <div className={styles.actRow}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => setShowActions(true)}
+              >
+                See actions
+              </button>
+              <a
+                className={styles.planButton}
+                href={planHref}
+                onClick={() => rememberReturnPath(planHref)}
+              >
+                Plan for {focus?.name ?? "this place"} →
+              </a>
+            </div>
+          </section>
 
           <p className={styles.footnote}>
             Estimates come from fitted temperature–health models applied to Copernicus
             ERA5 temperatures (observed) and downscaled climate projections. They show
-            association, not proof of cause.{" "}
-            <Link href="/learning">How CHART works</Link>
+            association, not proof of cause.
           </p>
         </aside>
 
@@ -623,6 +772,7 @@ export function ExploreApp() {
             loading={mapLoading}
             onSelect={(id) => update({ selected: id })}
             onOpen={open}
+            onHover={prefetch}
           />
           {mapError && (
             <p className={styles.mapMessage} role="status">
@@ -650,15 +800,23 @@ export function ExploreApp() {
               ))}
             </div>
             <small>
-              {(state.layer === "observed" || climateView) && state.month
-                ? monthLabel(state.month)
+              {(state.layer === "observed" || climateView) && month
+                ? monthLabel(month)
                 : ""}
               {climateView ? " · Copernicus ERA5-Land" : ""}
               {state.layer === "projection" && period
-                ? `${frameOutlook?.periods.find((p) => p.code === period)?.label ?? period}`
+                ? `${outlookInfo?.periods.find((p) => p.code === period)?.label ?? period}${scenario ? ` · ${tiers.get(scenario)} emissions (${sspLabel(scenario)})` : ""}`
                 : ""}
             </small>
           </div>
+          {showActions && (
+            <ActionsDrawer
+              actions={actions}
+              placeName={focus?.name ?? "this place"}
+              planHref={planHref}
+              onClose={() => setShowActions(false)}
+            />
+          )}
         </main>
       </div>
     </div>
@@ -668,28 +826,38 @@ export function ExploreApp() {
 function PlaceSummary({
   observed,
   outlook,
+  baseline,
   period,
   length,
   month,
   seasonMonths,
+  scenarioWord,
+  scenarioCode,
 }: {
   observed: ObservedRisk | null;
   outlook: HeatOutlook | null;
+  baseline: HeatOutlook | null;
   period: string | null;
   length: number;
   month: string | null;
   seasonMonths: number[];
+  scenarioWord: string | null;
+  scenarioCode: string | null;
 }) {
   const heat = (parts: { side: string; value_percent: number | null }[]) =>
     parts.find((part) => part.side === "heat")?.value_percent ?? null;
-  const cycle = outlook?.months ?? [];
-  const peak = Math.max(1, ...cycle.map((item) => heat(item.parts) ?? 0));
-  const periods = periodsOfLength(
-    outlook?.period_summary ?? [],
-    length,
-    outlook?.period_summary.find((row) => row.is_baseline)?.period ?? null,
-  );
+  const cycle = (source: HeatOutlook | null): CyclePoint[] =>
+    (source?.months ?? []).map((item) => ({
+      month: item.month,
+      value: heat(item.parts),
+      tmax: item.tmax_c,
+    }));
+  const baselineCode =
+    outlook?.period_summary.find((row) => row.is_baseline)?.period ?? null;
+  const periods = periodsOfLength(outlook?.period_summary ?? [], length, baselineCode);
   const periodPeak = Math.max(1, ...periods.map((row) => heat(row.parts) ?? 0));
+  const periodName = (code: string | null | undefined) =>
+    outlook?.periods.find((p) => p.code === code)?.label ?? code ?? "";
 
   if (!observed && !outlook) {
     return (
@@ -704,7 +872,9 @@ function PlaceSummary({
     <>
       {observed?.estimate && (
         <section className={styles.section} data-testid="explore-estimate">
-          <h2>{month ? `Observed · ${monthLabel(month)}` : "Observed"}</h2>
+          <h2>
+            {month ? `Observed · ${monthLabel(observed.month ?? month)}` : "Observed"}
+          </h2>
           <p className={styles.bigNumber}>
             {observed.estimate.value_percent === null
               ? "No heat excess"
@@ -721,32 +891,22 @@ function PlaceSummary({
         </section>
       )}
 
-      {cycle.length === 12 && (
+      {outlook && outlook.months.length === 12 && (
         <section className={styles.section} data-testid="explore-seasonal-cycle">
           <h2>Seasonal cycle</h2>
-          <div className={styles.cycle} aria-label="Typical share by month">
-            {cycle.map((item) => {
-              const value = heat(item.parts);
-              return (
-                <div
-                  key={item.month}
-                  className={styles.cycleBar}
-                  data-season={seasonMonths.includes(item.month) || undefined}
-                  title={`${MONTH_LABELS[item.month - 1]}: ${formatPercent(value)}${item.tmax_c !== null ? `, ${item.tmax_c.toFixed(1)} °C` : ""}`}
-                >
-                  <span
-                    style={{ height: `${Math.max(4, ((value ?? 0) / peak) * 100)}%` }}
-                  />
-                  <small>{MONTH_LABELS[item.month - 1][0]}</small>
-                </div>
-              );
-            })}
-          </div>
-          <p className={styles.muted}>
-            Typical month in{" "}
-            {outlook?.periods.find((p) => p.code === outlook.period)?.label}. Shaded
-            months are the official heat season.
-          </p>
+          <SeasonalLine
+            current={cycle(outlook)}
+            baseline={
+              baseline && baseline.period !== outlook.period ? cycle(baseline) : null
+            }
+            currentLabel={periodName(outlook.period)}
+            baselineLabel={
+              baseline && baseline.period !== outlook.period
+                ? periodName(baseline.period)
+                : null
+            }
+            seasonMonths={seasonMonths}
+          />
         </section>
       )}
 
@@ -768,8 +928,11 @@ function PlaceSummary({
             })}
           </ul>
           <p className={styles.muted}>
-            Average year in each period,{" "}
-            {outlook?.scenarios.find((s) => s.code === outlook.scenario)?.label}.
+            Average year in each {length}-year period
+            {scenarioWord && scenarioCode
+              ? `, ${scenarioWord.toLowerCase()} emissions (${sspLabel(scenarioCode)})`
+              : ""}
+            .
           </p>
         </section>
       )}

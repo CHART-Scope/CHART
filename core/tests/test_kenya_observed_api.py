@@ -347,6 +347,62 @@ def test_newest_run_wins_and_projections_are_ignored(client, factory) -> None:
     )
 
 
+def test_scores_are_reused_until_a_new_era5_run_arrives(
+    client, factory, monkeypatch
+) -> None:
+    """Scoring runs once per climate version, not on every read.
+
+    Regression: twenty years of Kenya daily ERA5 made each under-five read
+    rescore ~350,000 days and time out (HTTP 500 after 30 s). Reads now reuse
+    the scores; a new ERA5 run rescores, an ERA5-Land context run does not.
+    """
+    case = _cases("lbw_validation_cases.csv")[0]
+    lags = [float(case[f"tmax_lag{k}"]) for k in range(9)]
+    _seed_months(factory, date(2026, 7, 1), [lag + 5 for lag in lags])
+    computed: list[int] = []
+    original = observed._compute_scores
+
+    def counting(session, units, *args):
+        computed.append(len(units))
+        return original(session, units, *args)
+
+    monkeypatch.setattr(observed, "_compute_scores", counting)
+    monkeypatch.setattr(
+        observed,
+        "load_map_view",
+        lambda _session, geography_id, month, **_kwargs: MapResponse(
+            geography_id=geography_id, outcome="lbw", month=month, areas=[]
+        ),
+    )
+    path = f"/heat-outlook/{KAJIADO}/observed?outcome=lbw"
+    hot = client.get(path).json()["estimate"]["value_percent"]
+    assert client.get(path).json()["estimate"]["value_percent"] == hot
+    client.get("/heat-outlook/geo-ke/observed/map?outcome=lbw")
+    # Kajiado, then the other counties (its default month follows Kenya's);
+    # the repeat read and the national map reuse them all.
+    assert computed == [1, 2]
+
+    with factory() as session:
+        land = _run(
+            session, DataLabel.reanalysis, datetime(2026, 11, 1, tzinfo=timezone.utc)
+        )
+        land.resolution = "ERA5-Land 0.1 deg shared-area aggregate"
+        session.commit()
+    client.get(path)
+    assert computed == [1, 2]
+
+    _seed_months(
+        factory,
+        date(2026, 7, 1),
+        lags,
+        generated=datetime(2026, 12, 1, tzinfo=timezone.utc),
+    )
+    fresh = client.get(path).json()["estimate"]["value_percent"]
+    assert computed == [1, 2, 1, 2]
+    assert fresh == pytest.approx(100 * float(case["expected_af_heat_P"]), abs=0.01)
+    assert fresh < hot
+
+
 def test_lbw_third_trimester_keeps_the_guides_message(client, factory) -> None:
     _enable(client, "lbw", ["P", "T1", "T2", "T3"], "P")
     _seed_months(factory, date(2026, 7, 1), [31.0] * 9)

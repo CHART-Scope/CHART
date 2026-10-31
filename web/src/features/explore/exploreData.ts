@@ -27,9 +27,20 @@ export const OUTCOMES = [
 ] as const;
 
 export const COUNTRIES = [
-  { code: "IN", label: "India", start: "geo-in-madhya-pradesh" },
-  { code: "KE", label: "Kenya", start: "geo-ke" },
+  { code: "IN", label: "India", start: "geo-in-madhya-pradesh", path: "/india" },
+  { code: "KE", label: "Kenya", start: "geo-ke", path: "/kenya" },
 ] as const;
+
+/** The country a place sits in, from its code or, failing that, its path. */
+export function countryOf(place: ExplorePlace | undefined) {
+  if (!place) return undefined;
+  return COUNTRIES.find(
+    (country) =>
+      country.code === place.countryCode ||
+      place.path === country.path ||
+      place.path.startsWith(`${country.path}/`),
+  );
+}
 
 export const MONTH_LABELS = [
   "Jan",
@@ -198,4 +209,130 @@ export function periodsOfLength<T extends { period: string }>(
     lastEnd = end;
   }
   return chosen;
+}
+
+/**
+ * Plain names for the scenarios offered, from least to most emissions:
+ * "Low", "Medium", "High" (and "Very high" when there are four). Ranked by
+ * the SSP forcing level (the number after the dash), so the words follow
+ * the scenarios a release actually publishes.
+ */
+export function scenarioTiers(codes: string[]): Map<string, string> {
+  const forcing = (code: string) => Number(code.replace(/^ssp\d/i, "")) || 0;
+  const sorted = [...codes].sort((a, b) => forcing(a) - forcing(b));
+  const words =
+    sorted.length <= 1
+      ? ["Only scenario"]
+      : sorted.length === 2
+        ? ["Low", "High"]
+        : sorted.length === 3
+          ? ["Low", "Medium", "High"]
+          : ["Low", "Medium", "High", "Very high"];
+  return new Map(
+    sorted.map((code, index) => [code, words[Math.min(index, words.length - 1)]]),
+  );
+}
+
+/** "SSP5-8.5" from "ssp585". */
+export function sspLabel(code: string): string {
+  const match = /^ssp(\d)(\d)(\d)$/i.exec(code);
+  return match ? `SSP${match[1]}-${match[2]}.${match[3]}` : code.toUpperCase();
+}
+
+/** "2nd highest of 10" among the frame's areas with a value. */
+export function rankText(areas: MapArea[], area: MapArea): string | null {
+  if (area.value_percent === null) return null;
+  const values = areas
+    .map((item) => item.value_percent)
+    .filter((value): value is number => value !== null)
+    .sort((a, b) => b - a);
+  if (values.length < 3) return null;
+  const rank = values.indexOf(area.value_percent) + 1;
+  const suffix =
+    rank % 10 === 1 && rank !== 11
+      ? "st"
+      : rank % 10 === 2 && rank !== 12
+        ? "nd"
+        : rank % 10 === 3 && rank !== 13
+          ? "rd"
+          : "th";
+  return rank === 1
+    ? `Highest of ${values.length}`
+    : `${rank}${suffix} highest of ${values.length}`;
+}
+
+/** [west, south, east, north] of a GeoJSON geometry. */
+export function geometryBounds(
+  geometry: { coordinates: unknown } | null,
+): [number, number, number, number] | null {
+  if (!geometry) return null;
+  let west = Infinity;
+  let south = Infinity;
+  let east = -Infinity;
+  let north = -Infinity;
+  const walk = (value: unknown) => {
+    if (!Array.isArray(value)) return;
+    if (typeof value[0] === "number" && typeof value[1] === "number") {
+      west = Math.min(west, value[0]);
+      east = Math.max(east, value[0]);
+      south = Math.min(south, value[1]);
+      north = Math.max(north, value[1]);
+      return;
+    }
+    value.forEach(walk);
+  };
+  walk(geometry.coordinates);
+  return Number.isFinite(west) ? [west, south, east, north] : null;
+}
+
+export type PlaceMatch = { place: ExplorePlace; context: string };
+
+/**
+ * Places matching a search, best first: names that start with the text, then
+ * names with a word that does, then any match; larger areas before smaller.
+ */
+export function searchPlaces(
+  places: ExplorePlace[],
+  text: string,
+  limit = 12,
+): PlaceMatch[] {
+  const needle = text.trim().toLowerCase();
+  if (!needle) return [];
+  const byId = new Map(places.map((place) => [place.id, place]));
+  const depth = (place: ExplorePlace) => place.path.split("/").filter(Boolean).length;
+  return places
+    .map((place) => {
+      const name = place.name.toLowerCase();
+      const score = name.startsWith(needle)
+        ? 0
+        : name.split(/[\s-]+/).some((word) => word.startsWith(needle))
+          ? 1
+          : name.includes(needle)
+            ? 2
+            : -1;
+      return { place, score };
+    })
+    .filter((item) => item.score >= 0)
+    .sort(
+      (a, b) =>
+        a.score - b.score ||
+        depth(a.place) - depth(b.place) ||
+        a.place.name.localeCompare(b.place.name),
+    )
+    .slice(0, limit)
+    .map(({ place }) => ({ place, context: placeContext(byId, place) }));
+}
+
+/** "County · Kenya" or "District · Bhopal Division, India". */
+export function placeContext(
+  byId: Map<string, ExplorePlace>,
+  place: ExplorePlace,
+): string {
+  const parent = place.parentId ? byId.get(place.parentId) : undefined;
+  const country = countryOf(place)?.label;
+  const within =
+    parent && parent.level !== "country" && parent.name !== country
+      ? `${parent.name}, ${country ?? ""}`
+      : (country ?? "");
+  return [place.levelLabel, within].filter(Boolean).join(" · ");
 }

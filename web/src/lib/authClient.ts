@@ -250,6 +250,30 @@ export function startKeycloakSignIn() {
   window.location.replace("/auth/signin");
 }
 
+const returnPathStorageKey = "chart.auth.returnTo";
+
+/** Where to land after signing in, e.g. the place a visitor chose to plan. */
+export function rememberReturnPath(path: string) {
+  if (typeof window === "undefined") return;
+  safeStorage(() => window.sessionStorage.setItem(returnPathStorageKey, path));
+}
+
+/** The remembered path, once; only same-site paths are honoured. */
+export function takeReturnPath(): string | null {
+  if (typeof window === "undefined") return null;
+  const path = safeStorage(() => {
+    const stored = window.sessionStorage.getItem(returnPathStorageKey);
+    window.sessionStorage.removeItem(returnPathStorageKey);
+    return stored;
+  });
+  return path &&
+    path.startsWith("/") &&
+    !path.startsWith("//") &&
+    !path.startsWith("/auth/")
+    ? path
+    : null;
+}
+
 export function signOutOfKeycloak() {
   void signOut("user");
 }

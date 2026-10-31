@@ -39,19 +39,26 @@ test("a visitor explores Kenya's observed months without signing in", async ({
   ).toBeVisible();
   await expect(page.getByTestId("explore-legend")).toContainText("Observed heat share");
   await expect(page.getByTestId("explore-map").locator("canvas")).toBeVisible();
-  await expect
-    .poll(() =>
-      api.requests.some((item) => item.includes("/heat-outlook/geo-ke/observed/map")),
-    )
-    .toBe(true);
+  // The map loads once, for the month shown - not first with a default.
+  const mapReads = () =>
+    api.requests.filter((item) => item.includes("/heat-outlook/geo-ke/observed/map"));
+  await expect.poll(() => mapReads().length).toBe(1);
+  expect(mapReads()[0]).toContain("month=2026-08");
+  // Explore stands on its own: no Learning Hub detour.
+  await expect(
+    page.getByRole("link", { name: /Learning hub|How CHART works/i }),
+  ).toHaveCount(0);
 
   // Months held for the year are offered; choosing one moves the estimate.
-  await page
-    .getByRole("group", { name: "Month" })
-    .getByRole("button", { name: "Jun" })
-    .click();
+  const months = page.getByRole("group", { name: "Month" });
+  await months.getByRole("button", { name: "Jun" }).click();
   await expect(estimate).toContainText("Jun 2026");
   await expect(page).toHaveURL(/month=2026-06/);
+  await expect.poll(() => mapReads().length).toBe(2);
+  // Going back to a month already seen answers from memory, no reload.
+  await months.getByRole("button", { name: "Aug" }).click();
+  await expect(estimate).toContainText("Aug 2026");
+  expect(mapReads()).toHaveLength(2);
 
   expect(authorized).toEqual([]);
   await page.screenshot({
@@ -65,15 +72,21 @@ test("selecting a county shows its seasonal cycle and projected change", async (
 }) => {
   const { authorized } = await openExplore(page, "frame=geo-ke&outcome=lbw");
 
-  await page.getByRole("searchbox", { name: "Search places" }).fill("Kaji");
-  await page.getByRole("button", { name: /Kajiado/ }).click();
+  // The search autocompletes as you type and Enter takes you there.
+  const search = page.getByRole("combobox", { name: "Search places" });
+  await search.fill("Kaji");
+  await expect(page.getByRole("option").first()).toContainText("Kajiado");
+  await expect(page.getByRole("option").first()).toContainText("County · Kenya");
+  await search.press("Enter");
   await expect(page.getByRole("heading", { level: 1, name: "Kajiado" })).toBeVisible();
-  await expect(page).toHaveURL(/place=geo-ke-kajiado/);
+  await expect(page).toHaveURL(/frame=geo-ke&place=geo-ke-kajiado/);
 
+  // The seasonal cycle is a line over the twelve months, season shaded.
   const cycle = page.getByTestId("explore-seasonal-cycle");
-  await expect(cycle.locator("[title]")).toHaveCount(12);
-  // The official season (Dec-Mar) is marked on the cycle.
-  await expect(cycle.locator("[data-season]")).toHaveCount(4);
+  await expect(cycle.locator("svg title")).toHaveCount(12);
+  await expect(cycle.locator("[data-season-month]")).toHaveCount(4);
+  await expect(cycle.locator("path")).toHaveCount(1);
+  await expect(cycle).toContainText("Heat season");
   const projection = page.getByTestId("explore-projection");
   // The baseline and the non-overlapping 20-year periods, not every window.
   await expect(projection.getByRole("listitem")).toHaveCount(5);
@@ -86,6 +99,17 @@ test("selecting a county shows its seasonal cycle and projected change", async (
     .click();
   await expect(page).toHaveURL(/period=2061-2080/);
   await expect(page.getByTestId("explore-legend")).toContainText("2061–2080");
+  // Emissions read as Low / Medium / High, each with its SSP code.
+  const scenarios = page.getByRole("group", { name: "Scenario" }).getByRole("button");
+  await expect(scenarios).toHaveText(["LowSSP1-2.6", "MediumSSP3-7.0", "HighSSP5-8.5"]);
+  await expect(page.getByTestId("explore-legend")).toContainText(
+    "High emissions (SSP5-8.5)",
+  );
+  await scenarios.filter({ hasText: "Low" }).click();
+  await expect(page).toHaveURL(/scenario=ssp126/);
+  await expect(page.getByTestId("explore-projection")).toContainText(
+    "low emissions (SSP1-2.6)",
+  );
   // High projected shares keep their own classes instead of one ">15%".
   await expect(page.getByTestId("explore-legend")).toContainText("30–35%");
   await expect(page.getByTestId("explore-legend")).toContainText(">35%");
@@ -157,6 +181,88 @@ test("ERA5-Land temperature and heatwave days are context layers by month", asyn
     path: "../outputs/e2e/web/explore-temperature.png",
     fullPage: true,
   });
+});
+
+test("search reaches the other country, and a place leads to its actions and plan", async ({
+  page,
+}) => {
+  const { api } = await openExplore(page, "frame=geo-ke&outcome=lbw");
+  api.on(/^\/api\/chart\/recommended-actions$/, (route) =>
+    json(route, {
+      items: [
+        {
+          slug: "cool-roofs",
+          name: "Cool roofs for health facilities",
+          description: "Reflective roofing keeps maternity wards cooler.",
+          costOfImplementation: "low",
+          taxonomies: [
+            { type: "hazard", label: "Extreme heat" },
+            { type: "solution_type", label: "Infrastructure" },
+          ],
+          links: [{ url: "https://www.who.int/cool-roofs", label: "who.int" }],
+        },
+        {
+          slug: "flood-walls",
+          name: "Flood walls",
+          description: "Barriers against river floods.",
+          costOfImplementation: "high",
+          taxonomies: [{ type: "hazard", label: "Floods" }],
+          links: [],
+        },
+      ],
+      total: 2,
+    }),
+  );
+  await page.reload();
+
+  // An empty search lists the areas of the place being viewed.
+  const search = page.getByRole("combobox", { name: "Search places" });
+  await search.focus();
+  await expect(page.getByRole("listbox")).toContainText("Areas in Kenya");
+  await expect(page.getByRole("option", { name: /Kajiado/ })).toBeVisible();
+  // Typing reaches India too; picking it moves the whole view there.
+  await search.fill("bhop");
+  await page.getByRole("option", { name: /Bhopal Division/ }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Bhopal Division" }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/frame=geo-in-mp&place=geo-in-mp-bhopal/);
+  await expect(
+    page.getByRole("group", { name: "Country" }).getByRole("button", { name: "India" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  const act = page.getByTestId("explore-act");
+  await expect(act).toContainText("1 actions in the repository reduce heat risk");
+  await expect(
+    act.getByRole("link", { name: /Plan for Bhopal Division/ }),
+  ).toHaveAttribute(
+    "href",
+    /^\/dashboard\/geo-in-mp\?admin_unit=geo-in-mp-bhopal&outcome=lbw/,
+  );
+  await act.getByRole("button", { name: "See actions" }).click();
+  const drawer = page.getByRole("complementary", { name: "Action repository" });
+  await expect(drawer).toContainText("1 of 2 actions");
+  await drawer.getByRole("button", { name: /Cool roofs/ }).click();
+  await expect(drawer).toContainText("maternity wards");
+  await expect(drawer.getByRole("link", { name: "who.int" })).toHaveAttribute(
+    "href",
+    "https://www.who.int/cool-roofs",
+  );
+  await drawer.getByRole("button", { name: "All hazards" }).click();
+  await expect(drawer).toContainText("2 of 2 actions");
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+
+  // Signing in from here returns to this place's planning dashboard.
+  await page.route("**/auth/signin", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<p>Keycloak</p>" }),
+  );
+  await page.getByRole("link", { name: "Sign in to plan" }).click();
+  await expect(page).toHaveURL(/\/auth\/signin$/);
+  const remembered = await page.evaluate(() =>
+    window.sessionStorage.getItem("chart.auth.returnTo"),
+  );
+  expect(remembered).toMatch(/^\/dashboard\/geo-in-mp\?admin_unit=geo-in-mp-bhopal/);
 });
 
 test("a missing layer says so instead of an empty map", async ({ page }) => {

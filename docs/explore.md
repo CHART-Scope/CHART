@@ -20,6 +20,37 @@ double click, or "Open its …", moves down a level (state → divisions →
 districts; country → counties → constituencies). The URL holds every choice,
 so a view can be shared as a link.
 
+## Finding a place, and acting on it
+
+The search box autocompletes any state, division, district, county or
+constituency in either country (names that start with the text first, larger
+areas first); an empty box lists the areas being viewed. Picking a place
+moves the view to its country, outlines it on the map, dims the rest and
+zooms to it. Hovering an area shows its value, its rank among the areas
+shown, and fetches its details so the click is instant.
+
+Emissions scenarios read as **Low / Medium / High** (with the SSP code
+beneath), ranked by the scenarios a release publishes: SSP1-2.6, SSP3-7.0 and
+SSP5-8.5 for the current handover. The seasonal cycle is a line of the
+typical share in each month for the chosen period, against the 1981–2010
+baseline, with the official heat season shaded.
+
+**Act on it** opens the action repository (heat actions first, searchable,
+filterable by type and cost, with sources) and links to the planning
+dashboard for the place. A visitor who is not signed in goes through sign-in
+and returns to that place's dashboard (`chart.auth.returnTo`, same-site paths
+only).
+
+## Loading
+
+Each read is made once per page and only once every choice it depends on is
+known, so a view loads in one step; shown values stay until their
+replacement arrives, so the map recolours in place instead of blanking. Kenya's
+county estimates, which are scored from stored ERA5 rather than read from
+stored results, are cached on the server per county until a new ERA5 run is
+stored, and warmed in the background when the API starts (twenty years of
+daily under-five scoring otherwise took longer than the proxy allows).
+
 ## Public read
 
 Explore only reads stored, published estimates; nothing is downloaded or

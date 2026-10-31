@@ -25,6 +25,7 @@ from chart.climate.schemas import ErrorResponse, HealthResponse
 from chart.erf_registry.routes import router as erf_registry_router
 from chart.setup.bootstrap_routes import router as bootstrap_router
 from chart.geographies.routes import router as geographies_router
+from chart.heat_outlook.observed import start_observed_cache_warmer
 from chart.heat_outlook.routes import router as heat_outlook_router
 from chart.model_registry.routes import (
     releases_router as model_releases_router,
@@ -92,6 +93,10 @@ async def lifespan(_app: FastAPI):
     # error rather than a stale or wrong result. Trading a whole-app outage
     # for a precise error on one endpoint is the better bargain.
     restore_task = asyncio.create_task(_restore_models_after_startup())
+    # Kenya's observed months are scored from stored ERA5; keep them scored
+    # in the background so no request waits on a full rescoring.
+    if os.getenv("DATABASE_URL"):
+        start_observed_cache_warmer(get_session_factory())
     try:
         yield
     finally:

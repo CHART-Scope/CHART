@@ -7,13 +7,21 @@ import { useEffect, useRef, useState } from "react";
 
 import type { MapArea, MapResponse } from "@/lib/dashboardClient";
 
-import { areaValueText, colorFor, type Band, type ExploreLayer } from "./exploreData";
+import {
+  areaValueText,
+  colorFor,
+  geometryBounds,
+  rankText,
+  type Band,
+  type ExploreLayer,
+} from "./exploreData";
 import styles from "./explore.module.css";
 
 /**
- * The Explore map: the selected frame's areas shaded over an open street
- * basemap. Zoom and pan are the map's own; a click selects an area and a
- * double click opens the areas beneath it.
+ * The Explore map: the frame's areas shaded over an open street basemap.
+ * New values recolour the same shapes in place (no blank frame), the
+ * selected area is outlined and the rest dimmed, and choosing a place zooms
+ * to it. Click selects; double click opens the areas beneath.
  */
 
 const BASEMAP =
@@ -41,7 +49,10 @@ type Props = {
   loading: boolean;
   onSelect: (geographyId: string) => void;
   onOpen: (geographyId: string) => void;
+  onHover?: (geographyId: string | null) => void;
 };
+
+type Hover = { area: MapArea; x: number; y: number; flip: boolean };
 
 export function ExploreMap({
   data,
@@ -51,19 +62,19 @@ export function ExploreMap({
   loading,
   onSelect,
   onOpen,
+  onHover,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const framedId = useRef<string | null>(null);
+  const flownTo = useRef<string | null>(null);
   // Counts style loads: a fallback style needs the areas painted again.
   const [styleLoads, setStyleLoads] = useState(0);
   const ready = styleLoads > 0;
-  const [hover, setHover] = useState<{ area: MapArea; x: number; y: number } | null>(
-    null,
-  );
+  const [hover, setHover] = useState<Hover | null>(null);
   // Handlers read the latest props without re-binding map events.
-  const latest = useRef({ data, layer, onSelect, onOpen });
-  latest.current = { data, layer, onSelect, onOpen };
+  const latest = useRef({ data, selectedId, onSelect, onOpen, onHover });
+  latest.current = { data, selectedId, onSelect, onOpen, onHover };
 
   useEffect(() => {
     if (!container.current) return;
@@ -76,6 +87,7 @@ export function ExploreMap({
       dragRotate: false,
       pitchWithRotate: false,
       doubleClickZoom: false,
+      fadeDuration: 0,
     });
     instance.addControl(new maplibregl.NavigationControl({ showCompass: false }));
     let fellBack = false;
@@ -96,15 +108,7 @@ export function ExploreMap({
         id: "area-fill",
         type: "fill",
         source: SOURCE,
-        paint: {
-          "fill-color": ["get", "color"],
-          "fill-opacity": [
-            "case",
-            ["boolean", ["feature-state", "hover"], false],
-            0.82,
-            0.62,
-          ],
-        },
+        paint: { "fill-color": ["get", "color"], "fill-opacity": 0.7 },
       });
       instance.addLayer({
         id: "area-outline",
@@ -113,36 +117,68 @@ export function ExploreMap({
         paint: { "line-color": "#ffffff", "line-width": 1 },
       });
       instance.addLayer({
+        id: "area-hover",
+        type: "line",
+        source: SOURCE,
+        paint: {
+          "line-color": "#1e1f21",
+          "line-width": [
+            "case",
+            ["boolean", ["feature-state", "hover"], false],
+            1.5,
+            0,
+          ],
+        },
+      });
+      // A white casing under a dark line reads on every fill colour.
+      instance.addLayer({
+        id: "area-selected-casing",
+        type: "line",
+        source: SOURCE,
+        filter: ["==", ["get", "geography_id"], ""],
+        paint: { "line-color": "#ffffff", "line-width": 6 },
+      });
+      instance.addLayer({
         id: "area-selected",
         type: "line",
         source: SOURCE,
         filter: ["==", ["get", "geography_id"], ""],
-        paint: { "line-color": "#c8102e", "line-width": 2.5 },
+        paint: { "line-color": "#1e1f21", "line-width": 2.5 },
       });
       framedId.current = null;
       setStyleLoads((count) => count + 1);
     });
     let hovered: string | null = null;
-    instance.on("mousemove", "area-fill", (event) => {
-      const feature = event.features?.[0];
-      const id = feature?.properties?.geography_id as string | undefined;
-      if (!id) return;
-      instance.getCanvas().style.cursor = "pointer";
-      if (hovered !== id) {
-        if (hovered)
-          instance.setFeatureState({ source: SOURCE, id: hovered }, { hover: false });
-        hovered = id;
-        instance.setFeatureState({ source: SOURCE, id }, { hover: true });
-      }
-      const area = latest.current.data?.areas.find((item) => item.geography_id === id);
-      if (area) setHover({ area, x: event.point.x, y: event.point.y });
-    });
-    instance.on("mouseleave", "area-fill", () => {
-      instance.getCanvas().style.cursor = "";
+    const clearHover = () => {
       if (hovered)
         instance.setFeatureState({ source: SOURCE, id: hovered }, { hover: false });
       hovered = null;
+    };
+    instance.on("mousemove", "area-fill", (event) => {
+      const id = event.features?.[0]?.properties?.geography_id as string | undefined;
+      if (!id) return;
+      instance.getCanvas().style.cursor = "pointer";
+      if (hovered !== id) {
+        clearHover();
+        hovered = id;
+        instance.setFeatureState({ source: SOURCE, id }, { hover: true });
+        latest.current.onHover?.(id);
+      }
+      const area = latest.current.data?.areas.find((item) => item.geography_id === id);
+      const width = instance.getCanvas().clientWidth;
+      if (area)
+        setHover({
+          area,
+          x: event.point.x,
+          y: event.point.y,
+          flip: event.point.x > width - 260,
+        });
+    });
+    instance.on("mouseleave", "area-fill", () => {
+      instance.getCanvas().style.cursor = "";
+      clearHover();
       setHover(null);
+      latest.current.onHover?.(null);
     });
     instance.on("click", "area-fill", (event) => {
       const id = event.features?.[0]?.properties?.geography_id as string | undefined;
@@ -159,63 +195,120 @@ export function ExploreMap({
     };
   }, []);
 
-  // New values or a new frame: repaint, and fit when the frame changed.
+  // New values recolour the shapes in place; a new frame is fitted once.
   useEffect(() => {
     const instance = map.current;
-    if (!ready || !instance || !data) return;
-    // A hover box from the previous frame would name an area no longer shown.
-    setHover(null);
+    if (!ready || !instance) return;
     const source = instance.getSource(SOURCE) as GeoJSONSource | undefined;
     source?.setData({
       type: "FeatureCollection",
-      features: data.areas
+      features: (data?.areas ?? [])
         .filter((area) => area.geometry && area.geography_id)
         .map((area) => ({
           type: "Feature",
           geometry: area.geometry as GeoJSON.Geometry,
           properties: {
             geography_id: area.geography_id,
-            name: area.name,
             color: colorFor(area.value_percent, bands),
           },
         })),
     });
-    if (framedId.current !== data.geography_id && data.bounds.length === 4) {
+    // Keep the hover card's values in step with the colours under it.
+    setHover((current) => {
+      if (!current) return current;
+      const area = data?.areas.find(
+        (item) => item.geography_id === current.area.geography_id,
+      );
+      return area ? { ...current, area } : null;
+    });
+    if (data && framedId.current !== data.geography_id && data.bounds.length === 4) {
       framedId.current = data.geography_id;
-      const [west, south, east, north] = data.bounds;
+      flownTo.current = null;
+      const chosen = latest.current.selectedId;
+      const target = chosen
+        ? geometryBounds(
+            data.areas.find((area) => area.geography_id === chosen)?.geometry ?? null,
+          )
+        : null;
+      const [west, south, east, north] = target ?? data.bounds;
       instance.fitBounds(
         [
           [west, south],
           [east, north],
         ],
-        { padding: 48, duration: 600 },
+        { padding: target ? 96 : 48, duration: 600, maxZoom: 9 },
       );
+      if (target) flownTo.current = chosen;
     }
   }, [ready, styleLoads, data, bands]);
 
+  // The selection is outlined, the rest dimmed, and the map moves to it.
   useEffect(() => {
     const instance = map.current;
     if (!ready || !instance) return;
-    instance.setFilter("area-selected", [
+    const filter: maplibregl.FilterSpecification = [
       "==",
       ["get", "geography_id"],
       selectedId ?? "",
-    ]);
-  }, [ready, styleLoads, selectedId]);
+    ];
+    instance.setFilter("area-selected", filter);
+    instance.setFilter("area-selected-casing", filter);
+    instance.setPaintProperty(
+      "area-fill",
+      "fill-opacity",
+      selectedId
+        ? ["case", ["==", ["get", "geography_id"], selectedId], 0.92, 0.4]
+        : 0.7,
+    );
+    if (!selectedId || flownTo.current === selectedId) return;
+    const area = latest.current.data?.areas.find(
+      (item) => item.geography_id === selectedId,
+    );
+    const bounds = geometryBounds(area?.geometry ?? null);
+    if (!bounds) return;
+    flownTo.current = selectedId;
+    const [west, south, east, north] = bounds;
+    instance.fitBounds(
+      [
+        [west, south],
+        [east, north],
+      ],
+      { padding: 96, duration: 700, maxZoom: 9 },
+    );
+  }, [ready, styleLoads, selectedId, data]);
+
+  const rank = hover && data ? rankText(data.areas, hover.area) : null;
+  const band =
+    hover && hover.area.value_percent !== null
+      ? colorFor(hover.area.value_percent, bands)
+      : null;
 
   return (
     <div className={styles.mapFrame} aria-busy={loading}>
       <div ref={container} className={styles.map} data-testid="explore-map" />
-      {loading && <div className={styles.mapLoading}>Loading map…</div>}
+      <div className={styles.mapProgress} data-active={loading || undefined} />
       {hover && (
         <div
           className={styles.tooltip}
-          style={{ left: hover.x + 14, top: hover.y + 14 }}
+          style={
+            hover.flip
+              ? { right: `calc(100% - ${hover.x - 14}px)`, top: hover.y + 14 }
+              : { left: hover.x + 14, top: hover.y + 14 }
+          }
           role="status"
         >
+          <span className={styles.tooltipLevel}>{hover.area.level}</span>
           <strong>{hover.area.name}</strong>
-          <span>{areaValueText(hover.area, layer)}</span>
-          <small>Click to select · double-click to open</small>
+          <span className={styles.tooltipValue}>
+            {band && <i style={{ background: band }} />}
+            {areaValueText(hover.area, layer)}
+          </span>
+          {rank && <span className={styles.tooltipRank}>{rank}</span>}
+          <small>
+            {hover.area.geography_id === selectedId
+              ? "Selected · double-click to open"
+              : "Click for details · double-click to open"}
+          </small>
         </div>
       )}
     </div>
