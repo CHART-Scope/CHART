@@ -128,3 +128,35 @@ export function areaValueText(area: MapArea, layer: ExploreLayer): string {
   }
   return `${formatPercent(area.value_percent)} of cases linked to heat`;
 }
+
+/** Years a period code ("2041-2060") spans. */
+export function periodLength(code: string): number {
+  const [start, end] = code.split("-").map(Number);
+  return end - start + 1;
+}
+
+/**
+ * The periods shown for one length: the baseline, then non-overlapping
+ * windows of that length, earliest first. Releases may publish a window for
+ * every start year; listing them all buries the trend.
+ */
+export function periodsOfLength<T extends { period: string }>(
+  rows: T[],
+  length: number,
+  baseline: string | null,
+): T[] {
+  const sorted = [...rows].sort((a, b) => a.period.localeCompare(b.period));
+  const chosen: T[] = [];
+  let lastEnd = -Infinity;
+  for (const row of sorted) {
+    if (row.period === baseline) {
+      chosen.push(row);
+      continue;
+    }
+    const [start, end] = row.period.split("-").map(Number);
+    if (periodLength(row.period) !== length || start <= lastEnd) continue;
+    chosen.push(row);
+    lastEnd = end;
+  }
+  return chosen;
+}

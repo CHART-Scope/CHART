@@ -74,16 +74,25 @@ test("selecting a county shows its seasonal cycle and projected change", async (
   // The official season (Dec-Mar) is marked on the cycle.
   await expect(cycle.locator("[data-season]")).toHaveCount(4);
   const projection = page.getByTestId("explore-projection");
-  await expect(projection.getByRole("listitem")).toHaveCount(6);
+  // The baseline and the non-overlapping 20-year periods, not every window.
+  await expect(projection.getByRole("listitem")).toHaveCount(5);
 
   await page.getByRole("radio", { name: /Projected heat share/ }).check();
-  await expect(page.getByRole("group", { name: "Period" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Period", exact: true })).toBeVisible();
   await page
-    .getByRole("group", { name: "Period" })
+    .getByRole("group", { name: "Period", exact: true })
     .getByRole("button", { name: "2061–2080" })
     .click();
   await expect(page).toHaveURL(/period=2061-2080/);
   await expect(page.getByTestId("explore-legend")).toContainText("2061–2080");
+  // Shorter periods are a choice, still without overlapping windows.
+  await page
+    .getByRole("group", { name: "Period length" })
+    .getByRole("button", { name: "10 years" })
+    .click();
+  await expect(
+    page.getByRole("group", { name: "Period", exact: true }).getByRole("button"),
+  ).toHaveText(["1981–2010", "2011–2020"]);
 
   expect(authorized).toEqual([]);
   await page.screenshot({

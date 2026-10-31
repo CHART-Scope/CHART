@@ -26,6 +26,8 @@ import {
   lineage,
   monthLabel,
   monthsByYear,
+  periodLength,
+  periodsOfLength,
   seasonLabel,
   type ExploreLayer,
   type ExplorePlace,
@@ -46,6 +48,8 @@ type State = {
   month: string | null;
   period: string | null;
   scenario: string | null;
+  /** Years per projection period: 5, 10 or 20. */
+  length: number;
 };
 
 const LAYERS: { code: ExploreLayer; label: string; hint: string }[] = [
@@ -79,6 +83,7 @@ function readState(): State {
     month: params.get("month"),
     period: params.get("period"),
     scenario: params.get("scenario"),
+    length: Number(params.get("length")) || 20,
   };
 }
 
@@ -91,6 +96,7 @@ function writeState(state: State) {
   if (state.month) params.set("month", state.month);
   if (state.period) params.set("period", state.period);
   if (state.scenario) params.set("scenario", state.scenario);
+  params.set("length", String(state.length));
   window.history.replaceState(null, "", `/explore?${params}`);
 }
 
@@ -189,7 +195,25 @@ export function ExploreApp() {
     // state.month is read, not depended on: a month change keeps the list.
   }, [state.frame, state.outcome, places, update]);
 
-  const period = state.period ?? frameOutlook?.period ?? null;
+  const baselineCode =
+    frameOutlook?.period_summary.find((row) => row.is_baseline)?.period ?? null;
+  const lengths = [
+    ...new Set(
+      (frameOutlook?.periods ?? [])
+        .filter((item) => item.code !== baselineCode)
+        .map((item) => periodLength(item.code)),
+    ),
+  ].sort((a, b) => a - b);
+  const periodChoices = periodsOfLength(
+    (frameOutlook?.periods ?? []).map((item) => ({ ...item, period: item.code })),
+    state.length,
+    baselineCode,
+  );
+  const period =
+    state.period ??
+    (frameOutlook && periodChoices.some((item) => item.code === frameOutlook.period)
+      ? frameOutlook.period
+      : (periodChoices.find((item) => item.code !== baselineCode)?.code ?? null));
   const scenario = state.scenario ?? frameOutlook?.scenario ?? null;
 
   useEffect(() => {
@@ -416,20 +440,39 @@ export function ExploreApp() {
           {state.layer === "observed" && years.size > 0 && (
             <section className={styles.section}>
               <h2>Month</h2>
-              <div className={styles.chips} role="group" aria-label="Year">
-                {[...years.keys()].slice(-8).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    aria-pressed={item === year}
-                    onClick={() =>
-                      update({ month: (years.get(item) ?? []).at(-1) ?? null })
-                    }
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
+              {years.size > 8 ? (
+                <select
+                  className={styles.yearSelect}
+                  aria-label="Year"
+                  value={year ?? ""}
+                  onChange={(event) =>
+                    update({
+                      month: (years.get(event.target.value) ?? []).at(-1) ?? null,
+                    })
+                  }
+                >
+                  {[...years.keys()].reverse().map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className={styles.chips} role="group" aria-label="Year">
+                  {[...years.keys()].map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      aria-pressed={item === year}
+                      onClick={() =>
+                        update({ month: (years.get(item) ?? []).at(-1) ?? null })
+                      }
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className={styles.months} role="group" aria-label="Month">
                 {MONTH_LABELS.map((label, index) => {
                   const key = `${year}-${String(index + 1).padStart(2, "0")}`;
@@ -461,9 +504,30 @@ export function ExploreApp() {
 
           {state.layer === "projection" && frameOutlook && (
             <section className={styles.section}>
+              {lengths.length > 1 && (
+                <>
+                  <h2>Period length</h2>
+                  <div
+                    className={styles.segmented}
+                    role="group"
+                    aria-label="Period length"
+                  >
+                    {lengths.map((years) => (
+                      <button
+                        key={years}
+                        type="button"
+                        aria-pressed={years === state.length}
+                        onClick={() => update({ length: years, period: null })}
+                      >
+                        {years} years
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
               <h2>Future period</h2>
               <div className={styles.chips} role="group" aria-label="Period">
-                {frameOutlook.periods.map((item) => (
+                {periodChoices.map((item) => (
                   <button
                     key={item.code}
                     type="button"
@@ -494,6 +558,7 @@ export function ExploreApp() {
             observed={observed}
             outlook={outlook}
             period={period}
+            length={state.length}
             month={state.month}
             seasonMonths={season?.months ?? []}
           />
@@ -558,12 +623,14 @@ function PlaceSummary({
   observed,
   outlook,
   period,
+  length,
   month,
   seasonMonths,
 }: {
   observed: ObservedRisk | null;
   outlook: HeatOutlook | null;
   period: string | null;
+  length: number;
   month: string | null;
   seasonMonths: number[];
 }) {
@@ -571,7 +638,11 @@ function PlaceSummary({
     parts.find((part) => part.side === "heat")?.value_percent ?? null;
   const cycle = outlook?.months ?? [];
   const peak = Math.max(1, ...cycle.map((item) => heat(item.parts) ?? 0));
-  const periods = outlook?.period_summary ?? [];
+  const periods = periodsOfLength(
+    outlook?.period_summary ?? [],
+    length,
+    outlook?.period_summary.find((row) => row.is_baseline)?.period ?? null,
+  );
   const periodPeak = Math.max(1, ...periods.map((row) => heat(row.parts) ?? 0));
 
   if (!observed && !outlook) {

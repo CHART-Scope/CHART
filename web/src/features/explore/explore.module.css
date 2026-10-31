@@ -498,3 +498,14 @@
     height: 52vh;
   }
 }
+
+.yearSelect {
+  height: 32px;
+  margin-bottom: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--color-grey-mid);
+  border-radius: 0.5rem;
+  background: var(--color-white);
+  font: inherit;
+  font-size: 13px;
+}
