@@ -37,7 +37,7 @@ from chart.shared.db.models import (
 )
 from chart.shared.db.session import get_session_factory
 
-from .country_pull import configured_areas, pull_country_months
+from .country_pull import PRODUCTS, configured_areas, pull_country_months
 from .ingestion_jobs import newest_complete_month
 
 OBSERVED_LABELS = (DataLabel.observed, DataLabel.reanalysis)
@@ -90,8 +90,11 @@ def history_months(years: int, today: date) -> list[date]:
     return months
 
 
-def coverage(session: Session, country_code: str, months: list[date]) -> Coverage:
+def coverage(
+    session: Session, country_code: str, months: list[date], product: str = "era5"
+) -> Coverage:
     """Which configured place-months hold no observed monthly climate."""
+    variable = f"{PRODUCTS[product].variable_prefix}{MONTHLY_VARIABLE}"
     units = configured_areas(session, country_code)
     held = {
         (unit_id, month)
@@ -100,7 +103,7 @@ def coverage(session: Session, country_code: str, months: list[date]) -> Coverag
             .join(ClimateRun, ClimateRun.id == DistrictClimate.climate_run_id)
             .where(
                 DistrictClimate.admin_unit_id.in_([unit.id for unit in units]),
-                DistrictClimate.variable == MONTHLY_VARIABLE,
+                DistrictClimate.variable == variable,
                 DistrictClimate.period_month.between(months[0], months[-1]),
                 ClimateRun.data_label.in_(OBSERVED_LABELS),
             )
@@ -130,12 +133,13 @@ def backfill(
     score: bool = True,
     session_factory: sessionmaker[Session] | None = None,
     log: Callable[[str], None] = print,
+    product: str = "era5",
 ) -> BackfillReport:
     factory = session_factory or get_session_factory()
     months = history_months(years, today or date.today())
     report = BackfillReport(country_code=country_code)
     with factory() as session:
-        gaps = coverage(session, country_code, months)
+        gaps = coverage(session, country_code, months, product)
     missing_years = sorted(
         {int(month[:4]) for place in gaps.missing.values() for month in place}
     )
@@ -154,6 +158,7 @@ def backfill(
             country_code,
             [month for month in months if month.year in chunk],
             log=log,
+            product=product,
         )
         report.pulled_years.extend(chunk)
         report.skipped_places.update(outcome.skipped)
@@ -161,10 +166,11 @@ def backfill(
             f"{country_code} {chunk}: {outcome.areas_done}/{outcome.areas_total} places,"
             f" {outcome.monthly_rows} monthly and {outcome.daily_rows} daily rows"
         )
-    if score:
+    # Only ERA5 feeds the health models; ERA5-Land is a map layer.
+    if score and product == "era5":
         score_observed(factory, country_code, months[SCORING_LEAD_MONTHS:], report, log)
     with factory() as session:
-        report.coverage = coverage(session, country_code, months)
+        report.coverage = coverage(session, country_code, months, product)
     return report
 
 
@@ -251,12 +257,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--no-score", action="store_true", help="Pull climate without scoring"
     )
+    parser.add_argument(
+        "--product",
+        choices=sorted(PRODUCTS),
+        default="era5",
+        help="era5 feeds the models; era5-land is the sharper map layer",
+    )
     args = parser.parse_args(argv)
     # Progress must reach a log file or `docker exec` as it happens.
     sys.stdout.reconfigure(line_buffering=True)  # type: ignore[union-attr]
     country = args.country.upper()
     if args.command == "backfill":
-        report = backfill(country, args.years, score=not args.no_score)
+        report = backfill(
+            country, args.years, score=not args.no_score, product=args.product
+        )
         result = report.coverage
         print(json.dumps(asdict(report), indent=2, default=str))
     elif args.command == "score":
@@ -271,7 +285,10 @@ def main(argv: list[str] | None = None) -> int:
     else:
         with get_session_factory()() as session:
             result = coverage(
-                session, country, history_months(args.years, date.today())
+                session,
+                country,
+                history_months(args.years, date.today()),
+                args.product,
             )
         print(json.dumps(asdict(result), indent=2, default=str))
     assert result is not None

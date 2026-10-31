@@ -19,6 +19,10 @@ from threading import Lock
 import xarray as xr
 
 DATASET = "reanalysis-era5-single-levels"
+#: ERA5-Land: the same reanalysis re-run over land at 0.1 deg (about 9 km).
+#: Sharper for small areas, but not what the health models were fitted on.
+LAND_DATASET = "reanalysis-era5-land"
+DATASETS = {DATASET: 0.25, LAND_DATASET: 0.1}
 VARIABLE = "2m_temperature"
 _NETCDF_VALIDATION_LOCK = Lock()
 
@@ -51,12 +55,15 @@ def build_request(
     year: int,
     bbox: BBox,
     months: tuple[int, ...] | None = None,
+    dataset: str = DATASET,
 ) -> dict:
     validate_bbox(bbox)
     n, w, s, e = bbox
     selected_months = _normalize_months(months)
+    # ERA5-Land has a single product, so it takes no product type.
+    product = {"product_type": "reanalysis"} if dataset == DATASET else {}
     return {
-        "product_type": "reanalysis",
+        **product,
         "variable": VARIABLE,
         "year": str(year),
         "month": [f"{month:02d}" for month in selected_months],
@@ -72,9 +79,10 @@ def cache_key(
     year: int,
     bbox: BBox,
     months: tuple[int, ...] | None = None,
+    dataset: str = DATASET,
 ) -> str:
     payload = {
-        "dataset": DATASET,
+        "dataset": dataset,
         "variable": VARIABLE,
         "year": year,
         "months": list(_normalize_months(months)),
@@ -135,7 +143,11 @@ def _cached_path_ok(path: Path) -> bool:
 
 
 def _covering_cache(
-    cache_dir: Path, year: int, bbox: BBox, months: tuple[int, ...]
+    cache_dir: Path,
+    year: int,
+    bbox: BBox,
+    months: tuple[int, ...],
+    dataset: str = DATASET,
 ) -> Path | None:
     """Find a retained acquisition covering the complete requested extent/time."""
     candidates = []
@@ -146,7 +158,7 @@ def _covering_cache(
             request = document["request"]
             n, w, s, e = map(float, request["area"])
             if (
-                document.get("dataset") != DATASET
+                document.get("dataset") != dataset
                 or request.get("variable") != VARIABLE
                 or int(request["year"]) != year
                 or not set(months).issubset({int(m) for m in request["month"]})
@@ -227,12 +239,13 @@ def download_year(
     months: tuple[int, ...] | None = None,
     no_cache: bool = False,
     refresh: bool = False,
+    dataset: str = DATASET,
 ) -> DownloadResult:
     cache_dir = cache_dir or _default_cache_dir()
     cache_dir.mkdir(parents=True, exist_ok=True)
 
     selected_months = _normalize_months(months)
-    key = cache_key(year, bbox, selected_months)
+    key = cache_key(year, bbox, selected_months, dataset)
     nc_path = cache_dir / f"{key}.nc"
     meta_path = cache_dir / f"{key}.json"
 
@@ -245,7 +258,7 @@ def download_year(
             cache_hit=True,
         )
     if not no_cache and not refresh:
-        covering = _covering_cache(cache_dir, year, bbox, selected_months)
+        covering = _covering_cache(cache_dir, year, bbox, selected_months, dataset)
         if covering is not None:
             log.info(
                 "reusing covering cache: year=%d months=%s path=%s",
@@ -259,7 +272,7 @@ def download_year(
         log.info("mirror hit: year=%d months=%s key=%s", year, selected_months, key)
         return DownloadResult(year, selected_months, nc_path, True)
 
-    request = build_request(year, bbox, selected_months)
+    request = build_request(year, bbox, selected_months, dataset)
     client = _make_client()
 
     partial = nc_path.with_name(f".{nc_path.name}.{secrets.token_hex(8)}.partial")
@@ -271,7 +284,7 @@ def download_year(
         request["area"],
     )
     try:
-        client.retrieve(DATASET, request, str(partial))
+        client.retrieve(dataset, request, str(partial))
         if not _cached_path_ok(partial):
             raise RuntimeError("CDS_DOWNLOAD_INVALID")
         os.replace(partial, nc_path)
@@ -285,7 +298,7 @@ def download_year(
             meta_path,
             json.dumps(
                 {
-                    "dataset": DATASET,
+                    "dataset": dataset,
                     "request": request,
                     "downloaded_at": datetime.now(timezone.utc).isoformat(),
                     "cdsapi_version": getattr(cdsapi, "__version__", "unknown"),
@@ -312,6 +325,7 @@ def download_years(
     no_cache: bool = False,
     refresh: bool = False,
     max_workers: int = 3,
+    dataset: str = DATASET,
 ) -> list[DownloadResult]:
     """Download many years concurrently. Order in result matches input order."""
     by_year: dict[int, DownloadResult] = {}
@@ -325,6 +339,7 @@ def download_years(
                 months=(months_by_year or {}).get(y),
                 no_cache=no_cache,
                 refresh=refresh,
+                dataset=dataset,
             ): y
             for y in years
         }

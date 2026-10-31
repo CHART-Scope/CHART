@@ -22,7 +22,14 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
-from era5_heat import CELL_CENTRE, CELL_OVERLAP, AreaSpec, compute_heat_series_for_areas
+from era5_heat import (
+    CELL_CENTRE,
+    CELL_OVERLAP,
+    DATASET,
+    LAND_DATASET,
+    AreaSpec,
+    compute_heat_series_for_areas,
+)
 from era5_heat.io import write_json, write_table
 from geoalchemy2.shape import to_shape
 from shapely.geometry import mapping
@@ -51,6 +58,29 @@ DEFAULT_HEATWAVE = HeatwaveRule(
     source_name="CHART default",
     source_uri="",
 )
+
+
+@dataclass(frozen=True)
+class Product:
+    """A temperature product a pull can derive, and how its rows are filed."""
+
+    dataset: str
+    #: Prefix on stored variable names; empty for the models' own input.
+    variable_prefix: str
+    #: Daily rows feed the under-five scorer; a context product needs none.
+    with_daily: bool
+    resolution: str
+
+
+#: ``era5`` is what the health models read. ``era5-land`` (0.1 deg) is a
+#: sharper context layer for the map, filed under ``land_*`` variables that no
+#: scorer reads, because the models were not fitted on it.
+PRODUCTS = {
+    "era5": Product(DATASET, "", True, "ERA5 0.25 deg shared-area aggregate"),
+    "era5-land": Product(
+        LAND_DATASET, "land_", False, "ERA5-Land 0.1 deg shared-area aggregate"
+    ),
+}
 
 
 @dataclass
@@ -118,6 +148,7 @@ def pull_country_months(
     months: list[date],
     *,
     log: Callable[[str], None] = print,
+    product: str = "era5",
 ) -> PullOutcome:
     """Download one grid for ``months`` and persist every configured area's climate.
 
@@ -150,8 +181,9 @@ def pull_country_months(
             raise ValueError(f"admin unit {units[0].id} has no geography")
         preset_slug = geography.slug
 
+    chosen = PRODUCTS[product]
     log(
-        f"Pulling {country_code}: grid (N,W,S,E)={tuple(round(v, 2) for v in envelope)}"
+        f"Pulling {country_code} {product}: grid (N,W,S,E)={tuple(round(v, 2) for v in envelope)}"
         f", {len(months)} months, {len(areas)} areas"
     )
     ensure_climate_storage_capacity()
@@ -163,6 +195,7 @@ def pull_country_months(
         target_months=tuple(months),
         threshold_c=heatwave.threshold_c,
         min_run=heatwave.min_run_days,
+        dataset=chosen.dataset,
     )
     if not results:
         raise ClimateServiceError("CLIMATE_NO_GRID_CENTRES", 422)
@@ -176,7 +209,13 @@ def pull_country_months(
             )
     with session_factory() as session:
         run, monthly_rows, daily_rows = load_era5_shared_download(
-            session, preset_slug=preset_slug, results=results, csv_paths=csv_paths
+            session,
+            preset_slug=preset_slug,
+            results=results,
+            csv_paths=csv_paths,
+            variable_prefix=chosen.variable_prefix,
+            with_daily=chosen.with_daily,
+            resolution=chosen.resolution,
         )
         session.commit()
         run_id = run.id

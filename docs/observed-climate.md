@@ -94,6 +94,23 @@ load: one two-year round took between 50 seconds and 28 minutes.
   grid. The site stayed responsive (HTTP 200 in under 0.1 s), but SSH sessions
   occasionally timed out; run long loads outside working hours.
 
+## ERA5-Land map layer
+
+`--product era5-land` (`make climate-backfill PRODUCT=era5-land`) pulls
+Copernicus ERA5-Land, the same reanalysis re-run over land at 0.1° (about
+9 km), for the same configured places and stores monthly mean daily maximum,
+monthly maximum and heatwave days under `land_*` variable names, without
+daily rows. Explore shows them as the Temperature and Heatwave days layers
+(`GET /heat-outlook/{place}/climate`).
+
+They are deliberately not a model input. The India LBW model was fitted on
+monthly ERA5 temperatures and Kenya's on the modellers' own 0.1 °C product,
+reached from ERA5 through calibrated offsets; scoring ERA5-Land would shift
+every estimate without validation. No scorer, the VRA or the top-up reads
+`land_*` variables, and the backfill never scores this product. Moving the
+health estimates to ERA5-Land needs the modelling team to refit or
+recalibrate, then a measured comparison.
+
 ## Sharing the downloads
 
 A maintainer with bucket write access can publish the retained grids so other

@@ -392,6 +392,8 @@ def _missing_months(
         .where(
             DistrictClimate.admin_unit_id.in_(units),
             DistrictClimate.period_month.in_(wanted),
+            # The models' own ERA5 input; ERA5-Land rows do not count.
+            DistrictClimate.variable == "tmax_monthly_mean_c",
             ClimateRun.data_label.in_((DataLabel.observed, DataLabel.reanalysis)),
         )
         .group_by(DistrictClimate.period_month)

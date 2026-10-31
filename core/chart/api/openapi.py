@@ -529,6 +529,25 @@ OPERATION_DOCUMENTATION: dict[
             )
         },
     ),
+    ("get", "/heat-outlook/{geography_id}/climate"): OperationDocumentation(
+        summary="Read ERA5-Land temperature or heatwave days for a frame's areas",
+        description=(
+            "Returns the frame's areas with display geometry and, for one month, "
+            "either the monthly mean of daily maximum temperature (layer=tmax, "
+            "degrees C) or heatwave days at the country's official threshold "
+            "(layer=heat_days), from Copernicus ERA5-Land at 0.1 degrees. A map "
+            "context layer only: no health estimate reads these values. "
+            "available_months lists the months held. Readable without sign-in "
+            "when public read is enabled; areas stay restricted to the caller's "
+            "geography permissions."
+        ),
+        success_responses={
+            "200": (
+                "The frame's areas with each area's value for the month, or "
+                "not_reported, plus the months held."
+            )
+        },
+    ),
     ("get", "/vra/indicators"): OperationDocumentation(
         summary="List the vulnerability and resilience indicator catalogue",
         description=(

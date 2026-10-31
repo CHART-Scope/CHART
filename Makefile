@@ -491,15 +491,17 @@ docs-build: docs-prepare
 # India's observed estimates are scored too, so `make lbw-run` must be up.
 COUNTRY ?= IN
 YEARS ?= 2
+# era5 feeds the health models; era5-land is the sharper map layer only.
+PRODUCT ?= era5
 .PHONY: climate-backfill climate-verify climate-mirror-publish
 CLIMATE_HISTORY_ENV = DATABASE_URL="$(CHART_DATABASE_URL)" \
 	MODEL_CACHE_DIR="$(CHART_MODEL_CACHE_DIR)" \
 	INFERENCE_LBW_BASE_URL="$${INFERENCE_LBW_BASE_URL:-http://127.0.0.1:8000}"
 climate-backfill: climate-migrate
-	$(CLIMATE_HISTORY_ENV) $(VENV_PYTHON) -m chart.climate.history backfill --country $(COUNTRY) --years $(YEARS)
+	$(CLIMATE_HISTORY_ENV) $(VENV_PYTHON) -m chart.climate.history backfill --country $(COUNTRY) --years $(YEARS) --product $(PRODUCT)
 
 climate-verify:
-	$(CLIMATE_HISTORY_ENV) $(VENV_PYTHON) -m chart.climate.history verify --country $(COUNTRY) --years $(YEARS)
+	$(CLIMATE_HISTORY_ENV) $(VENV_PYTHON) -m chart.climate.history verify --country $(COUNTRY) --years $(YEARS) --product $(PRODUCT)
 
 # Maintainers only: share retained ERA5 grids so other installs skip the queue.
 climate-mirror-publish:

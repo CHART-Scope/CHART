@@ -244,3 +244,27 @@ export async function fetchOutlookCapabilities(
   if (!response.ok) throw new Error("Available outlook views could not load.");
   return response.json() as Promise<OutlookCapabilities>;
 }
+
+export type ClimateLayer = "tmax" | "heat_days";
+
+export type ClimateLayerMap = MapResponse & {
+  available_months: string[];
+  source: string;
+};
+
+/** ERA5-Land temperature or heatwave days per area: a map layer, not a model input. */
+export async function fetchClimateLayer(
+  geographyId: string,
+  accessToken: string | null | undefined,
+  layer: ClimateLayer,
+  month?: string | null,
+): Promise<ClimateLayerMap> {
+  const params = new URLSearchParams({ layer });
+  if (month) params.set("month", month);
+  const response = await authFetch(
+    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/climate?${params}`,
+    { accessToken },
+  );
+  if (!response.ok) throw new Error("The climate layer could not load.");
+  return (await response.json()) as ClimateLayerMap;
+}

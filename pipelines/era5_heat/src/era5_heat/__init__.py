@@ -26,6 +26,8 @@ from .aggregate import (
 )
 from .cds_client import (
     DATASET,
+    DATASETS,
+    LAND_DATASET,
     VARIABLE,
     BBox,
     download_metadata,
@@ -45,6 +47,7 @@ __all__ = [
     "District",
     "BBox",
     "DATASET",
+    "LAND_DATASET",
     "VARIABLE",
     "CELL_CENTRE",
     "CELL_OVERLAP",
@@ -239,6 +242,7 @@ def compute_heat_series_for_areas(
     refresh: bool = False,
     max_workers: int | None = None,
     grid_transform: Callable[[xr.Dataset], xr.Dataset] | None = None,
+    dataset: str = DATASET,
 ) -> dict[int, tuple[pd.DataFrame, dict, pd.Series]]:
     """Download one grid covering ``bbox``, then derive every area from it.
 
@@ -282,16 +286,19 @@ def compute_heat_series_for_areas(
     # available (overlap areas, and centre areas too small to hold a centre),
     # and keeps the request - so its cache key - stable as areas are added.
     north, west, south, east = bbox
+    cell = DATASETS[dataset]
+    steps = round(1 / cell)
     acquisition_bbox = (
-        min(90.0, math.ceil(north * 4) / 4 + 0.25),
-        max(-180.0, math.floor(west * 4) / 4 - 0.25),
-        max(-90.0, math.floor(south * 4) / 4 - 0.25),
-        min(180.0, math.ceil(east * 4) / 4 + 0.25),
+        min(90.0, round(math.ceil(north * steps) / steps + cell, 4)),
+        max(-180.0, round(math.floor(west * steps) / steps - cell, 4)),
+        max(-90.0, round(math.floor(south * steps) / steps - cell, 4)),
+        min(180.0, round(math.ceil(east * steps) / steps + cell, 4)),
     )
     t_start = time.monotonic()
     downloads = download_years(
         year_list,
         acquisition_bbox,
+        dataset=dataset,
         cache_dir=cache_dir,
         months_by_year=months_by_year,
         no_cache=no_cache,
@@ -367,8 +374,12 @@ def compute_heat_series_for_areas(
         frame = add_handoff_metadata(
             frame,
             climate_source="Copernicus Climate Data Store",
-            climate_dataset=DATASET,
-            climate_source_version="ERA5 hourly data on single levels",
+            climate_dataset=dataset,
+            climate_source_version=(
+                "ERA5 hourly data on single levels"
+                if dataset == DATASET
+                else "ERA5-Land hourly data"
+            ),
             climate_variable=VARIABLE,
             data_status="observed_reanalysis",
             generated_at=generated_at,
@@ -390,7 +401,11 @@ def compute_heat_series_for_areas(
             {
                 "schema_version": 1,
                 "source": "Copernicus Climate Data Store",
-                "source_version": "ERA5 hourly data on single levels",
+                "source_version": (
+                    "ERA5 hourly data on single levels"
+                    if dataset == DATASET
+                    else "ERA5-Land hourly data"
+                ),
                 "data_status": "observed_reanalysis",
                 "district": area.name,
                 "bbox": list(bbox),
@@ -405,7 +420,7 @@ def compute_heat_series_for_areas(
                 "downscaling_method": (
                     "expert_analytics_pending" if grid_transform is not None else "none"
                 ),
-                "dataset": DATASET,
+                "dataset": dataset,
                 "variable": VARIABLE,
                 "window": {
                     "start_year": year_list[0],

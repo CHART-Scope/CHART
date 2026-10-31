@@ -11,7 +11,11 @@ Kenya, a health outcome and a map layer, and clicks any place to see:
   scenario.
 
 Layers are the observed heat share (by year and month), the projected heat
-share (by period and scenario) and the vulnerability assessment index. A
+share (by period and scenario), **temperature** and **heatwave days** (by
+month, from Copernicus ERA5-Land at about 9 km) and the vulnerability
+assessment index. Temperature and heatwave days are context: the health
+estimates keep reading the data their models were fitted on (ERA5 for India;
+the modellers' 0.1 °C product, reached by calibrated ERA5, for Kenya). A
 double click, or "Open its …", moves down a level (state → divisions →
 districts; country → counties → constituencies). The URL holds every choice,
 so a view can be shared as a link.
@@ -24,7 +28,7 @@ The API serves those reads without a sign-in when `CHART_PUBLIC_READ=true`:
 
 | Open to visitors | Still requires sign-in |
 |---|---|
-| `GET /heat-outlook/{place}`, `/map`, `/observed`, `/observed/map`, `/capabilities` | Predictions and climate pulls (`POST /climate/...`) |
+| `GET /heat-outlook/{place}`, `/map`, `/observed`, `/observed/map`, `/climate`, `/capabilities` | Predictions and climate pulls (`POST /climate/...`) |
 | `GET /vra/indicators`, `/vra/{place}/assessment`, `/map`, `/areas/{area}` | Model settings, VRA uploads and coverage, users, workspaces, audit |
 | `GET /geographies` (already public) | Saved plans and the planning dashboard |
 

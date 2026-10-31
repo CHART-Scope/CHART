@@ -15,7 +15,11 @@ export type ExplorePlace = {
   parentId: string | null;
 };
 
-export type ExploreLayer = "observed" | "projection" | "vulnerability";
+export type ExploreLayer =
+  "observed" | "projection" | "tmax" | "heat_days" | "vulnerability";
+
+/** Layers read from ERA5-Land, by month, that no health estimate uses. */
+export const CLIMATE_LAYERS: ExploreLayer[] = ["tmax", "heat_days"];
 
 export const OUTCOMES = [
   { code: "lbw", label: "Low birth weight" },
@@ -72,10 +76,33 @@ export const VULNERABILITY_BANDS: Band[] = [
   { upper: Number.POSITIVE_INFINITY, label: "0.75–1", color: "#1f3c73" },
 ];
 
+/** Monthly mean of daily maximum temperature, °C. */
+export const TEMPERATURE_BANDS: Band[] = [
+  { upper: 24, label: "<24°", color: "#2c7bb6" },
+  { upper: 27, label: "24–27°", color: "#abd9e9" },
+  { upper: 30, label: "27–30°", color: "#ffffbf" },
+  { upper: 33, label: "30–33°", color: "#fdd78a" },
+  { upper: 36, label: "33–36°", color: "#fdae61" },
+  { upper: 39, label: "36–39°", color: "#f46d43" },
+  { upper: Number.POSITIVE_INFINITY, label: "≥39°", color: "#a50026" },
+];
+
+/** Heatwave days in the month, at the country's official threshold. */
+export const HEAT_DAY_BANDS: Band[] = [
+  { upper: 0, label: "0", color: "#f3efe9" },
+  { upper: 3, label: "1–3", color: "#fdd49e" },
+  { upper: 7, label: "4–7", color: "#fc8d59" },
+  { upper: 14, label: "8–14", color: "#d7301f" },
+  { upper: Number.POSITIVE_INFINITY, label: "15+", color: "#7f0000" },
+];
+
 export const NO_VALUE_COLOR = "#d9d6d0";
 
 export function bandsFor(layer: ExploreLayer): Band[] {
-  return layer === "vulnerability" ? VULNERABILITY_BANDS : SHARE_BANDS;
+  if (layer === "vulnerability") return VULNERABILITY_BANDS;
+  if (layer === "tmax") return TEMPERATURE_BANDS;
+  if (layer === "heat_days") return HEAT_DAY_BANDS;
+  return SHARE_BANDS;
 }
 
 export function colorFor(value: number | null, bands: Band[]): string {
@@ -133,6 +160,10 @@ export function areaValueText(area: MapArea, layer: ExploreLayer): string {
   }
   if (layer === "vulnerability") {
     return `Vulnerability ${(area.value_percent / 100).toFixed(2)}`;
+  }
+  if (layer === "tmax") return `${area.value_percent.toFixed(1)} °C mean daily maximum`;
+  if (layer === "heat_days") {
+    return `${Math.round(area.value_percent)} heatwave day${Math.round(area.value_percent) === 1 ? "" : "s"}`;
   }
   return `${formatPercent(area.value_percent)} of cases linked to heat`;
 }

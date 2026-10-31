@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { installKenya } from "./support/kenya";
+import { json } from "./support/fakeApi";
+import { fixtures, installKenya } from "./support/kenya";
 
 // The public Explore view: no sign-in, every request anonymous, the map
 // shaded from published estimates, and a place's estimate, seasonal cycle
@@ -100,6 +101,55 @@ test("selecting a county shows its seasonal cycle and projected change", async (
   expect(authorized).toEqual([]);
   await page.screenshot({
     path: "../outputs/e2e/web/explore-projection.png",
+    fullPage: true,
+  });
+});
+
+test("ERA5-Land temperature and heatwave days are context layers by month", async ({
+  page,
+}) => {
+  const { api } = await openExplore(page, "frame=geo-ke&outcome=lbw");
+  api.on(/^\/api\/chart\/heat-outlook\/geo-ke\/climate$/, (route, url) => {
+    const layer = url.searchParams.get("layer");
+    const month = url.searchParams.get("month") ?? "2026-09";
+    return json(route, {
+      ...fixtures.mapFrame,
+      outcome: "lbw",
+      month,
+      metric: `climate_${layer}`,
+      unit: layer === "tmax" ? "degC" : "days",
+      available_months: ["2026-07", "2026-08", "2026-09"],
+      source: "Copernicus ERA5-Land (0.1°), area mean of daily maxima",
+      areas: fixtures.mapFrame.areas.map((area, index) => ({
+        ...area,
+        value_percent: layer === "tmax" ? 28 + (index % 12) : index % 9,
+        missing_reason: null,
+      })),
+    });
+  });
+
+  await page.getByRole("radio", { name: /^Temperature/ }).check();
+  const legend = page.getByTestId("explore-legend");
+  await expect(legend).toContainText("Temperature");
+  await expect(legend).toContainText("33–36°");
+  await expect(legend).toContainText("Sep 2026 · Copernicus ERA5-Land");
+  await expect(page).toHaveURL(/layer=tmax/);
+  // Its own months: the three ERA5-Land months, not the observed estimates'.
+  const monthGroup = page.getByRole("group", { name: "Month" });
+  await expect(monthGroup.getByRole("button", { name: "Sep" })).toBeEnabled();
+  await expect(monthGroup.getByRole("button", { name: "Jun" })).toBeDisabled();
+  await monthGroup.getByRole("button", { name: "Jul" }).click();
+  await expect(legend).toContainText("Jul 2026");
+  await expect
+    .poll(() => api.requests.some((item) => item.includes("layer=tmax&month=2026-07")))
+    .toBe(true);
+
+  await legend.getByRole("button", { name: "See info" }).click();
+  await expect(legend).toContainText("Context only");
+  await page.getByRole("radio", { name: /^Heatwave days/ }).check();
+  await expect(legend).toContainText("15+");
+  await page.screenshot({
+    path: "../outputs/e2e/web/explore-temperature.png",
     fullPage: true,
   });
 });

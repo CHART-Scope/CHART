@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -38,11 +38,14 @@ from chart.climate.ingestion_jobs import (
     recent_complete_months,
 )
 from chart.shared.db.base import Base
+from chart.heat_outlook.climate_layer import load_climate_layer
+from chart.risk.schemas import MapArea, MapResponse
 from chart.shared.db.models import (
     AdminUnit,
     AppGeography,
     ClimateIngestionJob,
     DistrictClimate,
+    DistrictClimateDay,
     Geography,
 )
 from chart_pipeline.definitions import (
@@ -136,10 +139,18 @@ def session_factory(tmp_path, monkeypatch):
         yield factory
 
 
-def _cache_grid(cache: Path, months: list[date]) -> None:
+def _cache_grid(
+    cache: Path,
+    months: list[date],
+    *,
+    acquisition: tuple[float, float, float, float] = ACQUISITION,
+    step: float = 0.25,
+    dataset_name: str = "reanalysis-era5-single-levels",
+    tmax_k: float = TMAX_K,
+) -> None:
     """The retained hourly grid a country pull of ``months`` reads."""
     cache.mkdir(parents=True, exist_ok=True)
-    north, west, south, east = ACQUISITION
+    north, west, south, east = acquisition
     for year in sorted({month.year for month in months}):
         chosen = tuple(month.month for month in months if month.year == year)
         hours = pd.DatetimeIndex(
@@ -149,19 +160,20 @@ def _cache_grid(cache: Path, months: list[date]) -> None:
                 for hour in range(monthrange(year, month)[1] * 24)
             ]
         )
-        lats = np.arange(north, south - 0.01, -0.25)
-        lons = np.arange(west, east + 0.01, 0.25)
+        lats = np.round(np.arange(north, south - step / 4, -step), 4)
+        lons = np.round(np.arange(west, east + step / 4, step), 4)
         dataset = xr.Dataset(
             {
                 "t2m": (
                     ("valid_time", "latitude", "longitude"),
-                    np.full((len(hours), len(lats), len(lons)), TMAX_K),
+                    np.full((len(hours), len(lats), len(lons)), tmax_k),
                 )
             },
             coords={"valid_time": hours, "latitude": lats, "longitude": lons},
         )
         dataset.t2m.attrs["units"] = "K"
-        dataset.to_netcdf(cache / f"{cache_key(year, ACQUISITION, chosen)}.nc")
+        key = cache_key(year, acquisition, chosen, dataset_name)
+        dataset.to_netcdf(cache / f"{key}.nc")
         dataset.close()
 
 
@@ -316,6 +328,84 @@ def test_backfill_reads_the_public_mirror_before_copernicus(
             "test": "backfill_reads_the_public_mirror_before_copernicus",
             "grids": sorted(path.name for path in mirror.glob("*.nc")),
             "places": report.coverage.places,
+            "result": "passed",
+        },
+    )
+
+
+def test_era5_land_fills_its_own_layer_and_never_the_model_input(
+    session_factory, tmp_path, monkeypatch
+):
+    """ERA5-Land is a map layer: stored apart, invisible to scoring."""
+    months = history.history_months(1, date.today())
+    # 30 deg C on the 0.1 deg ERA5-Land grid, one cell beyond the places.
+    _cache_grid(
+        tmp_path / "cache",
+        months,
+        acquisition=(-0.9, 35.9, -1.6, 37.1),
+        step=0.1,
+        dataset_name="reanalysis-era5-land",
+        tmax_k=303.15,
+    )
+    report = history.backfill(
+        "KE", 1, session_factory=session_factory, log=print, product="era5-land"
+    )
+    assert report.coverage is not None and report.coverage.complete
+    assert report.scored == 0 and not report.unscored
+
+    with session_factory() as session:
+        variables = set(session.scalars(select(DistrictClimate.variable).distinct()))
+        daily = session.scalar(select(func.count(DistrictClimateDay.id)))
+        # The models' ERA5 input is still missing every month.
+        era5 = history.coverage(session, "KE", months)
+        queued = queue_recent_month_top_ups(session, today=date.today())
+        session.rollback()
+    assert variables == {
+        "land_tmax_monthly_mean_c",
+        "land_tmax_monthly_max_c",
+        "land_heatwave_days",
+    }
+    assert daily == 0
+    assert len(era5.missing) == 3
+    assert [job.country_code for job in queued] == ["KE"]
+
+    def frame(session, geography_id, month, **_kwargs):
+        units = session.scalars(select(AdminUnit).order_by(AdminUnit.code)).all()
+        return MapResponse(
+            geography_id=geography_id,
+            outcome="lbw",
+            areas=[
+                MapArea(
+                    admin_unit_id=unit.id,
+                    geography_id=unit.app_geography_id,
+                    code=unit.code,
+                    name=unit.name,
+                    level=unit.level,
+                )
+                for unit in units
+            ],
+        )
+
+    monkeypatch.setattr("chart.heat_outlook.climate_layer.load_map_view", frame)
+    with session_factory() as session:
+        layer = load_climate_layer(session, "geo-ke", "tmax", None)
+        days = load_climate_layer(session, "geo-ke", "heat_days", None)
+    values = {area.code: area.value_percent for area in layer.areas}
+    assert layer.month == months[-1].strftime("%Y-%m")
+    assert len(layer.available_months) == len(months)
+    assert values["nairobi"] == values["mombasa"] == pytest.approx(30.0)
+    # Not in the model configuration, so never pulled.
+    assert values["unlisted"] is None
+    # 30 deg C sits below every threshold here (Nairobi 32, default 35).
+    assert {area.value_percent for area in days.areas if area.code != "unlisted"} == {0}
+    _evidence(
+        "era5-land",
+        {
+            "test": "era5_land_fills_its_own_layer_and_never_the_model_input",
+            "variables": sorted(variables),
+            "daily_rows": daily,
+            "era5_places_missing": len(era5.missing),
+            "layer_month": layer.month,
             "result": "passed",
         },
     )

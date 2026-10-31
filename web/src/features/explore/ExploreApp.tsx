@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { MapResponse } from "@/lib/dashboardClient";
 import {
+  fetchClimateLayer,
   fetchHeatOutlook,
   fetchHeatOutlookMap,
   fetchObservedRisk,
@@ -17,6 +18,7 @@ import { fetchVraMap } from "@/lib/vraClient";
 
 import { ExploreMap } from "./ExploreMap";
 import {
+  CLIMATE_LAYERS,
   COUNTRIES,
   MONTH_LABELS,
   OUTCOMES,
@@ -64,6 +66,16 @@ const LAYERS: { code: ExploreLayer; label: string; hint: string }[] = [
     hint: "Average share linked to heat in a future period under a climate scenario.",
   },
   {
+    code: "tmax",
+    label: "Temperature",
+    hint: "Monthly mean of the daily maximum air temperature, from Copernicus ERA5-Land at about 9 km. Context only: the health estimates use the data their models were fitted on.",
+  },
+  {
+    code: "heat_days",
+    label: "Heatwave days",
+    hint: "Days in the month in a heatwave at the country's official threshold (IMD: 40 °C; KMD: 32–38 °C by county over 3+ days), from ERA5-Land. Context only.",
+  },
+  {
     code: "vulnerability",
     label: "Vulnerability",
     hint: "Vulnerability and resilience assessment index, 0 (least) to 1 (most vulnerable).",
@@ -79,7 +91,9 @@ function readState(): State {
     frame: params.get("frame") ?? COUNTRIES[0].start,
     selected: params.get("place"),
     outcome: params.get("outcome") ?? "lbw",
-    layer: layer === "projection" || layer === "vulnerability" ? layer : "observed",
+    layer: LAYERS.some((item) => item.code === layer)
+      ? (layer as ExploreLayer)
+      : "observed",
     month: params.get("month"),
     period: params.get("period"),
     scenario: params.get("scenario"),
@@ -108,6 +122,7 @@ export function ExploreApp() {
   const [mapError, setMapError] = useState<string | null>(null);
   const [frameOutlook, setFrameOutlook] = useState<HeatOutlook | null>(null);
   const [months, setMonths] = useState<string[]>([]);
+  const [climateMonths, setClimateMonths] = useState<string[]>([]);
   const [observed, setObserved] = useState<ObservedRisk | null>(null);
   const [outlook, setOutlook] = useState<HeatOutlook | null>(null);
   const [query, setQuery] = useState("");
@@ -220,8 +235,22 @@ export function ExploreApp() {
     let cancelled = false;
     setMapLoading(true);
     setMapError(null);
-    const load =
-      state.layer === "vulnerability"
+    const climate = CLIMATE_LAYERS.includes(state.layer);
+    const load = climate
+      ? fetchClimateLayer(
+          state.frame,
+          null,
+          state.layer as "tmax" | "heat_days",
+          climateMonths.includes(state.month ?? "") ? state.month : null,
+        ).then((response) => {
+          if (!cancelled) {
+            setClimateMonths(response.available_months);
+            if (response.month && response.month !== state.month)
+              update({ month: response.month });
+          }
+          return response;
+        })
+      : state.layer === "vulnerability"
         ? fetchVraMap(state.frame, null)
         : state.layer === "projection"
           ? fetchHeatOutlookMap(state.frame, null, {
@@ -243,7 +272,9 @@ export function ExploreApp() {
           setMapError(
             state.layer === "vulnerability"
               ? "No vulnerability assessment is published for this area yet."
-              : "No published estimates for this area and choice.",
+              : CLIMATE_LAYERS.includes(state.layer)
+                ? "No ERA5-Land months are loaded for this area yet."
+                : "No published estimates for this area and choice.",
           );
         }
       })
@@ -253,7 +284,8 @@ export function ExploreApp() {
     return () => {
       cancelled = true;
     };
-  }, [state.frame, state.layer, state.outcome, state.month, period, scenario]);
+    // climateMonths is read to validate the month, not to refetch.
+  }, [state.frame, state.layer, state.outcome, state.month, period, scenario, update]);
 
   // The focused place's own estimate, seasonal cycle and projected change.
   useEffect(() => {
@@ -280,7 +312,10 @@ export function ExploreApp() {
 
   const bands = bandsFor(state.layer);
   const season = (outlook ?? frameOutlook)?.heat_season ?? null;
-  const years = useMemo(() => monthsByYear(months), [months]);
+  const climateView = CLIMATE_LAYERS.includes(state.layer);
+  const shownMonths = climateView ? climateMonths : months;
+  const years = useMemo(() => monthsByYear(shownMonths), [shownMonths]);
+  const focusArea = map?.areas.find((area) => area.geography_id === focusId);
   const year = state.month?.slice(0, 4) ?? [...years.keys()].at(-1) ?? null;
   const matches = query.trim()
     ? places
@@ -437,7 +472,7 @@ export function ExploreApp() {
             </div>
           </section>
 
-          {state.layer === "observed" && years.size > 0 && (
+          {(state.layer === "observed" || climateView) && years.size > 0 && (
             <section className={styles.section}>
               <h2>Month</h2>
               {years.size > 8 ? (
@@ -607,7 +642,10 @@ export function ExploreApp() {
               ))}
             </div>
             <small>
-              {state.layer === "observed" && state.month ? monthLabel(state.month) : ""}
+              {(state.layer === "observed" || climateView) && state.month
+                ? monthLabel(state.month)
+                : ""}
+              {climateView ? " · Copernicus ERA5-Land" : ""}
               {state.layer === "projection" && period
                 ? `${frameOutlook?.periods.find((p) => p.code === period)?.label ?? period}`
                 : ""}

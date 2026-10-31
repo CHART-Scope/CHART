@@ -21,6 +21,7 @@ from .observed import (
     load_observed,
     load_observed_map,
 )
+from .climate_layer import ClimateLayerResponse, load_climate_layer
 from .observed_stored import (
     live_model_release,
     load_stored_observed,
@@ -273,6 +274,36 @@ def read_observed_map(
         FileNotFoundError,
     ) as exc:
         raise HTTPException(status_code=404, detail="OBSERVED_NOT_AVAILABLE") from exc
+    except OutlookSelectionInvalid as exc:
+        raise HTTPException(
+            status_code=422, detail="OUTLOOK_SELECTION_INVALID"
+        ) from exc
+
+
+@router.get(
+    "/{geography_id}/climate",
+    response_model=ClimateLayerResponse,
+    summary="Read ERA5-Land temperature or heatwave days for the frame's areas",
+)
+def read_climate_layer(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
+    layer: Annotated[str, Query(pattern=r"^(tmax|heat_days)$")] = "tmax",
+    month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+) -> ClimateLayerResponse:
+    """A context layer for the map: the monthly mean of daily maximum
+    temperature, or heatwave days at each country's official threshold, from
+    ERA5-Land. Not an input to any health estimate; `available_months` lists
+    the months held."""
+    require_read_access(user, geography_id)
+    try:
+        with get_session_factory()() as session:
+            frame = load_climate_layer(session, geography_id, layer, month)
+            return _scoped_map(session, frame, user)
+    except NoAdminUnitForGeography as exc:
+        raise HTTPException(
+            status_code=404, detail="CLIMATE_LAYER_NOT_AVAILABLE"
+        ) from exc
     except OutlookSelectionInvalid as exc:
         raise HTTPException(
             status_code=422, detail="OUTLOOK_SELECTION_INVALID"
