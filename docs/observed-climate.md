@@ -94,6 +94,20 @@ load: one two-year round took between 50 seconds and 28 minutes.
   grid. The site stayed responsive (HTTP 200 in under 0.1 s), but SSH sessions
   occasionally timed out; run long loads outside working hours.
 
+## Kenya calibration for every county
+
+Kenya's county estimates shift stored ERA5 onto the model's temperature scale
+with per-county, per-month offsets (`calibration.json` in the release).
+Release v2_2026_10_06 shipped 44 of 47 counties: Mombasa and Vihiga then held
+no ERA5 cell centre, and Narok's handover rows did not join. Now that every
+county holds ERA5 for 2011–2020, `core/scripts/kenya_calibration_extend.py`
+adds the missing ones from the release's published 2011–2020 typical months
+and the stored ERA5, after reproducing the published offsets (43 of 44
+exactly; Nakuru's handover rows differ from its published outlook, and its
+published offsets are kept). Added entries are marked `derived`. Stored ERA5
+for 2011–2020 matches the release's ERA5 file exactly for all 45 counties
+that file covers.
+
 ## ERA5-Land map layer
 
 `--product era5-land` (`make climate-backfill PRODUCT=era5-land`) pulls

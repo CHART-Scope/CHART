@@ -107,7 +107,9 @@ export function PlaceSearch({
                 event.preventDefault();
                 pick(match);
               }}
-              onMouseEnter={() => setActive(index)}
+              // Follow the pointer only when it moves: a list opening under a
+              // resting pointer must not change what Enter picks.
+              onMouseMove={() => index !== active && setActive(index)}
             >
               <span>{highlight(match.place.name, text)}</span>
               <small>{match.context}</small>

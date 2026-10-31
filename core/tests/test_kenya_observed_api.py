@@ -581,3 +581,26 @@ def test_map_shades_scored_counties_only(client, factory, monkeypatch) -> None:
     assert response.json()["metric"] == "heat_attributable_share_observed_month"
     unknown = client.get("/heat-outlook/geo-ke/observed/map?outcome=lbw&month=2020-01")
     assert unknown.status_code == 422
+
+
+def test_shipped_calibration_covers_every_county() -> None:
+    """Mombasa, Vihiga and Narok had no observed estimate (no offsets).
+
+    kenya_calibration_extend.py added them from the release's published
+    2011-2020 typical months and stored ERA5, after reproducing 43 of the 44
+    published counties exactly; the published entries are unchanged.
+    """
+    document = json.loads((dlnm.release_dir(SHIPPED) / "calibration.json").read_text())
+    counties = document["counties"]
+    assert len(counties) == 47
+    added = {key for key, entry in counties.items() if "derived" in entry}
+    assert added == {"geo-ke-mombasa", "geo-ke-narok", "geo-ke-vihiga"}
+    assert counties["geo-ke-baringo"]["offset_c"][0] == -4.175
+    for key in added:
+        assert len(counties[key]["offset_c"]) == 12
+        assert all(abs(value) < 5 for value in counties[key]["offset_c"])
+        assert 15 < counties[key]["u5_reference_tmax_c"] < 35
+    loaded = observed.calibration(SHIPPED)
+    assert (
+        "geo-ke-mombasa" in loaded.offsets and "geo-ke-mombasa" in loaded.u5_reference
+    )

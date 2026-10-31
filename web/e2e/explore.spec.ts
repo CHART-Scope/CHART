@@ -215,11 +215,26 @@ test("search reaches the other country, and a place leads to its actions and pla
   );
   await page.reload();
 
+  // Regression: a list opening under a resting pointer highlighted the row
+  // under it, so Enter picked that row instead of the best match.
+  const search0 = page.getByRole("combobox", { name: "Search places" });
+  const box = await search0.boundingBox();
+  if (!box) throw new Error("search box not laid out");
+  await page.mouse.move(box.x + 40, box.y + box.height + 60);
+  await search0.fill("a");
+  const best = (
+    await page.getByRole("option").first().locator("span").innerText()
+  ).trim();
+  await expect(page.getByRole("option")).not.toHaveCount(1);
+  await search0.press("Enter");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(best);
+
   // An empty search lists the areas of the place being viewed.
   const search = page.getByRole("combobox", { name: "Search places" });
   await search.focus();
-  await expect(page.getByRole("listbox")).toContainText("Areas in Kenya");
-  await expect(page.getByRole("option", { name: /Kajiado/ })).toBeVisible();
+  // (The pick above was India, so its areas are listed.)
+  await expect(page.getByRole("listbox")).toContainText(`Areas in ${best}`);
+  await expect(page.getByRole("option", { name: /Madhya Pradesh/ })).toBeVisible();
   // Typing reaches India too; picking it moves the whole view there.
   await search.fill("bhop");
   await page.getByRole("option", { name: /Bhopal Division/ }).click();

@@ -192,6 +192,13 @@
       ],
       "u5_reference_tmax_c": 26.076
     },
+    "geo-ke-mombasa": {
+      "offset_c": [
+        0.508, 0.76, 0.53, 0.47, 0.711, 0.231, 0.231, 0.436, 0.72, 0.44, 0.306, -0.025
+      ],
+      "u5_reference_tmax_c": 29.343,
+      "derived": "kenya_calibration_extend.py: published outlook 2011-2020 typical months and stored ERA5 2011-2020"
+    },
     "geo-ke-muranga": {
       "offset_c": [
         -1.832, -1.573, -1.602, -1.552, -1.205, -1.257, -2.246, -2.009, -1.526, -1.241,
@@ -219,6 +226,14 @@
         -1.162, -2.052
       ],
       "u5_reference_tmax_c": 23.22
+    },
+    "geo-ke-narok": {
+      "offset_c": [
+        -1.148, -1.583, -1.623, -1.48, -1.092, -0.809, -1.558, -1.154, -0.841, -1.057,
+        -0.8, -0.798
+      ],
+      "u5_reference_tmax_c": 23.638,
+      "derived": "kenya_calibration_extend.py: published outlook 2011-2020 typical months and stored ERA5 2011-2020"
     },
     "geo-ke-nyamira": {
       "offset_c": [
@@ -296,6 +311,14 @@
         -0.856, -1.687
       ],
       "u5_reference_tmax_c": 22.013
+    },
+    "geo-ke-vihiga": {
+      "offset_c": [
+        -1.372, -1.949, -0.956, -0.822, -1.138, -1.324, -1.367, -1.236, -0.655, -0.466,
+        -0.432, -1.065
+      ],
+      "u5_reference_tmax_c": 24.956,
+      "derived": "kenya_calibration_extend.py: published outlook 2011-2020 typical months and stored ERA5 2011-2020"
     },
     "geo-ke-wajir": {
       "offset_c": [
