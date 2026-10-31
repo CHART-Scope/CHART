@@ -108,7 +108,9 @@ Outcome, layer, month, period and emissions are kept throughout.
 Three layers keep a view from loading twice. The API builds each published
 read once per **data version** (`core/chart/api/read_cache.py`: the newest
 climate run, stored prediction, active model, VRA run, forecast and
-population files, and the deployed image) and keeps it; it sends an `ETag`
+population files, and the deployed image) and keeps it. The version is re-read
+every five minutes, so new results appear within five minutes even while a
+load writes rows. It sends an `ETag`
 and `Cache-Control` (public for visitors, private for signed-in users, one
 minute, then revalidate), so a browser reload either reuses its copy or gets
 a 304 without the server rebuilding anything. Explore's own page cache

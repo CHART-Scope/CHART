@@ -33,9 +33,11 @@ CACHED_PREFIXES = ("/heat-outlook/", "/vra/", "/geographies")
 #: Never cached: per-user or administrative reads.
 EXCLUDED_PARTS = ("/coverage", "/template", "/runs", "/values")
 MAX_ENTRIES = 600
-#: How long a data version is trusted before it is read again. Zero: a few
-#: indexed MAX() queries per read, so a new result is never served stale.
-VERSION_SECONDS = 0.0
+#: How long a data version is trusted before it is read again. While a
+#: backfill or scoring run writes new rows every few seconds, re-reading it on
+#: every request would invalidate every copy at once; five minutes keeps the
+#: cache useful during loads and shows new results within five minutes.
+VERSION_SECONDS = 300.0
 BROWSER_SECONDS = 60
 
 _entries: OrderedDict[str, tuple[str, bytes, str]] = OrderedDict()

@@ -118,3 +118,33 @@ def test_off_unless_the_deployment_turns_it_on(monkeypatch) -> None:
     response = client.get("/heat-outlook/geo-ke/map")
     assert calls == ["geo-ke", "geo-ke"]
     assert "etag" not in response.headers
+
+
+def test_data_version_is_trusted_for_five_minutes(monkeypatch) -> None:
+    """Regression: while scoring wrote rows every second the version moved
+    on every request, so no ETag ever matched and every copy was rebuilt."""
+    from chart.shared.db import session as db_session
+
+    read_cache.clear()
+    reads: list[int] = []
+
+    class _Session:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def scalar(self, _query):
+            reads.append(1)
+            return len(reads)  # a new row on every read
+
+    monkeypatch.setattr(db_session, "get_session_factory", lambda: _Session)
+    clock = {"now": 1000.0}
+    monkeypatch.setattr(read_cache.time, "monotonic", lambda: clock["now"])
+    first = read_cache.data_version()
+    clock["now"] += 299
+    assert read_cache.data_version() == first
+    clock["now"] += 2
+    assert read_cache.data_version() != first
+    read_cache.clear()

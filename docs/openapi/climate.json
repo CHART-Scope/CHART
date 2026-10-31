@@ -3288,6 +3288,350 @@
         "description": "Stores which pregnancy windows or age groups, scenarios and data modes a country offers for an outcome. Settings may only narrow what the tables and releases support: unknown codes are refused (MODEL_SETTINGS_OPTION_UNKNOWN), every view keeps at least one option (MODEL_SETTINGS_OPTION_REQUIRED) and each default must be switched on (MODEL_SETTINGS_DEFAULT_NOT_ENABLED). Requires access to the country path; any signed-in role may write for now. Every change records a model_settings_changed audit event with the values before and after."
       }
     },
+    "/saved-plans": {
+      "get": {
+        "tags": [
+          "saved-plans"
+        ],
+        "summary": "List the user's saved plans",
+        "operationId": "list_saved_plans_saved_plans_get",
+        "responses": {
+          "200": {
+            "description": "The caller's saved plans; empty when none.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedPlanList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Returns the caller's own saved plans, newest first, each with the dashboard choices that reopen it, the published estimate captured when it was saved and the deterministic risk_level/timing signals recommendations are keyed on. Plans for places no longer in the caller's geography scope are omitted. Requires a dashboard reader role."
+      },
+      "post": {
+        "tags": [
+          "saved-plans"
+        ],
+        "summary": "Save a dashboard view with its published estimate",
+        "operationId": "create_saved_plan_saved_plans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedPlanCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The saved plan with its captured figure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedPlanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Stores a named plan for a geography (and optional sub-area within it), outcome and observed or projected selection. The API resolves the selection and captures the estimate through the same outlook service as the dashboard; a view with no published estimate is saved with figure.status unavailable and a reason. Refuses places outside the caller's scope (GEOGRAPHY_OUT_OF_SCOPE), a sub-area outside its frame (PLAN_AREA_INVALID), a selection the publication does not contain (OUTLOOK_SELECTION_INVALID) and more than 100 plans per user (SAVED_PLAN_LIMIT)."
+      }
+    },
+    "/saved-plans/{plan_id}": {
+      "get": {
+        "tags": [
+          "saved-plans"
+        ],
+        "summary": "Open one saved plan",
+        "operationId": "read_saved_plan_saved_plans__plan_id__get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 36,
+              "maxLength": 36,
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The saved plan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedPlanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns one of the caller's plans. Another user's plan is reported as SAVED_PLAN_NOT_FOUND; a plan whose place has left the caller's scope is refused with GEOGRAPHY_OUT_OF_SCOPE."
+      },
+      "delete": {
+        "tags": [
+          "saved-plans"
+        ],
+        "summary": "Remove a saved plan",
+        "operationId": "delete_saved_plan_saved_plans__plan_id__delete",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 36,
+              "maxLength": 36,
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The plan was removed."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Deletes one of the caller's plans. Another user's plan is reported as SAVED_PLAN_NOT_FOUND and left untouched."
+      }
+    },
+    "/saved-plans/{plan_id}/recommendations": {
+      "post": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Rank repository actions for a saved plan, with an insight",
+        "operationId": "recommend_for_plan_saved_plans__plan_id__recommendations_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 36,
+              "maxLength": 36,
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The ranked actions with reasons and the insight.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Ranks the candidate actions the browser sends for one of the caller's plans. The rules ranking (season, then cost unless heat risk is clearly raised, then health-led) is the default; a configured classifier replaces only the order and, if it fails, ranker falls back to rules with ranker_note set. The insight is a template unless an administrator chose a language model; it falls back to the template on any provider failure (insight.note) and a generated insight is reused until the provider, model or ranking changes. Ownership and scope follow GET /saved-plans/{plan_id}."
+      }
+    },
+    "/recommendation-settings": {
+      "get": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Read how recommendations are ranked and explained",
+        "operationId": "read_recommendation_settings_recommendation_settings_get",
+        "responses": {
+          "200": {
+            "description": "The settings and the available options.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationSettingsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Returns the chosen ranker and insight provider/model with every option and whether the server environment enables it (credentials are never stored or returned). Administrators only (chart_admin)."
+      },
+      "put": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Choose the ranker and the insight provider and model",
+        "operationId": "write_recommendation_settings_recommendation_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendationSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The settings as they now apply.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Stores the installation's ranker and insight provider/model. Refuses unknown options (RANKER_UNKNOWN, INSIGHT_PROVIDER_UNKNOWN), options the environment does not enable (RANKER_NOT_CONFIGURED, INSIGHT_PROVIDER_NOT_CONFIGURED) and a language model provider without a model (INSIGHT_MODEL_REQUIRED). Administrators only; every change records a recommendation_settings_changed audit event."
+      }
+    },
+    "/recommendation-settings/providers/{provider}/models": {
+      "get": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "List the models an insight provider offers",
+        "operationId": "list_provider_models_recommendation_settings_providers__provider__models_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 32,
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The provider's models and their source.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderModels"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Fetches the model list from the provider's API when it offers one (source provider), otherwise returns CHART_INSIGHT_MODELS (source configured). Fails with INSIGHT_MODELS_UNAVAILABLE when neither is available. Administrators only."
+      }
+    },
     "/learning/resources": {
       "get": {
         "tags": [
@@ -5100,6 +5444,60 @@
           "admin"
         ],
         "title": "BootstrapSetupResponse"
+      },
+      "Candidate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "seasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Seasons"
+          },
+          "cost": {
+            "type": "string",
+            "enum": [
+              "Low",
+              "Medium",
+              "High"
+            ],
+            "title": "Cost"
+          },
+          "department": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Department"
+          },
+          "action_type": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Action Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "seasons",
+          "cost",
+          "department",
+          "action_type"
+        ],
+        "title": "Candidate",
+        "description": "One repository action the browser offers for ranking."
       },
       "CatalogEntry": {
         "properties": {
@@ -7482,6 +7880,52 @@
         ],
         "title": "IngestionResult"
       },
+      "Insight": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "generated": {
+            "type": "boolean",
+            "title": "Generated"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "model",
+          "text",
+          "generated"
+        ],
+        "title": "Insight"
+      },
       "LagWindowSpec": {
         "properties": {
           "months": {
@@ -9517,6 +9961,262 @@
         ],
         "title": "PlaceResponse"
       },
+      "PlanChoices": {
+        "properties": {
+          "view": {
+            "type": "string",
+            "enum": [
+              "observed",
+              "projection"
+            ],
+            "title": "View"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "scenario": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "pattern": "^[A-Za-z0-9_.-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "pattern": "^[A-Za-z0-9_.-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "selector": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "pattern": "^[A-Za-z0-9_.-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selector"
+          },
+          "observed_selector": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "pattern": "^[A-Za-z0-9_.-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Selector"
+          },
+          "reference": {
+            "type": "string",
+            "enum": [
+              "annual",
+              "peak"
+            ],
+            "title": "Reference",
+            "default": "annual"
+          }
+        },
+        "type": "object",
+        "required": [
+          "view"
+        ],
+        "title": "PlanChoices",
+        "description": "The dashboard selections that reopen a saved view."
+      },
+      "PlanFigure": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "captured",
+              "unavailable"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Place"
+          },
+          "release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release"
+          },
+          "when": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "When"
+          },
+          "selector_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selector Label"
+          },
+          "percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent"
+          },
+          "low_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Percent"
+          },
+          "high_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Percent"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ratio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "heat_season_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heat Season Label"
+          },
+          "heat_season_months": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Heat Season Months",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "PlanFigure",
+        "description": "The published estimate for a plan's choices when it was saved."
+      },
+      "PlanSignals": {
+        "properties": {
+          "risk_level": {
+            "type": "string",
+            "enum": [
+              "elevated",
+              "possible",
+              "not_detected",
+              "unknown"
+            ],
+            "title": "Risk Level"
+          },
+          "timing": {
+            "type": "string",
+            "enum": [
+              "before",
+              "during",
+              "after"
+            ],
+            "title": "Timing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "risk_level",
+          "timing"
+        ],
+        "title": "PlanSignals",
+        "description": "Deterministic reading of the figure that recommendations are keyed on.\n\n``risk_level``: ``elevated`` when the ratio's 95% CI lies above 1,\n``possible`` when only the central estimate does (or a share is reported\nwithout a ratio), ``not_detected`` when the central ratio is at or below 1,\n``unknown`` without a figure. ``timing``: a projection plans ahead of the\nheat season; an observed month inside the official season is ``during``,\nup to two months after it ``after``, otherwise ``before``."
+      },
       "PlanningOptionsResponse": {
         "properties": {
           "geography_id": {
@@ -10523,6 +11223,92 @@
         ],
         "title": "ProjectionScenarioOptionResponse"
       },
+      "ProviderModels": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "provider",
+              "configured",
+              "none"
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "models",
+          "source"
+        ],
+        "title": "ProviderModels"
+      },
+      "ProviderOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "available"
+        ],
+        "title": "ProviderOption"
+      },
+      "RankedAction": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "reasons"
+        ],
+        "title": "RankedAction"
+      },
       "Ratio": {
         "properties": {
           "kind": {
@@ -10583,6 +11369,159 @@
         ],
         "title": "Recommendation",
         "description": "A ranked suggestion plus the human-readable reason it was picked."
+      },
+      "RecommendationRequest": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Candidates"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 3
+          }
+        },
+        "type": "object",
+        "required": [
+          "candidates"
+        ],
+        "title": "RecommendationRequest"
+      },
+      "RecommendationResponse": {
+        "properties": {
+          "ranker": {
+            "type": "string",
+            "title": "Ranker"
+          },
+          "ranker_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranker Model"
+          },
+          "ranker_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranker Note"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RankedAction"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "insight": {
+            "$ref": "#/components/schemas/Insight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ranker",
+          "items",
+          "insight"
+        ],
+        "title": "RecommendationResponse"
+      },
+      "RecommendationSettings": {
+        "properties": {
+          "ranker": {
+            "type": "string",
+            "maxLength": 32,
+            "title": "Ranker",
+            "default": "rules"
+          },
+          "insight_provider": {
+            "type": "string",
+            "maxLength": 32,
+            "title": "Insight Provider",
+            "default": "template"
+          },
+          "insight_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insight Model"
+          }
+        },
+        "type": "object",
+        "title": "RecommendationSettings"
+      },
+      "RecommendationSettingsResponse": {
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/RecommendationSettings"
+          },
+          "rankers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderOption"
+            },
+            "type": "array",
+            "title": "Rankers"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderOption"
+            },
+            "type": "array",
+            "title": "Providers"
+          },
+          "updated_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By User Id"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "settings",
+          "rankers",
+          "providers"
+        ],
+        "title": "RecommendationSettingsResponse"
       },
       "Rejection": {
         "properties": {
@@ -11042,6 +11981,124 @@
           "output_hash"
         ],
         "title": "RunSummary"
+      },
+      "SavedPlanCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "geography_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Geography Id"
+          },
+          "admin_unit_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admin Unit Id"
+          },
+          "outcome": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{1,64}$",
+            "title": "Outcome"
+          },
+          "choices": {
+            "$ref": "#/components/schemas/PlanChoices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "geography_id",
+          "outcome",
+          "choices"
+        ],
+        "title": "SavedPlanCreate"
+      },
+      "SavedPlanList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SavedPlanResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "SavedPlanList"
+      },
+      "SavedPlanResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "admin_unit_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admin Unit Id"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "choices": {
+            "$ref": "#/components/schemas/PlanChoices"
+          },
+          "figure": {
+            "$ref": "#/components/schemas/PlanFigure"
+          },
+          "signals": {
+            "$ref": "#/components/schemas/PlanSignals"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "geography_id",
+          "admin_unit_id",
+          "outcome",
+          "choices",
+          "figure",
+          "signals",
+          "created_at"
+        ],
+        "title": "SavedPlanResponse"
       },
       "SectorOption": {
         "properties": {
