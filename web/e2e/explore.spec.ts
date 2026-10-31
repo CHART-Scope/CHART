@@ -132,7 +132,8 @@ test("ERA5-Land temperature and heatwave days are context layers by month", asyn
   const legend = page.getByTestId("explore-legend");
   await expect(legend).toContainText("Temperature");
   await expect(legend).toContainText("33–36°");
-  await expect(legend).toContainText("Sep 2026 · Copernicus ERA5-Land");
+  // Switching layer keeps the month being viewed (Aug, from the observed layer).
+  await expect(legend).toContainText("Aug 2026 · Copernicus ERA5-Land");
   await expect(page).toHaveURL(/layer=tmax/);
   // Its own months: the three ERA5-Land months, not the observed estimates'.
   const monthGroup = page.getByRole("group", { name: "Month" });
@@ -143,6 +144,10 @@ test("ERA5-Land temperature and heatwave days are context layers by month", asyn
   await expect
     .poll(() => api.requests.some((item) => item.includes("layer=tmax&month=2026-07")))
     .toBe(true);
+
+  // A shared link keeps its month.
+  await page.goto("/explore?frame=geo-ke&outcome=lbw&layer=tmax&month=2026-08");
+  await expect(legend).toContainText("Aug 2026 · Copernicus ERA5-Land");
 
   await legend.getByRole("button", { name: "See info" }).click();
   await expect(legend).toContainText("Context only");

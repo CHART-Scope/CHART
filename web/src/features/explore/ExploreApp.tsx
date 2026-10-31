@@ -237,19 +237,27 @@ export function ExploreApp() {
     setMapError(null);
     const climate = CLIMATE_LAYERS.includes(state.layer);
     const load = climate
-      ? fetchClimateLayer(
+      ? // Ask for the chosen month while this layer's months are unknown (a
+        // shared link); a month it does not hold falls back to its newest.
+        fetchClimateLayer(
           state.frame,
           null,
           state.layer as "tmax" | "heat_days",
-          climateMonths.includes(state.month ?? "") ? state.month : null,
-        ).then((response) => {
-          if (!cancelled) {
-            setClimateMonths(response.available_months);
-            if (response.month && response.month !== state.month)
-              update({ month: response.month });
-          }
-          return response;
-        })
+          !climateMonths.length || climateMonths.includes(state.month ?? "")
+            ? state.month
+            : null,
+        )
+          .catch(() =>
+            fetchClimateLayer(state.frame, null, state.layer as "tmax" | "heat_days"),
+          )
+          .then((response) => {
+            if (!cancelled) {
+              setClimateMonths(response.available_months);
+              if (response.month && response.month !== state.month)
+                update({ month: response.month });
+            }
+            return response;
+          })
       : state.layer === "vulnerability"
         ? fetchVraMap(state.frame, null)
         : state.layer === "projection"

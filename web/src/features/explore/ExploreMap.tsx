@@ -163,6 +163,8 @@ export function ExploreMap({
   useEffect(() => {
     const instance = map.current;
     if (!ready || !instance || !data) return;
+    // A hover box from the previous frame would name an area no longer shown.
+    setHover(null);
     const source = instance.getSource(SOURCE) as GeoJSONSource | undefined;
     source?.setData({
       type: "FeatureCollection",
