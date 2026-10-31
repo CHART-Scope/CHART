@@ -121,6 +121,11 @@ function readState(): State {
   };
 }
 
+/**
+ * Keep the URL in step. Moving to another place is a history entry, so the
+ * browser's Back steps back up the drill-down; other choices replace the
+ * current entry so Back is not filled with every month clicked.
+ */
 function writeState(state: State) {
   const params = new URLSearchParams();
   params.set("frame", state.frame);
@@ -131,7 +136,14 @@ function writeState(state: State) {
   if (state.period) params.set("period", state.period);
   if (state.scenario) params.set("scenario", state.scenario);
   params.set("length", String(state.length));
-  window.history.replaceState(null, "", `/explore?${params}`);
+  const next = `/explore?${params}`;
+  if (`${window.location.pathname}${window.location.search}` === next) return;
+  const current = new URLSearchParams(window.location.search);
+  const moved =
+    current.get("frame") !== state.frame ||
+    (current.get("place") ?? null) !== state.selected;
+  if (moved) window.history.pushState(null, "", next);
+  else window.history.replaceState(null, "", next);
 }
 
 // One key per published read; see exploreCache.
@@ -197,12 +209,18 @@ export function ExploreApp() {
   const [actions, setActions] = useState<RecommendedAction[]>([]);
   const [showActions, setShowActions] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [frameView, setFrameView] = useState<"selection" | "frame">("selection");
 
   const update = useCallback((patch: Partial<State>) => {
     setState((current) => ({ ...current, ...patch }));
   }, []);
 
   useEffect(() => writeState(state), [state]);
+  useEffect(() => {
+    const restore = () => setState(readState());
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
 
   useEffect(() => {
     listGeographies()
@@ -477,12 +495,14 @@ export function ExploreApp() {
     const hasChildren = children(places, id).length > 0;
     update(hasChildren ? { frame: id, selected: null } : { selected: id });
   };
-  const pickPlace = (place: ExplorePlace) =>
+  const pickPlace = (place: ExplorePlace) => {
+    setFrameView("selection");
     update(
       place.parentId
         ? { frame: place.parentId, selected: place.id }
         : { frame: place.id, selected: null },
     );
+  };
 
   return (
     <div className={styles.shell}>
@@ -764,6 +784,22 @@ export function ExploreApp() {
         </aside>
 
         <main className={styles.mapArea}>
+          {(state.selected || frame?.parentId) && (
+            <button
+              type="button"
+              className={styles.upButton}
+              onClick={() => {
+                if (state.selected) return update({ selected: null });
+                setFrameView("frame");
+                update({ frame: frame?.parentId as string, selected: state.frame });
+              }}
+            >
+              ↑{" "}
+              {state.selected
+                ? `All of ${frame?.name ?? ""}`
+                : `Up to ${placeById.get(frame?.parentId ?? "")?.name ?? ""}`}
+            </button>
+          )}
           <ExploreMap
             data={map}
             layer={state.layer}
@@ -773,6 +809,7 @@ export function ExploreApp() {
             onSelect={(id) => update({ selected: id })}
             onOpen={open}
             onHover={prefetch}
+            frameView={frameView}
           />
           {mapError && (
             <p className={styles.mapMessage} role="status">

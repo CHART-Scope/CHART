@@ -123,6 +123,24 @@ test("selecting a county shows its seasonal cycle and projected change", async (
   ).toHaveText(["1981–2010", "2011–2020"]);
 
   expect(authorized).toEqual([]);
+  // Drilling back up keeps every setting, and moves the map out.
+  const before = new URL(page.url()).searchParams;
+  await page.getByRole("button", { name: "↑ All of Kenya" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Kenya" })).toBeVisible();
+  await expect(page).not.toHaveURL(/place=/);
+  const after = new URL(page.url()).searchParams;
+  for (const key of ["outcome", "layer", "period", "scenario", "length"])
+    expect(after.get(key)).toBe(before.get(key));
+  // A country has nothing above it.
+  await expect(page.getByRole("button", { name: /^↑/ })).toHaveCount(0);
+  // The browser's Back returns to the county; Forward goes up again.
+  await page.goBack();
+  await expect(page.getByRole("heading", { level: 1, name: "Kajiado" })).toBeVisible();
+  await expect(page).toHaveURL(/place=geo-ke-kajiado/);
+  await expect(page.getByRole("radio", { name: /Projected heat share/ })).toBeChecked();
+  await page.goForward();
+  await expect(page.getByRole("heading", { level: 1, name: "Kenya" })).toBeVisible();
+
   await page.screenshot({
     path: "../outputs/e2e/web/explore-projection.png",
     fullPage: true,
@@ -241,6 +259,16 @@ test("search reaches the other country, and a place leads to its actions and pla
   await expect(
     page.getByRole("heading", { level: 1, name: "Bhopal Division" }),
   ).toBeVisible();
+  await expect(page).toHaveURL(/frame=geo-in-mp&place=geo-in-mp-bhopal/);
+  // Up from a selection, then up a level: the state outlined in India.
+  await page.getByRole("button", { name: "↑ All of Madhya Pradesh" }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Madhya Pradesh" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "↑ Up to India" }).click();
+  await expect(page).toHaveURL(/frame=geo-in&place=geo-in-mp/);
+  await page.goBack();
+  await page.goBack();
   await expect(page).toHaveURL(/frame=geo-in-mp&place=geo-in-mp-bhopal/);
   await expect(
     page.getByRole("group", { name: "Country" }).getByRole("button", { name: "India" }),

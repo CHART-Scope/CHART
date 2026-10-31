@@ -50,6 +50,11 @@ type Props = {
   onSelect: (geographyId: string) => void;
   onOpen: (geographyId: string) => void;
   onHover?: (geographyId: string | null) => void;
+  /**
+   * On a new frame, zoom to the selected place ("selection", e.g. a search
+   * pick) or show the whole frame with it outlined ("frame", going up).
+   */
+  frameView?: "selection" | "frame";
 };
 
 type Hover = { area: MapArea; x: number; y: number; flip: boolean };
@@ -63,6 +68,7 @@ export function ExploreMap({
   onSelect,
   onOpen,
   onHover,
+  frameView = "selection",
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
@@ -73,8 +79,8 @@ export function ExploreMap({
   const ready = styleLoads > 0;
   const [hover, setHover] = useState<Hover | null>(null);
   // Handlers read the latest props without re-binding map events.
-  const latest = useRef({ data, selectedId, onSelect, onOpen, onHover });
-  latest.current = { data, selectedId, onSelect, onOpen, onHover };
+  const latest = useRef({ data, selectedId, onSelect, onOpen, onHover, frameView });
+  latest.current = { data, selectedId, onSelect, onOpen, onHover, frameView };
 
   useEffect(() => {
     if (!container.current) return;
@@ -225,11 +231,12 @@ export function ExploreMap({
       framedId.current = data.geography_id;
       flownTo.current = null;
       const chosen = latest.current.selectedId;
-      const target = chosen
-        ? geometryBounds(
-            data.areas.find((area) => area.geography_id === chosen)?.geometry ?? null,
-          )
-        : null;
+      const target =
+        chosen && latest.current.frameView === "selection"
+          ? geometryBounds(
+              data.areas.find((area) => area.geography_id === chosen)?.geometry ?? null,
+            )
+          : null;
       const [west, south, east, north] = target ?? data.bounds;
       instance.fitBounds(
         [
@@ -238,7 +245,8 @@ export function ExploreMap({
         ],
         { padding: target ? 96 : 48, duration: 600, maxZoom: 9 },
       );
-      if (target) flownTo.current = chosen;
+      // Outlined but not zoomed to: the selection must not fly in either.
+      flownTo.current = chosen;
     }
   }, [ready, styleLoads, data, bands]);
 
@@ -260,7 +268,23 @@ export function ExploreMap({
         ? ["case", ["==", ["get", "geography_id"], selectedId], 0.92, 0.4]
         : 0.7,
     );
-    if (!selectedId || flownTo.current === selectedId) return;
+    if (!selectedId) {
+      // Leaving a place zooms back out to the whole area being viewed.
+      const frame = latest.current.data;
+      if (flownTo.current && frame && frame.bounds.length === 4) {
+        const [west, south, east, north] = frame.bounds;
+        instance.fitBounds(
+          [
+            [west, south],
+            [east, north],
+          ],
+          { padding: 48, duration: 700 },
+        );
+      }
+      flownTo.current = null;
+      return;
+    }
+    if (flownTo.current === selectedId) return;
     const area = latest.current.data?.areas.find(
       (item) => item.geography_id === selectedId,
     );

@@ -41,6 +41,12 @@ dashboard for the place. A visitor who is not signed in goes through sign-in
 and returns to that place's dashboard (`chart.auth.returnTo`, same-site paths
 only).
 
+Drilling back is as direct as drilling in: the **↑** button on the map first
+leaves the selected place (zooming back out to the whole area), then goes up a
+level with the place you came from outlined; the breadcrumb jumps to any
+ancestor; and the browser's Back and Forward step through the places visited.
+Outcome, layer, month, period and emissions are kept throughout.
+
 ## Loading
 
 Each read is made once per page and only once every choice it depends on is
