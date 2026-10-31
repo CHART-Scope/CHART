@@ -246,7 +246,7 @@ export function ExploreMap({
           [west, south],
           [east, north],
         ],
-        { padding: target ? 96 : 48, duration: 600, maxZoom: 9 },
+        { padding: target ? 96 : 48, duration: 600, maxZoom: 12 },
       );
       // Outlined but not zoomed to: the selection must not fly in either.
       flownTo.current = chosen;
@@ -300,7 +300,7 @@ export function ExploreMap({
         [west, south],
         [east, north],
       ],
-      { padding: 96, duration: 700, maxZoom: 9 },
+      { padding: 96, duration: 700, maxZoom: 12 },
     );
   }, [ready, styleLoads, selectedId, data]);
 
