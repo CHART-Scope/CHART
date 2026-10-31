@@ -394,6 +394,8 @@ def _score_units(
 
 
 _SCORED: dict[tuple, dict[str, CountyMonth]] = {}
+#: Places the background warmer scores per turn of the lock.
+WARM_BATCH = 8
 
 
 def _disk_path(outcome: str, selector: str, release: str, version: int) -> Path | None:
@@ -523,7 +525,16 @@ def warm_observed_cache(get_factory, *, interval_seconds: float = 600) -> None:
                     )
                     for outcome, selector in DEFAULT_SELECTOR.items():
                         started = time.monotonic()
-                        _score_units(session, units, outcome, selector, release)
+                        # Small batches: a visitor's request waits for one
+                        # batch at most, not for every place in Kenya.
+                        for first in range(0, len(units), WARM_BATCH):
+                            _score_units(
+                                session,
+                                units[first : first + WARM_BATCH],
+                                outcome,
+                                selector,
+                                release,
+                            )
                         logger.info(
                             "observed cache warm: %s/%s in %.1fs",
                             outcome,
