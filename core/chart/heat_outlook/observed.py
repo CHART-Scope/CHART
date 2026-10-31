@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from calendar import monthrange
@@ -35,6 +36,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from functools import lru_cache
+from pathlib import Path
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -336,7 +338,23 @@ def _score_units(
             with _CACHE_LOCK:
                 missing = [unit for unit in missing if keys[unit.id] not in _SCORED]
             if missing:
-                fresh = _compute_scores(session, missing, outcome, selector, release)
+                # A restart keeps its scores: they are saved beside the models.
+                path = _disk_path(outcome, selector, release, version[1])
+                saved = _read_disk(path)
+                fresh = {
+                    unit.id: saved[unit.app_geography_id]
+                    for unit in missing
+                    if unit.app_geography_id in saved
+                }
+                todo = [unit for unit in missing if unit.id not in fresh]
+                if todo:
+                    computed = _compute_scores(
+                        session, todo, outcome, selector, release
+                    )
+                    fresh.update(computed)
+                    for unit in todo:
+                        saved[unit.app_geography_id or ""] = computed.get(unit.id, {})
+                    _write_disk(path, saved)
                 with _CACHE_LOCK:
                     if any(key[4] != version for key in _SCORED):
                         # A new climate version retires every older entry.
@@ -349,6 +367,68 @@ def _score_units(
 
 
 _SCORED: dict[tuple, dict[str, CountyMonth]] = {}
+
+
+def _disk_path(outcome: str, selector: str, release: str, version: int) -> Path | None:
+    """Where scores for one climate version are kept across restarts."""
+    root = os.getenv("CHART_OBSERVED_CACHE_DIR") or (
+        str(Path(os.environ["MODEL_CACHE_DIR"]) / "observed-scores")
+        if os.getenv("MODEL_CACHE_DIR")
+        else None
+    )
+    if not root:
+        return None
+    return Path(root) / f"{release}-{outcome}-{selector}-{version}.json"
+
+
+def _read_disk(path: Path | None) -> dict[str, dict[str, CountyMonth]]:
+    if path is None or not path.is_file():
+        return {}
+    try:
+        document = json.loads(path.read_text())
+        return {
+            geography_id: {
+                month: CountyMonth(
+                    value_percent=item["value_percent"],
+                    low_percent=item["low_percent"],
+                    high_percent=item["high_percent"],
+                    thin_data=item["thin_data"],
+                    inputs=[ObservedInput(**row) for row in item["inputs"]],
+                )
+                for month, item in months.items()
+            }
+            for geography_id, months in document.items()
+        }
+    except (OSError, ValueError, KeyError, TypeError):
+        logger.warning("observed score file %s unreadable; rescoring", path)
+        return {}
+
+
+def _write_disk(path: Path | None, scores: dict[str, dict[str, CountyMonth]]) -> None:
+    if path is None:
+        return
+    document = {
+        geography_id: {
+            month: {
+                "value_percent": item.value_percent,
+                "low_percent": item.low_percent,
+                "high_percent": item.high_percent,
+                "thin_data": item.thin_data,
+                "inputs": [row.model_dump() for row in item.inputs],
+            }
+            for month, item in months.items()
+        }
+        for geography_id, months in scores.items()
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.partial")
+        temporary.write_text(json.dumps(document))
+        os.replace(temporary, path)
+    except OSError:
+        logger.warning("observed scores not saved to %s", path, exc_info=True)
+
+
 _CACHE_LOCK = threading.Lock()
 _COMPUTE_LOCK = threading.Lock()
 logger = logging.getLogger(__name__)

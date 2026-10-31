@@ -604,3 +604,41 @@ def test_shipped_calibration_covers_every_county() -> None:
     assert (
         "geo-ke-mombasa" in loaded.offsets and "geo-ke-mombasa" in loaded.u5_reference
     )
+
+
+def test_scores_survive_a_restart_without_rescoring(
+    client, factory, monkeypatch, tmp_path
+) -> None:
+    """Right after a deploy every Kenya read rescored, and under-five timed out.
+
+    Scores are saved beside the models (MODEL_CACHE_DIR/observed-scores); a
+    restarted API (empty memory) reads them back instead of rescoring.
+    """
+    case = _cases("lbw_validation_cases.csv")[0]
+    _seed_months(
+        factory, date(2026, 7, 1), [float(case[f"tmax_lag{k}"]) for k in range(9)]
+    )
+    path = f"/heat-outlook/{KAJIADO}/observed?outcome=lbw"
+    first = client.get(path).json()
+    saved = list((tmp_path / "models" / "observed-scores").glob("*.json"))
+    assert len(saved) == 1
+
+    computed: list[int] = []
+    original = observed._compute_scores
+    monkeypatch.setattr(
+        observed,
+        "_compute_scores",
+        lambda session, units, *args: computed.append(len(units))
+        or original(session, units, *args),
+    )
+    observed._SCORED.clear()  # what a restart leaves
+    again = client.get(path).json()
+    assert computed == []
+    assert again["estimate"] == first["estimate"]
+    assert again["history"] == first["history"]
+
+    # A damaged file is ignored and rescored, never served.
+    saved[0].write_text("{not json")
+    observed._SCORED.clear()
+    assert client.get(path).json()["estimate"] == first["estimate"]
+    assert computed
