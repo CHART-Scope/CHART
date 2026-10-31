@@ -2543,6 +2543,173 @@
         }
       }
     },
+    "/heat-outlook/{geography_id}/forecast": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read a place's six-month seasonal forecast and heat shares",
+        "description": "Returns the next six months for one place from the Copernicus C3S multi-system seasonal forecast: each month's forecast mean daily maximum (the place's ERA5 normal plus the area-weighted anomaly) and the heat-attributable share scored with the place's model, with the coolest and warmest forecast system as the range. Built once per C3S issue; readable without sign-in when public read is enabled.",
+        "operationId": "read_forecast_heat_outlook__geography_id__forecast_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The issue, the forecast systems, and for each coming month the temperature and share with their ranges.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/heat-outlook/{geography_id}/forecast/map": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read a frame's areas shaded by a forecast month's heat share",
+        "description": "Returns the frame's areas with display geometry, each shaded by its own forecast heat share for one of the next six months (default the first), with its range across forecast systems and forecast temperature. Areas without a forecast are marked, never zeroed.",
+        "operationId": "read_forecast_map_heat_outlook__geography_id__forecast_map_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The frame's areas with the month's forecast share, ranges and temperatures, and the issue's months.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastMap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/vra/indicators": {
       "get": {
         "tags": [
@@ -6106,6 +6273,256 @@
           "error"
         ],
         "title": "ErrorResponse"
+      },
+      "ForecastMap": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric",
+            "default": "attributable_fraction"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": "percent"
+          },
+          "bounds": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Bounds"
+          },
+          "simplify_tolerance_degrees": {
+            "type": "number",
+            "title": "Simplify Tolerance Degrees",
+            "default": 0.0
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/MapArea"
+            },
+            "type": "array",
+            "title": "Areas"
+          },
+          "issue": {
+            "type": "string",
+            "title": "Issue"
+          },
+          "months": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Months"
+          },
+          "ranges": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Ranges",
+            "default": {}
+          },
+          "tmax_c": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Tmax C",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "outcome",
+          "issue",
+          "months"
+        ],
+        "title": "ForecastMap"
+      },
+      "ForecastMonth": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "tmax_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tmax C"
+          },
+          "tmax_low_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tmax Low C"
+          },
+          "tmax_high_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tmax High C"
+          },
+          "value_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Percent"
+          },
+          "low_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Percent"
+          },
+          "high_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month"
+        ],
+        "title": "ForecastMonth"
+      },
+      "ForecastResponse": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "issue": {
+            "type": "string",
+            "title": "Issue"
+          },
+          "selector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selector"
+          },
+          "selectors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Selectors"
+          },
+          "months": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastMonth"
+            },
+            "type": "array",
+            "title": "Months"
+          },
+          "systems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Systems"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_uri": {
+            "type": "string",
+            "title": "Source Uri"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "outcome",
+          "issue",
+          "selector",
+          "selectors",
+          "months",
+          "systems",
+          "source",
+          "source_uri",
+          "method"
+        ],
+        "title": "ForecastResponse"
       },
       "GeographyAccessResponse": {
         "properties": {
