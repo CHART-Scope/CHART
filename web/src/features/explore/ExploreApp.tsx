@@ -678,7 +678,15 @@ export function ExploreApp() {
                 <p className={styles.seasonNote}>
                   <span className={styles.seasonSwatch} /> {season.label}:{" "}
                   {seasonLabel(season.months)}, peak in{" "}
-                  {MONTH_LABELS[season.peak_month - 1]} ({season.source_name})
+                  {MONTH_LABELS[season.peak_month - 1]} (
+                  {season.source_uri ? (
+                    <a href={season.source_uri} target="_blank" rel="noreferrer">
+                      {season.source_name}
+                    </a>
+                  ) : (
+                    season.source_name
+                  )}
+                  )
                 </p>
               )}
             </section>

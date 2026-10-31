@@ -37,6 +37,10 @@ test("a visitor explores Kenya's observed months without signing in", async ({
       /Hot season: Dec–Mar, peak in Feb \(Kenya Meteorological Department\)/,
     ),
   ).toBeVisible();
+  // The season names its source, and links to it.
+  await expect(
+    page.getByRole("link", { name: "Kenya Meteorological Department" }),
+  ).toHaveAttribute("href", /^https:\/\//);
   await expect(page.getByTestId("explore-legend")).toContainText("Observed heat share");
   await expect(page.getByTestId("explore-map").locator("canvas")).toBeVisible();
   // The map loads once, for the month shown - not first with a default.
