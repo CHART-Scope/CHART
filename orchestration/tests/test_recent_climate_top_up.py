@@ -455,3 +455,61 @@ def test_recent_top_up_waits_before_repeating(session_factory):
             "result": "passed",
         },
     )
+
+
+def test_a_constituency_uses_its_countys_heatwave_threshold(
+    session_factory, tmp_path
+) -> None:
+    """Regression: constituencies were counted at the 35 deg C default.
+
+    Thresholds are set per county (Nairobi 32 deg C); a constituency inside
+    Nairobi must use Nairobi's, not the national default.
+    """
+    from chart.climate.country_pull import pull_country_months
+
+    index = tmp_path / "models/outlooks/index.json"
+    listed = json.loads(index.read_text())
+    listed["geo-ke-constituency-westlands"] = {
+        "country_code": "KE",
+        "level": "constituency",
+    }
+    index.write_text(json.dumps(listed))
+    with session_factory() as session:
+        session.add(
+            AppGeography(
+                id="geo-ke-constituency-westlands",
+                country_code="KE",
+                level="constituency",
+                level_label="Constituency",
+                name="Westlands",
+                parent_id="geo-ke-nairobi",
+                path="/kenya/nairobi/westlands",
+            )
+        )
+        session.flush()
+        geography = session.scalars(select(Geography)).first()
+        session.add(
+            AdminUnit(
+                geography_id=geography.id,
+                app_geography_id="geo-ke-constituency-westlands",
+                level="constituency",
+                code="westlands",
+                name="Westlands",
+                boundary=_polygon(36.0, -1.0, 36.25, -1.25),
+                bbox_north=-1.0,
+                bbox_west=36.0,
+                bbox_south=-1.25,
+                bbox_east=36.25,
+            )
+        )
+        session.commit()
+    month = date(2026, 6, 1)
+    _cache_grid(tmp_path / "cache", [month])
+
+    pull_country_months(session_factory, "KE", [month], log=print)
+
+    held = _held(session_factory)
+    days = monthrange(month.year, month.month)[1]
+    # 33 deg C every day: above Nairobi's 32, below the 35 default.
+    assert held[("westlands", month)]["heatwave_days"] == days
+    assert held[("kajiado", month)]["heatwave_days"] == 0

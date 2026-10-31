@@ -142,6 +142,22 @@ def country_heatwave_rule(country_code: str | None) -> HeatwaveRule:
     return heatwave_rule(country_code or "") or DEFAULT_HEATWAVE
 
 
+def area_threshold(
+    rule: HeatwaveRule, parents: dict[str, str | None], geography_id: str | None
+) -> float:
+    """The place's own threshold, else its nearest ancestor's, else the country's.
+
+    Thresholds are set per county or city (Nairobi 32 deg C); a constituency
+    inside one uses that county's, not the national default.
+    """
+    current = geography_id
+    while current:
+        if current in rule.area_thresholds_c:
+            return rule.area_thresholds_c[current]
+        current = parents.get(current)
+    return rule.threshold_c
+
+
 def pull_country_months(
     session_factory: sessionmaker[Session],
     country_code: str,
@@ -162,6 +178,10 @@ def pull_country_months(
             raise ClimateServiceError("CLIMATE_NO_AREAS", 409)
         envelope = country_envelope(units)
         heatwave = country_heatwave_rule(country_code)
+        parents: dict[str, str | None] = {
+            row.id: row.parent_id
+            for row in session.execute(select(AppGeography.id, AppGeography.parent_id))
+        }
         areas = [
             AreaSpec(
                 id=unit.id,
@@ -171,7 +191,9 @@ def pull_country_months(
                 aggregation_method=(
                     CELL_OVERLAP if unit.level in OVERLAP_LEVELS else CELL_CENTRE
                 ),
-                heatwave_threshold_c=heatwave.threshold_for(unit.app_geography_id),
+                heatwave_threshold_c=area_threshold(
+                    heatwave, parents, unit.app_geography_id
+                ),
             )
             for unit in units
         ]

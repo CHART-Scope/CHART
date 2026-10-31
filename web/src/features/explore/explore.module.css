@@ -896,3 +896,21 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+.layerGroup {
+  margin: 6px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.layerGroup:first-child {
+  margin-top: 0;
+}
+
+.legendSource {
+  display: block;
+  margin-bottom: 2px;
+}

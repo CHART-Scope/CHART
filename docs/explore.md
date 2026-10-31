@@ -20,6 +20,25 @@ double click, or "Open its …", moves down a level (state → divisions →
 districts; country → counties → constituencies). The URL holds every choice,
 so a view can be shared as a link.
 
+## Historical and projected
+
+Layers are grouped by where their numbers come from. **Historical** layers
+(observed heat share, temperature, heatwave days) come from Copernicus
+reanalysis of what happened; **Projections** from climate-model scenarios.
+On a historical layer the seasonal cycle is the selected year's observed
+months against the average year, with the year's average share; months with
+no heat excess count as 0%. On the projected layer it is the period's typical
+year against 1981–2010.
+
+**Heatwave days** follow each country's own rule. Kenya: days in runs of 3
+or more at or above the county's KMD threshold (Nairobi 32 °C, Mombasa 36,
+Kisumu 37, Turkana, Marsabit and Mandera 38; 35 °C elsewhere); a
+constituency uses its county's. India: days whose maximum reached 40 °C,
+labelled "Days ≥ 40 °C", because IMD's full heatwave definition also needs
+4.5 °C above the normal, which this count does not test. Both are computed
+on each area's mean daily maximum, so a single hot spot inside a large area
+can be missed.
+
 ## Population
 
 The **Population** layer shades people per km² for everyone, children under

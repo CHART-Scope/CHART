@@ -85,18 +85,29 @@ test("selecting a county shows its seasonal cycle and projected change", async (
   await expect(page.getByRole("heading", { level: 1, name: "Kajiado" })).toBeVisible();
   await expect(page).toHaveURL(/frame=geo-ke&place=geo-ke-kajiado/);
 
-  // The seasonal cycle is a line over the twelve months, season shaded.
+  // On the historical layer the cycle is the selected year's observed
+  // months against the average year: May-Sep 2026 average 19.1%.
   const cycle = page.getByTestId("explore-seasonal-cycle");
+  await expect(cycle).toContainText("Seasonal cycle, 2026");
   await expect(cycle.locator("svg title")).toHaveCount(12);
   await expect(cycle.locator("[data-season-month]")).toHaveCount(4);
-  await expect(cycle.locator("path")).toHaveCount(1);
-  await expect(cycle).toContainText("Heat season");
+  await expect(cycle.locator("path")).toHaveCount(2);
+  await expect(page.getByTestId("explore-year-average")).toContainText(
+    "Year average: 19.1%",
+  );
+  // Layers read as historical (Copernicus) apart from projections.
+  await expect(page.getByText("Historical · Copernicus ERA5 reanalysis")).toBeVisible();
+  await expect(page.getByText("Projections · climate models")).toBeVisible();
   const projection = page.getByTestId("explore-projection");
   // The baseline and the non-overlapping 20-year periods, not every window.
   await expect(projection.getByRole("listitem")).toHaveCount(5);
 
   await page.getByRole("radio", { name: /Projected heat share/ }).check();
   await expect(page.getByRole("group", { name: "Period", exact: true })).toBeVisible();
+  // Projections show the period's typical year instead, season shaded.
+  await expect(cycle).not.toContainText("observed");
+  await expect(cycle.locator("path")).toHaveCount(1);
+  await expect(cycle).toContainText("Heat season");
   await page
     .getByRole("group", { name: "Period", exact: true })
     .getByRole("button", { name: "2061–2080" })
@@ -374,6 +385,10 @@ test("population shows density on the map and counts for the place", async ({
   await page.getByRole("radio", { name: /^Population/ }).check();
   const legend = page.getByTestId("explore-legend");
   await expect(legend).toContainText("Population");
+  await expect(legend.getByRole("link", { name: "WorldPop 2025" })).toHaveAttribute(
+    "href",
+    "https://hub.worldpop.org/project/categories?id=3",
+  );
   await expect(legend).toContainText("1.5k–5k");
   await page
     .getByRole("group", { name: "People" })

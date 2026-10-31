@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { dashboardHref } from "@/features/dashboard/dashboardNavigation";
 import { rememberReturnPath } from "@/lib/authClient";
@@ -89,11 +89,6 @@ const LAYERS: { code: ExploreLayer; label: string; hint: string }[] = [
     hint: "Share of cases linked to heat in a past month, from ERA5 temperatures and the fitted health model.",
   },
   {
-    code: "projection",
-    label: "Projected heat share",
-    hint: "Average share linked to heat in a future period under an emissions scenario.",
-  },
-  {
     code: "tmax",
     label: "Temperature",
     hint: "Monthly mean of the daily maximum air temperature, from Copernicus ERA5-Land at about 9 km. Context only: the health estimates use the data their models were fitted on.",
@@ -101,7 +96,12 @@ const LAYERS: { code: ExploreLayer; label: string; hint: string }[] = [
   {
     code: "heat_days",
     label: "Heatwave days",
-    hint: "Days in the month in a heatwave at the country's official threshold (IMD: 40 °C; KMD: 32–38 °C by county over 3+ days), from ERA5-Land. Context only.",
+    hint: "India: days whose maximum reached 40 °C (IMD's threshold; its full heatwave definition also needs 4.5 °C above normal, which this count does not test). Kenya: days in runs of 3 or more at or above the county's KMD threshold (Nairobi 32 °C, Mombasa 36, Kisumu 37, Turkana, Marsabit and Mandera 38; 35 °C elsewhere). From ERA5-Land; context only.",
+  },
+  {
+    code: "projection",
+    label: "Projected heat share",
+    hint: "Average share linked to heat in a future period under an emissions scenario.",
   },
   {
     code: "population",
@@ -114,6 +114,19 @@ const LAYERS: { code: ExploreLayer; label: string; hint: string }[] = [
     hint: "Vulnerability and resilience assessment index, 0 (least) to 1 (most vulnerable).",
   },
 ];
+
+/** Where each group of layers starts, so historical and projected read apart. */
+const LAYER_GROUP_START: Partial<Record<ExploreLayer, string>> = {
+  observed: "Historical · Copernicus ERA5 reanalysis",
+  projection: "Projections · climate models",
+  population: "Context",
+};
+
+/** Names that depend on the country's own definition. */
+function layerLabel(layer: ExploreLayer, country: string | undefined): string | null {
+  if (layer === "heat_days" && country === "IN") return "Days ≥ 40 °C";
+  return null;
+}
 
 function readState(): State {
   const params = new URLSearchParams(
@@ -637,35 +650,43 @@ export function ExploreApp() {
             <h2>Map layer</h2>
             <div role="radiogroup" aria-label="Map layer" className={styles.layers}>
               {LAYERS.map((item) => (
-                <label key={item.code} className={styles.layer}>
-                  <input
-                    type="radio"
-                    name="layer"
-                    checked={state.layer === item.code}
-                    onChange={() => update({ layer: item.code })}
-                  />
-                  <span>{item.label}</span>
-                  <span className={styles.layerValue}>
-                    {item.code === "observed"
-                      ? formatPercent(observed?.estimate?.value_percent)
-                      : item.code === "projection"
-                        ? formatPercent(
-                            outlook?.period_summary
-                              .find((row) => row.period === period)
-                              ?.parts.find((part) => part.side === "heat")
-                              ?.value_percent,
-                          )
-                        : item.code === state.layer && focusArea?.value_percent != null
-                          ? item.code === "tmax"
-                            ? `${focusArea.value_percent.toFixed(1)} °C`
-                            : item.code === "heat_days"
-                              ? `${Math.round(focusArea.value_percent)} d`
-                              : item.code === "population"
-                                ? `${formatCount(focusArea.value_percent)}/km²`
-                                : (focusArea.value_percent / 100).toFixed(2)
-                          : ""}
-                  </span>
-                </label>
+                <Fragment key={item.code}>
+                  {LAYER_GROUP_START[item.code] && (
+                    <p className={styles.layerGroup}>{LAYER_GROUP_START[item.code]}</p>
+                  )}
+                  <label className={styles.layer}>
+                    <input
+                      type="radio"
+                      name="layer"
+                      checked={state.layer === item.code}
+                      onChange={() => update({ layer: item.code })}
+                    />
+                    <span>
+                      {layerLabel(item.code, countryOf(frame)?.code) ?? item.label}
+                    </span>
+                    <span className={styles.layerValue}>
+                      {item.code === "observed"
+                        ? formatPercent(observed?.estimate?.value_percent)
+                        : item.code === "projection"
+                          ? formatPercent(
+                              outlook?.period_summary
+                                .find((row) => row.period === period)
+                                ?.parts.find((part) => part.side === "heat")
+                                ?.value_percent,
+                            )
+                          : item.code === state.layer &&
+                              focusArea?.value_percent != null
+                            ? item.code === "tmax"
+                              ? `${focusArea.value_percent.toFixed(1)} °C`
+                              : item.code === "heat_days"
+                                ? `${Math.round(focusArea.value_percent)} d`
+                                : item.code === "population"
+                                  ? `${formatCount(focusArea.value_percent)}/km²`
+                                  : (focusArea.value_percent / 100).toFixed(2)
+                            : ""}
+                    </span>
+                  </label>
+                </Fragment>
               ))}
             </div>
           </section>
@@ -825,6 +846,8 @@ export function ExploreApp() {
               seasonMonths={season?.months ?? []}
               scenarioWord={scenario ? (tiers.get(scenario) ?? null) : null}
               scenarioCode={scenario}
+              historical={state.layer !== "projection"}
+              year={observedMonth?.slice(0, 4) ?? null}
             />
           </div>
 
@@ -927,7 +950,7 @@ export function ExploreApp() {
                 ? (area) => {
                     const found = peopleCounts?.counts[area.geography_id ?? ""];
                     return found
-                      ? `${formatCount(found.total)} people · ${formatCount(found.under5)} under five`
+                      ? `${formatCount(found.total)} people · ${formatCount(found.under5)} under five · WorldPop ${peopleCounts?.year ?? ""}`
                       : null;
                   }
                 : undefined
@@ -959,6 +982,15 @@ export function ExploreApp() {
                 </span>
               ))}
             </div>
+            {state.layer === "population" && peopleCounts && (
+              <small className={styles.legendSource}>
+                Source:{" "}
+                <a href={peopleCounts.source_uri} target="_blank" rel="noreferrer">
+                  WorldPop {peopleCounts.year}
+                </a>{" "}
+                ({peopleCounts.license}), 1 km grid summed per area
+              </small>
+            )}
             <small>
               {(state.layer === "observed" || climateView) && month
                 ? monthLabel(month)
@@ -993,6 +1025,8 @@ function PlaceSummary({
   seasonMonths,
   scenarioWord,
   scenarioCode,
+  historical,
+  year,
 }: {
   observed: ObservedRisk | null;
   outlook: HeatOutlook | null;
@@ -1003,6 +1037,9 @@ function PlaceSummary({
   seasonMonths: number[];
   scenarioWord: string | null;
   scenarioCode: string | null;
+  /** Show the selected year's observed months rather than a projected period. */
+  historical: boolean;
+  year: string | null;
 }) {
   const heat = (parts: { side: string; value_percent: number | null }[]) =>
     parts.find((part) => part.side === "heat")?.value_percent ?? null;
@@ -1018,6 +1055,40 @@ function PlaceSummary({
   const periodPeak = Math.max(1, ...periods.map((row) => heat(row.parts) ?? 0));
   const periodName = (code: string | null | undefined) =>
     outlook?.periods.find((p) => p.code === code)?.label ?? code ?? "";
+
+  // The observed months of the selected year, and every year's average. A
+  // scored month without a share had no heat excess (the guides suppress a
+  // negative share), so it counts as 0, not as missing.
+  const history = (observed?.history ?? []).map((row) => ({
+    ...row,
+    value_percent: row.value_percent ?? 0,
+  }));
+  const byMonth = (rows: typeof history, month: number) =>
+    rows.filter((row) => Number(row.month.slice(5, 7)) === month);
+  const average = (values: (number | null)[]) => {
+    const held = values.filter((value): value is number => value !== null);
+    return held.length ? held.reduce((a, b) => a + b, 0) / held.length : null;
+  };
+  const inYear = history.filter((row) => row.month.startsWith(`${year}-`));
+  const yearCycle: CyclePoint[] | null =
+    year && inYear.length
+      ? Array.from({ length: 12 }, (_, index) => ({
+          month: index + 1,
+          value: average(byMonth(inYear, index + 1).map((row) => row.value_percent)),
+          tmax: null,
+        }))
+      : null;
+  const allYears: CyclePoint[] | null = history.length
+    ? Array.from({ length: 12 }, (_, index) => ({
+        month: index + 1,
+        value: average(byMonth(history, index + 1).map((row) => row.value_percent)),
+        tmax: null,
+      }))
+    : null;
+  const yearAverage = average(inYear.map((row) => row.value_percent));
+  const allYearsAverage = average(history.map((row) => row.value_percent));
+  const firstYear = history[0]?.month.slice(0, 4);
+  const lastYear = history.at(-1)?.month.slice(0, 4);
 
   if (!observed && !outlook) {
     return (
@@ -1051,7 +1122,29 @@ function PlaceSummary({
         </section>
       )}
 
-      {outlook && outlook.months.length === 12 && (
+      {historical && yearCycle && (
+        <section className={styles.section} data-testid="explore-seasonal-cycle">
+          <h2>
+            Seasonal cycle, {year} <span className={styles.muted}>· observed</span>
+          </h2>
+          <SeasonalLine
+            current={yearCycle}
+            baseline={allYears}
+            currentLabel={year ?? ""}
+            baselineLabel={`Average ${firstYear}–${lastYear}`}
+            seasonMonths={seasonMonths}
+          />
+          <p className={styles.muted} data-testid="explore-year-average">
+            Year average: {formatPercent(yearAverage)} of cases linked to heat
+            {allYearsAverage !== null
+              ? ` (average year ${formatPercent(allYearsAverage)})`
+              : ""}
+            . Months with no heat excess count as 0%.
+          </p>
+        </section>
+      )}
+
+      {!(historical && yearCycle) && outlook && outlook.months.length === 12 && (
         <section className={styles.section} data-testid="explore-seasonal-cycle">
           <h2>Seasonal cycle</h2>
           <SeasonalLine
