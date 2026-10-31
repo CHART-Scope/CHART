@@ -2484,6 +2484,65 @@
         }
       }
     },
+    "/heat-outlook/{geography_id}/population": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read WorldPop population for a frame's areas",
+        "description": "Returns the frame's areas with display geometry shaded by people per km2 of the chosen group (measure=total, under5 or women_15_49), with each area's counts in counts and the frame's own in place. From WorldPop Global2 R2025A (1 km, census-based, UN adjusted, CC BY 4.0) summed over CHART's boundaries. Context for the heat estimates, not an input. Readable without sign-in when public read is enabled.",
+        "operationId": "read_population_heat_outlook__geography_id__population_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "measure",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(total|under5|women_15_49)$",
+              "default": "total",
+              "title": "Measure"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The frame's areas with people per km2, each area's counts, and the source, licence and citation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PopulationMap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/vra/indicators": {
       "get": {
         "tags": [
@@ -8953,6 +9012,34 @@
         ],
         "title": "PlaceListResponse"
       },
+      "PlacePopulation": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "under5": {
+            "type": "integer",
+            "title": "Under5"
+          },
+          "women_15_49": {
+            "type": "integer",
+            "title": "Women 15 49"
+          },
+          "area_km2": {
+            "type": "number",
+            "title": "Area Km2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "under5",
+          "women_15_49",
+          "area_km2"
+        ],
+        "title": "PlacePopulation"
+      },
       "PlaceResponse": {
         "properties": {
           "geography_id": {
@@ -9089,6 +9176,117 @@
           "next_three_months"
         ],
         "title": "PlanningOptionsResponse"
+      },
+      "PopulationMap": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric",
+            "default": "attributable_fraction"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": "percent"
+          },
+          "bounds": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Bounds"
+          },
+          "simplify_tolerance_degrees": {
+            "type": "number",
+            "title": "Simplify Tolerance Degrees",
+            "default": 0.0
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/MapArea"
+            },
+            "type": "array",
+            "title": "Areas"
+          },
+          "measure": {
+            "type": "string",
+            "title": "Measure"
+          },
+          "measure_label": {
+            "type": "string",
+            "title": "Measure Label"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlacePopulation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "counts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PlacePopulation"
+            },
+            "type": "object",
+            "title": "Counts",
+            "default": {}
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_uri": {
+            "type": "string",
+            "title": "Source Uri"
+          },
+          "license": {
+            "type": "string",
+            "title": "License"
+          },
+          "citation": {
+            "type": "string",
+            "title": "Citation"
+          },
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "outcome",
+          "measure",
+          "measure_label",
+          "source",
+          "source_uri",
+          "license",
+          "citation",
+          "year"
+        ],
+        "title": "PopulationMap"
       },
       "PredictRequest": {
         "properties": {
