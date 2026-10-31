@@ -39,6 +39,7 @@ rebuilt.
 
 Open:
 
+- Explore (public map, no sign-in): `http://127.0.0.1:3100/explore`
 - Planning app: `http://127.0.0.1:3100/plan`
 - Risk dashboard: `http://127.0.0.1:3100/dashboard/<place>`
 - Design system: `http://127.0.0.1:3100/design-system`

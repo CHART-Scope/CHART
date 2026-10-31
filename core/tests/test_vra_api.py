@@ -30,7 +30,7 @@ from sqlalchemy import event, func, select
 
 from chart.api.app import app
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import require_current_user
+from chart.auth.service import require_current_user, require_reader
 from chart.setup.service import restore_deployed_models
 from chart.shared.db import session as db_session
 from chart.shared.db.base import Base
@@ -193,6 +193,9 @@ def as_user(factory) -> Iterator:
 
     current = {"user": ADMIN}
     app.dependency_overrides[require_current_user] = lambda: current["user"]
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
 
     def switch(user: CurrentUserContext) -> TestClient:
         current["user"] = user
@@ -202,6 +205,7 @@ def as_user(factory) -> Iterator:
         yield switch
     finally:
         app.dependency_overrides.pop(require_current_user, None)
+        app.dependency_overrides.pop(require_reader, None)
 
 
 def _csv(rows: list[tuple]) -> str:
@@ -810,6 +814,7 @@ def test_out_of_scope_and_unknown_geographies_are_refused(as_user, factory) -> N
         "GEOGRAPHY_NOT_FOUND",
     )
     app.dependency_overrides.pop(require_current_user, None)
+    app.dependency_overrides.pop(require_reader, None)
     assert TestClient(app).get(f"/vra/{MP}/assessment").status_code == 401
 
 

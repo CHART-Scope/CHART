@@ -82,6 +82,45 @@ def require_current_user(
     return verify_keycloak_token(credentials.credentials, get_auth_config())
 
 
+#: The read-only visitor an open installation serves without a sign-in.
+PUBLIC_VISITOR = CurrentUserContext.model_validate(
+    {
+        "userId": "public",
+        "username": "public",
+        "roles": ["public_viewer"],
+        "geographyScopes": ["/"],
+    }
+)
+
+
+def public_read_enabled() -> bool:
+    """Whether published estimates may be read without signing in.
+
+    On by setting ``CHART_PUBLIC_READ=true``; an installation that holds data
+    it may not publish leaves it off and keeps every read behind sign-in.
+    """
+    return os.getenv("CHART_PUBLIC_READ", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
+def require_reader(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_auth)],
+) -> CurrentUserContext:
+    """A signed-in user, or the public visitor on an open installation.
+
+    Only for reads of published estimates. Anything that changes data, queues
+    work or shows a person's own records keeps ``require_current_user``.
+    """
+    if credentials is not None and credentials.scheme.lower() == "bearer":
+        return verify_keycloak_token(credentials.credentials, get_auth_config())
+    if public_read_enabled():
+        return PUBLIC_VISITOR
+    raise _auth_error("AUTH_TOKEN_REQUIRED", 401)
+
+
 def verify_keycloak_token(token: str, config: AuthConfig) -> CurrentUserContext:
     try:
         key = _get_signing_key(config.jwks_url, config.jwks_timeout_seconds, token)
@@ -127,7 +166,7 @@ def apply_active_geography(
 def can_read_geography_path(user: CurrentUserContext, requested_path: str) -> bool:
     requested = _normalize_geography_path(requested_path)
     return any(
-        requested == scope or requested.startswith(f"{scope}/")
+        scope == "/" or requested == scope or requested.startswith(f"{scope}/")
         for scope in map(_normalize_geography_path, user.geography_scopes)
     )
 

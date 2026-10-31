@@ -17,7 +17,7 @@ from sqlalchemy import select
 
 from chart.api.app import app
 from chart.audit import service as audit_service
-from chart.auth.service import require_current_user
+from chart.auth.service import require_current_user, require_reader
 from chart.climate.schemas import PredictRequest
 from chart.heat_outlook import routes as outlook_routes
 from chart.climate.service import (
@@ -194,6 +194,9 @@ def test_settings_are_scoped_to_countries_the_user_can_read(client) -> None:
     app.dependency_overrides[require_current_user] = lambda: _user(
         geography_scopes=["/india"]
     )
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     denied = client.get("/model-settings?country=KE&outcome=lbw")
     assert (denied.status_code, denied.json()["error"]) == (
         403,
@@ -282,6 +285,9 @@ def india(client, settings_db):
     app.dependency_overrides[require_current_user] = lambda: _user(
         geography_scopes=["/india"]
     )
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     return settings_db
 
 

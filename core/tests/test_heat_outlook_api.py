@@ -21,7 +21,7 @@ from sqlalchemy.pool import StaticPool
 
 from chart.api.app import app
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import require_current_user
+from chart.auth.service import require_current_user, require_reader
 from chart.heat_outlook import routes as outlook_routes
 from chart.risk import routes as risk_routes
 from chart.heat_outlook import service as outlook_service
@@ -285,10 +285,14 @@ def client(tmp_path, monkeypatch, settings_db) -> Iterator[TestClient]:
         lambda geography_id: "/kenya" if geography_id == "geo-ke" else "/kenya/kajiado",
     )
     app.dependency_overrides[require_current_user] = lambda: _user()
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(require_current_user, None)
+        app.dependency_overrides.pop(require_reader, None)
 
 
 def test_lbw_whole_pregnancy_reads_months_and_periods(client) -> None:
@@ -467,10 +471,16 @@ def test_denies_other_geographies_and_roles(client) -> None:
     app.dependency_overrides[require_current_user] = lambda: _user(
         geography_scopes=["/india"]
     )
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     assert client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw").status_code == 403
     app.dependency_overrides[require_current_user] = lambda: _user(
         roles=["unknown_role"]
     )
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     assert client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw").status_code == 403
 
 
@@ -536,15 +546,22 @@ def test_map_denies_other_geographies_and_roles(client) -> None:
     app.dependency_overrides[require_current_user] = lambda: _user(
         geography_scopes=["/india"]
     )
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     assert client.get("/heat-outlook/geo-ke/map?outcome=lbw").status_code == 403
     app.dependency_overrides[require_current_user] = lambda: _user(
         roles=["unknown_role"]
     )
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     assert client.get("/heat-outlook/geo-ke/map?outcome=lbw").status_code == 403
 
 
 def test_map_rejects_unauthenticated_client() -> None:
     app.dependency_overrides.pop(require_current_user, None)
+    app.dependency_overrides.pop(require_reader, None)
     response = TestClient(app).get("/heat-outlook/geo-ke/map?outcome=lbw")
     assert response.status_code in (401, 403)
 

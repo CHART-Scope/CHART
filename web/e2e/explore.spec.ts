@@ -1,0 +1,113 @@
+import { expect, test, type Page } from "@playwright/test";
+
+import { installKenya } from "./support/kenya";
+
+// The public Explore view: no sign-in, every request anonymous, the map
+// shaded from published estimates, and a place's estimate, seasonal cycle
+// and projected change in the side panel. Responses are the real Python
+// service's Kenya output (support/kenya.ts). The basemap host is blocked so
+// the map must still draw its areas on the plain fallback style.
+
+async function openExplore(page: Page, query: string) {
+  const authorized: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/chart/") && request.headers()["authorization"])
+      authorized.push(request.url());
+  });
+  await page.route("https://tiles.openfreemap.org/**", (route) => route.abort());
+  const api = await installKenya(page);
+  await page.goto(`/explore?${query}`);
+  return { api, authorized };
+}
+
+test("a visitor explores Kenya's observed months without signing in", async ({
+  page,
+}) => {
+  const { api, authorized } = await openExplore(page, "frame=geo-ke&outcome=lbw");
+
+  await expect(page).toHaveURL(/\/explore\?/);
+  await expect(page.getByRole("heading", { level: 1, name: "Kenya" })).toBeVisible();
+  const estimate = page.getByTestId("explore-estimate");
+  await expect(estimate).toContainText("Aug 2026");
+  await expect(estimate).toContainText("14.7%");
+  await expect(estimate).toContainText("odds ratio 1.19");
+  await expect(
+    page.getByText(
+      /Hot season: Dec–Mar, peak in Feb \(Kenya Meteorological Department\)/,
+    ),
+  ).toBeVisible();
+  await expect(page.getByTestId("explore-legend")).toContainText("Observed heat share");
+  await expect(page.getByTestId("explore-map").locator("canvas")).toBeVisible();
+  await expect
+    .poll(() =>
+      api.requests.some((item) => item.includes("/heat-outlook/geo-ke/observed/map")),
+    )
+    .toBe(true);
+
+  // Months held for the year are offered; choosing one moves the estimate.
+  await page
+    .getByRole("group", { name: "Month" })
+    .getByRole("button", { name: "Jun" })
+    .click();
+  await expect(estimate).toContainText("Jun 2026");
+  await expect(page).toHaveURL(/month=2026-06/);
+
+  expect(authorized).toEqual([]);
+  await page.screenshot({
+    path: "../outputs/e2e/web/explore-observed.png",
+    fullPage: true,
+  });
+});
+
+test("selecting a county shows its seasonal cycle and projected change", async ({
+  page,
+}) => {
+  const { authorized } = await openExplore(page, "frame=geo-ke&outcome=lbw");
+
+  await page.getByRole("searchbox", { name: "Search places" }).fill("Kaji");
+  await page.getByRole("button", { name: /Kajiado/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Kajiado" })).toBeVisible();
+  await expect(page).toHaveURL(/place=geo-ke-kajiado/);
+
+  const cycle = page.getByTestId("explore-seasonal-cycle");
+  await expect(cycle.locator("[title]")).toHaveCount(12);
+  // The official season (Dec-Mar) is marked on the cycle.
+  await expect(cycle.locator("[data-season]")).toHaveCount(4);
+  const projection = page.getByTestId("explore-projection");
+  await expect(projection.getByRole("listitem")).toHaveCount(6);
+
+  await page.getByRole("radio", { name: /Projected heat share/ }).check();
+  await expect(page.getByRole("group", { name: "Period" })).toBeVisible();
+  await page
+    .getByRole("group", { name: "Period" })
+    .getByRole("button", { name: "2061–2080" })
+    .click();
+  await expect(page).toHaveURL(/period=2061-2080/);
+  await expect(page.getByTestId("explore-legend")).toContainText("2061–2080");
+
+  expect(authorized).toEqual([]);
+  await page.screenshot({
+    path: "../outputs/e2e/web/explore-projection.png",
+    fullPage: true,
+  });
+});
+
+test("a missing layer says so instead of an empty map", async ({ page }) => {
+  await openExplore(page, "frame=geo-ke&outcome=lbw&layer=vulnerability");
+  await expect(
+    page.getByRole("status").filter({ hasText: "No vulnerability assessment" }),
+  ).toBeVisible();
+});
+
+test("Explore fits a phone screen", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 860 });
+  await openExplore(page, "frame=geo-ke&outcome=lbw");
+  await expect(page.getByTestId("explore-estimate")).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+  ).toBe(true);
+  await page.screenshot({
+    path: "../outputs/e2e/web/explore-phone.png",
+    fullPage: true,
+  });
+});

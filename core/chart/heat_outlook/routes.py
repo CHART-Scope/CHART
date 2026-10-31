@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import require_current_user, can_read_geography_path
+from chart.auth.service import can_read_geography_path, require_reader
 from chart.model_settings.service import live_restriction, outlook_restriction
 from chart.risk.routes import _require_read_access as require_read_access
 from chart.risk.schemas import MapResponse
@@ -52,7 +52,7 @@ def _restriction(geography_id: str, outcome: str):
 @router.get("/{geography_id}/capabilities", response_model=OutlookCapabilities)
 def capabilities(
     geography_id: str,
-    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
     outcome: str = LBW_OUTCOME,
 ) -> OutlookCapabilities:
     require_read_access(user, geography_id)
@@ -105,7 +105,7 @@ def _scoped_map(session, frame, user):
 )
 def read_heat_outlook(
     geography_id: str,
-    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
     outcome: str = LBW_OUTCOME,
     scenario: Annotated[str | None, Query(max_length=16)] = None,
     period: Annotated[str | None, Query(max_length=16)] = None,
@@ -138,7 +138,7 @@ def read_heat_outlook(
 )
 def read_heat_outlook_map(
     geography_id: str,
-    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
     outcome: str = LBW_OUTCOME,
     scenario: Annotated[str | None, Query(max_length=16)] = None,
     period: Annotated[str | None, Query(max_length=16)] = None,
@@ -177,7 +177,7 @@ def read_heat_outlook_map(
 )
 def read_observed(
     geography_id: str,
-    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
     outcome: str = LBW_OUTCOME,
     month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
     selector: Annotated[str | None, Query(max_length=32)] = None,
@@ -222,7 +222,7 @@ def read_observed(
 )
 def read_observed_map(
     geography_id: str,
-    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
     outcome: str = LBW_OUTCOME,
     month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
     selector: Annotated[str | None, Query(max_length=32)] = None,

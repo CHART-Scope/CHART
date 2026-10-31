@@ -254,8 +254,13 @@ export async function installKenya(
       return json(route, { error: "E2E_FAILURE" }, options.observedStatus);
     if (!settings.data_modes.includes("observed"))
       return json(route, { error: "VIEW_TURNED_OFF" }, 404);
+    // Asking for the newest month by name answers as the API does: the same
+    // response as asking with no month.
+    const latest =
+      observedFixtures.observed[`${geography}|${outcome}|${selector}|latest`];
     const body =
-      observedFixtures.observed[`${geography}|${outcome}|${selector}|${month}`];
+      observedFixtures.observed[`${geography}|${outcome}|${selector}|${month}`] ??
+      (latest?.month === month ? latest : undefined);
     if (!body) return json(route, { error: "OBSERVED_NOT_AVAILABLE" }, 404);
     if (!enabled) return json(route, { error: "OUTLOOK_SELECTION_INVALID" }, 422);
     return json(route, {

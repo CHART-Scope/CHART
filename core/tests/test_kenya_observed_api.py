@@ -25,7 +25,7 @@ from sqlalchemy.pool import StaticPool
 
 from chart.api.app import app
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import require_current_user
+from chart.auth.service import require_current_user, require_reader
 from chart.heat_outlook import dlnm, observed
 from chart.heat_outlook import routes as outlook_routes
 from chart.heat_outlook.service import NO_EXCESS_LBW, NO_EXCESS_NEONATAL
@@ -257,10 +257,14 @@ def client(release, factory, monkeypatch) -> Iterator[TestClient]:
         lambda geography_id: "/kenya" if geography_id == "geo-ke" else "/kenya/kajiado",
     )
     app.dependency_overrides[require_current_user] = lambda: _user()
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(require_current_user, None)
+        app.dependency_overrides.pop(require_reader, None)
 
 
 def _enable(client: TestClient, outcome: str, selectors: list[str], default: str):
@@ -449,9 +453,13 @@ def test_denies_other_geographies_roles_and_anonymous(client) -> None:
     app.dependency_overrides[require_current_user] = lambda: _user(
         geography_scopes=["/india"]
     )
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     assert client.get(f"/heat-outlook/{KAJIADO}/observed").status_code == 403
     assert client.get(f"/heat-outlook/{KAJIADO}/observed/map").status_code == 403
     app.dependency_overrides.pop(require_current_user, None)
+    app.dependency_overrides.pop(require_reader, None)
     assert client.get(f"/heat-outlook/{KAJIADO}/observed").status_code == 401
 
 

@@ -24,6 +24,8 @@ x-python-environment: &python-environment
   # The default hour read as "stuck" on the dashboard; a running job renews
   # its lease every minute, so ten minutes only shortens the dead wait.
   PREDICTION_LEASE_SECONDS: "600"
+  # Published estimates readable without signing in (docs/explore.md).
+  CHART_PUBLIC_READ: ${CHART_PUBLIC_READ:-false}
 
 x-dagster-environment: &dagster-environment
   <<: *python-environment

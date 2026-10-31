@@ -20,7 +20,7 @@ from sqlalchemy.pool import StaticPool
 
 from chart.api.app import app
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import require_current_user
+from chart.auth.service import require_current_user, require_reader
 from chart.heat_outlook import routes as outlook_routes
 from chart.model_settings import service as settings_service
 from chart.risk import routes as risk_routes
@@ -193,10 +193,14 @@ def client(factory, monkeypatch) -> Iterator[TestClient]:
         roles=["health_planning_lead"],
         geography_scopes=["/india"],
     )
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(require_current_user, None)
+        app.dependency_overrides.pop(require_reader, None)
 
 
 def test_capability_uses_the_shared_observed_view(client) -> None:
@@ -262,3 +266,56 @@ def test_unknown_window_and_month_are_refused(client) -> None:
         ).status_code
         == 422
     )
+
+
+@pytest.fixture
+def anonymous(factory, monkeypatch) -> Iterator[TestClient]:
+    """No sign-in at all: the request carries no Authorization header."""
+
+    def frame(_session, geography_id, month, *, outcome, **_kwargs) -> MapResponse:
+        return MapResponse(geography_id=geography_id, outcome=outcome, areas=[])
+
+    monkeypatch.setattr("chart.heat_outlook.observed_stored.load_map_view", frame)
+    monkeypatch.setattr(
+        risk_routes, "_resolve_place_path", lambda _id: "/india/madhya-pradesh"
+    )
+    app.dependency_overrides.clear()
+    yield TestClient(app)
+
+
+def test_an_open_installation_serves_published_reads_without_sign_in(
+    anonymous, monkeypatch
+) -> None:
+    monkeypatch.setenv("CHART_PUBLIC_READ", "true")
+    body = anonymous.get(f"/heat-outlook/{BHOPAL}/observed?outcome=lbw").json()
+    assert body["estimate"]["value_percent"] == 20.0
+    assert (
+        anonymous.get(f"/heat-outlook/{BHOPAL}/capabilities?outcome=lbw").status_code
+        == 200
+    )
+    assert (
+        anonymous.get(f"/heat-outlook/{STATE}/observed/map?outcome=lbw").status_code
+        == 200
+    )
+
+
+def test_a_closed_installation_still_requires_sign_in(anonymous, monkeypatch) -> None:
+    monkeypatch.delenv("CHART_PUBLIC_READ", raising=False)
+    response = anonymous.get(f"/heat-outlook/{BHOPAL}/observed?outcome=lbw")
+    assert response.status_code == 401
+
+
+def test_public_visitors_cannot_change_data_or_queue_work(
+    anonymous, monkeypatch
+) -> None:
+    monkeypatch.setenv("CHART_PUBLIC_READ", "true")
+    attempts = [
+        anonymous.post(
+            "/climate/predict",
+            json={"geography_id": BHOPAL, "planning_date": "2026-09-01"},
+        ),
+        anonymous.post("/climate/ingestion-jobs", json={"country_code": "IN"}),
+        anonymous.put("/model-settings/IN/lbw", json={}),
+        anonymous.get(f"/vra/{STATE}/coverage"),
+    ]
+    assert [response.status_code for response in attempts] == [401] * len(attempts)

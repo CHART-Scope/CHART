@@ -84,6 +84,7 @@ nav:
       - From R output to the dashboard: model-integration.md
   - Data pipeline: data-pipeline.md
   - VRA data and integration plan: vra-integration-plan.md
+  - Explore (public map): explore.md
   - Dashboard: dashboard.md
   - Project:
       - Digital public good and licensing: licensing.md
