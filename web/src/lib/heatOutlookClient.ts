@@ -268,3 +268,37 @@ export async function fetchClimateLayer(
   if (!response.ok) throw new Error("The climate layer could not load.");
   return (await response.json()) as ClimateLayerMap;
 }
+
+export type PopulationMeasure = "total" | "under5" | "women_15_49";
+
+export type PlacePopulation = {
+  total: number;
+  under5: number;
+  women_15_49: number;
+  area_km2: number;
+};
+
+export type PopulationMap = MapResponse & {
+  measure: PopulationMeasure;
+  measure_label: string;
+  place: PlacePopulation | null;
+  counts: Record<string, PlacePopulation>;
+  source: string;
+  source_uri: string;
+  license: string;
+  citation: string;
+  year: number;
+};
+
+/** WorldPop people per area: shaded by density, with counts per area. */
+export async function fetchPopulation(
+  geographyId: string,
+  measure: PopulationMeasure,
+): Promise<PopulationMap> {
+  const response = await authFetch(
+    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/population?measure=${measure}`,
+    { auth: false },
+  );
+  if (!response.ok) throw new Error("Population could not load.");
+  return (await response.json()) as PopulationMap;
+}

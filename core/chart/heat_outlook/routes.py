@@ -21,6 +21,12 @@ from .observed import (
     load_observed,
     load_observed_map,
 )
+from chart.population.service import (
+    PopulationMap,
+    PopulationNotAvailable,
+    load_population_map,
+)
+
 from .climate_layer import ClimateLayerResponse, load_climate_layer
 from .observed_stored import (
     live_model_release,
@@ -308,3 +314,26 @@ def read_climate_layer(
         raise HTTPException(
             status_code=422, detail="OUTLOOK_SELECTION_INVALID"
         ) from exc
+
+
+@router.get(
+    "/{geography_id}/population",
+    response_model=PopulationMap,
+    summary="Read WorldPop population for a frame's areas",
+)
+def read_population(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
+    measure: Annotated[str, Query(pattern=r"^(total|under5|women_15_49)$")] = "total",
+) -> PopulationMap:
+    """People, children under five or women 15-49 per area, from WorldPop.
+
+    Areas are shaded by people per km2; each area's counts are in `counts`.
+    Context for the heat estimates, not an input to them."""
+    require_read_access(user, geography_id)
+    try:
+        with get_session_factory()() as session:
+            frame = load_population_map(session, geography_id, measure)
+            return _scoped_map(session, frame, user)
+    except (NoAdminUnitForGeography, PopulationNotAvailable) as exc:
+        raise HTTPException(status_code=404, detail="POPULATION_NOT_AVAILABLE") from exc

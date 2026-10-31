@@ -55,6 +55,8 @@ type Props = {
    * pick) or show the whole frame with it outlined ("frame", going up).
    */
   frameView?: "selection" | "frame";
+  /** A second line for the hover card, e.g. an area's head counts. */
+  detail?: (area: MapArea) => string | null;
 };
 
 type Hover = { area: MapArea; x: number; y: number; flip: boolean };
@@ -69,6 +71,7 @@ export function ExploreMap({
   onOpen,
   onHover,
   frameView = "selection",
+  detail,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
@@ -327,6 +330,9 @@ export function ExploreMap({
             {band && <i style={{ background: band }} />}
             {areaValueText(hover.area, layer)}
           </span>
+          {detail?.(hover.area) && (
+            <span className={styles.tooltipRank}>{detail(hover.area)}</span>
+          )}
           {rank && <span className={styles.tooltipRank}>{rank}</span>}
           <small>
             {hover.area.geography_id === selectedId

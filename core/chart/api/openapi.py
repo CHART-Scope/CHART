@@ -548,6 +548,23 @@ OPERATION_DOCUMENTATION: dict[
             )
         },
     ),
+    ("get", "/heat-outlook/{geography_id}/population"): OperationDocumentation(
+        summary="Read WorldPop population for a frame's areas",
+        description=(
+            "Returns the frame's areas with display geometry shaded by people per "
+            "km2 of the chosen group (measure=total, under5 or women_15_49), with "
+            "each area's counts in counts and the frame's own in place. From "
+            "WorldPop Global2 R2025A (1 km, census-based, UN adjusted, CC BY 4.0) "
+            "summed over CHART's boundaries. Context for the heat estimates, not "
+            "an input. Readable without sign-in when public read is enabled."
+        ),
+        success_responses={
+            "200": (
+                "The frame's areas with people per km2, each area's counts, and "
+                "the source, licence and citation."
+            )
+        },
+    ),
     ("get", "/vra/indicators"): OperationDocumentation(
         summary="List the vulnerability and resilience indicator catalogue",
         description=(

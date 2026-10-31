@@ -20,6 +20,21 @@ double click, or "Open its …", moves down a level (state → divisions →
 districts; country → counties → constituencies). The URL holds every choice,
 so a view can be shared as a link.
 
+## Population
+
+The **Population** layer shades people per km² for everyone, children under
+five or women aged 15–49, and every place's panel shows its counts. Figures
+come from WorldPop Global2 R2025A for 2025 (constrained, UN-adjusted, 1 km,
+CC BY 4.0), built from each country's census, summed over CHART's own
+boundaries by `core/scripts/worldpop_population.py` into
+`core/chart/population/worldpop_2025.json` (63 places in India, 337 in
+Kenya; small places weight the cells they partly cover). Kenya's national
+total is 56.8 million and its counties sum within 0.1%, its constituencies
+within 0.7%; Madhya Pradesh is 91.1 million and its divisions and districts
+sum within 0.01%. WorldPop applies one age structure across Madhya Pradesh,
+so its under-five and women shares are the same in every district there;
+Kenya's vary by place. Served at `GET /heat-outlook/{place}/population`.
+
 ## Finding a place, and acting on it
 
 The search box autocompletes any state, division, district, county or

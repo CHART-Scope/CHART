@@ -9,6 +9,7 @@ the chosen window's stored share. Nothing is scored by a read.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from datetime import date
 
@@ -319,3 +320,84 @@ def test_public_visitors_cannot_change_data_or_queue_work(
         anonymous.get(f"/vra/{STATE}/coverage"),
     ]
     assert [response.status_code for response in attempts] == [401] * len(attempts)
+
+
+def test_population_layer_shades_density_and_carries_counts(
+    anonymous, monkeypatch, tmp_path
+) -> None:
+    """WorldPop people per area: density shaded, counts beside, public read."""
+    from chart.population import service as population
+
+    data = tmp_path / "worldpop.json"
+    data.write_text(
+        json.dumps(
+            {
+                "source": "WorldPop Global2 R2025A, constrained, UN adjusted, 1 km",
+                "year": 2025,
+                "license": "CC BY 4.0",
+                "source_uri": "https://hub.worldpop.org/project/categories?id=3",
+                "citation": "Bondarenko M. et al. (2025).",
+                "places": {
+                    BHOPAL: {
+                        "total": 8_000_000,
+                        "under5": 700_000,
+                        "women_15_49": 2_100_000,
+                        "area_km2": 25_000.0,
+                    },
+                    STATE: {
+                        "total": 88_000_000,
+                        "under5": 8_000_000,
+                        "women_15_49": 23_000_000,
+                        "area_km2": 308_000.0,
+                    },
+                },
+            }
+        )
+    )
+    monkeypatch.setattr(population, "DATA", data)
+    population._document.cache_clear()
+
+    def frame(_session, geography_id, month, **_kwargs) -> MapResponse:
+        return MapResponse(
+            geography_id=geography_id,
+            outcome="lbw",
+            areas=[
+                MapArea(
+                    admin_unit_id=1,
+                    geography_id=BHOPAL,
+                    code="bhopal",
+                    level="division",
+                    name="Bhopal",
+                ),
+                MapArea(
+                    admin_unit_id=2,
+                    geography_id="geo-in-madhya-pradesh-division-sagar",
+                    code="sagar",
+                    level="division",
+                    name="Sagar",
+                ),
+            ],
+        )
+
+    monkeypatch.setattr(population, "load_map_view", frame)
+    monkeypatch.setenv("CHART_PUBLIC_READ", "true")
+
+    body = anonymous.get(f"/heat-outlook/{STATE}/population").json()
+    areas = {area["geography_id"]: area for area in body["areas"]}
+    assert areas[BHOPAL]["value_percent"] == 320.0  # people per km2
+    # Sagar is not a place this database knows, so it is not shown at all.
+    assert set(areas) == {BHOPAL}
+    assert body["counts"][BHOPAL]["under5"] == 700_000
+    assert body["place"]["total"] == 88_000_000
+    assert body["license"] == "CC BY 4.0"
+
+    under5 = anonymous.get(f"/heat-outlook/{STATE}/population?measure=under5").json()
+    assert under5["areas"][0]["value_percent"] == 28.0
+    assert (
+        anonymous.get(f"/heat-outlook/{STATE}/population?measure=men").status_code
+        == 422
+    )
+    monkeypatch.setattr(population, "DATA", tmp_path / "missing.json")
+    population._document.cache_clear()
+    assert anonymous.get(f"/heat-outlook/{STATE}/population").status_code == 404
+    population._document.cache_clear()

@@ -312,6 +312,85 @@ test("search reaches the other country, and a place leads to its actions and pla
   expect(remembered).toMatch(/^\/dashboard\/geo-in-mp\?admin_unit=geo-in-mp-bhopal/);
 });
 
+test("population shows density on the map and counts for the place", async ({
+  page,
+}) => {
+  const { api } = await openExplore(
+    page,
+    "frame=geo-ke&place=geo-ke-kajiado&outcome=lbw",
+  );
+  api.on(/^\/api\/chart\/heat-outlook\/geo-ke\/population$/, (route, url) => {
+    const measure = url.searchParams.get("measure") ?? "total";
+    const count = (index: number) => ({
+      total: 1_000_000 + index * 10_000,
+      under5: 130_000 + index * 1_000,
+      women_15_49: 250_000 + index * 2_000,
+      area_km2: 5_000,
+    });
+    const counts = Object.fromEntries(
+      fixtures.mapFrame.areas.map((area, index) => [area.geography_id, count(index)]),
+    );
+    return json(route, {
+      ...fixtures.mapFrame,
+      outcome: "lbw",
+      metric: `population_density_${measure}`,
+      unit: "people_per_km2",
+      measure,
+      measure_label: measure,
+      place: {
+        total: 57_000_000,
+        under5: 7_400_000,
+        women_15_49: 14_000_000,
+        area_km2: 580_000,
+      },
+      counts,
+      areas: fixtures.mapFrame.areas.map((area, index) => ({
+        ...area,
+        value_percent:
+          (measure === "under5" ? count(index).under5 : count(index).total) / 5_000,
+        missing_reason: null,
+      })),
+      source: "WorldPop Global2 R2025A, constrained, UN adjusted, 1 km",
+      source_uri: "https://hub.worldpop.org/project/categories?id=3",
+      license: "CC BY 4.0",
+      citation: "Bondarenko M. et al. (2025).",
+      year: 2025,
+    });
+  });
+  await page.reload();
+
+  // Whatever the layer, the place's people are in the panel, with the source.
+  const people = page.getByTestId("explore-people");
+  const kajiado = fixtures.mapFrame.areas.findIndex(
+    (area) => area.geography_id === "geo-ke-kajiado",
+  );
+  await expect(people).toContainText("People (2025)");
+  await expect(people).toContainText((1_000_000 + kajiado * 10_000).toLocaleString());
+  await expect(people.getByRole("link", { name: "WorldPop" })).toHaveAttribute(
+    "href",
+    "https://hub.worldpop.org/project/categories?id=3",
+  );
+
+  await page.getByRole("radio", { name: /^Population/ }).check();
+  const legend = page.getByTestId("explore-legend");
+  await expect(legend).toContainText("Population");
+  await expect(legend).toContainText("1.5k–5k");
+  await page
+    .getByRole("group", { name: "People" })
+    .getByRole("button", { name: "Under five" })
+    .click();
+  await expect(page).toHaveURL(/layer=population.*people=under5/);
+  await expect
+    .poll(() => api.requests.some((item) => item.includes("population?measure=under5")))
+    .toBe(true);
+  // Under-five classes are scaled to the group, not everyone's.
+  await expect(legend).not.toContainText("1.5k–5k");
+  await page.screenshot({
+    path: "../outputs/e2e/web/explore-population.png",
+    fullPage: true,
+  });
+});
+
 test("a missing layer says so instead of an empty map", async ({ page }) => {
   await openExplore(page, "frame=geo-ke&outcome=lbw&layer=vulnerability");
   await expect(

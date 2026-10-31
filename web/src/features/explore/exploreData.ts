@@ -16,7 +16,13 @@ export type ExplorePlace = {
 };
 
 export type ExploreLayer =
-  "observed" | "projection" | "tmax" | "heat_days" | "vulnerability";
+  "observed" | "projection" | "tmax" | "heat_days" | "population" | "vulnerability";
+
+export const POPULATION_MEASURES = [
+  { code: "total", label: "Everyone" },
+  { code: "under5", label: "Under five" },
+  { code: "women_15_49", label: "Women 15–49" },
+] as const;
 
 /** Layers read from ERA5-Land, by month, that no health estimate uses. */
 export const CLIMATE_LAYERS: ExploreLayer[] = ["tmax", "heat_days"];
@@ -107,12 +113,44 @@ export const HEAT_DAY_BANDS: Band[] = [
   { upper: Number.POSITIVE_INFINITY, label: "15+", color: "#7f0000" },
 ];
 
+/** People per km², roughly logarithmic: rural to dense urban. */
+export const DENSITY_BANDS: Band[] = [
+  { upper: 50, label: "<50", color: "#f1eef6" },
+  { upper: 150, label: "50–150", color: "#d4b9da" },
+  { upper: 300, label: "150–300", color: "#c994c7" },
+  { upper: 600, label: "300–600", color: "#df65b0" },
+  { upper: 1500, label: "600–1.5k", color: "#e7298a" },
+  { upper: 5000, label: "1.5k–5k", color: "#ce1256" },
+  { upper: Number.POSITIVE_INFINITY, label: ">5k", color: "#91003f" },
+];
+
+/** The same classes for a group that is a fraction of everyone. */
+export function densityBandsFor(measure: string): Band[] {
+  const scale = measure === "under5" ? 0.12 : measure === "women_15_49" ? 0.25 : 1;
+  if (scale === 1) return DENSITY_BANDS;
+  return DENSITY_BANDS.map((band) => ({
+    ...band,
+    upper: band.upper * scale,
+    label: Number.isFinite(band.upper)
+      ? `≤${formatCount(band.upper * scale)}`
+      : `>${formatCount(DENSITY_BANDS[DENSITY_BANDS.length - 2].upper * scale)}`,
+  }));
+}
+
+/** 1234 → "1.2k", 5_600_000 → "5.6M". */
+export function formatCount(value: number): string {
+  if (value >= 1e6) return `${(value / 1e6).toFixed(value >= 1e7 ? 0 : 1)}M`;
+  if (value >= 1e3) return `${(value / 1e3).toFixed(value >= 1e4 ? 0 : 1)}k`;
+  return `${Math.round(value)}`;
+}
+
 export const NO_VALUE_COLOR = "#d9d6d0";
 
 export function bandsFor(layer: ExploreLayer): Band[] {
   if (layer === "vulnerability") return VULNERABILITY_BANDS;
   if (layer === "tmax") return TEMPERATURE_BANDS;
   if (layer === "heat_days") return HEAT_DAY_BANDS;
+  if (layer === "population") return DENSITY_BANDS;
   return SHARE_BANDS;
 }
 
@@ -173,6 +211,8 @@ export function areaValueText(area: MapArea, layer: ExploreLayer): string {
     return `Vulnerability ${(area.value_percent / 100).toFixed(2)}`;
   }
   if (layer === "tmax") return `${area.value_percent.toFixed(1)} °C mean daily maximum`;
+  if (layer === "population")
+    return `${formatCount(area.value_percent)} people per km²`;
   if (layer === "heat_days") {
     return `${Math.round(area.value_percent)} heatwave day${Math.round(area.value_percent) === 1 ? "" : "s"}`;
   }

@@ -8,6 +8,7 @@ import { rememberReturnPath } from "@/lib/authClient";
 import type { MapResponse } from "@/lib/dashboardClient";
 import {
   fetchClimateLayer,
+  fetchPopulation,
   fetchHeatOutlook,
   fetchHeatOutlookMap,
   fetchObservedRisk,
@@ -16,6 +17,8 @@ import {
   type ClimateLayerMap,
   type HeatOutlook,
   type ObservedRisk,
+  type PopulationMap,
+  type PopulationMeasure,
 } from "@/lib/heatOutlookClient";
 import {
   listGeographies,
@@ -33,6 +36,9 @@ import {
   CLIMATE_LAYERS,
   COUNTRIES,
   MONTH_LABELS,
+  POPULATION_MEASURES,
+  densityBandsFor,
+  formatCount,
   countryOf,
   OUTCOMES,
   bandsFor,
@@ -72,6 +78,8 @@ type State = {
   scenario: string | null;
   /** Years per projection period: 5, 10 or 20. */
   length: number;
+  /** Who the population layer counts. */
+  people: PopulationMeasure;
 };
 
 const LAYERS: { code: ExploreLayer; label: string; hint: string }[] = [
@@ -96,6 +104,11 @@ const LAYERS: { code: ExploreLayer; label: string; hint: string }[] = [
     hint: "Days in the month in a heatwave at the country's official threshold (IMD: 40 °C; KMD: 32–38 °C by county over 3+ days), from ERA5-Land. Context only.",
   },
   {
+    code: "population",
+    label: "Population",
+    hint: "People per km², from WorldPop 2025 (1 km grid built from each census and UN-adjusted). Counts for each area are in the hover card and the panel.",
+  },
+  {
     code: "vulnerability",
     label: "Vulnerability",
     hint: "Vulnerability and resilience assessment index, 0 (least) to 1 (most vulnerable).",
@@ -118,6 +131,8 @@ function readState(): State {
     period: params.get("period"),
     scenario: params.get("scenario"),
     length: Number(params.get("length")) || 20,
+    people: (POPULATION_MEASURES.find((item) => item.code === params.get("people"))
+      ?.code ?? "total") as PopulationMeasure,
   };
 }
 
@@ -136,6 +151,7 @@ function writeState(state: State) {
   if (state.period) params.set("period", state.period);
   if (state.scenario) params.set("scenario", state.scenario);
   params.set("length", String(state.length));
+  if (state.layer === "population") params.set("people", state.people);
   const next = `/explore?${params}`;
   if (`${window.location.pathname}${window.location.search}` === next) return;
   const current = new URLSearchParams(window.location.search);
@@ -168,6 +184,9 @@ const climateRead = (geo: string, layer: ClimateLayer, month?: string | null) =>
   cached(`climate|${geo}|${layer}|${month ?? ""}`, () =>
     fetchClimateLayer(geo, null, layer, month),
   );
+
+const populationRead = (geo: string, measure: PopulationMeasure) =>
+  cached(`population|${geo}|${measure}`, () => fetchPopulation(geo, measure));
 
 /** The first of the frame and its children that has the read. */
 async function firstAvailable<T>(ids: string[], read: (id: string) => Promise<T>) {
@@ -280,6 +299,21 @@ export function ExploreApp() {
     };
   }, [frameKey, state.frame, state.outcome, childIds]);
 
+  // Who lives in the frame's areas, for the panel whatever the layer.
+  const [framePopulation, setFramePopulation] = useState<{
+    key: string;
+    data: PopulationMap;
+  } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    populationRead(state.frame, "total")
+      .then((data) => !cancelled && setFramePopulation({ key: state.frame, data }))
+      .catch(() => !cancelled && setFramePopulation(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [state.frame]);
+
   const climateView = CLIMATE_LAYERS.includes(state.layer);
   const climateKey = `${state.frame}|${state.layer}`;
   useEffect(() => {
@@ -362,6 +396,11 @@ export function ExploreApp() {
   // The map: one read, made once its month or period is known.
   const mapRead: { key: string; load: () => Promise<MapResponse> } | null = (() => {
     const { frame: geo, outcome, layer } = state;
+    if (layer === "population")
+      return {
+        key: `population|${geo}|${state.people}`,
+        load: () => populationRead(geo, state.people),
+      };
     if (layer === "vulnerability")
       return { key: `vra|${geo}`, load: () => fetchVraMap(geo, null) };
     if (climateView) {
@@ -470,7 +509,16 @@ export function ExploreApp() {
   const observed = focusData?.observed ?? null;
   const outlook = focusData?.outlook ?? null;
   const focusStale = focusData?.key !== focusKey;
-  const bands = bandsFor(state.layer);
+  const bands =
+    state.layer === "population"
+      ? densityBandsFor(state.people)
+      : bandsFor(state.layer);
+  const peopleCounts =
+    framePopulation?.key === state.frame ? framePopulation.data : null;
+  const focusPeople =
+    peopleCounts?.counts[focusId] ??
+    (focusId === state.frame ? peopleCounts?.place : null) ??
+    null;
   const season = (outlook ?? outlookInfo)?.heat_season ?? null;
   const years = useMemo(
     () => monthsByYear(climateView ? climateMonths : observedMonths),
@@ -612,7 +660,9 @@ export function ExploreApp() {
                             ? `${focusArea.value_percent.toFixed(1)} °C`
                             : item.code === "heat_days"
                               ? `${Math.round(focusArea.value_percent)} d`
-                              : (focusArea.value_percent / 100).toFixed(2)
+                              : item.code === "population"
+                                ? `${formatCount(focusArea.value_percent)}/km²`
+                                : (focusArea.value_percent / 100).toFixed(2)
                           : ""}
                   </span>
                 </label>
@@ -692,6 +742,24 @@ export function ExploreApp() {
             </section>
           )}
 
+          {state.layer === "population" && (
+            <section className={styles.section}>
+              <h2>Who</h2>
+              <div className={styles.segmented} role="group" aria-label="People">
+                {POPULATION_MEASURES.map((item) => (
+                  <button
+                    key={item.code}
+                    type="button"
+                    aria-pressed={state.people === item.code}
+                    onClick={() => update({ people: item.code })}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           {state.layer === "projection" && outlookInfo && (
             <section className={styles.section}>
               {lengths.length > 1 && (
@@ -760,6 +828,43 @@ export function ExploreApp() {
             />
           </div>
 
+          {focusPeople && peopleCounts && (
+            <section className={styles.section} data-testid="explore-people">
+              <h2>People ({peopleCounts.year})</h2>
+              <dl className={styles.people}>
+                <div>
+                  <dt>Everyone</dt>
+                  <dd>{focusPeople.total.toLocaleString()}</dd>
+                </div>
+                <div>
+                  <dt>Children under five</dt>
+                  <dd>{focusPeople.under5.toLocaleString()}</dd>
+                </div>
+                <div>
+                  <dt>Women 15–49</dt>
+                  <dd>{focusPeople.women_15_49.toLocaleString()}</dd>
+                </div>
+                <div>
+                  <dt>Per km²</dt>
+                  <dd>
+                    {focusPeople.area_km2
+                      ? Math.round(
+                          focusPeople.total / focusPeople.area_km2,
+                        ).toLocaleString()
+                      : "–"}
+                  </dd>
+                </div>
+              </dl>
+              <p className={styles.muted}>
+                <a href={peopleCounts.source_uri} target="_blank" rel="noreferrer">
+                  WorldPop
+                </a>{" "}
+                {peopleCounts.year} estimate from census data, 1 km grid summed over
+                this area ({peopleCounts.license}).
+              </p>
+            </section>
+          )}
+
           <section className={styles.section} data-testid="explore-act">
             <h2>Act on it</h2>
             <p className={styles.muted}>
@@ -817,6 +922,16 @@ export function ExploreApp() {
             onSelect={(id) => update({ selected: id })}
             onOpen={open}
             onHover={prefetch}
+            detail={
+              state.layer === "population"
+                ? (area) => {
+                    const found = peopleCounts?.counts[area.geography_id ?? ""];
+                    return found
+                      ? `${formatCount(found.total)} people · ${formatCount(found.under5)} under five`
+                      : null;
+                  }
+                : undefined
+            }
             frameView={frameView}
           />
           {mapError && (
