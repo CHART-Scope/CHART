@@ -2408,6 +2408,82 @@
         }
       }
     },
+    "/heat-outlook/{geography_id}/climate": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read ERA5-Land temperature or heatwave days for a frame's areas",
+        "description": "Returns the frame's areas with display geometry and, for one month, either the monthly mean of daily maximum temperature (layer=tmax, degrees C) or heatwave days at the country's official threshold (layer=heat_days), from Copernicus ERA5-Land at 0.1 degrees. A map context layer only: no health estimate reads these values. available_months lists the months held. Readable without sign-in when public read is enabled; areas stay restricted to the caller's geography permissions.",
+        "operationId": "read_climate_layer_heat_outlook__geography_id__climate_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "layer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(tmax|heat_days)$",
+              "default": "tmax",
+              "title": "Layer"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The frame's areas with each area's value for the month, or not_reported, plus the months held.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClimateLayerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/vra/indicators": {
       "get": {
         "tags": [
@@ -4972,6 +5048,77 @@
           "status"
         ],
         "title": "CircuitResetResponse"
+      },
+      "ClimateLayerResponse": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric",
+            "default": "attributable_fraction"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": "percent"
+          },
+          "bounds": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Bounds"
+          },
+          "simplify_tolerance_degrees": {
+            "type": "number",
+            "title": "Simplify Tolerance Degrees",
+            "default": 0.0
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/MapArea"
+            },
+            "type": "array",
+            "title": "Areas"
+          },
+          "available_months": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Months",
+            "default": []
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "Copernicus ERA5-Land (0.1\u00b0), area mean of daily maxima"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "outcome"
+        ],
+        "title": "ClimateLayerResponse"
       },
       "ClimateMonthResponse": {
         "properties": {
