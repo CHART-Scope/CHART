@@ -382,6 +382,24 @@ test("population shows density on the map and counts for the place", async ({
     "https://hub.worldpop.org/project/categories?id=3",
   );
 
+  // The hover card: the outcome's figure beside the estimate, and the
+  // area's children and women with the design team's icons.
+  const map = page.getByTestId("explore-map");
+  const box = await map.boundingBox();
+  if (!box) throw new Error("map not laid out");
+  // Selected Kajiado fills the view, so the middle of the map is Kajiado.
+  await page.waitForTimeout(800);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  const hover = page.getByTestId("explore-hover");
+  await expect(hover).toContainText("Kajiado");
+  await expect(hover).toContainText("of low-birth-weight births");
+  await expect(hover).toContainText("under five");
+  await expect(hover).toContainText("women 15–49");
+  await expect(hover).toContainText("WorldPop 2025");
+  await expect(hover.locator("use")).toHaveCount(3);
+  await page.screenshot({ path: "../outputs/e2e/web/explore-hover.png" });
+  await page.mouse.move(box.x + 5, box.y + 5);
+
   await page.getByRole("radio", { name: /^Population/ }).check();
   const legend = page.getByTestId("explore-legend");
   await expect(legend).toContainText("Population");

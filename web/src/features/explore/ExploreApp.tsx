@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Icon, IconSprite, type IconName } from "@/components/Icon";
 import { dashboardHref } from "@/features/dashboard/dashboardNavigation";
 import { rememberReturnPath } from "@/lib/authClient";
 import type { MapResponse } from "@/lib/dashboardClient";
@@ -114,6 +115,15 @@ const LAYERS: { code: ExploreLayer; label: string; hint: string }[] = [
     hint: "Vulnerability and resilience assessment index, 0 (least) to 1 (most vulnerable).",
   },
 ];
+
+/** The design team's figure for each outcome's affected group. */
+function exposedFigure(outcome: string): IconName {
+  return outcome === "lbw" ? "newborn" : "child";
+}
+
+function outcomeNoun(outcome: string): string {
+  return outcome === "lbw" ? "of low-birth-weight births" : "of under-five deaths";
+}
 
 /** Where each group of layers starts, so historical and projected read apart. */
 const LAYER_GROUP_START: Partial<Record<ExploreLayer, string>> = {
@@ -567,6 +577,7 @@ export function ExploreApp() {
 
   return (
     <div className={styles.shell}>
+      <IconSprite />
       <header className={styles.topbar}>
         <Link href="/" className={styles.brand}>
           CHART
@@ -860,11 +871,15 @@ export function ExploreApp() {
                   <dd>{focusPeople.total.toLocaleString()}</dd>
                 </div>
                 <div>
-                  <dt>Children under five</dt>
+                  <dt>
+                    <Icon name="child" size={14} /> Under five
+                  </dt>
                   <dd>{focusPeople.under5.toLocaleString()}</dd>
                 </div>
                 <div>
-                  <dt>Women 15–49</dt>
+                  <dt>
+                    <Icon name="pregnant-woman" size={14} /> Women 15–49
+                  </dt>
                   <dd>{focusPeople.women_15_49.toLocaleString()}</dd>
                 </div>
                 <div>
@@ -945,16 +960,24 @@ export function ExploreApp() {
             onSelect={(id) => update({ selected: id })}
             onOpen={open}
             onHover={prefetch}
-            detail={
-              state.layer === "population"
-                ? (area) => {
-                    const found = peopleCounts?.counts[area.geography_id ?? ""];
-                    return found
-                      ? `${formatCount(found.total)} people · ${formatCount(found.under5)} under five · WorldPop ${peopleCounts?.year ?? ""}`
-                      : null;
-                  }
-                : undefined
+            figure={
+              state.layer === "observed" || state.layer === "projection"
+                ? exposedFigure(state.outcome)
+                : null
             }
+            caption={
+              state.layer === "observed"
+                ? `${outcomeNoun(state.outcome)} · ${month ? monthLabel(month) : ""}`
+                : state.layer === "projection"
+                  ? `${outcomeNoun(state.outcome)} · ${outlookInfo?.periods.find((p) => p.code === period)?.label ?? ""}${scenario ? `, ${tiers.get(scenario)?.toLowerCase()} emissions` : ""}`
+                  : null
+            }
+            people={(area) => {
+              const found = peopleCounts?.counts[area.geography_id ?? ""];
+              return found && peopleCounts
+                ? { ...found, year: peopleCounts.year }
+                : null;
+            }}
             frameView={frameView}
           />
           {mapError && (

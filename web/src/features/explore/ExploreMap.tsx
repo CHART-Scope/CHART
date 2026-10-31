@@ -7,8 +7,11 @@ import { useEffect, useRef, useState } from "react";
 
 import type { MapArea, MapResponse } from "@/lib/dashboardClient";
 
+import { Icon, type IconName } from "@/components/Icon";
+
 import {
   areaValueText,
+  formatCount,
   colorFor,
   geometryBounds,
   rankText,
@@ -55,8 +58,17 @@ type Props = {
    * pick) or show the whole frame with it outlined ("frame", going up).
    */
   frameView?: "selection" | "frame";
-  /** A second line for the hover card, e.g. an area's head counts. */
-  detail?: (area: MapArea) => string | null;
+  /** The design team's figure for the measure shaded (newborn, child). */
+  figure?: IconName | null;
+  /** A line under the value, e.g. "of births · Sep 2026". */
+  caption?: string | null;
+  /** The area's people, from WorldPop, when known. */
+  people?: (area: MapArea) => {
+    total: number;
+    under5: number;
+    women_15_49: number;
+    year: number;
+  } | null;
 };
 
 type Hover = { area: MapArea; x: number; y: number; flip: boolean };
@@ -71,7 +83,9 @@ export function ExploreMap({
   onOpen,
   onHover,
   frameView = "selection",
-  detail,
+  figure,
+  caption,
+  people,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
@@ -323,18 +337,43 @@ export function ExploreMap({
               : { left: hover.x + 14, top: hover.y + 14 }
           }
           role="status"
+          data-testid="explore-hover"
         >
           <span className={styles.tooltipLevel}>{hover.area.level}</span>
-          <strong>{hover.area.name}</strong>
-          <span className={styles.tooltipValue}>
-            {band && <i style={{ background: band }} />}
-            {areaValueText(hover.area, layer)}
+          <strong className={styles.tooltipName}>{hover.area.name}</strong>
+          <span className={styles.tooltipMain}>
+            {figure && hover.area.value_percent !== null && (
+              <Icon name={figure} size={30} className={styles.tooltipFigure} />
+            )}
+            <span>
+              <span className={styles.tooltipValue}>
+                {band && <i style={{ background: band }} />}
+                {areaValueText(hover.area, layer)}
+              </span>
+              {caption && <small className={styles.tooltipCaption}>{caption}</small>}
+            </span>
           </span>
-          {detail?.(hover.area) && (
-            <span className={styles.tooltipRank}>{detail(hover.area)}</span>
-          )}
           {rank && <span className={styles.tooltipRank}>{rank}</span>}
-          <small>
+          {(() => {
+            const found = people?.(hover.area);
+            return found ? (
+              <span className={styles.tooltipPeople}>
+                <span title="Children under five">
+                  <Icon name="child" size={18} /> {formatCount(found.under5)}
+                  <small>under five</small>
+                </span>
+                <span title="Women aged 15 to 49">
+                  <Icon name="pregnant-woman" size={18} />{" "}
+                  {formatCount(found.women_15_49)}
+                  <small>women 15–49</small>
+                </span>
+                <small className={styles.tooltipSource}>
+                  of {formatCount(found.total)} people · WorldPop {found.year}
+                </small>
+              </span>
+            ) : null;
+          })()}
+          <small className={styles.tooltipHint}>
             {hover.area.geography_id === selectedId
               ? "Selected · double-click to open"
               : "Click for details · double-click to open"}

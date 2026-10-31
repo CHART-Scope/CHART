@@ -18,7 +18,8 @@ Before writing, the script recomputes every county already in the file and
 refuses to continue unless nearly all reproduce exactly (43 of 44 for
 v2_2026_10_06; Nakuru's handover rows differ from its published outlook), so
 the method is proven on the existing release first. Existing entries are
-never changed::
+never changed. Constituencies are added the same way, each from its own
+outlook and ERA5, under ``constituencies``::
 
     DATABASE_URL=... python core/scripts/kenya_calibration_extend.py \\
         core/chart/heat_outlook/releases/v2_2026_10_06/calibration.json
@@ -136,6 +137,29 @@ def main(argv: list[str]) -> None:
                 ),
             }
             print(f"added {geography_id}: {counties[geography_id]}")
+        # Constituencies: each from its own published typical months, its own
+        # ERA5 and its own 1991-2020 reference, as the counties above. The
+        # modellers' constituency projections apply the national curve the
+        # same way, so the observed months match their method.
+        constituencies = document.setdefault("constituencies", {})
+        for geography_id in sorted(
+            session.scalars(
+                select(AdminUnit.app_geography_id).where(
+                    AdminUnit.level == "constituency",
+                    AdminUnit.app_geography_id.like("geo-ke-%"),
+                )
+            )
+        ):
+            if geography_id in constituencies:
+                continue
+            try:
+                constituencies[geography_id] = {
+                    "offset_c": offsets(session, geography_id),
+                    "u5_reference_tmax_c": round(u5_reference(geography_id), 3),
+                }
+            except (LookupError, ValueError) as error:
+                print(f"skipped {geography_id}: {error}")
+        print(f"constituencies calibrated: {len(constituencies)}")
     path.write_text(json.dumps(document, indent=1) + "\n")
 
 

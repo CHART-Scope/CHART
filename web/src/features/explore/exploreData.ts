@@ -216,7 +216,7 @@ export function areaValueText(area: MapArea, layer: ExploreLayer): string {
   if (layer === "heat_days") {
     return `${Math.round(area.value_percent)} heatwave day${Math.round(area.value_percent) === 1 ? "" : "s"}`;
   }
-  return `${formatPercent(area.value_percent)} of cases linked to heat`;
+  return `${formatPercent(area.value_percent)} linked to heat`;
 }
 
 /** Years a period code ("2041-2060") spans. */

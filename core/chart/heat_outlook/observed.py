@@ -45,6 +45,7 @@ from chart.risk.schemas import MapResponse
 from chart.risk.service import load_map_view
 from chart.shared.db.models import (
     AdminUnit,
+    AppGeography,
     ClimateRun,
     DataLabel,
     DistrictClimate,
@@ -109,11 +110,12 @@ def calibration(release: str) -> Calibration:
     if not path.is_file():
         raise ObservedNotCalibrated(release)
     document = json.loads(path.read_text())
+    # Counties and constituencies, each calibrated from its own temperatures.
+    areas = {**document["counties"], **document.get("constituencies", {})}
     return Calibration(
-        offsets={key: value["offset_c"] for key, value in document["counties"].items()},
+        offsets={key: value["offset_c"] for key, value in areas.items()},
         u5_reference={
-            key: value["u5_reference_tmax_c"]
-            for key, value in document["counties"].items()
+            key: value["u5_reference_tmax_c"] for key, value in areas.items()
         },
         note=document["note"],
     )
@@ -163,11 +165,15 @@ def load_observed(
         )
         for key in available
     ]
-    place = "Kenya" if geography_id == KENYA else units[0].name
+    level = "country" if geography_id == KENYA else units[0].level
     return ObservedResponse(
         geography_id=geography_id,
-        place=place if geography_id == KENYA else f"{place} County",
-        level="country" if geography_id == KENYA else "county",
+        place=(
+            "Kenya"
+            if geography_id == KENYA
+            else f"{units[0].name} County" if level == "county" else units[0].name
+        ),
+        level=level,
         outcome=outcome,
         release=release,
         selectors=selectors,
@@ -199,7 +205,7 @@ def load_observed_map(
         raise ViewTurnedOff("observed")
     release = outlook_release()
     _, selector = _resolve_selector(outcome, release, selector, restriction)
-    units = _units(session, KENYA, outcome)
+    units = _frame_units(session, geography_id, outcome)
     scored = _score_units(session, units, outcome, selector, release)
     # Any month one county can score may be mapped: a county's newest month
     # is often newer than Kenya's, and the map shows the others as missing.
@@ -283,17 +289,38 @@ def _available(scored: dict[int, dict[str, CountyMonth]]) -> list[str]:
 def _units(session: Session, geography_id: str, outcome: str) -> list[AdminUnit]:
     if outcome not in OUTCOMES:
         raise OutlookNotAvailable(geography_id)
-    query = select(AdminUnit).where(AdminUnit.level == "county")
     if geography_id == KENYA:
-        query = query.where(AdminUnit.app_geography_id.like(f"{KENYA}-%"))
+        query = select(AdminUnit).where(
+            AdminUnit.level == "county",
+            AdminUnit.app_geography_id.like(f"{KENYA}-%"),
+        )
     elif geography_id.startswith(f"{KENYA}-"):
-        query = query.where(AdminUnit.app_geography_id == geography_id)
+        query = select(AdminUnit).where(
+            AdminUnit.level.in_(("county", "constituency")),
+            AdminUnit.app_geography_id == geography_id,
+        )
     else:
         raise OutlookNotAvailable(geography_id)
     units = list(session.scalars(query.order_by(AdminUnit.name)))
     if not units:
         raise OutlookNotAvailable(geography_id)
     return units
+
+
+def _frame_units(session: Session, geography_id: str, outcome: str) -> list[AdminUnit]:
+    """The areas a frame's map shows: Kenya's counties, a county's
+    constituencies, or a constituency itself."""
+    if geography_id == KENYA:
+        return _units(session, KENYA, outcome)
+    children = list(
+        session.scalars(
+            select(AdminUnit)
+            .join(AppGeography, AppGeography.id == AdminUnit.app_geography_id)
+            .where(AppGeography.parent_id == geography_id)
+            .order_by(AdminUnit.name)
+        )
+    )
+    return children or _units(session, geography_id, outcome)
 
 
 def _resolve_selector(
@@ -485,7 +512,15 @@ def warm_observed_cache(get_factory, *, interval_seconds: float = 600) -> None:
                 # Resolved here, not at startup: a database that is not
                 # reachable yet must never stop the API from starting.
                 with get_factory()() as session:
-                    units = _units(session, KENYA, LBW_OUTCOME)
+                    # Counties and constituencies, so every map opens warm.
+                    units = _units(session, KENYA, LBW_OUTCOME) + list(
+                        session.scalars(
+                            select(AdminUnit).where(
+                                AdminUnit.level == "constituency",
+                                AdminUnit.app_geography_id.like(f"{KENYA}-%"),
+                            )
+                        )
+                    )
                     for outcome, selector in DEFAULT_SELECTOR.items():
                         started = time.monotonic()
                         _score_units(session, units, outcome, selector, release)

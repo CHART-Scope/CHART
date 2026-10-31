@@ -8,7 +8,7 @@ import styles from "./explore.module.css";
 export type CyclePoint = { month: number; value: number | null; tmax: number | null };
 
 const WIDTH = 320;
-const HEIGHT = 132;
+const HEIGHT = 112;
 const PAD = { top: 12, right: 8, bottom: 20, left: 30 };
 
 /**

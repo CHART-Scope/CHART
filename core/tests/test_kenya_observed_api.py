@@ -49,6 +49,7 @@ from chart.shared.db.models import (
 SHIPPED = "v2_2026_10_06"
 FIXTURES = Path(__file__).parent / "fixtures" / "kenya_dlnm"
 KAJIADO = "geo-ke-kajiado"
+CENTRAL = "geo-ke-constituency-kajiado-central"
 GARISSA = "geo-ke-garissa"
 OFFSET_C = 0.5
 
@@ -107,6 +108,9 @@ def release(tmp_path, monkeypatch) -> str:
                 "counties": {
                     county: {"offset_c": [OFFSET_C] * 12, "u5_reference_tmax_c": 28.54}
                     for county in (KAJIADO, GARISSA)
+                },
+                "constituencies": {
+                    CENTRAL: {"offset_c": [OFFSET_C] * 12, "u5_reference_tmax_c": 28.54}
                 },
             }
         )
@@ -593,6 +597,8 @@ def test_shipped_calibration_covers_every_county() -> None:
     document = json.loads((dlnm.release_dir(SHIPPED) / "calibration.json").read_text())
     counties = document["counties"]
     assert len(counties) == 47
+    # Every constituency, each from its own outlook and ERA5.
+    assert len(document["constituencies"]) == 289
     added = {key for key, entry in counties.items() if "derived" in entry}
     assert added == {"geo-ke-mombasa", "geo-ke-narok", "geo-ke-vihiga"}
     assert counties["geo-ke-baringo"]["offset_c"][0] == -4.175
@@ -642,3 +648,69 @@ def test_scores_survive_a_restart_without_rescoring(
     observed._SCORED.clear()
     assert client.get(path).json()["estimate"] == first["estimate"]
     assert computed
+
+
+def test_a_constituency_has_its_own_observed_months(
+    client, factory, monkeypatch
+) -> None:
+    """Constituencies showed "no model": the national curve now scores them
+    on their own ERA5 and calibration, as the modellers' projections do."""
+    with factory() as session:
+        session.add(
+            AppGeography(
+                id=CENTRAL,
+                country_code="KE",
+                level="constituency",
+                level_label="Constituency",
+                name="Kajiado Central",
+                parent_id=KAJIADO,
+                path="/kenya/kajiado/kajiado-central",
+            )
+        )
+        session.flush()
+        county = _county(session)
+        session.add(
+            AdminUnit(
+                geography_id=county.geography_id,
+                app_geography_id=CENTRAL,
+                level="constituency",
+                code="kajiado-central",
+                name="Kajiado Central",
+            )
+        )
+        session.commit()
+    case = _cases("lbw_validation_cases.csv")[0]
+    lags = [float(case[f"tmax_lag{k}"]) for k in range(9)]
+    _seed_months(factory, date(2026, 7, 1), lags, county=CENTRAL)
+    _seed_months(factory, date(2026, 7, 1), lags)
+
+    body = client.get(f"/heat-outlook/{CENTRAL}/observed?outcome=lbw").json()
+    assert body["place"] == "Kajiado Central"
+    assert body["level"] == "constituency"
+    assert body["estimate"]["value_percent"] == pytest.approx(
+        100 * float(case["expected_af_heat_P"]), abs=0.01
+    )
+
+    def shapes_only(_session, geography_id, month, **_kwargs) -> MapResponse:
+        return MapResponse(
+            geography_id=geography_id,
+            outcome="lbw",
+            month=month,
+            areas=[
+                MapArea(
+                    admin_unit_id=99,
+                    geography_id=CENTRAL,
+                    code="kajiado-central",
+                    level="constituency",
+                    name="Kajiado Central",
+                )
+            ],
+        )
+
+    monkeypatch.setattr(observed, "load_map_view", shapes_only)
+    mapped = client.get(
+        f"/heat-outlook/{KAJIADO}/observed/map?outcome=lbw&month=2026-07"
+    )
+    assert mapped.status_code == 200, mapped.text
+    (area,) = mapped.json()["areas"]
+    assert area["value_percent"] == body["estimate"]["value_percent"]

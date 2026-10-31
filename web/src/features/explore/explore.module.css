@@ -914,3 +914,155 @@
   display: block;
   margin-bottom: 2px;
 }
+
+/* ---- Compact side panel: everything visible with little scrolling ---- */
+.panel {
+  width: 348px;
+  padding: 12px 16px 20px;
+}
+
+.placeName {
+  font-size: 24px;
+  margin: 0 0 2px;
+}
+
+.level {
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.section {
+  padding: 10px 0;
+}
+
+.section:first-of-type {
+  margin-top: 6px;
+}
+
+.section h2 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--color-text-dim);
+}
+
+.layers {
+  gap: 3px;
+}
+
+.layer {
+  font-size: 13px;
+}
+
+.segmented button,
+.chips button,
+.months button {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.months {
+  gap: 4px;
+}
+
+.bigNumber {
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.muted {
+  font-size: 12px;
+}
+
+.people {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.people dt {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+}
+
+.people dd {
+  font-size: 15px;
+}
+
+.periods {
+  gap: 3px;
+  font-size: 12px;
+}
+
+.footnote {
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+/* ---- Hover card ---- */
+.tooltip {
+  min-width: 220px;
+  max-width: 280px;
+  padding: 10px 12px;
+  gap: 4px;
+  border-radius: 0.6rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+.tooltipName {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.tooltipMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.tooltipFigure {
+  flex-shrink: 0;
+  color: var(--color-maroon);
+}
+
+.tooltipMain .tooltipValue {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tooltipCaption {
+  display: block;
+  color: var(--color-text-muted);
+}
+
+.tooltipPeople {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-grey-light);
+}
+
+.tooltipPeople > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.tooltipPeople > span small {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.tooltipSource {
+  grid-column: 1 / -1;
+  color: var(--color-text-faint);
+}
+
+.tooltipHint {
+  color: var(--color-text-faint);
+}

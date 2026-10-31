@@ -104,7 +104,16 @@ county holds ERA5 for 2011–2020, `core/scripts/kenya_calibration_extend.py`
 adds the missing ones from the release's published 2011–2020 typical months
 and the stored ERA5, after reproducing the published offsets (43 of 44
 exactly; Nakuru's handover rows differ from its published outlook, and its
-published offsets are kept). Added entries are marked `derived`. Stored ERA5
+published offsets are kept). Added entries are marked `derived`.
+
+The same script calibrates all 289 constituencies (`constituencies` in
+`calibration.json`), each from its own published 2011–2020 typical months, its
+own stored ERA5 and its own 1991–2020 under-five reference. Kenya's models are
+one national curve, and the modellers' constituency projections apply it to
+each constituency's temperatures; the observed months now do the same, so a
+constituency shows its own observed estimate instead of "no model".
+Constituency offsets differ from their county's by 0.8 °C at the median (up to
+3.5 °C in hilly counties), which is why each is calibrated separately. Stored ERA5
 for 2011–2020 matches the release's ERA5 file exactly for all 45 counties
 that file covers.
 
