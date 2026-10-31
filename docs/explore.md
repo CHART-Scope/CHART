@@ -36,8 +36,7 @@ leaves it off, and every read then needs a signed-in user as before.
 
 The map is MapLibre GL over OpenFreeMap's Positron basemap (open data from
 OpenStreetMap, no API key; `NEXT_PUBLIC_EXPLORE_BASEMAP` overrides the style
-URL). Areas are CHART's own simplified boundaries. Heat shares use six classes:
-the dashboard's 0–5, 5–10 and 10–15%, then 15–25, 25–35 and over 35%, because
-projected shares reach 25–40% in Madhya Pradesh and a single "over 15%" class
-painted the whole state one colour. If the basemap cannot load, the areas are drawn on a plain
+URL). Areas are CHART's own simplified boundaries. Heat shares use 5-point classes
+up to 35%: projected shares in Madhya Pradesh run 25–34% across divisions, and
+the dashboard's top class ("over 15%") painted the whole state one colour. If the basemap cannot load, the areas are drawn on a plain
 background, so the map never comes up empty.

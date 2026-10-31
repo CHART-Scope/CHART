@@ -45,16 +45,18 @@ export const MONTH_LABELS = [
 export type Band = { upper: number; label: string; color: string };
 
 /**
- * Heat-attributable share, percent of cases. The dashboard's four classes up
- * to 15%, then two more: projected shares reach 25-40% in Madhya Pradesh, and
- * a single ">15%" class painted the whole state one colour.
+ * Heat-attributable share, percent of cases, in 5-point steps up to 35%.
+ * Projected shares in Madhya Pradesh run 25-34% across its divisions; the
+ * dashboard's top class (">15%") painted the whole state one colour.
  */
 export const SHARE_BANDS: Band[] = [
-  { upper: 5, label: "0–5%", color: "#f8e3c6" },
-  { upper: 10, label: "5–10%", color: "#f2b06a" },
-  { upper: 15, label: "10–15%", color: "#e0602c" },
-  { upper: 25, label: "15–25%", color: "#b8352a" },
-  { upper: 35, label: "25–35%", color: "#7d1d2a" },
+  { upper: 5, label: "0–5%", color: "#fbecd6" },
+  { upper: 10, label: "5–10%", color: "#f6cf95" },
+  { upper: 15, label: "10–15%", color: "#f0a65e" },
+  { upper: 20, label: "15–20%", color: "#e27a3d" },
+  { upper: 25, label: "20–25%", color: "#c8502e" },
+  { upper: 30, label: "25–30%", color: "#a1302a" },
+  { upper: 35, label: "30–35%", color: "#741c27" },
   { upper: Number.POSITIVE_INFINITY, label: ">35%", color: "#45101a" },
 ];
 
