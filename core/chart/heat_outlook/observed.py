@@ -391,7 +391,7 @@ def _compute_scores(
     }
 
 
-def warm_observed_cache(session_factory, *, interval_seconds: float = 600) -> None:
+def warm_observed_cache(get_factory, *, interval_seconds: float = 600) -> None:
     """Keep Kenya's default observed views scored, so no visitor waits for it.
 
     Runs forever in a daemon thread: scores every county for each outcome's
@@ -402,7 +402,9 @@ def warm_observed_cache(session_factory, *, interval_seconds: float = 600) -> No
         try:
             if _calibrated():
                 release = outlook_release()
-                with session_factory() as session:
+                # Resolved here, not at startup: a database that is not
+                # reachable yet must never stop the API from starting.
+                with get_factory()() as session:
                     units = _units(session, KENYA, LBW_OUTCOME)
                     for outcome, selector in DEFAULT_SELECTOR.items():
                         started = time.monotonic()
@@ -418,10 +420,10 @@ def warm_observed_cache(session_factory, *, interval_seconds: float = 600) -> No
         time.sleep(interval_seconds)
 
 
-def start_observed_cache_warmer(session_factory) -> threading.Thread:
+def start_observed_cache_warmer(get_factory) -> threading.Thread:
     thread = threading.Thread(
         target=warm_observed_cache,
-        args=(session_factory,),
+        args=(get_factory,),
         name="observed-cache-warmer",
         daemon=True,
     )

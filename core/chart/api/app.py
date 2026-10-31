@@ -96,7 +96,7 @@ async def lifespan(_app: FastAPI):
     # Kenya's observed months are scored from stored ERA5; keep them scored
     # in the background so no request waits on a full rescoring.
     if os.getenv("DATABASE_URL"):
-        start_observed_cache_warmer(get_session_factory())
+        start_observed_cache_warmer(get_session_factory)
     try:
         yield
     finally:
