@@ -233,6 +233,8 @@ export async function fetchVraMap(
   const response = await authFetch(`${base(geographyId)}/map`, {
     accessToken,
     signal: options.signal,
+    // Revalidated by ETag; the server rebuilds only when its data changes.
+    cache: "default",
   });
   return readJson<MapResponse>(response);
 }

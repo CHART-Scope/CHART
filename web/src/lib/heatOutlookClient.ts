@@ -154,7 +154,7 @@ export async function fetchHeatOutlook(
   if (selection.selector) params.set("selector", selection.selector);
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}?${params}`,
-    { accessToken, signal },
+    { accessToken, signal, cache: "default" },
   );
   if (response.status === 404) throw new OutlookNotPublished(geographyId);
   if (!response.ok) throw new Error("The heat outlook could not load.");
@@ -174,7 +174,7 @@ export async function fetchHeatOutlookMap(
   if (selection.reference) params.set("reference", selection.reference);
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/map?${params}`,
-    { accessToken },
+    { accessToken, cache: "default" },
   );
   if (!response.ok) throw new Error("The heat outlook map could not load.");
   return (await response.json()) as MapResponse;
@@ -196,7 +196,7 @@ export async function fetchObservedRisk(
 ): Promise<ObservedRisk> {
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/observed?${observedParams(selection)}`,
-    { accessToken, signal },
+    { accessToken, signal, cache: "default" },
   );
   if (response.status === 404) throw new OutlookNotPublished(geographyId);
   if (!response.ok) throw new Error("The observed estimate could not load.");
@@ -211,7 +211,7 @@ export async function fetchObservedRiskMap(
 ): Promise<MapResponse> {
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/observed/map?${observedParams(selection)}`,
-    { accessToken },
+    { accessToken, cache: "default" },
   );
   if (!response.ok) throw new Error("The observed map could not load.");
   return (await response.json()) as MapResponse;
@@ -239,7 +239,7 @@ export async function fetchOutlookCapabilities(
   const params = new URLSearchParams({ outcome });
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/capabilities?${params}`,
-    { accessToken, signal },
+    { accessToken, signal, cache: "default" },
   );
   if (!response.ok) throw new Error("Available outlook views could not load.");
   return response.json() as Promise<OutlookCapabilities>;
@@ -263,7 +263,7 @@ export async function fetchClimateLayer(
   if (month) params.set("month", month);
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/climate?${params}`,
-    { accessToken },
+    { accessToken, cache: "default" },
   );
   if (!response.ok) throw new Error("The climate layer could not load.");
   return (await response.json()) as ClimateLayerMap;
@@ -297,7 +297,7 @@ export async function fetchPopulation(
 ): Promise<PopulationMap> {
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/population?measure=${measure}`,
-    { auth: false },
+    { auth: false, cache: "default" },
   );
   if (!response.ok) throw new Error("Population could not load.");
   return (await response.json()) as PopulationMap;
@@ -340,7 +340,7 @@ export async function fetchForecast(
 ): Promise<PlaceForecast> {
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/forecast?outcome=${outcome}`,
-    { auth: false },
+    { auth: false, cache: "default" },
   );
   if (!response.ok) throw new Error("The forecast could not load.");
   return (await response.json()) as PlaceForecast;
@@ -356,7 +356,7 @@ export async function fetchForecastMap(
   if (month) params.set("month", month);
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/forecast/map?${params}`,
-    { auth: false },
+    { auth: false, cache: "default" },
   );
   if (!response.ok) throw new Error("The forecast map could not load.");
   return (await response.json()) as ForecastMap;

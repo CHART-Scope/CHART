@@ -103,6 +103,19 @@ level with the place you came from outlined; the breadcrumb jumps to any
 ancestor; and the browser's Back and Forward step through the places visited.
 Outcome, layer, month, period and emissions are kept throughout.
 
+## Caching
+
+Three layers keep a view from loading twice. The API builds each published
+read once per **data version** (`core/chart/api/read_cache.py`: the newest
+climate run, stored prediction, active model, VRA run, forecast and
+population files, and the deployed image) and keeps it; it sends an `ETag`
+and `Cache-Control` (public for visitors, private for signed-in users, one
+minute, then revalidate), so a browser reload either reuses its copy or gets
+a 304 without the server rebuilding anything. Explore's own page cache
+answers any read already made this visit, including hover prefetches.
+Responses are keyed by the caller's Authorization header; the cache is on
+where `CHART_READ_CACHE=1` (the deployed API).
+
 ## Loading
 
 Each read is made once per page and only once every choice it depends on is

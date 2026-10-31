@@ -397,6 +397,8 @@ test("population shows density on the map and counts for the place", async ({
   await expect(hover).toContainText("women 15–49");
   await expect(hover).toContainText("WorldPop 2025");
   await expect(hover.locator("use")).toHaveCount(3);
+  // Kajiado has no areas beneath it here, so no double-click is offered.
+  await expect(hover).not.toContainText("double-click");
   await page.screenshot({ path: "../outputs/e2e/web/explore-hover.png" });
   await page.mouse.move(box.x + 5, box.y + 5);
 

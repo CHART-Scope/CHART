@@ -26,6 +26,8 @@ x-python-environment: &python-environment
   PREDICTION_LEASE_SECONDS: "600"
   # Published estimates readable without signing in (docs/explore.md).
   CHART_PUBLIC_READ: ${CHART_PUBLIC_READ:-false}
+  # Published reads built once per data version (core/chart/api/read_cache.py).
+  CHART_READ_CACHE: "1"
 
 x-dagster-environment: &dagster-environment
   <<: *python-environment

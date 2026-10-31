@@ -29,6 +29,7 @@ import logging
 import os
 import sys
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -115,12 +116,14 @@ def available_systems(issue: date) -> list[System]:
         request = urllib.request.Request(
             CONSTRAINTS_URL, data=body, headers={"content-type": "application/json"}
         )
-        try:
-            with urllib.request.urlopen(request, timeout=60) as response:
-                found = json.loads(response.read()).get("system") or []
-        except OSError:
-            logger.warning("C3S constraints for %s unavailable", centre)
-            continue
+        found: list[str] = []
+        for _attempt in range(3):
+            try:
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    found = json.loads(response.read()).get("system") or []
+                break
+            except OSError:
+                logger.warning("C3S constraints for %s unavailable; retrying", centre)
         # The newest system when a centre runs two (ECCC).
         if found:
             systems.append(System(centre, max(found, key=int)))
@@ -281,14 +284,24 @@ def build(country: str, issue: date | None = None, *, log=print) -> Path:
     )
     cache = Path(os.getenv("ERA5_CACHE_DIR", "/tmp")) / "c3s-seasonal"
     anomalies: dict[str, dict[str, dict[int, float]]] = {}
-    for system in systems:
-        try:
-            anomalies[system.label] = area_anomalies(
-                download(system, issue, bbox, cache), shapes
-            )
+
+    def fetch(system: System) -> tuple[System, Path]:
+        return system, download(system, issue, bbox, cache)
+
+    # All systems are requested together: each waits in the Copernicus queue
+    # on its own, so one at a time would take hours.
+    with ThreadPoolExecutor(max_workers=len(systems)) as pool:
+        futures = [pool.submit(fetch, system) for system in systems]
+        for future in as_completed(futures):
+            try:
+                system, path = future.result()
+            except (
+                Exception
+            ) as error:  # noqa: BLE001 - one centre must not stop the rest
+                log(f"{country} {issue:%Y-%m}: a system was skipped ({error})")
+                continue
+            anomalies[system.label] = area_anomalies(path, shapes)
             log(f"{country} {issue:%Y-%m}: {system.label} downloaded")
-        except Exception as error:  # noqa: BLE001 - one centre must not stop the rest
-            log(f"{country} {issue:%Y-%m}: {system.label} skipped ({error})")
     if not anomalies:
         raise RuntimeError("no C3S system could be downloaded")
 

@@ -1136,6 +1136,10 @@ export function ExploreApp() {
             onSelect={(id) => update({ selected: id })}
             onOpen={open}
             onHover={prefetch}
+            childLabel={(id) => {
+              const below = children(places, id);
+              return below.length ? `${below[0].levelLabel.toLowerCase()}s` : null;
+            }}
             figure={
               state.layer === "observed" ||
               state.layer === "projection" ||

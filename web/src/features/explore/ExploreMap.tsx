@@ -62,6 +62,8 @@ type Props = {
   figure?: IconName | null;
   /** A line under the value, e.g. "of births · Sep 2026". */
   caption?: string | null;
+  /** The level beneath a place ("districts"), or null when it has none. */
+  childLabel?: (geographyId: string) => string | null;
   /** A per-area line, e.g. a forecast's range across systems. */
   note?: (area: MapArea) => string | null;
   /** The area's people, from WorldPop, when known. */
@@ -87,6 +89,7 @@ export function ExploreMap({
   frameView = "selection",
   figure,
   caption,
+  childLabel,
   note,
   people,
 }: Props) {
@@ -385,9 +388,15 @@ export function ExploreMap({
             ) : null;
           })()}
           <small className={styles.tooltipHint}>
-            {hover.area.geography_id === selectedId
-              ? "Selected · double-click to open"
-              : "Click for details · double-click to open"}
+            {(() => {
+              const below = childLabel?.(hover.area.geography_id ?? "");
+              const first =
+                hover.area.geography_id === selectedId
+                  ? "Selected"
+                  : "Click for details";
+              // Only places with areas beneath them can be opened.
+              return below ? `${first} · double-click for its ${below}` : first;
+            })()}
           </small>
         </div>
       )}
