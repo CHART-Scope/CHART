@@ -85,6 +85,9 @@ test("selecting a county shows its seasonal cycle and projected change", async (
     .click();
   await expect(page).toHaveURL(/period=2061-2080/);
   await expect(page.getByTestId("explore-legend")).toContainText("2061–2080");
+  // High projected shares keep their own classes instead of one ">15%".
+  await expect(page.getByTestId("explore-legend")).toContainText("25–35%");
+  await expect(page.getByTestId("explore-legend")).toContainText(">35%");
   // Shorter periods are a choice, still without overlapping windows.
   await page
     .getByRole("group", { name: "Period length" })
