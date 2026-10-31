@@ -145,12 +145,10 @@ def _seed_place_and_model(session_factory) -> None:
         session.commit()
 
 
-def _seed_three_climate_months(session_factory) -> None:
+def _seed_three_climate_months(session_factory, code: str = "madhya-pradesh") -> None:
     now = TEST_NOW
     with session_factory() as session:
-        admin_unit = session.scalar(
-            select(AdminUnit).where(AdminUnit.code == "madhya-pradesh")
-        )
+        admin_unit = session.scalar(select(AdminUnit).where(AdminUnit.code == code))
         assert admin_unit is not None
         observed_records = []
         for period, value in (
@@ -1229,3 +1227,74 @@ def test_a_newer_request_for_another_outcome_does_not_hide_this_one(
         now=TEST_NOW,
     )
     assert again.request_id == lbw.request_id
+
+
+def test_a_district_without_a_model_is_scored_with_its_nearest_ancestors(
+    session_factory,
+) -> None:
+    """India's 52 districts had no model and so no observed months.
+
+    A district is scored with its nearest fitted ancestor's curve (here the
+    state's) on the district's own climate, stored as the district's result,
+    and the mapping says where the curve came from.
+    """
+    from chart.model_registry.service import get_active_model_mapping
+
+    with session_factory() as session:
+        session.add(
+            AppGeography(
+                id="geo-in-madhya-pradesh-district-bhopal",
+                country_code="IN",
+                level="district",
+                level_label="District",
+                name="Bhopal",
+                parent_id="geo-in-madhya-pradesh",
+                path="/india/madhya-pradesh/district/bhopal",
+            )
+        )
+        session.flush()
+        state = session.scalar(select(AdminUnit))
+        district = AdminUnit(
+            geography_id=state.geography_id,
+            app_geography_id="geo-in-madhya-pradesh-district-bhopal",
+            level="district",
+            code="bhopal-district",
+            name="Bhopal",
+        )
+        session.add(district)
+        session.commit()
+        district_id = district.id
+        mapping = get_active_model_mapping(session, admin_unit_id=district_id)
+        own = get_active_model_mapping(
+            session, admin_unit_id=district_id, inherit=False
+        )
+    assert own is None
+    assert mapping is not None
+    assert mapping.model_area_name == "Madhya Pradesh"
+    assert mapping.inherited_from == "geo-in-madhya-pradesh"
+
+    request = PredictRequest(
+        geography_id="geo-in-madhya-pradesh-district-bhopal",
+        planning_date=date(2026, 7, 1),
+    )
+    accepted = submit_prediction(request, session_factory=session_factory)
+    lease_token = _claim(session_factory, accepted.request_id, "dagster-district")
+    _seed_three_climate_months(session_factory, code="bhopal-district")
+    prepare_prediction_input(
+        accepted.request_id,
+        live=False,
+        lease_token=lease_token,
+        session_factory=session_factory,
+        now=TEST_NOW,
+    )
+    with patch("chart.climate.service.score_lbw_model", return_value=_score()) as score:
+        complete_prediction_request(
+            accepted.request_id,
+            lease_token=lease_token,
+            session_factory=session_factory,
+        )
+    # The state's curve, the district's temperatures, stored for the district.
+    assert score.call_args.args[0].model_area_name == "Madhya Pradesh"
+    with session_factory() as session:
+        stored = session.scalars(select(PredictionResult)).all()
+    assert [row.admin_unit_id for row in stored] == [district_id]

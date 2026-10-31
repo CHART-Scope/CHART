@@ -108,6 +108,26 @@ def live_model_release(
     )
 
 
+def _reference_note(
+    session: Session,
+    unit: AdminUnit,
+    outcome: str,
+    release: str,
+    model_area: str | None,
+) -> str:
+    mapping = get_active_model_mapping(session, admin_unit_id=unit.id, outcome=outcome)
+    curve = f"the {release} model" + (f" fitted for {model_area}" if model_area else "")
+    if mapping is not None and mapping.inherited_from:
+        # The district has no curve of its own; its division's is applied
+        # to the district's own temperatures, as the projections do.
+        return (
+            f"No model was fitted for {unit.name}; scored with {curve} "
+            f"(the nearest fitted area) on {unit.name}'s own ERA5 daily "
+            "maximum temperatures."
+        )
+    return f"Scored by {curve}, on ERA5 daily maximum temperature for this place."
+
+
 def load_stored_observed(
     session: Session,
     geography_id: str,
@@ -151,11 +171,7 @@ def load_stored_observed(
             )
             for key, row in sorted(stored.items())
         ],
-        reference_note=(
-            f"Scored by the {release} model"
-            + (f" fitted for {model_area}" if model_area else "")
-            + ", on ERA5 daily maximum temperature for this place."
-        ),
+        reference_note=_reference_note(session, unit, outcome, release, model_area),
         calibration_note=(
             "Estimates are computed when the month's climate is loaded and "
             "stored; the dashboard reads them."

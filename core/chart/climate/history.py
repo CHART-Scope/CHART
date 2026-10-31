@@ -29,8 +29,6 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from chart.heat_outlook.service import legacy_observed_supported, published_index
 from chart.shared.db.models import (
-    ActiveModelAssignment,
-    AdminUnit,
     ClimateRun,
     DataLabel,
     DistrictClimate,
@@ -189,25 +187,25 @@ def score_observed(
     # Imported here: the request path loads the model registry and scoring
     # clients, which pulling climate does not need.
     from chart.heat_outlook.observed_stored import live_model_release
-    from chart.heat_outlook.service import LBW_OUTCOME
+    from chart.heat_outlook.service import LBW_OUTCOME, U5_OUTCOME
 
     from .requests import submit_prediction
     from .schemas import PredictRequest, PredictResponse, PregnancyWindow
 
     with factory() as session:
-        rows = session.execute(
-            select(AdminUnit.app_geography_id, ActiveModelAssignment.outcome)
-            .join(
-                ActiveModelAssignment,
-                ActiveModelAssignment.admin_unit_id == AdminUnit.id,
-            )
-            .where(AdminUnit.app_geography_id.like(f"geo-{country_code.lower()}-%"))
-            .order_by(AdminUnit.app_geography_id, ActiveModelAssignment.outcome)
-        ).all()
-        # Kenya's counties are shown by the calibrated scorer, which reads the
-        # stored climate directly; scoring them through R would go unread.
-        # Every validated pregnancy window is stored, so the dashboard can
-        # offer whichever the country settings leave on.
+        # Every configured place with a model of its own or its nearest
+        # fitted ancestor's (districts use their division's curve on their
+        # own temperatures).
+        rows = [
+            (unit.app_geography_id, outcome)
+            for unit in configured_areas(session, country_code)
+            for outcome in (LBW_OUTCOME, U5_OUTCOME)
+            if unit.app_geography_id
+        ]
+        # Kenya's counties and constituencies are shown by the calibrated
+        # scorer, which reads the stored climate directly; scoring them
+        # through R would go unread. Every validated pregnancy window is
+        # stored, so the dashboard can offer whichever settings leave on.
         assigned: list[tuple[str, str, tuple[PregnancyWindow, ...] | None]] = []
         for geography_id, outcome in rows:
             if not geography_id or legacy_observed_supported(
@@ -215,9 +213,11 @@ def score_observed(
             ):
                 continue
             found = live_model_release(session, geography_id, outcome)
+            if found is None:
+                continue
             validated = cast(
                 tuple[PregnancyWindow, ...],
-                found[3] if found and outcome == LBW_OUTCOME else (),
+                found[3] if outcome == LBW_OUTCOME else (),
             )
             assigned.append((geography_id, outcome, validated or None))
     if not assigned:

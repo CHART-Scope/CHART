@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
@@ -41,6 +41,11 @@ class ActiveModelMapping:
     validated_pregnancy_windows: tuple[PregnancyWindow, ...]
     outcome: str = DEFAULT_OUTCOME
     input_spec: dict | None = None
+    #: Set when the place has no fitted model of its own and uses its nearest
+    #: ancestor's (a district its division's curve, applied to the district's
+    #: own temperatures, as the modellers' projections do): that place's
+    #: geography id.
+    inherited_from: str | None = None
 
 
 def release_base_uri(release_file_uri: str | None) -> str | None:
@@ -193,6 +198,26 @@ def get_active_model_mapping(
     admin_unit_id: int,
     module: str = "prediction",
     outcome: str = DEFAULT_OUTCOME,
+    inherit: bool = True,
+) -> ActiveModelMapping | None:
+    """The place's active model, or with ``inherit`` its nearest ancestor's.
+
+    A place below the level a model was fitted at (an India district, a
+    Kenya constituency) is scored with its nearest fitted ancestor's curve on
+    its own temperatures; the mapping says so in ``inherited_from``.
+    """
+    own = _own_active_mapping(session, admin_unit_id, module, outcome)
+    if own is not None or not inherit:
+        return own
+    for ancestor_unit_id, geography_id in _ancestor_units(session, admin_unit_id):
+        found = _own_active_mapping(session, ancestor_unit_id, module, outcome)
+        if found is not None:
+            return replace(found, inherited_from=geography_id)
+    return None
+
+
+def _own_active_mapping(
+    session: Session, admin_unit_id: int, module: str, outcome: str
 ) -> ActiveModelMapping | None:
     row = session.execute(
         select(ModelRelease, ModelAreaMapping)
@@ -225,6 +250,28 @@ def get_active_model_mapping(
         outcome=release.outcome,
         input_spec=release.input_spec,
     )
+
+
+def _ancestor_units(session: Session, admin_unit_id: int) -> list[tuple[int, str]]:
+    """(admin unit id, geography id) of each ancestor, nearest first."""
+    geography_id = session.scalar(
+        select(AdminUnit.app_geography_id).where(AdminUnit.id == admin_unit_id)
+    )
+    chain: list[tuple[int, str]] = []
+    seen: set[str] = set()
+    while geography_id and geography_id not in seen:
+        seen.add(geography_id)
+        geography_id = session.scalar(
+            select(AppGeography.parent_id).where(AppGeography.id == geography_id)
+        )
+        if not geography_id:
+            break
+        unit_id = session.scalar(
+            select(AdminUnit.id).where(AdminUnit.app_geography_id == geography_id)
+        )
+        if unit_id is not None:
+            chain.append((unit_id, geography_id))
+    return chain
 
 
 def get_active_model_mappings(
@@ -291,6 +338,14 @@ def get_model_mapping(
         .limit(1)
     ).first()
     if row is None:
+        # A place scored with an ancestor's curve has no mapping of its own
+        # in the release; the ancestor's is the one it was scored with.
+        for ancestor_unit_id, geography_id in _ancestor_units(session, admin_unit_id):
+            found = get_model_mapping(
+                session, release_id=release_id, admin_unit_id=ancestor_unit_id
+            )
+            if found is not None:
+                return replace(found, inherited_from=geography_id)
         return None
     release, mapping = row
     return ActiveModelMapping(

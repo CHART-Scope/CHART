@@ -117,6 +117,19 @@ Constituency offsets differ from their county's by 0.8 °C at the median (up to
 for 2011–2020 matches the release's ERA5 file exactly for all 45 counties
 that file covers.
 
+## Places without a fitted model
+
+Models are fitted for some levels only: in India the state and its 10
+divisions, in Kenya the national curve. A place below them (a Madhya Pradesh
+district) is scored with its **nearest fitted ancestor's curve** (its
+division's) on the place's **own** ERA5 temperatures, stored as the place's
+result and labelled "No model was fitted for X; scored with the model fitted
+for Y". The model registry resolves this (`get_active_model_mapping`, with
+`inherited_from` naming the ancestor), so predictions, the backfill's
+`score` step and the observed view all treat the district alike. The planning
+screens' place lists are unchanged. This mirrors how the modellers' district
+and constituency projections apply a wider curve to local temperatures.
+
 ## ERA5-Land map layer
 
 `--product era5-land` (`make climate-backfill PRODUCT=era5-land`) pulls

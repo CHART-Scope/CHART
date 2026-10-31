@@ -424,6 +424,18 @@ test("population shows density on the map and counts for the place", async ({
   });
 });
 
+test("the first map load says so, then clears", async ({ page }) => {
+  await page.route("**/heat-outlook/geo-ke/observed/map**", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await route.fallback();
+  });
+  await openExplore(page, "frame=geo-ke&outcome=lbw");
+  const loading = page.getByRole("status").filter({ hasText: "Loading map" });
+  await expect(loading).toBeVisible();
+  await expect(loading).toHaveCount(0);
+  await expect(page.getByTestId("explore-estimate")).toBeVisible();
+});
+
 test("a missing layer says so instead of an empty map", async ({ page }) => {
   await openExplore(page, "frame=geo-ke&outcome=lbw&layer=vulnerability");
   await expect(

@@ -328,6 +328,11 @@ export function ExploreMap({
     <div className={styles.mapFrame} aria-busy={loading}>
       <div ref={container} className={styles.map} data-testid="explore-map" />
       <div className={styles.mapProgress} data-active={loading || undefined} />
+      {loading && !data && (
+        <div className={styles.mapFirstLoad} role="status">
+          <span className={styles.spinner} aria-hidden="true" /> Loading map…
+        </div>
+      )}
       {hover && (
         <div
           className={styles.tooltip}
