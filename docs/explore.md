@@ -56,7 +56,9 @@ shifting each 2006–2016 year's daily series by the forecast's departure from
 normal), India's live models (districts with their division's; under-five
 with the forecast repeated over its lags, the release's interactive
 profile). `python -m chart.climate.seasonal_forecast build --country KE`
-builds an issue; the Dagster `seasonal_forecast_sensor` checks daily and
+builds an issue and saves it to `MODEL_CACHE_DIR/forecasts/{country}-{issue}.json`
+(downloads are kept under `ERA5_CACHE_DIR/c3s-seasonal`, so a rebuild does not
+queue at the CDS again); the Dagster `seasonal_forecast_sensor` checks daily and
 rebuilds both countries when C3S publishes a new issue. Beyond six months
 forecast skill is too low to show; the projections start in the next
 five-year period.

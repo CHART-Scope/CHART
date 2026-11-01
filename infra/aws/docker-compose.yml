@@ -28,6 +28,14 @@ x-python-environment: &python-environment
   CHART_PUBLIC_READ: ${CHART_PUBLIC_READ:-false}
   # Published reads built once per data version (core/chart/api/read_cache.py).
   CHART_READ_CACHE: "1"
+  # Recommendation providers (docs/recommendations.md). Bedrock uses the
+  # instance role; keys stay in .env.prod. Unset means rules and template only.
+  AWS_REGION: ${AWS_REGION:-eu-west-2}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+  CHART_INSIGHT_MODELS: ${CHART_INSIGHT_MODELS:-}
+  CHART_RECOMMENDER_URL: ${CHART_RECOMMENDER_URL:-}
 
 x-dagster-environment: &dagster-environment
   <<: *python-environment
@@ -315,8 +323,9 @@ services:
       - chart-dagster-storage:/opt/dagster/storage
       - chart-climate-data:/opt/chart/data/climate
       # The model configuration (outlooks/index.json) decides which places a
-      # climate pull derives.
-      - chart-lbw-model:/models:ro
+      # climate pull derives; the seasonal forecast job saves its scores under
+      # /models/forecasts, so the mount is writable.
+      - chart-lbw-model:/models
     command:
       [
         "dagster",
