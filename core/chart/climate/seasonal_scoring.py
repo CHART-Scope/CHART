@@ -66,13 +66,14 @@ def score_places(
                 if result and _has_value(result):
                     place[outcome] = result
                     scored += 1
-        parents = dict(
-            session.execute(
+        parents: dict[str, str | None] = {
+            key: parent
+            for key, parent in session.execute(
                 select(AppGeography.id, AppGeography.parent_id).where(
                     AppGeography.id.in_(list(places))
                 )
-            ).all()
-        )
+            )
+        }
     filled = _fill_from_children(places, parents)
     log(
         f"{country}: scored {scored} place-outcomes for {len(months)} months"
@@ -127,9 +128,11 @@ def _fill_from_children(places: dict[str, dict], parents: dict[str, str | None])
                     ]
                     if triples:
                         values.setdefault(code, {})[month] = [
-                            round(sum(t[i] for t in triples) / len(triples), 2)
-                            if all(t[i] is not None for t in triples)
-                            else None
+                            (
+                                round(sum(t[i] for t in triples) / len(triples), 2)
+                                if all(t[i] is not None for t in triples)
+                                else None
+                            )
                             for i in range(3)
                         ]
             if values:
