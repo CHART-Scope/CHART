@@ -26,6 +26,8 @@ from chart.heat_outlook import observed
 from chart.heat_outlook.service import (
     DEFAULT_SELECTOR,
     LBW_OUTCOME,
+    NO_EXCESS_HEAT,
+    NO_EXCESS_LBW,
     U5_OUTCOME,
     legacy_observed_supported,
     outlook_release,
@@ -75,6 +77,21 @@ def _triple(values: list[float | None]) -> list[float | None]:
     return [round(central, 2), round(min(known), 2), round(max(known), 2)]
 
 
+def _share(estimate: observed.ObservedEstimate) -> float | None:
+    """The estimate's share, 0 where the guide hides a negative one.
+
+    A month the model scores below a risk ratio of 1 has no heat excess; the
+    observed view says so in words, but a forecast month left empty would
+    read as missing data. India's scoring floors the same case at 0.
+    """
+    if estimate.value_percent is None and estimate.message in (
+        NO_EXCESS_LBW,
+        NO_EXCESS_HEAT,
+    ):
+        return 0.0
+    return estimate.value_percent
+
+
 def _kenya(session, unit, outcome, place, months) -> dict | None:
     release = outlook_release()
     cal = observed.calibration(release)
@@ -96,9 +113,7 @@ def _kenya(session, unit, outcome, place, months) -> dict | None:
                         series[other] = temps[other_key][variant]
                 found = observed._score_lbw(series, cal, unit, selector, release)
                 shares.append(
-                    observed._estimate(
-                        outcome, selector, [found[key]], release
-                    ).value_percent
+                    _share(observed._estimate(outcome, selector, [found[key]], release))
                     if key in found
                     else None
                 )
@@ -131,7 +146,7 @@ def _kenya(session, unit, outcome, place, months) -> dict | None:
                     found = observed._score_u5(shifted, cal, unit, selector, release)
                     years.extend(found.values())
                 shares.append(
-                    observed._estimate(outcome, selector, years, release).value_percent
+                    _share(observed._estimate(outcome, selector, years, release))
                     if years
                     else None
                 )

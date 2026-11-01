@@ -24,6 +24,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from chart.api.app import app
+from chart.climate import seasonal_scoring
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import require_current_user, require_reader
 from chart.heat_outlook import dlnm, observed
@@ -420,6 +421,26 @@ def test_lbw_third_trimester_keeps_the_guides_message(client, factory) -> None:
     assert body["selector_note"] is not None
     # Only the third-trimester months (lags 0-2) count.
     assert [item["counted"] for item in body["inputs"]] == [True] * 3 + [False] * 6
+
+
+def test_forecast_months_without_heat_excess_score_zero(release, factory) -> None:
+    """Regression: a forecast month the guide hides (risk ratio below 1) was
+    saved empty, so the map showed it as missing data in 1,000+ Kenya place-
+    months while India's scoring floors the same case at 0."""
+    _seed_months(factory, date(2026, 9, 1), [24.0] * 9)
+    months = [date(2026, 10, 1), date(2026, 11, 1)]
+    place = {"tmax_c": {"2026-10": [22.0, 21.0, 23.0], "2026-11": [30.0, 26.0, 31.0]}}
+
+    with factory() as session:
+        scored = seasonal_scoring._kenya(
+            session, _county(session), "lbw", place, months
+        )
+
+    assert scored is not None
+    assert scored["values"]["P"] == {
+        "2026-10": [0.0, 0.0, 0.0],
+        "2026-11": [0.0, 0.0, 0.0],
+    }
 
 
 def test_disabled_selector_is_refused(client, factory) -> None:

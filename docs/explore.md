@@ -50,7 +50,8 @@ so CHART uses C3S's maximum-temperature **anomalies** (each system against its
 1993–2016 hindcast normal) and adds them to the place's own ERA5 normal for the
 calendar month (2006–2016), so forecasts sit on the scale the models read.
 The central value is the mean of systems; the range is the coolest and
-warmest system. Each place's months are scored with its own models: Kenya's
+warmest system. A month the model scores below a risk ratio of 1 is shown as
+0% (no heat excess) in both countries, never as missing. Each place's months are scored with its own models: Kenya's
 calibrated national curves (counties and constituencies; under-five by
 shifting each 2006–2016 year's daily series by the forecast's departure from
 normal), India's live models (districts with their division's; under-five
