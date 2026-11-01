@@ -443,6 +443,37 @@ def test_forecast_months_without_heat_excess_score_zero(release, factory) -> Non
     }
 
 
+def test_kenya_as_a_whole_forecasts_the_mean_of_its_counties(release, factory) -> None:
+    """Regression: the country has no calibrated curve, so its scoring came
+    back with every month empty and was kept, and the mean of the counties
+    never replaced it."""
+    _seed_months(factory, date(2026, 9, 1), [24.0] * 9)
+    months = [date(2026, 10, 1)]
+    temps = {"2026-10": [22.0, 21.0, 23.0]}
+    with factory() as session:
+        county = _county(session)
+        country = AdminUnit(
+            geography_id=county.geography_id,
+            app_geography_id="geo-ke",
+            level="country",
+            code="KE",
+            name="Kenya",
+        )
+        session.add(country)
+        session.commit()
+        units = {
+            country.app_geography_id: country,
+            county.app_geography_id: county,
+        }
+    places = {key: {"tmax_c": dict(temps)} for key in units}
+
+    seasonal_scoring.score_places(factory, "KE", units, places, months, log=print)
+
+    county_lbw = places[KAJIADO]["lbw"]["values"]["P"]["2026-10"]
+    assert places["geo-ke"]["lbw"]["values"]["P"]["2026-10"] == county_lbw
+    assert places["geo-ke"]["lbw"]["from_children"] == 1
+
+
 def test_disabled_selector_is_refused(client, factory) -> None:
     _seed_months(factory, date(2026, 7, 1), [31.0] * 9)
 

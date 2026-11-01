@@ -63,7 +63,7 @@ def score_places(
                 except Exception as error:  # noqa: BLE001 - one place must not stop all
                     log(f"{key} {outcome}: not scored ({error})")
                     continue
-                if result:
+                if result and _has_value(result):
                     place[outcome] = result
                     scored += 1
         parents = dict(
@@ -77,6 +77,15 @@ def score_places(
     log(
         f"{country}: scored {scored} place-outcomes for {len(months)} months"
         f" ({filled} more from the mean of their places)"
+    )
+
+
+def _has_value(result: dict) -> bool:
+    """False for a place scored without a curve (every month empty)."""
+    return any(
+        triple[0] is not None
+        for months in result["values"].values()
+        for triple in months.values()
     )
 
 
