@@ -19,6 +19,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import date, timedelta
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from chart.health_impact.derivation import attributable_fraction_milli
@@ -33,7 +34,7 @@ from chart.heat_outlook.service import (
     outlook_release,
 )
 from chart.model_registry.service import get_active_model_mapping
-from chart.shared.db.models import AdminUnit
+from chart.shared.db.models import AdminUnit, AppGeography
 
 from .model_scoring import score_association_model, score_lbw_model
 
@@ -65,7 +66,72 @@ def score_places(
                 if result:
                     place[outcome] = result
                     scored += 1
-    log(f"{country}: scored {scored} place-outcomes for {len(months)} months")
+        parents = dict(
+            session.execute(
+                select(AppGeography.id, AppGeography.parent_id).where(
+                    AppGeography.id.in_(list(places))
+                )
+            ).all()
+        )
+    filled = _fill_from_children(places, parents)
+    log(
+        f"{country}: scored {scored} place-outcomes for {len(months)} months"
+        f" ({filled} more from the mean of their places)"
+    )
+
+
+def _fill_from_children(places: dict[str, dict], parents: dict[str, str | None]) -> int:
+    """A place without its own model (Kenya as a whole, a state without an
+    under-five curve) gets the mean of the places directly beneath it, as the
+    observed view averages Kenya's counties. Deepest places are filled first."""
+    children: dict[str, list[str]] = {}
+    for key, parent in parents.items():
+        if parent in places:
+            children.setdefault(parent, []).append(key)
+
+    def depth(key: str) -> int:
+        level = 0
+        while parents.get(key) in places:
+            key = parents[key]  # type: ignore[assignment]
+            level += 1
+        return level
+
+    filled = 0
+    for key in sorted(children, key=depth, reverse=True):
+        for outcome in (LBW_OUTCOME, U5_OUTCOME):
+            if outcome in places[key]:
+                continue
+            scored = [places[c][outcome] for c in children[key] if outcome in places[c]]
+            if not scored:
+                continue
+            values: dict[str, dict[str, list[float | None]]] = {}
+            for code in sorted({code for item in scored for code in item["values"]}):
+                months = sorted(
+                    {m for item in scored for m in item["values"].get(code, {})}
+                )
+                for month in months:
+                    triples = [
+                        item["values"][code][month]
+                        for item in scored
+                        if month in item["values"].get(code, {})
+                        and item["values"][code][month][0] is not None
+                    ]
+                    if triples:
+                        values.setdefault(code, {})[month] = [
+                            round(sum(t[i] for t in triples) / len(triples), 2)
+                            if all(t[i] is not None for t in triples)
+                            else None
+                            for i in range(3)
+                        ]
+            if values:
+                selector = scored[0]["selector"]
+                places[key][outcome] = {
+                    "selector": selector if selector in values else sorted(values)[0],
+                    "values": values,
+                    "from_children": len(scored),
+                }
+                filled += 1
+    return filled
 
 
 def _triple(values: list[float | None]) -> list[float | None]:

@@ -186,3 +186,34 @@ def test_a_saved_issue_is_served_publicly_with_ranges(client) -> None:
     # A month outside the issue is refused.
     outside = client.get("/heat-outlook/geo-ke/forecast/map?outcome=lbw&month=2027-06")
     assert outside.status_code == 422
+
+
+def test_a_place_without_its_own_model_takes_the_mean_of_its_places() -> None:
+    """Regression: Kenya as a whole has no calibrated curve, so its six months
+    were saved empty while all 47 counties had estimates."""
+    from chart.climate.seasonal_scoring import _fill_from_children
+
+    def scored(central: float) -> dict:
+        return {
+            "selector": "P",
+            "values": {"P": {"2026-10": [central, central - 1, central + 1]}},
+        }
+
+    places = {
+        "geo-ke": {"tmax_c": {}},
+        "geo-ke-a": {"tmax_c": {}, "lbw": scored(10.0)},
+        "geo-ke-b": {"tmax_c": {}, "lbw": scored(20.0)},
+        "geo-ke-b-x": {"tmax_c": {}, "lbw": scored(99.0)},
+    }
+    parents = {
+        "geo-ke": None,
+        "geo-ke-a": "geo-ke",
+        "geo-ke-b": "geo-ke",
+        "geo-ke-b-x": "geo-ke-b",
+    }
+
+    assert _fill_from_children(places, parents) == 1
+    # Direct places only: the constituency does not count twice.
+    assert places["geo-ke"]["lbw"]["values"]["P"]["2026-10"] == [15.0, 14.0, 16.0]
+    assert places["geo-ke"]["lbw"]["from_children"] == 2
+    assert "under_5_mortality" not in places["geo-ke"]
