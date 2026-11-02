@@ -56,7 +56,10 @@ two for moderate, one for low precision, in green, amber and red (the design
 system's precision colours). These are the dashboard's classes,
 computed by the API from the 95% interval of the odds or risk ratio
 (`core/chart/risk/precision.py`, thresholds agreed with the health team);
-hovering gives the interval. A low-precision figure is drawn a little softer.
+hovering or focusing shows a small card with the level, the interval and what
+it means. The same bars follow the observed and projected figures in the layer
+list, updating with the month, period and scenario. The forecast has no model
+interval, so it shows none; its shaded range is the spread across systems. A low-precision figure is drawn a little softer.
 The map's colours do not carry precision, and the forecast's shaded range is
 the spread across forecast systems, a different uncertainty.
 
@@ -93,8 +96,9 @@ its option: a row of months (a firmer divider where the year turns,
 heat-season months underlined in amber), then the place's line, in the
 seasonal cycle's style, with the central forecast, the range across systems
 shaded behind it and the heat season marked. Either picks the map's month.
-Past months (the observed estimate, month and year pickers, seasonal cycle)
-give way while the forecast is on, and the forecast shows nowhere else.
+The past month's figure and the month and year pickers give way while the
+forecast is on; the seasonal cycle stays as the place's context. The forecast
+shows nowhere else.
 
 ## Population
 

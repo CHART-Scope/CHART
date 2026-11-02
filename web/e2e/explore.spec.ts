@@ -67,8 +67,26 @@ test("a visitor explores Kenya's observed months without signing in", async ({
 
   // Months held for the year are offered; choosing one moves the estimate.
   const months = page.getByRole("group", { name: "Month" });
+  // The layer list carries each figure with its precision, so it reads at a
+  // glance and follows the choices below.
+  const observedRow = page.locator("label").filter({ hasText: "Observed heat share" });
+  await expect(observedRow).toContainText("14.7%");
+  await expect(observedRow.getByRole("img", { name: /precision/ })).toHaveAttribute(
+    "aria-label",
+    "High precision: the 95% interval of the odds ratio is 1.02–1.35",
+  );
+  await expect(
+    page
+      .locator("label")
+      .filter({ hasText: "Projected heat share" })
+      .getByRole("img", { name: /precision/ }),
+  ).toHaveCount(1);
   await months.getByRole("button", { name: "Jun" }).click();
   await expect(estimate).toContainText("Jun 2026");
+  await expect(observedRow.getByRole("img", { name: /precision/ })).toHaveAttribute(
+    "aria-label",
+    "High precision: the 95% interval of the odds ratio is 1.03–1.33",
+  );
   await expect(page).toHaveURL(/month=2026-06/);
   await expect.poll(() => mapReads().length).toBe(2);
   // Going back to a month already seen answers from memory, no reload.
@@ -519,12 +537,13 @@ test("the next six months: forecast map, months and the place's range", async ({
   await expect(panel).toHaveCount(0);
   await expect(page.getByRole("group", { name: "Forecast month" })).toHaveCount(0);
 
-  // Choosing it: past months give way to the six coming ones, right under
+  // Choosing it: the past month gives way to the six coming ones, right under
   // the option - a row of months, then the line with its range, the year
   // written once where it starts.
   await page.getByRole("radio", { name: /^Forecast heat share/ }).check();
   await expect(page.getByTestId("explore-estimate")).toHaveCount(0);
-  await expect(page.getByTestId("explore-seasonal-cycle")).toHaveCount(0);
+  // The seasonal cycle stays: whatever the time view, it sets the place's year.
+  await expect(page.getByTestId("explore-seasonal-cycle")).toBeVisible();
   await expect(page.getByRole("group", { name: "Month", exact: true })).toHaveCount(0);
   await expect(panel.getByRole("img", { name: /next six months/ })).toBeVisible();
   const chips = panel.getByRole("group", { name: "Months ahead" }).getByRole("button");
@@ -627,7 +646,25 @@ test("a low-precision estimate shows one bar and reads softer", async ({ page })
     "background-color",
     "rgb(221, 46, 90)",
   );
-  await expect(estimate.locator("[data-precision='low']")).toHaveCSS("opacity", "0.7");
+  // The figure itself reads softer (a lighter maroon).
+  await expect(estimate.locator("[data-precision='low']")).not.toHaveCSS(
+    "color",
+    "rgb(85, 17, 31)",
+  );
+  // Hover shows a card: the level, the interval and what it means.
+  const card = precision.locator(":scope > span");
+  await expect(card).toHaveCSS("opacity", "0");
+  await precision.hover();
+  await expect(card).toHaveCSS("opacity", "1");
+  await expect(card).toContainText("Low precision");
+  await expect(card).toContainText("95% interval of the odds ratio: 0.90–5.40");
+  await expect(card).toContainText("treat the figure as a rough guide");
+  await page.waitForTimeout(200);
+  const at = (await estimate.boundingBox())!;
+  await page.screenshot({
+    path: "../outputs/e2e/web/explore-precision-card.png",
+    clip: { x: 0, y: Math.max(0, at.y - 80), width: 360, height: at.height + 100 },
+  });
   await estimate.screenshot({ path: "../outputs/e2e/web/explore-precision-low.png" });
 });
 
@@ -723,6 +760,23 @@ test("Explore fits a phone screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 860 });
   await openExplore(page, "frame=geo-ke&outcome=lbw");
   await expect(page.getByTestId("explore-estimate")).toBeVisible();
+  // Each layer's figure and its precision bars stay inside the sidebar.
+  const row = page.locator("label").filter({ hasText: "Observed heat share" });
+  const bars = row.getByRole("img", { name: /precision/ });
+  await expect(bars).toBeVisible();
+  const rowBox = (await row.boundingBox())!;
+  const barsBox = (await bars.boundingBox())!;
+  expect(barsBox.x + barsBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width + 1);
+  await bars.focus();
+  const card = bars.locator(":scope > span");
+  await expect(card).toHaveCSS("opacity", "1");
+  const cardBox = (await card.boundingBox())!;
+  expect(cardBox.x).toBeGreaterThanOrEqual(0);
+  expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(390);
+  await page.screenshot({
+    path: "../outputs/e2e/web/explore-phone-precision.png",
+    clip: { x: 0, y: Math.max(0, cardBox.y - 10), width: 390, height: 260 },
+  });
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
   ).toBe(true);

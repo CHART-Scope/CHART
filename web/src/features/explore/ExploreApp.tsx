@@ -696,6 +696,14 @@ export function ExploreApp() {
         high: null,
         tmax: null,
       }));
+  // The precision behind the layer list's figures, as they change.
+  const observedRatio =
+    observed?.estimate?.value_percent != null ? observed.estimate.ratio : null;
+  const projectionPart = outlook?.period_summary
+    .find((row) => row.period === period)
+    ?.parts.find((part) => part.side === "heat");
+  const projectionRatio =
+    projectionPart?.value_percent != null ? projectionPart.ratio : null;
   const forecastBody =
     forecastPoints.length > 0 ? (
       <>
@@ -832,12 +840,7 @@ export function ExploreApp() {
                               )?.value_percent,
                             )
                           : item.code === "projection"
-                            ? formatPercent(
-                                outlook?.period_summary
-                                  .find((row) => row.period === period)
-                                  ?.parts.find((part) => part.side === "heat")
-                                  ?.value_percent,
-                              )
+                            ? formatPercent(projectionPart?.value_percent)
                             : item.code === state.layer &&
                                 focusArea?.value_percent != null
                               ? item.code === "tmax"
@@ -848,6 +851,12 @@ export function ExploreApp() {
                                     ? `${formatCount(focusArea.value_percent)}/km²`
                                     : (focusArea.value_percent / 100).toFixed(2)
                               : ""}
+                      {item.code === "observed" && observedRatio && (
+                        <PrecisionMark ratio={observedRatio} align="end" />
+                      )}
+                      {item.code === "projection" && projectionRatio && (
+                        <PrecisionMark ratio={projectionRatio} align="end" />
+                      )}
                     </span>
                   </label>
                   {item.code === "forecast" &&
@@ -1039,27 +1048,23 @@ export function ExploreApp() {
             </section>
           )}
 
-          {/* The forecast stands on its own: past months are for the other layers. */}
-          {state.layer !== "forecast" && (
-            <div
-              aria-busy={focusStale}
-              className={focusStale ? styles.stale : undefined}
-            >
-              <PlaceSummary
-                observed={observed}
-                outlook={outlook}
-                baseline={focusData?.baseline ?? null}
-                period={period}
-                length={state.length}
-                month={observedMonth}
-                seasonMonths={season?.months ?? []}
-                scenarioWord={scenario ? (tiers.get(scenario) ?? null) : null}
-                scenarioCode={scenario}
-                historical={state.layer !== "projection"}
-                year={observedMonth?.slice(0, 4) ?? null}
-              />
-            </div>
-          )}
+          {/* Past months give way to the forecast; the seasonal cycle stays as context. */}
+          <div aria-busy={focusStale} className={focusStale ? styles.stale : undefined}>
+            <PlaceSummary
+              observed={observed}
+              outlook={outlook}
+              baseline={focusData?.baseline ?? null}
+              period={period}
+              length={state.length}
+              month={observedMonth}
+              seasonMonths={season?.months ?? []}
+              scenarioWord={scenario ? (tiers.get(scenario) ?? null) : null}
+              scenarioCode={scenario}
+              historical={state.layer !== "projection"}
+              showEstimate={state.layer !== "forecast"}
+              year={observedMonth?.slice(0, 4) ?? null}
+            />
+          </div>
 
           {focusPeople && peopleCounts && (
             <section className={styles.section} data-testid="explore-people">
@@ -1285,6 +1290,7 @@ function PlaceSummary({
   scenarioWord,
   scenarioCode,
   historical,
+  showEstimate,
   year,
 }: {
   observed: ObservedRisk | null;
@@ -1298,6 +1304,8 @@ function PlaceSummary({
   scenarioCode: string | null;
   /** Show the selected year's observed months rather than a projected period. */
   historical: boolean;
+  /** False while the forecast is on: the past month's figure gives way. */
+  showEstimate: boolean;
   year: string | null;
 }) {
   const heat = (parts: { side: string; value_percent: number | null }[]) =>
@@ -1360,7 +1368,7 @@ function PlaceSummary({
   }
   return (
     <>
-      {observed?.estimate && (
+      {showEstimate && observed?.estimate && (
         <section className={styles.section} data-testid="explore-estimate">
           <h2>
             {month ? `Observed · ${monthLabel(observed.month ?? month)}` : "Observed"}

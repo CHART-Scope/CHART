@@ -308,7 +308,7 @@
 
 /* A low-precision estimate reads a little softer. */
 .bigNumber[data-precision="low"] {
-  opacity: 0.7;
+  color: color-mix(in srgb, var(--color-maroon) 65%, var(--color-white));
 }
 
 /* Signal bars: three for high precision, two moderate, one low. */
@@ -338,6 +338,136 @@
 
 .precision i:nth-child(3) {
   height: 14px;
+}
+
+.precision {
+  position: relative;
+  outline: none;
+}
+
+/* The card on hover or keyboard focus: level in its colour, the interval,
+   and one line on what it means. */
+.precisionCard {
+  position: absolute;
+  z-index: 10;
+  bottom: calc(100% + 10px);
+  left: -14px;
+  display: grid;
+  gap: 3px;
+  width: 230px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-card);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  color: var(--color-text);
+  font-family: var(--font-body, inherit);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.precisionCard::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 18px;
+  width: 8px;
+  height: 8px;
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  transform: translateY(-4px) rotate(45deg);
+}
+
+.precision:hover .precisionCard,
+.precision:focus-visible .precisionCard {
+  opacity: 1;
+  transform: none;
+}
+
+.precisionCard strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 13px;
+}
+
+.precisionCard strong::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.precision[data-level="high"] .precisionCard strong {
+  color: var(--color-success);
+}
+
+.precision[data-level="moderate"] .precisionCard strong {
+  color: var(--color-amber);
+}
+
+.precision[data-level="low"] .precisionCard strong {
+  color: var(--color-sem-low);
+}
+
+.precisionCard b {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.precision[data-align="end"] .precisionCard {
+  right: -8px;
+  left: auto;
+}
+
+.precision[data-align="end"] .precisionCard::after {
+  right: 10px;
+  left: auto;
+}
+
+/* In the layer list: the value, then its bars, a touch smaller. */
+.layerValue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.layerValue .precision {
+  height: 11px;
+  margin-left: 6px;
+  gap: 1.5px;
+}
+
+.layerValue .precision i {
+  width: 3px;
+}
+
+.layerValue .precision i:nth-child(1) {
+  height: 5px;
+}
+
+.layerValue .precision i:nth-child(2) {
+  height: 8px;
+}
+
+.layerValue .precision i:nth-child(3) {
+  height: 11px;
+}
+
+.precisionCard small {
+  color: var(--color-text-muted);
+  font-size: 11px;
 }
 
 /* The design system's precision colours: green, amber, red. */
