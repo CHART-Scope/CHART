@@ -1007,19 +1007,25 @@ export function ExploreApp() {
               <dl className={styles.people}>
                 <div>
                   <dt>Everyone</dt>
-                  <dd>{focusPeople.total.toLocaleString()}</dd>
+                  <dd title={focusPeople.total.toLocaleString()}>
+                    {formatCount(focusPeople.total)}
+                  </dd>
                 </div>
                 <div>
                   <dt>
-                    <Icon name="child" size={14} /> Under five
+                    <Icon name="child" size={12} /> Under five
                   </dt>
-                  <dd>{focusPeople.under5.toLocaleString()}</dd>
+                  <dd title={focusPeople.under5.toLocaleString()}>
+                    {formatCount(focusPeople.under5)}
+                  </dd>
                 </div>
                 <div>
                   <dt>
-                    <Icon name="pregnant-woman" size={14} /> Women 15–49
+                    <Icon name="pregnant-woman" size={12} /> Women 15–49
                   </dt>
-                  <dd>{focusPeople.women_15_49.toLocaleString()}</dd>
+                  <dd title={focusPeople.women_15_49.toLocaleString()}>
+                    {formatCount(focusPeople.women_15_49)}
+                  </dd>
                 </div>
                 <div>
                   <dt>Per km²</dt>

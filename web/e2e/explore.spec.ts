@@ -376,7 +376,24 @@ test("population shows density on the map and counts for the place", async ({
     (area) => area.geography_id === "geo-ke-kajiado",
   );
   await expect(people).toContainText("People (2025)");
-  await expect(people).toContainText((1_000_000 + kajiado * 10_000).toLocaleString());
+  // Counts are short (1.0M, 132k) so long ones still fit; the exact count is
+  // on hover. Labels keep to one line, so the four figures share a row.
+  const total = 1_000_000 + kajiado * 10_000;
+  const everyone = people.locator("dd").first();
+  await expect(everyone).toHaveText(`${(total / 1e6).toFixed(1)}M`);
+  await expect(everyone).toHaveAttribute("title", total.toLocaleString());
+  const figureTops = await people
+    .locator("dd")
+    .evaluateAll((items) =>
+      items.map((item) => Math.round(item.getBoundingClientRect().top)),
+    );
+  expect(figureTops).toHaveLength(4);
+  expect(new Set(figureTops).size).toBe(1);
+  const fits = await people
+    .locator("dl")
+    .evaluate((list) => list.scrollWidth <= list.clientWidth + 1);
+  expect(fits).toBe(true);
+  await people.screenshot({ path: "../outputs/e2e/web/explore-people.png" });
   await expect(people.getByRole("link", { name: "WorldPop" })).toHaveAttribute(
     "href",
     "https://hub.worldpop.org/project/categories?id=3",
