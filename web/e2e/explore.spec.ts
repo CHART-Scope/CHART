@@ -31,7 +31,11 @@ test("a visitor explores Kenya's observed months without signing in", async ({
   const estimate = page.getByTestId("explore-estimate");
   await expect(estimate).toContainText("Aug 2026");
   await expect(estimate).toContainText("14.7%");
-  await expect(estimate).toContainText("odds ratio 1.19");
+  await expect(estimate).toContainText("Odds ratio 1.19");
+  // Three times, as tabs; Observed is the one open.
+  const tabs = page.getByRole("tablist", { name: "Time" }).getByRole("tab");
+  await expect(tabs).toHaveText(["Observed", "Next 6 months", "Projections"]);
+  await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
   // Beside the figure, how firm it is: the dashboard's precision, in bars.
   const precision = estimate.getByRole("img", { name: /precision/ });
   await expect(precision).toHaveAttribute(
@@ -67,23 +71,10 @@ test("a visitor explores Kenya's observed months without signing in", async ({
 
   // Months held for the year are offered; choosing one moves the estimate.
   const months = page.getByRole("group", { name: "Month" });
-  // The layer list carries each figure with its precision, so it reads at a
-  // glance and follows the choices below.
-  const observedRow = page.locator("label").filter({ hasText: "Observed heat share" });
-  await expect(observedRow).toContainText("14.7%");
-  await expect(observedRow.getByRole("img", { name: /precision/ })).toHaveAttribute(
-    "aria-label",
-    "High precision: the 95% interval of the odds ratio is 1.02–1.35",
-  );
-  await expect(
-    page
-      .locator("label")
-      .filter({ hasText: "Projected heat share" })
-      .getByRole("img", { name: /precision/ }),
-  ).toHaveCount(1);
   await months.getByRole("button", { name: "Jun" }).click();
   await expect(estimate).toContainText("Jun 2026");
-  await expect(observedRow.getByRole("img", { name: /precision/ })).toHaveAttribute(
+  // The figure at the top follows, its precision with it.
+  await expect(precision).toHaveAttribute(
     "aria-label",
     "High precision: the 95% interval of the odds ratio is 1.03–1.33",
   );
@@ -125,15 +116,22 @@ test("selecting a county shows its seasonal cycle and projected change", async (
   await expect(page.getByTestId("explore-year-average")).toContainText(
     "Year average: 19.1%",
   );
-  // Layers read as historical (Copernicus) apart from projections.
-  await expect(page.getByText("Historical · Copernicus ERA5 reanalysis")).toBeVisible();
-  await expect(page.getByText("Projections · climate models")).toBeVisible();
+  // Past months show no projection controls or periods.
+  await expect(page.getByTestId("explore-projection")).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Period", exact: true })).toHaveCount(0);
+
+  await page.getByRole("tab", { name: "Projections" }).click();
+  await expect(page.getByRole("group", { name: "Period", exact: true })).toBeVisible();
+  // Past months and their pickers give way.
+  await expect(page.getByRole("group", { name: "Month", exact: true })).toHaveCount(0);
+  // The figure at the top is now the period's, with its precision.
+  await expect(page.getByTestId("explore-estimate")).toContainText("2041–2060");
+  await expect(
+    page.getByTestId("explore-estimate").getByRole("img", { name: /precision/ }),
+  ).toHaveCount(1);
   const projection = page.getByTestId("explore-projection");
   // The baseline and the non-overlapping 20-year periods, not every window.
   await expect(projection.getByRole("listitem")).toHaveCount(5);
-
-  await page.getByRole("radio", { name: /Projected heat share/ }).check();
-  await expect(page.getByRole("group", { name: "Period", exact: true })).toBeVisible();
   // Projections show the period's typical year instead, season shaded.
   await expect(cycle).not.toContainText("observed");
   await expect(cycle.locator("path")).toHaveCount(1);
@@ -174,7 +172,7 @@ test("selecting a county shows its seasonal cycle and projected change", async (
   await expect(page.getByRole("heading", { level: 1, name: "Kenya" })).toBeVisible();
   await expect(page).not.toHaveURL(/place=/);
   const after = new URL(page.url()).searchParams;
-  for (const key of ["outcome", "layer", "period", "scenario", "length"])
+  for (const key of ["outcome", "view", "period", "scenario", "length"])
     expect(after.get(key)).toBe(before.get(key));
   // A country has nothing above it.
   await expect(page.getByRole("button", { name: /^↑/ })).toHaveCount(0);
@@ -182,7 +180,10 @@ test("selecting a county shows its seasonal cycle and projected change", async (
   await page.goBack();
   await expect(page.getByRole("heading", { level: 1, name: "Kajiado" })).toBeVisible();
   await expect(page).toHaveURL(/place=geo-ke-kajiado/);
-  await expect(page.getByRole("radio", { name: /Projected heat share/ })).toBeChecked();
+  await expect(page.getByRole("tab", { name: "Projections" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   await page.goForward();
   await expect(page.getByRole("heading", { level: 1, name: "Kenya" })).toBeVisible();
 
@@ -215,13 +216,14 @@ test("ERA5-Land temperature and heatwave days are context layers by month", asyn
     });
   });
 
-  await page.getByRole("radio", { name: /^Temperature/ }).check();
+  const shows = page.getByRole("group", { name: "Map shows" });
+  await shows.getByRole("button", { name: "Temperature" }).click();
   const legend = page.getByTestId("explore-legend");
   await expect(legend).toContainText("Temperature");
   await expect(legend).toContainText("33–36°");
   // Switching layer keeps the month being viewed (Aug, from the observed layer).
   await expect(legend).toContainText("Aug 2026 · Copernicus ERA5-Land");
-  await expect(page).toHaveURL(/layer=tmax/);
+  await expect(page).toHaveURL(/map=tmax/);
   // Its own months: the three ERA5-Land months, not the observed estimates'.
   const monthGroup = page.getByRole("group", { name: "Month" });
   await expect(monthGroup.getByRole("button", { name: "Sep" })).toBeEnabled();
@@ -232,14 +234,26 @@ test("ERA5-Land temperature and heatwave days are context layers by month", asyn
     .poll(() => api.requests.some((item) => item.includes("layer=tmax&month=2026-07")))
     .toBe(true);
 
-  // A shared link keeps its month.
+  // A shared link keeps its month (old links with "layer" too).
   await page.goto("/explore?frame=geo-ke&outcome=lbw&layer=tmax&month=2026-08");
   await expect(legend).toContainText("Aug 2026 · Copernicus ERA5-Land");
 
   await legend.getByRole("button", { name: "See info" }).click();
   await expect(legend).toContainText("Context only");
-  await page.getByRole("radio", { name: /^Heatwave days/ }).check();
+  await shows.getByRole("button", { name: "Heatwave days" }).click();
   await expect(legend).toContainText("15+");
+  // The thresholds' official source, linked.
+  await expect(
+    legend.getByRole("link", { name: "Kenya Meteorological Department" }),
+  ).toHaveAttribute("href", /^https:\/\//);
+  // Temperature and heatwave days are past months: other times shade the heat share.
+  await page.getByRole("tab", { name: "Next 6 months" }).click();
+  await expect(shows.getByRole("button")).toHaveText(["Heat share", "Population"]);
+  await page.getByRole("tab", { name: "Observed" }).click();
+  await expect(shows.getByRole("button", { name: "Heatwave days" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await page.screenshot({
     path: "../outputs/e2e/web/explore-temperature.png",
     fullPage: true,
@@ -449,8 +463,13 @@ test("population shows density on the map and counts for the place", async ({
   await page.screenshot({ path: "../outputs/e2e/web/explore-hover.png" });
   await page.mouse.move(box.x + 5, box.y + 5);
 
-  await page.getByRole("radio", { name: /^Population/ }).check();
+  await page
+    .getByRole("group", { name: "Map shows" })
+    .getByRole("button", { name: "Population" })
+    .click();
   const legend = page.getByTestId("explore-legend");
+  // The estimate at the top stays whatever the map shows.
+  await expect(page.getByTestId("explore-estimate")).toContainText("%");
   await expect(legend).toContainText("Population");
   await expect(legend.getByRole("link", { name: "WorldPop 2025" })).toHaveAttribute(
     "href",
@@ -461,7 +480,7 @@ test("population shows density on the map and counts for the place", async ({
     .getByRole("group", { name: "People" })
     .getByRole("button", { name: "Under five" })
     .click();
-  await expect(page).toHaveURL(/layer=population.*people=under5/);
+  await expect(page).toHaveURL(/map=population.*people=under5/);
   await expect
     .poll(() => api.requests.some((item) => item.includes("population?measure=under5")))
     .toBe(true);
@@ -528,23 +547,28 @@ test("the next six months: forecast map, months and the place's range", async ({
   );
   await page.reload();
 
-  // On the observed layer nothing of the forecast shows but its own option.
+  // On Observed nothing of the forecast shows but its tab.
   const panel = page.getByTestId("explore-forecast");
-  await expect(page.getByTestId("explore-estimate")).toBeVisible();
-  await expect(
-    page.getByText("Next 6 months · Copernicus C3S forecasts"),
-  ).toBeVisible();
+  const estimate = page.getByTestId("explore-estimate");
+  await expect(estimate).toContainText("2026");
   await expect(panel).toHaveCount(0);
   await expect(page.getByRole("group", { name: "Forecast month" })).toHaveCount(0);
 
-  // Choosing it: the past month gives way to the six coming ones, right under
-  // the option - a row of months, then the line with its range, the year
-  // written once where it starts.
-  await page.getByRole("radio", { name: /^Forecast heat share/ }).check();
-  await expect(page.getByTestId("explore-estimate")).toHaveCount(0);
-  // The seasonal cycle stays: whatever the time view, it sets the place's year.
-  await expect(page.getByTestId("explore-seasonal-cycle")).toBeVisible();
+  // Choosing it: the figure at the top becomes the month ahead's, with its
+  // range across systems; the past months and their pickers give way, and
+  // the six coming months follow - a row of months, then the line.
+  await page.getByRole("tab", { name: "Next 6 months" }).click();
+  await expect(estimate).toContainText("12.0%");
+  await expect(estimate).toContainText("Oct 2026 forecast");
+  await expect(estimate).toContainText("Range 9.0%–15.0% across 3 forecast systems");
+  // The forecast has no model interval, so no precision bars.
+  await expect(estimate.getByRole("img", { name: /precision/ })).toHaveCount(0);
+  // The seasonal cycle stays as context: the place's average year.
+  await expect(page.getByTestId("explore-seasonal-cycle")).toContainText(
+    "average year",
+  );
   await expect(page.getByRole("group", { name: "Month", exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("explore-projection")).toHaveCount(0);
   await expect(panel.getByRole("img", { name: /next six months/ })).toBeVisible();
   const chips = panel.getByRole("group", { name: "Months ahead" }).getByRole("button");
   await expect(chips).toHaveCount(6);
@@ -559,7 +583,7 @@ test("the next six months: forecast map, months and the place's range", async ({
   await chips.nth(2).hover();
   await expect(panel).toContainText("Dec 2026: 14.0%");
   await expect(chips.first()).toHaveAttribute("aria-pressed", "true");
-  // Right under the forecast's radio, its six months in one row.
+  // Right under the tabs and the figure, the six months in one row.
   const picker = page.getByRole("group", { name: "Forecast month" });
   const months6 = picker.getByRole("button");
   await expect(months6).toHaveText(["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"]);
@@ -570,21 +594,21 @@ test("the next six months: forecast map, months and the place's range", async ({
       new Set(items.map((item) => Math.round(item.getBoundingClientRect().top))).size,
   );
   expect(rows).toBe(1);
-  const radioBox = await page
-    .getByRole("radio", { name: /^Forecast heat share/ })
-    .boundingBox();
-  const pickerBox = await picker.boundingBox();
-  expect(pickerBox!.y - (radioBox!.y + radioBox!.height)).toBeLessThan(16);
+  const heroBox = (await estimate.boundingBox())!;
+  const pickerBox = (await picker.boundingBox())!;
+  expect(pickerBox.y).toBeGreaterThan(heroBox.y);
+  expect(pickerBox.y - (heroBox.y + heroBox.height)).toBeLessThan(40);
   await picker.screenshot({ path: "../outputs/e2e/web/explore-forecast-picker.png" });
   await expect(page.getByTestId("explore-legend")).toContainText(
     "Oct 2026 · Copernicus C3S forecast",
   );
   await chips.nth(1).click();
-  await expect(page).toHaveURL(/layer=forecast.*month=2026-11/);
+  await expect(page).toHaveURL(/view=forecast.*month=2026-11/);
   await expect(chips.nth(1)).toHaveAttribute("aria-pressed", "true");
-  // The row under the radio picks too, and the line follows.
+  await expect(estimate).toContainText("Nov 2026 forecast");
+  // The row picks too, and the line follows.
   await months6.nth(2).click();
-  await expect(page).toHaveURL(/layer=forecast.*month=2026-12/);
+  await expect(page).toHaveURL(/view=forecast.*month=2026-12/);
   await expect(chips.nth(2)).toHaveAttribute("aria-pressed", "true");
   await expect
     .poll(() =>
@@ -749,6 +773,50 @@ test("the first map load says so, then clears", async ({ page }) => {
   await expect(page.getByTestId("explore-estimate")).toBeVisible();
 });
 
+test("vulnerability lays its dots over any view, with its score on hover", async ({
+  page,
+}) => {
+  const { api } = await openExplore(page, "frame=geo-ke&outcome=lbw");
+  api.on(/^\/api\/chart\/vra\/geo-ke\/map$/, (route) =>
+    json(route, {
+      ...fixtures.mapFrame,
+      outcome: "vra",
+      metric: "vra_index",
+      areas: fixtures.mapFrame.areas.map((area, index) => ({
+        ...area,
+        value_percent: area.geography_id === "geo-ke-kajiado" ? 62 : (index * 7) % 100,
+        missing_reason: null,
+      })),
+    }),
+  );
+  const toggle = page.getByRole("switch", { name: /Vulnerability \(VRA\)/ });
+  await expect(toggle).not.toBeChecked();
+  await toggle.check();
+  await expect(page).toHaveURL(/vra=1/);
+  const legend = page.getByTestId("explore-legend");
+  await expect(legend).toContainText("Vulnerability (VRA)");
+  // The heat share stays the map's colour; VRA rides on top, on any time.
+  await expect(legend).toContainText("Observed heat share");
+  await page.getByRole("tab", { name: "Projections" }).click();
+  await expect(toggle).toBeChecked();
+  await expect(legend).toContainText("Vulnerability (VRA)");
+  await page.getByRole("tab", { name: "Observed" }).click();
+
+  // The hover card gives the area's score.
+  await page.getByRole("combobox").fill("Kajiado");
+  await page.getByRole("combobox").press("Enter");
+  const map = page.getByTestId("explore-map");
+  const box = (await map.boundingBox())!;
+  await page.waitForTimeout(800);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.getByTestId("explore-hover")).toContainText(
+    "Vulnerability (VRA) 0.62",
+  );
+  await page.screenshot({ path: "../outputs/e2e/web/explore-vra.png" });
+  await toggle.uncheck();
+  await expect(legend).not.toContainText("Vulnerability (VRA)");
+});
+
 test("a missing layer says so instead of an empty map", async ({ page }) => {
   await openExplore(page, "frame=geo-ke&outcome=lbw&layer=vulnerability");
   await expect(
@@ -760,8 +828,8 @@ test("Explore fits a phone screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 860 });
   await openExplore(page, "frame=geo-ke&outcome=lbw");
   await expect(page.getByTestId("explore-estimate")).toBeVisible();
-  // Each layer's figure and its precision bars stay inside the sidebar.
-  const row = page.locator("label").filter({ hasText: "Observed heat share" });
+  // The figure's precision bars and their card stay on screen.
+  const row = page.getByTestId("explore-estimate");
   const bars = row.getByRole("img", { name: /precision/ });
   await expect(bars).toBeVisible();
   const rowBox = (await row.boundingBox())!;

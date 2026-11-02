@@ -13,6 +13,7 @@ import {
   areaValueText,
   formatCount,
   colorFor,
+  centreOf,
   geometryBounds,
   rankText,
   type Band,
@@ -31,6 +32,7 @@ const BASEMAP =
   process.env.NEXT_PUBLIC_EXPLORE_BASEMAP ??
   "https://tiles.openfreemap.org/styles/positron";
 const SOURCE = "areas";
+const OVERLAY = "overlay";
 /** Used when the basemap cannot load (offline, blocked): areas still show. */
 const PLAIN_STYLE = {
   version: 8 as const,
@@ -71,6 +73,8 @@ type Props = {
    * (Explore moves there), false to offer "not covered yet" at the point.
    */
   onOutside?: (lngLat: [number, number]) => Promise<boolean>;
+  /** Vulnerability (VRA) per area, drawn as dots over the shading. */
+  overlay?: MapResponse | null;
   /** The area's people, from WorldPop, when known. */
   people?: (area: MapArea) => {
     total: number;
@@ -99,6 +103,7 @@ export function ExploreMap({
   note,
   people,
   onOutside,
+  overlay,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
@@ -168,6 +173,31 @@ export function ExploreMap({
         type: "line",
         source: SOURCE,
         paint: { "line-color": "#ffffff", "line-width": 1 },
+      });
+      instance.addSource(OVERLAY, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      // Vulnerability dots: bigger and darker where the index is higher.
+      instance.addLayer({
+        id: "overlay-dots",
+        type: "circle",
+        source: OVERLAY,
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["get", "value"], 0, 3, 100, 11],
+          "circle-color": [
+            "interpolate",
+            ["linear"],
+            ["get", "value"],
+            0,
+            "#c9b8f0",
+            100,
+            "#3d1a8f",
+          ],
+          "circle-opacity": 0.9,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 1.5,
+        },
       });
       instance.addLayer({
         id: "area-hover",
@@ -308,6 +338,28 @@ export function ExploreMap({
     }
   }, [ready, styleLoads, data, bands]);
 
+  // The overlay's dots, one per assessed area with a value.
+  useEffect(() => {
+    const instance = map.current;
+    if (!ready || !instance) return;
+    const source = instance.getSource(OVERLAY) as GeoJSONSource | undefined;
+    source?.setData({
+      type: "FeatureCollection",
+      features: (overlay?.areas ?? []).flatMap((area) => {
+        const centre = area.value_percent !== null ? centreOf(area.geometry) : null;
+        return centre
+          ? [
+              {
+                type: "Feature" as const,
+                geometry: { type: "Point" as const, coordinates: centre },
+                properties: { value: area.value_percent },
+              },
+            ]
+          : [];
+      }),
+    });
+  }, [ready, styleLoads, overlay]);
+
   // The selection is outlined, the rest dimmed, and the map moves to it.
   useEffect(() => {
     const instance = map.current;
@@ -432,6 +484,16 @@ export function ExploreMap({
             <span className={styles.tooltipRank}>{note(hover.area)}</span>
           )}
           {rank && <span className={styles.tooltipRank}>{rank}</span>}
+          {(() => {
+            const vra = overlay?.areas.find(
+              (item) => item.geography_id === hover.area.geography_id,
+            )?.value_percent;
+            return vra !== undefined && vra !== null ? (
+              <span className={styles.tooltipVra}>
+                <i /> Vulnerability (VRA) {(vra / 100).toFixed(2)}
+              </span>
+            ) : null;
+          })()}
           {(() => {
             const found = people?.(hover.area);
             return found ? (

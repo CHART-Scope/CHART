@@ -1,34 +1,51 @@
 # Explore: CHART without an account
 
 `/explore` is the public, map-first view of CHART. A visitor picks India or
-Kenya, a health outcome and a map layer, and clicks any place to see:
-
-- its **observed** estimate for a month (share of low birth weight or
-  under-five deaths linked to that month's heat, with the odds or risk ratio),
-- its **seasonal cycle**: the typical share in each calendar month, with the
-  country's official heat season marked,
-- **how it changes** across the projection periods under the chosen emissions
-  scenario.
-
-Layers are the observed heat share (by year and month), the projected heat
-share (by period and scenario), **temperature** and **heatwave days** (by
-month, from Copernicus ERA5-Land at about 9 km) and the vulnerability
-assessment index. Temperature and heatwave days are context: the health
-estimates keep reading the data their models were fitted on (ERA5 for India;
-the modellers' 0.1 °C product, reached by calibrated ERA5, for Kenya). A
-double click, or "Open its …", moves down a level (state → divisions →
+Kenya and a health outcome, clicks any place on the map, and reads its
+estimate: the share of low birth weight or under-five deaths linked to heat.
+A double click, or "Open its …", moves down a level (state → divisions →
 districts; country → counties → constituencies). The URL holds every choice,
 so a view can be shared as a link.
 
+## Layout
+
+The panel reads top to bottom, and nothing repeats:
+
+1. **Place and outcome.**
+2. **Time, as three tabs**: **Observed** (a past month, from Copernicus ERA5
+   reanalysis), **Next 6 months** (the Copernicus C3S seasonal forecast) and
+   **Projections** (a future period under an emissions scenario, from ISIMIP
+   climate models).
+3. **The estimate**, always there and following the tab: the share, its
+   precision bars (observed and projected), when it is for, and its ratio or
+   range.
+4. **That tab's controls only**: year and months for Observed (with the
+   official heat season and its source); the six months and their line for
+   Next 6 months; period length, period and emissions for Projections.
+5. **Map shows**: heat share, temperature, heatwave days (both past months
+   only, from Copernicus ERA5-Land at about 9 km) or population. The estimate
+   above stays whatever the map shows.
+6. **Vulnerability (VRA)**, a switch: the assessment index as dots over the
+   map (larger and darker for more vulnerable areas), on any tab and any map
+   choice, with each area's score in the hover card. It says so when no
+   assessment is published.
+7. **Seasonal cycle**, always, as context: the year against the average year
+   (Observed), the average year (Next 6 months), the period against
+   1981–2010 (Projections); then **How it changes** across periods
+   (Projections only), **People**, and **Act on it**.
+
+Temperature and heatwave days are context: the health estimates keep reading
+the data their models were fitted on (ERA5 for India; the modellers' 0.1 °C
+product, reached by calibrated ERA5, for Kenya). Every legend names its
+source as a link; heatwave days also link the threshold's source (KMD, IMD).
+Links from before the tabs (`layer=…`) still open the same view.
+
 ## Historical and projected
 
-Layers are grouped by where their numbers come from. **Historical** layers
-(observed heat share, temperature, heatwave days) come from Copernicus
-reanalysis of what happened; **Projections** from climate-model scenarios.
-On a historical layer the seasonal cycle is the selected year's observed
-months against the average year, with the year's average share; months with
-no heat excess count as 0%. On the projected layer it is the period's typical
-year against 1981–2010.
+On Observed the seasonal cycle is the selected year's observed months against
+the average year, with the year's average share; months with no heat excess
+count as 0%. On Projections it is the period's typical year against
+1981–2010.
 
 **Heatwave days** follow each country's own rule. Kenya: days in runs of 3
 or more at or above the county's KMD threshold (Nairobi 32 °C, Mombasa 36,
@@ -57,11 +74,10 @@ system's precision colours). These are the dashboard's classes,
 computed by the API from the 95% interval of the odds or risk ratio
 (`core/chart/risk/precision.py`, thresholds agreed with the health team);
 hovering or focusing shows a small card with the level, the interval and what
-it means. The same bars follow the observed and projected figures in the layer
-list, updating with the month, period and scenario. The forecast has no model
-interval, so it shows none; its shaded range is the spread across systems. A low-precision figure is drawn a little softer.
-The map's colours do not carry precision, and the forecast's shaded range is
-the spread across forecast systems, a different uncertainty.
+it means. They follow the estimate as the tab, month, period or scenario
+changes. The forecast has no model interval, so it shows none; its range is
+the spread across forecast systems, a different uncertainty. A low-precision
+figure is drawn a little softer. The map's colours do not carry precision.
 
 ## Next six months
 
@@ -91,14 +107,11 @@ rebuilds both countries when C3S publishes a new issue. Beyond six months
 forecast skill is too low to show; the projections start in the next
 five-year period.
 
-Choosing the **Forecast heat share** layer puts the six months right under
-its option: a row of months (a firmer divider where the year turns,
-heat-season months underlined in amber), then the place's line, in the
-seasonal cycle's style, with the central forecast, the range across systems
-shaded behind it and the heat season marked. Either picks the map's month.
-The past month's figure and the month and year pickers give way while the
-forecast is on; the seasonal cycle stays as the place's context. The forecast
-shows nowhere else.
+The **Next 6 months** tab puts the six months right under the estimate: a
+row of months (a firmer divider where the year turns, heat-season months
+underlined in amber), then the place's line, in the seasonal cycle's style,
+with the central forecast, the range across systems shaded behind it and the
+heat season marked. Either picks the map's month, and the estimate follows.
 
 ## Population
 

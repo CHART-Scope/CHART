@@ -331,6 +331,41 @@ export function geometryBounds(
   return Number.isFinite(west) ? [west, south, east, north] : null;
 }
 
+/**
+ * Where to draw a dot for an area: the centroid of its largest polygon's outer
+ * ring (shoelace formula), or that ring's first point when it is degenerate.
+ */
+export function centreOf(
+  geometry: { type: string; coordinates: unknown } | null,
+): [number, number] | null {
+  if (!geometry) return null;
+  const polygons = (
+    geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates
+  ) as number[][][][];
+  if (!Array.isArray(polygons)) return null;
+  let best: [number, number] | null = null;
+  let bestArea = -1;
+  for (const rings of polygons) {
+    const ring = rings?.[0];
+    if (!ring?.length) continue;
+    let area = 0;
+    let cx = 0;
+    let cy = 0;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const cross = ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
+      area += cross;
+      cx += (ring[j][0] + ring[i][0]) * cross;
+      cy += (ring[j][1] + ring[i][1]) * cross;
+    }
+    const size = Math.abs(area / 2);
+    if (size > bestArea) {
+      bestArea = size;
+      best = area ? [cx / (3 * area), cy / (3 * area)] : [ring[0][0], ring[0][1]];
+    }
+  }
+  return best;
+}
+
 /** Whether a [lng, lat] point lies in a GeoJSON Polygon or MultiPolygon. */
 export function containsPoint(
   geometry: { type: string; coordinates: unknown } | null,

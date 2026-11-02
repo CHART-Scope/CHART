@@ -93,7 +93,7 @@ for (const device of DEVICES) {
     await expect(act).toBeInViewport();
 
     // Layers switch with a tap; the forecast's months stay on one row.
-    await page.getByRole("radio", { name: /^Forecast heat share/ }).check();
+    await page.getByRole("tab", { name: "Next 6 months" }).click();
     const picker = page
       .getByRole("group", { name: "Forecast month" })
       .getByRole("button");
@@ -107,7 +107,7 @@ for (const device of DEVICES) {
       .nth(1)
       .tap()
       .catch(() => picker.nth(1).click());
-    await expect(page).toHaveURL(/layer=forecast.*month=2026-11/);
+    await expect(page).toHaveURL(/view=forecast.*month=2026-11/);
     expect(await fits()).toBe(true);
 
     // Search opens a list that stays on screen.

@@ -246,25 +246,6 @@
   margin-bottom: 8px;
 }
 
-.layers {
-  display: grid;
-  gap: 8px;
-}
-
-.layer {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 8px;
-  align-items: center;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.layerValue {
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
-}
-
 .months {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -434,35 +415,6 @@
 .precision[data-align="end"] .precisionCard::after {
   right: 10px;
   left: auto;
-}
-
-/* In the layer list: the value, then its bars, a touch smaller. */
-.layerValue {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.layerValue .precision {
-  height: 11px;
-  margin-left: 6px;
-  gap: 1.5px;
-}
-
-.layerValue .precision i {
-  width: 3px;
-}
-
-.layerValue .precision i:nth-child(1) {
-  height: 5px;
-}
-
-.layerValue .precision i:nth-child(2) {
-  height: 8px;
-}
-
-.layerValue .precision i:nth-child(3) {
-  height: 11px;
 }
 
 .precisionCard small {
@@ -1042,19 +994,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.layerGroup {
-  margin: 6px 0 0;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--color-text-faint);
-}
-
-.layerGroup:first-child {
-  margin-top: 0;
-}
-
 .legendSource {
   display: block;
   margin-bottom: 2px;
@@ -1088,14 +1027,6 @@
   margin: 0 0 6px;
   font-size: 12px;
   color: var(--color-text-dim);
-}
-
-.layers {
-  gap: 3px;
-}
-
-.layer {
-  font-size: 13px;
 }
 
 .segmented button,
@@ -1419,6 +1350,149 @@
 /* With the forecast layer on, its line sits under the month row. */
 .forecastInline {
   margin: 0 0 6px 22px;
+}
+
+/* The time an estimate is for: three tabs in one bar. */
+.timeTabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 14px 0 0;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--color-grey-light);
+}
+
+.timeTabs button {
+  padding: 7px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-dim);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.timeTabs button:hover {
+  color: var(--color-text);
+}
+
+.timeTabs button[aria-selected="true"] {
+  background: var(--surface-card);
+  color: var(--color-maroon);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* The one estimate, whatever the time: the figure, its precision, its when. */
+.hero {
+  padding-top: 10px;
+}
+
+.hero[aria-busy="true"] {
+  opacity: 0.6;
+}
+
+.heroDetail {
+  margin: 2px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+/* What the map is shaded by: an even grid of choices. */
+.mapShows {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.mapShows button {
+  padding: 6px 8px;
+  border: 1px solid var(--color-grey-mid);
+  border-radius: 6px;
+  background: var(--surface-card);
+  color: var(--color-text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mapShows button[aria-pressed="true"] {
+  border-color: var(--color-near-black);
+  background: var(--color-near-black);
+  color: var(--color-white);
+}
+
+/* The vulnerability switch: an overlay on any view. */
+.vraSwitch {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: start;
+  margin-top: 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.vraSwitch input {
+  appearance: none;
+  position: relative;
+  width: 30px;
+  height: 18px;
+  margin: 1px 0 0;
+  border-radius: 9px;
+  background: var(--color-grey-mid);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.vraSwitch input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-white);
+  transition: transform 0.15s ease;
+}
+
+.vraSwitch input:checked {
+  background: var(--color-sem-behaviour);
+}
+
+.vraSwitch input:checked::after {
+  transform: translateX(12px);
+}
+
+.vraSwitch small {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.legendVra,
+.tooltipVra {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendVra i,
+.tooltipVra i {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--color-white);
+  border-radius: 50%;
+  background: #3d1a8f;
+  box-shadow: 0 0 0 1px #3d1a8f;
+}
+
+.tooltipVra {
+  font-size: 12px;
+  color: var(--color-text-dim);
 }
 
 /* ---- Phones and portrait tablets (last, so it wins over the compact panel

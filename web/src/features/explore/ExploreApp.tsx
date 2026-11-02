@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Icon, IconSprite, type IconName } from "@/components/Icon";
 import { dashboardHref } from "@/features/dashboard/dashboardNavigation";
@@ -20,6 +20,7 @@ import {
   type ClimateLayerMap,
   type HeatOutlook,
   type ObservedRisk,
+  type OutlookRatio,
   type ForecastMap,
   type PlaceForecast,
   type PopulationMap,
@@ -80,7 +81,12 @@ type State = {
   frame: string;
   selected: string | null;
   outcome: string;
-  layer: ExploreLayer;
+  /** The time an estimate is for: past months, the next six, or a period. */
+  time: TimeView;
+  /** What the map is shaded by; temperature and heatwave days are past months. */
+  show: MapShow;
+  /** The vulnerability assessment as dots over whatever the map shows. */
+  vra: boolean;
   month: string | null;
   period: string | null;
   scenario: string | null;
@@ -128,6 +134,45 @@ const LAYERS: { code: ExploreLayer; label: string; hint: string }[] = [
   },
 ];
 
+type TimeView = "observed" | "forecast" | "projection";
+type MapShow = "heat" | "tmax" | "heat_days" | "population";
+
+const TIME_VIEWS: { code: TimeView; label: string }[] = [
+  { code: "observed", label: "Observed" },
+  { code: "forecast", label: "Next 6 months" },
+  { code: "projection", label: "Projections" },
+];
+
+/** Sources named once, beside the view they feed. */
+const TIME_SOURCES: Record<TimeView, { name: string; href: string }> = {
+  observed: {
+    name: "Copernicus ERA5 reanalysis",
+    href: "https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels",
+  },
+  forecast: {
+    name: "Copernicus C3S seasonal forecasts",
+    href: "https://cds.climate.copernicus.eu/datasets/seasonal-postprocessed-single-levels",
+  },
+  projection: {
+    name: "ISIMIP climate models",
+    href: "https://www.isimip.org/",
+  },
+};
+
+const MAP_SHOWS: { code: MapShow; label: string; pastOnly?: boolean }[] = [
+  { code: "heat", label: "Heat share" },
+  { code: "tmax", label: "Temperature", pastOnly: true },
+  { code: "heat_days", label: "Heatwave days", pastOnly: true },
+  { code: "population", label: "Population" },
+];
+
+/** The map layer a time view and a map choice come to. */
+function layerOf(time: TimeView, show: MapShow): ExploreLayer {
+  if (show === "population") return "population";
+  if ((show === "tmax" || show === "heat_days") && time === "observed") return show;
+  return time;
+}
+
 /** The design team's figure for each outcome's affected group. */
 function exposedFigure(outcome: string): IconName {
   return outcome === "lbw" ? "newborn" : "child";
@@ -136,14 +181,6 @@ function exposedFigure(outcome: string): IconName {
 function outcomeNoun(outcome: string): string {
   return outcome === "lbw" ? "of low-birth-weight births" : "of under-five deaths";
 }
-
-/** Where each group of layers starts, so historical and projected read apart. */
-const LAYER_GROUP_START: Partial<Record<ExploreLayer, string>> = {
-  observed: "Historical · Copernicus ERA5 reanalysis",
-  forecast: "Next 6 months · Copernicus C3S forecasts",
-  projection: "Projections · climate models",
-  population: "Context",
-};
 
 /** Names that depend on the country's own definition. */
 function layerLabel(layer: ExploreLayer, country: string | undefined): string | null {
@@ -155,14 +192,21 @@ function readState(): State {
   const params = new URLSearchParams(
     typeof window === "undefined" ? "" : window.location.search,
   );
-  const layer = params.get("layer");
+  // Links from before the time tabs carried one "layer"; read them the same.
+  const legacy = params.get("layer");
+  const time = (TIME_VIEWS.find((item) => item.code === params.get("view"))?.code ??
+    TIME_VIEWS.find((item) => item.code === legacy)?.code ??
+    "observed") as TimeView;
+  const show = (MAP_SHOWS.find((item) => item.code === params.get("map"))?.code ??
+    MAP_SHOWS.find((item) => item.code === legacy)?.code ??
+    "heat") as MapShow;
   return {
     frame: params.get("frame") ?? COUNTRIES[0].start,
     selected: params.get("place"),
     outcome: params.get("outcome") ?? "lbw",
-    layer: LAYERS.some((item) => item.code === layer)
-      ? (layer as ExploreLayer)
-      : "observed",
+    time,
+    show,
+    vra: params.get("vra") === "1" || legacy === "vulnerability",
     month: params.get("month"),
     period: params.get("period"),
     scenario: params.get("scenario"),
@@ -182,12 +226,14 @@ function writeState(state: State) {
   params.set("frame", state.frame);
   if (state.selected) params.set("place", state.selected);
   params.set("outcome", state.outcome);
-  params.set("layer", state.layer);
+  params.set("view", state.time);
+  if (state.show !== "heat") params.set("map", state.show);
+  if (state.vra) params.set("vra", "1");
   if (state.month) params.set("month", state.month);
   if (state.period) params.set("period", state.period);
   if (state.scenario) params.set("scenario", state.scenario);
   params.set("length", String(state.length));
-  if (state.layer === "population") params.set("people", state.people);
+  if (state.show === "population") params.set("people", state.people);
   const next = `/explore?${params}`;
   if (`${window.location.pathname}${window.location.search}` === next) return;
   const current = new URLSearchParams(window.location.search);
@@ -277,6 +323,7 @@ export function ExploreApp() {
     setState((current) => ({ ...current, ...patch }));
   }, []);
 
+  const layer = layerOf(state.time, state.show);
   useEffect(() => writeState(state), [state]);
   useEffect(() => {
     const restore = () => setState(readState());
@@ -357,6 +404,27 @@ export function ExploreApp() {
     };
   }, [state.frame]);
 
+  // The vulnerability assessment, as dots over whatever the map shows.
+  const [vraOverlay, setVraOverlay] = useState<{
+    key: string;
+    data: MapResponse | null;
+  } | null>(null);
+  useEffect(() => {
+    if (!state.vra) return;
+    let cancelled = false;
+    cached(`vra|${state.frame}`, () => fetchVraMap(state.frame, null))
+      .then((data) => !cancelled && setVraOverlay({ key: state.frame, data }))
+      .catch(() => !cancelled && setVraOverlay({ key: state.frame, data: null }));
+    return () => {
+      cancelled = true;
+    };
+  }, [state.vra, state.frame]);
+  const vraMap = state.vra && vraOverlay?.key === state.frame ? vraOverlay.data : null;
+  const vraError =
+    state.vra && vraOverlay?.key === state.frame && !vraOverlay.data
+      ? "No vulnerability assessment is published for this area yet."
+      : null;
+
   // The forecast's months, from the frame's first forecast map.
   const forecastKey = `${state.frame}|${state.outcome}`;
   const [forecastInfo, setForecastInfo] = useState<{
@@ -365,7 +433,7 @@ export function ExploreApp() {
     issue: string | null;
   } | null>(null);
   useEffect(() => {
-    if (state.layer !== "forecast") return;
+    if (layer !== "forecast") return;
     let cancelled = false;
     forecastMapRead(state.frame, state.outcome)
       .then((response) => {
@@ -388,7 +456,7 @@ export function ExploreApp() {
     return () => {
       cancelled = true;
     };
-  }, [forecastKey, state.frame, state.outcome, state.layer]);
+  }, [forecastKey, state.frame, state.outcome, layer]);
   const forecastMonths = forecastInfo?.key === forecastKey ? forecastInfo.months : [];
   const forecastMonth =
     state.month && forecastMonths.includes(state.month)
@@ -411,18 +479,18 @@ export function ExploreApp() {
     };
   }, [focusId, state.outcome]);
 
-  const climateView = CLIMATE_LAYERS.includes(state.layer);
-  const climateKey = `${state.frame}|${state.layer}`;
+  const climateView = CLIMATE_LAYERS.includes(layer);
+  const climateKey = `${state.frame}|${layer}`;
   useEffect(() => {
     if (!climateView) return;
     let cancelled = false;
-    const layer = state.layer as ClimateLayer;
-    climateRead(state.frame, layer)
+    const climateLayer = layer as ClimateLayer;
+    climateRead(state.frame, climateLayer)
       .then((response) => {
         if (cancelled) return;
         // The newest month is the same read under its own name.
         if (response.month)
-          prime(`climate|${state.frame}|${layer}|${response.month}`, response);
+          prime(`climate|${state.frame}|${climateLayer}|${response.month}`, response);
         setClimateInfo({
           key: climateKey,
           months: response.available_months,
@@ -436,7 +504,7 @@ export function ExploreApp() {
     return () => {
       cancelled = true;
     };
-  }, [climateView, climateKey, state.frame, state.layer]);
+  }, [climateView, climateKey, state.frame, layer]);
 
   const frameReady = frameInfo?.key === frameKey;
   const outlookInfo = frameReady ? frameInfo.outlook : null;
@@ -492,7 +560,7 @@ export function ExploreApp() {
 
   // The map: one read, made once its month or period is known.
   const mapRead: { key: string; load: () => Promise<MapResponse> } | null = (() => {
-    const { frame: geo, outcome, layer } = state;
+    const { frame: geo, outcome } = state;
     if (layer === "forecast") {
       if (!forecastMonth) return null;
       return {
@@ -555,7 +623,7 @@ export function ExploreApp() {
         if (cancelled) return;
         setMap(null);
         setMapError(
-          state.layer === "vulnerability"
+          layer === "vulnerability"
             ? "No vulnerability assessment is published for this area yet."
             : climateView
               ? "No ERA5-Land months are loaded for this area yet."
@@ -566,7 +634,7 @@ export function ExploreApp() {
     return () => {
       cancelled = true;
     };
-  }, [mapKey, state.layer, climateView]);
+  }, [mapKey, layer, climateView]);
 
   // The focused place: its month, seasonal cycle and change over periods.
   const focusKey = `${focusId}|${state.outcome}|${observedMonth ?? ""}|${period ?? ""}|${scenario ?? ""}`;
@@ -614,9 +682,7 @@ export function ExploreApp() {
   const outlook = focusData?.outlook ?? null;
   const focusStale = focusData?.key !== focusKey;
   const bands =
-    state.layer === "population"
-      ? densityBandsFor(state.people)
-      : bandsFor(state.layer);
+    layer === "population" ? densityBandsFor(state.people) : bandsFor(layer);
   const peopleCounts =
     framePopulation?.key === state.frame ? framePopulation.data : null;
   const focusPeople =
@@ -635,7 +701,7 @@ export function ExploreApp() {
     adminUnit: state.selected,
     outcome: state.outcome,
     choices: {
-      view: state.layer === "projection" ? "projection" : "observed",
+      view: layer === "projection" ? "projection" : "observed",
       month: observedMonth ?? undefined,
       period: period ?? undefined,
       scenario: scenario ?? undefined,
@@ -696,21 +762,79 @@ export function ExploreApp() {
         high: null,
         tmax: null,
       }));
-  // The precision behind the layer list's figures, as they change.
-  const observedRatio =
-    observed?.estimate?.value_percent != null ? observed.estimate.ratio : null;
+  // What the map is shaded by: past-only choices fall back to the heat share.
+  const shown: MapShow =
+    MAP_SHOWS.find((item) => item.code === state.show)?.pastOnly &&
+    state.time !== "observed"
+      ? "heat"
+      : state.show;
+
+  // The one estimate at the top, for whichever time is chosen.
   const projectionPart = outlook?.period_summary
     .find((row) => row.period === period)
     ?.parts.find((part) => part.side === "heat");
-  const projectionRatio =
-    projectionPart?.value_percent != null ? projectionPart.ratio : null;
+  const hero: {
+    value: number | null;
+    ratio: OutlookRatio | null;
+    when: string | null;
+    detail: string | null;
+    empty: string;
+    message: string;
+  } = (() => {
+    if (state.time === "forecast") {
+      const row =
+        placeMonths?.months.find((item) => item.month === forecastMonth) ??
+        placeMonths?.months[0];
+      return {
+        value: row?.value_percent ?? null,
+        ratio: null,
+        when: row ? `${monthLabel(row.month)} forecast` : null,
+        detail:
+          row && row.low_percent !== null && row.high_percent !== null
+            ? `Range ${formatPercent(row.low_percent)}–${formatPercent(row.high_percent)} across ${placeMonths?.systems.length ?? 0} forecast systems${row.tmax_c !== null ? ` · ${row.tmax_c.toFixed(1)} °C mean daily max` : ""}`
+            : null,
+        empty: "–",
+        message: placeMonths
+          ? "No forecast for this month"
+          : "No forecast for this place yet",
+      };
+    }
+    if (state.time === "projection") {
+      const label = outlookInfo?.periods.find((item) => item.code === period)?.label;
+      return {
+        value: projectionPart?.value_percent ?? null,
+        ratio: projectionPart?.ratio ?? null,
+        when: label
+          ? `${label}${scenario ? `, ${tiers.get(scenario)?.toLowerCase()} emissions` : ""}`
+          : null,
+        detail:
+          projectionPart?.gcm_min_percent != null &&
+          projectionPart.gcm_max_percent != null
+            ? `Range ${formatPercent(projectionPart.gcm_min_percent)}–${formatPercent(projectionPart.gcm_max_percent)} across climate models`
+            : null,
+        empty: "–",
+        message: "No projection for this choice",
+      };
+    }
+    const estimate = observed?.estimate ?? null;
+    return {
+      value: estimate?.value_percent ?? null,
+      ratio: estimate?.ratio ?? null,
+      when: observed?.month ? monthLabel(observed.month) : null,
+      detail: estimate?.ratio
+        ? `${estimate.ratio.kind === "odds_ratio" ? "Odds" : "Risk"} ratio ${estimate.ratio.value.toFixed(2)}`
+        : null,
+      empty: estimate ? "No heat excess" : "–",
+      message: estimate?.message ?? "No published estimate for this month",
+    };
+  })();
   const forecastBody =
     forecastPoints.length > 0 ? (
       <>
         <ForecastLine
           points={forecastPoints}
-          selected={state.layer === "forecast" ? forecastMonth : null}
-          onSelect={(month) => update({ layer: "forecast", month })}
+          selected={layer === "forecast" ? forecastMonth : null}
+          onSelect={(month) => update({ time: "forecast", month })}
           seasonMonths={season?.months ?? []}
           systems={placeMonths?.systems.length ?? 0}
         />
@@ -809,102 +933,41 @@ export function ExploreApp() {
             </div>
           </section>
 
-          <section className={styles.section}>
-            <h2>Map layer</h2>
-            <div role="radiogroup" aria-label="Map layer" className={styles.layers}>
-              {LAYERS.map((item) => (
-                <Fragment key={item.code}>
-                  {LAYER_GROUP_START[item.code] && (
-                    <p className={styles.layerGroup}>{LAYER_GROUP_START[item.code]}</p>
-                  )}
-                  <label className={styles.layer}>
-                    <input
-                      type="radio"
-                      name="layer"
-                      checked={state.layer === item.code}
-                      onChange={() => update({ layer: item.code })}
-                    />
-                    <span>
-                      {layerLabel(item.code, countryOf(frame)?.code) ?? item.label}
-                    </span>
-                    <span className={styles.layerValue}>
-                      {item.code === "observed"
-                        ? formatPercent(observed?.estimate?.value_percent)
-                        : item.code === "forecast"
-                          ? formatPercent(
-                              placeForecast?.data?.months.find(
-                                (row) =>
-                                  row.month ===
-                                  (forecastMonth ??
-                                    placeForecast.data?.months[0]?.month),
-                              )?.value_percent,
-                            )
-                          : item.code === "projection"
-                            ? formatPercent(projectionPart?.value_percent)
-                            : item.code === state.layer &&
-                                focusArea?.value_percent != null
-                              ? item.code === "tmax"
-                                ? `${focusArea.value_percent.toFixed(1)} °C`
-                                : item.code === "heat_days"
-                                  ? `${Math.round(focusArea.value_percent)} d`
-                                  : item.code === "population"
-                                    ? `${formatCount(focusArea.value_percent)}/km²`
-                                    : (focusArea.value_percent / 100).toFixed(2)
-                              : ""}
-                      {item.code === "observed" && observedRatio && (
-                        <PrecisionMark ratio={observedRatio} align="end" />
-                      )}
-                      {item.code === "projection" && projectionRatio && (
-                        <PrecisionMark ratio={projectionRatio} align="end" />
-                      )}
-                    </span>
-                  </label>
-                  {item.code === "forecast" &&
-                    state.layer === "forecast" &&
-                    forecastMonths.length > 0 && (
-                      <div
-                        className={styles.forecastPicker}
-                        role="group"
-                        aria-label="Forecast month"
-                      >
-                        {forecastMonths.map((key) => (
-                          <button
-                            key={key}
-                            type="button"
-                            aria-pressed={forecastMonth === key}
-                            aria-label={monthLabel(key)}
-                            title={monthLabel(key)}
-                            data-season={
-                              season?.months.includes(Number(key.slice(5, 7))) ||
-                              undefined
-                            }
-                            data-new-year={
-                              (key.endsWith("-01") && key !== forecastMonths[0]) ||
-                              undefined
-                            }
-                            onClick={() => update({ month: key })}
-                          >
-                            {MONTH_LABELS[Number(key.slice(5, 7)) - 1]}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  {item.code === "forecast" &&
-                    state.layer === "forecast" &&
-                    forecastBody && (
-                      <div
-                        className={styles.forecastInline}
-                        data-testid="explore-forecast"
-                      >
-                        {forecastBody}
-                      </div>
-                    )}
-                </Fragment>
-              ))}
-            </div>
+          <div className={styles.timeTabs} role="tablist" aria-label="Time">
+            {TIME_VIEWS.map((item) => (
+              <button
+                key={item.code}
+                type="button"
+                role="tab"
+                aria-selected={state.time === item.code}
+                onClick={() => update({ time: item.code })}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          <section
+            className={`${styles.section} ${styles.hero}`}
+            data-testid="explore-estimate"
+            aria-busy={focusStale}
+          >
+            <p className={styles.bigNumber} data-precision={hero.ratio?.precision}>
+              {hero.value === null ? hero.empty : formatPercent(hero.value)}
+              {hero.value !== null && hero.ratio && (
+                <PrecisionMark ratio={hero.ratio} />
+              )}
+            </p>
+            <p className={styles.muted}>
+              {hero.value === null
+                ? hero.message
+                : `${outcomeNoun(state.outcome)} linked to heat`}
+              {hero.when ? ` · ${hero.when}` : ""}
+            </p>
+            {hero.detail && <p className={styles.heroDetail}>{hero.detail}</p>}
           </section>
 
-          {(state.layer === "observed" || climateView) && years.size > 0 && (
+          {state.time === "observed" && years.size > 0 && (
             <section className={styles.section}>
               <h2>Month</h2>
               {years.size > 8 ? (
@@ -976,25 +1039,41 @@ export function ExploreApp() {
             </section>
           )}
 
-          {state.layer === "population" && (
+          {state.time === "forecast" && forecastMonths.length > 0 && (
             <section className={styles.section}>
-              <h2>Who</h2>
-              <div className={styles.segmented} role="group" aria-label="People">
-                {POPULATION_MEASURES.map((item) => (
+              <div
+                className={styles.forecastPicker}
+                role="group"
+                aria-label="Forecast month"
+              >
+                {forecastMonths.map((key) => (
                   <button
-                    key={item.code}
+                    key={key}
                     type="button"
-                    aria-pressed={state.people === item.code}
-                    onClick={() => update({ people: item.code })}
+                    aria-pressed={forecastMonth === key}
+                    aria-label={monthLabel(key)}
+                    title={monthLabel(key)}
+                    data-season={
+                      season?.months.includes(Number(key.slice(5, 7))) || undefined
+                    }
+                    data-new-year={
+                      (key.endsWith("-01") && key !== forecastMonths[0]) || undefined
+                    }
+                    onClick={() => update({ month: key })}
                   >
-                    {item.label}
+                    {MONTH_LABELS[Number(key.slice(5, 7)) - 1]}
                   </button>
                 ))}
               </div>
+              {forecastBody && (
+                <div className={styles.forecastInline} data-testid="explore-forecast">
+                  {forecastBody}
+                </div>
+              )}
             </section>
           )}
 
-          {state.layer === "projection" && outlookInfo && (
+          {state.time === "projection" && outlookInfo && (
             <section className={styles.section}>
               {lengths.length > 1 && (
                 <>
@@ -1048,7 +1127,57 @@ export function ExploreApp() {
             </section>
           )}
 
-          {/* Past months give way to the forecast; the seasonal cycle stays as context. */}
+          <section className={styles.section}>
+            <h2>Map shows</h2>
+            <div className={styles.mapShows} role="group" aria-label="Map shows">
+              {MAP_SHOWS.filter(
+                (item) => !item.pastOnly || state.time === "observed",
+              ).map((item) => (
+                <button
+                  key={item.code}
+                  type="button"
+                  aria-pressed={shown === item.code}
+                  onClick={() => update({ show: item.code })}
+                >
+                  {(item.code === "heat_days" &&
+                    layerLabel("heat_days", countryOf(frame)?.code)) ||
+                    item.label}
+                </button>
+              ))}
+            </div>
+            {shown === "population" && (
+              <div className={styles.segmented} role="group" aria-label="People">
+                {POPULATION_MEASURES.map((item) => (
+                  <button
+                    key={item.code}
+                    type="button"
+                    aria-pressed={state.people === item.code}
+                    onClick={() => update({ people: item.code })}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <label className={styles.vraSwitch}>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={state.vra}
+                onChange={(event) => update({ vra: event.target.checked })}
+              />
+              <span>
+                Vulnerability (VRA)
+                <small role={state.vra && vraError ? "status" : undefined}>
+                  {state.vra && vraError
+                    ? vraError
+                    : "Dots over the map: larger and darker for more vulnerable areas."}
+                </small>
+              </span>
+            </label>
+          </section>
+
+          {/* The seasonal cycle stays whatever the time: the place's year in context. */}
           <div aria-busy={focusStale} className={focusStale ? styles.stale : undefined}>
             <PlaceSummary
               observed={observed}
@@ -1060,8 +1189,7 @@ export function ExploreApp() {
               seasonMonths={season?.months ?? []}
               scenarioWord={scenario ? (tiers.get(scenario) ?? null) : null}
               scenarioCode={scenario}
-              historical={state.layer !== "projection"}
-              showEstimate={state.layer !== "forecast"}
+              view={state.time}
               year={observedMonth?.slice(0, 4) ?? null}
             />
           </div>
@@ -1163,7 +1291,7 @@ export function ExploreApp() {
           )}
           <ExploreMap
             data={map}
-            layer={state.layer}
+            layer={layer}
             bands={bands}
             selectedId={state.selected}
             loading={mapLoading}
@@ -1171,19 +1299,18 @@ export function ExploreApp() {
             onOpen={open}
             onHover={prefetch}
             onOutside={openPoint}
+            overlay={vraMap}
             childLabel={(id) => {
               const below = children(places, id);
               return below.length ? `${below[0].levelLabel.toLowerCase()}s` : null;
             }}
             figure={
-              state.layer === "observed" ||
-              state.layer === "projection" ||
-              state.layer === "forecast"
+              layer === "observed" || layer === "projection" || layer === "forecast"
                 ? exposedFigure(state.outcome)
                 : null
             }
             note={
-              state.layer === "forecast"
+              layer === "forecast"
                 ? (area) => {
                     const forecast = map as ForecastMap | null;
                     const range = forecast?.ranges?.[area.geography_id ?? ""];
@@ -1202,11 +1329,11 @@ export function ExploreApp() {
                 : undefined
             }
             caption={
-              state.layer === "forecast"
+              layer === "forecast"
                 ? `${outcomeNoun(state.outcome)} · ${forecastMonth ? monthLabel(forecastMonth) : ""} forecast`
-                : state.layer === "observed"
+                : layer === "observed"
                   ? `${outcomeNoun(state.outcome)} · ${month ? monthLabel(month) : ""}`
-                  : state.layer === "projection"
+                  : layer === "projection"
                     ? `${outcomeNoun(state.outcome)} · ${outlookInfo?.periods.find((p) => p.code === period)?.label ?? ""}${scenario ? `, ${tiers.get(scenario)?.toLowerCase()} emissions` : ""}`
                     : null
             }
@@ -1225,14 +1352,14 @@ export function ExploreApp() {
           )}
           <div className={styles.legend} data-testid="explore-legend">
             <div className={styles.legendHead}>
-              <strong>{LAYERS.find((item) => item.code === state.layer)?.label}</strong>
+              <strong>{LAYERS.find((item) => item.code === layer)?.label}</strong>
               <button type="button" onClick={() => setShowInfo((value) => !value)}>
                 {showInfo ? "Hide info" : "See info"}
               </button>
             </div>
             {showInfo && (
               <p className={styles.legendInfo}>
-                {LAYERS.find((item) => item.code === state.layer)?.hint}
+                {LAYERS.find((item) => item.code === layer)?.hint}
               </p>
             )}
             <div className={styles.legendBands}>
@@ -1243,7 +1370,12 @@ export function ExploreApp() {
                 </span>
               ))}
             </div>
-            {state.layer === "population" && peopleCounts && (
+            {vraMap && (
+              <small className={styles.legendVra}>
+                <i /> Vulnerability (VRA): larger, darker dots are more vulnerable
+              </small>
+            )}
+            {layer === "population" && peopleCounts && (
               <small className={styles.legendSource}>
                 Source:{" "}
                 <a href={peopleCounts.source_uri} target="_blank" rel="noreferrer">
@@ -1252,17 +1384,60 @@ export function ExploreApp() {
                 ({peopleCounts.license}), 1 km grid summed per area
               </small>
             )}
-            <small>
-              {(state.layer === "observed" || climateView) && month
-                ? monthLabel(month)
-                : ""}
-              {climateView ? " · Copernicus ERA5-Land" : ""}
-              {state.layer === "forecast" && forecastMonth
-                ? `${monthLabel(forecastMonth)} · Copernicus C3S forecast`
-                : ""}
-              {state.layer === "projection" && period
-                ? `${outlookInfo?.periods.find((p) => p.code === period)?.label ?? period}${scenario ? ` · ${tiers.get(scenario)} emissions (${sspLabel(scenario)})` : ""}`
-                : ""}
+            <small className={styles.legendSource}>
+              {layer === "observed" && month && (
+                <>
+                  {monthLabel(month)} ·{" "}
+                  <a href={TIME_SOURCES.observed.href} target="_blank" rel="noreferrer">
+                    Copernicus ERA5
+                  </a>
+                </>
+              )}
+              {climateView && month && (
+                <>
+                  {monthLabel(month)} ·{" "}
+                  <a
+                    href="https://cds.climate.copernicus.eu/datasets/reanalysis-era5-land"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Copernicus ERA5-Land
+                  </a>
+                  {layer === "heat_days" && season?.source_uri && (
+                    <>
+                      {" "}
+                      · thresholds:{" "}
+                      <a href={season.source_uri} target="_blank" rel="noreferrer">
+                        {season.source_name}
+                      </a>
+                    </>
+                  )}
+                </>
+              )}
+              {layer === "forecast" && forecastMonth && (
+                <>
+                  {monthLabel(forecastMonth)} ·{" "}
+                  <a href={TIME_SOURCES.forecast.href} target="_blank" rel="noreferrer">
+                    Copernicus C3S forecast
+                  </a>
+                </>
+              )}
+              {layer === "projection" && period && (
+                <>
+                  {outlookInfo?.periods.find((p) => p.code === period)?.label ?? period}
+                  {scenario
+                    ? ` · ${tiers.get(scenario)} emissions (${sspLabel(scenario)})`
+                    : ""}{" "}
+                  ·{" "}
+                  <a
+                    href={TIME_SOURCES.projection.href}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    ISIMIP climate models
+                  </a>
+                </>
+              )}
             </small>
           </div>
           {showActions && (
@@ -1289,8 +1464,7 @@ function PlaceSummary({
   seasonMonths,
   scenarioWord,
   scenarioCode,
-  historical,
-  showEstimate,
+  view,
   year,
 }: {
   observed: ObservedRisk | null;
@@ -1302,10 +1476,9 @@ function PlaceSummary({
   seasonMonths: number[];
   scenarioWord: string | null;
   scenarioCode: string | null;
-  /** Show the selected year's observed months rather than a projected period. */
-  historical: boolean;
-  /** False while the forecast is on: the past month's figure gives way. */
-  showEstimate: boolean;
+  /** Past months: the year against the average; next six: the average year;
+   *  projections: the period against the baseline, and how it changes. */
+  view: TimeView;
   year: string | null;
 }) {
   const heat = (parts: { side: string; value_percent: number | null }[]) =>
@@ -1356,6 +1529,7 @@ function PlaceSummary({
   const allYearsAverage = average(history.map((row) => row.value_percent));
   const firstYear = history[0]?.month.slice(0, 4);
   const lastYear = history.at(-1)?.month.slice(0, 4);
+  const yearsSpan = firstYear === lastYear ? firstYear : `${firstYear}–${lastYear}`;
 
   if (!observed && !outlook) {
     return (
@@ -1368,34 +1542,23 @@ function PlaceSummary({
   }
   return (
     <>
-      {showEstimate && observed?.estimate && (
-        <section className={styles.section} data-testid="explore-estimate">
+      {view === "forecast" && allYears && (
+        <section className={styles.section} data-testid="explore-seasonal-cycle">
           <h2>
-            {month ? `Observed · ${monthLabel(observed.month ?? month)}` : "Observed"}
+            Seasonal cycle{" "}
+            <span className={styles.muted}>· average year {yearsSpan}</span>
           </h2>
-          <p
-            className={styles.bigNumber}
-            data-precision={observed.estimate.ratio?.precision}
-          >
-            {observed.estimate.value_percent === null
-              ? "No heat excess"
-              : formatPercent(observed.estimate.value_percent)}
-            {observed.estimate.value_percent !== null && observed.estimate.ratio && (
-              <PrecisionMark ratio={observed.estimate.ratio} />
-            )}
-          </p>
-          <p className={styles.muted}>
-            {observed.estimate.value_percent === null
-              ? (observed.estimate.message ?? "")
-              : "of cases in this month linked to heat"}
-            {observed.estimate.ratio
-              ? ` · ${observed.estimate.ratio.kind === "odds_ratio" ? "odds" : "risk"} ratio ${observed.estimate.ratio.value.toFixed(2)}`
-              : ""}
-          </p>
+          <SeasonalLine
+            current={allYears}
+            baseline={null}
+            currentLabel={`Average ${firstYear}–${lastYear}`}
+            baselineLabel={null}
+            seasonMonths={seasonMonths}
+          />
         </section>
       )}
 
-      {historical && yearCycle && (
+      {view === "observed" && yearCycle && (
         <section className={styles.section} data-testid="explore-seasonal-cycle">
           <h2>
             Seasonal cycle, {year} <span className={styles.muted}>· observed</span>
@@ -1404,7 +1567,7 @@ function PlaceSummary({
             current={yearCycle}
             baseline={allYears}
             currentLabel={year ?? ""}
-            baselineLabel={`Average ${firstYear}–${lastYear}`}
+            baselineLabel={`Average ${yearsSpan}`}
             seasonMonths={seasonMonths}
           />
           <p className={styles.muted} data-testid="explore-year-average">
@@ -1417,7 +1580,7 @@ function PlaceSummary({
         </section>
       )}
 
-      {!(historical && yearCycle) && outlook && outlook.months.length === 12 && (
+      {view === "projection" && outlook && outlook.months.length === 12 && (
         <section className={styles.section} data-testid="explore-seasonal-cycle">
           <h2>Seasonal cycle</h2>
           <SeasonalLine
@@ -1436,7 +1599,7 @@ function PlaceSummary({
         </section>
       )}
 
-      {periods.length > 1 && (
+      {view === "projection" && periods.length > 1 && (
         <section className={styles.section} data-testid="explore-projection">
           <h2>How it changes</h2>
           <ul className={styles.periods}>
