@@ -51,6 +51,9 @@ for (const width of [1440, 390]) {
     await expect(
       page.getByRole("heading", { name: "Three questions CHART answers" }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Help bring CHART to your area" }),
+    ).toHaveAttribute("href", "/support");
     await page.screenshot({
       path: `../outputs/e2e/web/landing-${width}.png`,
       fullPage: true,

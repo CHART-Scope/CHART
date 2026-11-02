@@ -45,6 +45,7 @@ import {
   MONTH_LABELS,
   POPULATION_MEASURES,
   densityBandsFor,
+  containsPoint,
   formatCount,
   countryOf,
   OUTCOMES,
@@ -654,6 +655,25 @@ export function ExploreApp() {
         : { frame: place.id, selected: null },
     );
   };
+  // A click on the map where nothing is drawn: if it falls in a covered place
+  // (the other country, say), go there; otherwise the map offers "not here yet".
+  const openPoint = async (point: [number, number]): Promise<boolean> => {
+    const roots = places.filter((place) => !place.parentId);
+    try {
+      for (const root of roots) {
+        const frame = await populationRead(root.id, "total");
+        const hit = frame.areas.find((area) => containsPoint(area.geometry, point));
+        const place = hit?.geography_id ? placeById.get(hit.geography_id) : undefined;
+        if (place) {
+          pickPlace(place);
+          return true;
+        }
+      }
+    } catch {
+      return true; // unknown coverage: say nothing rather than "not covered"
+    }
+    return false;
+  };
 
   // The place's next six months, as a line; its month labels pick the map's
   // forecast month (switching to the forecast layer from any other).
@@ -1106,6 +1126,7 @@ export function ExploreApp() {
             onSelect={(id) => update({ selected: id })}
             onOpen={open}
             onHover={prefetch}
+            onOutside={openPoint}
             childLabel={(id) => {
               const below = children(places, id);
               return below.length ? `${below[0].levelLabel.toLowerCase()}s` : null;

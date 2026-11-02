@@ -39,6 +39,16 @@ labelled "Days ≥ 40 °C", because IMD's full heatwave definition also needs
 on each area's mean daily maximum, so a single hot spot inside a large area
 can be missed.
 
+## Outside the covered places
+
+A click on the map where no area is drawn is checked against each country's
+outline (its population map, already cached by Explore): inside a covered
+place, Explore moves there; anywhere else a card says CHART is not there yet
+and links to `/support?near=<lat>,<lng>`. That public page says what is
+covered (Kenya; Madhya Pradesh, India), the three ways to help (health data,
+climate and modelling work, partnership or funding) and opens an email to
+info@scopeimpact.fi with the area filled in. The landing page links to it too.
+
 ## Precision
 
 Beside a place's estimate, signal bars show how firm it is: three for high,

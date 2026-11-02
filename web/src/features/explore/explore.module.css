@@ -1216,3 +1216,45 @@
   background: var(--color-seq-2);
   opacity: 0.55;
 }
+
+/* A click outside the places CHART covers: what it covers, and how to help. */
+.outside {
+  position: absolute;
+  z-index: 5;
+  width: 260px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-card);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  font-size: 13px;
+}
+
+.outside strong {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.outside p {
+  margin: 0 0 8px;
+  color: var(--color-text-dim);
+  line-height: 1.45;
+}
+
+.outside a {
+  font-weight: 600;
+}
+
+.outsideClose {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}

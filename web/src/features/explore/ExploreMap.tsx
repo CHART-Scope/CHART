@@ -66,6 +66,11 @@ type Props = {
   childLabel?: (geographyId: string) => string | null;
   /** A per-area line, e.g. a forecast's range across systems. */
   note?: (area: MapArea) => string | null;
+  /**
+   * A click on no drawn area: resolves true when the point is a covered place
+   * (Explore moves there), false to offer "not covered yet" at the point.
+   */
+  onOutside?: (lngLat: [number, number]) => Promise<boolean>;
   /** The area's people, from WorldPop, when known. */
   people?: (area: MapArea) => {
     total: number;
@@ -76,6 +81,7 @@ type Props = {
 };
 
 type Hover = { area: MapArea; x: number; y: number; flip: boolean };
+type Outside = { x: number; y: number; lat: number; lng: number };
 
 export function ExploreMap({
   data,
@@ -92,6 +98,7 @@ export function ExploreMap({
   childLabel,
   note,
   people,
+  onOutside,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
@@ -101,9 +108,26 @@ export function ExploreMap({
   const [styleLoads, setStyleLoads] = useState(0);
   const ready = styleLoads > 0;
   const [hover, setHover] = useState<Hover | null>(null);
+  const [outside, setOutside] = useState<Outside | null>(null);
   // Handlers read the latest props without re-binding map events.
-  const latest = useRef({ data, selectedId, onSelect, onOpen, onHover, frameView });
-  latest.current = { data, selectedId, onSelect, onOpen, onHover, frameView };
+  const latest = useRef({
+    data,
+    selectedId,
+    onSelect,
+    onOpen,
+    onHover,
+    onOutside,
+    frameView,
+  });
+  latest.current = {
+    data,
+    selectedId,
+    onSelect,
+    onOpen,
+    onHover,
+    onOutside,
+    frameView,
+  };
 
   useEffect(() => {
     if (!container.current) return;
@@ -213,6 +237,17 @@ export function ExploreMap({
       const id = event.features?.[0]?.properties?.geography_id as string | undefined;
       if (id) latest.current.onSelect(id);
     });
+    instance.on("click", (event) => {
+      setOutside(null);
+      if (instance.queryRenderedFeatures(event.point, { layers: ["area-fill"] }).length)
+        return;
+      const { lng, lat } = event.lngLat;
+      const point = { x: event.point.x, y: event.point.y, lat, lng };
+      void latest.current.onOutside?.([lng, lat]).then((covered) => {
+        if (!covered) setOutside(point);
+      });
+    });
+    instance.on("movestart", () => setOutside(null));
     instance.on("dblclick", "area-fill", (event) => {
       const id = event.features?.[0]?.properties?.geography_id as string | undefined;
       if (id) latest.current.onOpen(id);
@@ -337,6 +372,35 @@ export function ExploreMap({
       {loading && !data && (
         <div className={styles.mapFirstLoad} role="status">
           <span className={styles.spinner} aria-hidden="true" /> Loading map…
+        </div>
+      )}
+      {outside && (
+        <div
+          className={styles.outside}
+          role="dialog"
+          aria-label="Not covered yet"
+          data-testid="explore-outside"
+          style={{
+            left: Math.min(outside.x, (container.current?.clientWidth ?? 0) - 270),
+            top: Math.max(8, outside.y - 12),
+          }}
+        >
+          <button
+            type="button"
+            className={styles.outsideClose}
+            aria-label="Close"
+            onClick={() => setOutside(null)}
+          >
+            ×
+          </button>
+          <strong>CHART isn&rsquo;t here yet</strong>
+          <p>
+            Estimates cover Kenya and Madhya Pradesh, India, today. Data, modelling or
+            funding can bring CHART to this area.
+          </p>
+          <a href={`/support?near=${outside.lat.toFixed(2)},${outside.lng.toFixed(2)}`}>
+            Help bring CHART here →
+          </a>
         </div>
       )}
       {hover && (

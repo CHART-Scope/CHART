@@ -156,7 +156,8 @@ export function Login({
             <p className={styles.openNote}>
               Anyone can explore the published estimates without an account. CHART is
               free and open source, so a ministry or partner can run it for their own
-              country.
+              country. Not covered yet?{" "}
+              <a href="/support">Help bring CHART to your area</a>.
             </p>
           </section>
           <section className={styles.toolkit} aria-labelledby="toolkit-title">

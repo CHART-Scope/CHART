@@ -331,6 +331,31 @@ export function geometryBounds(
   return Number.isFinite(west) ? [west, south, east, north] : null;
 }
 
+/** Whether a [lng, lat] point lies in a GeoJSON Polygon or MultiPolygon. */
+export function containsPoint(
+  geometry: { type: string; coordinates: unknown } | null,
+  [x, y]: [number, number],
+): boolean {
+  if (!geometry) return false;
+  const polygons = (
+    geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates
+  ) as number[][][][];
+  if (!Array.isArray(polygons)) return false;
+  // Even-odd ray casting over every ring: holes cancel their outer ring.
+  return polygons.some((rings) => {
+    let inside = false;
+    for (const ring of rings) {
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, yi] = ring[i];
+        const [xj, yj] = ring[j];
+        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)
+          inside = !inside;
+      }
+    }
+    return inside;
+  });
+}
+
 export type PlaceMatch = { place: ExplorePlace; context: string };
 
 /**

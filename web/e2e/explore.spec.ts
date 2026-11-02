@@ -596,6 +596,75 @@ test("a low-precision estimate shows one bar and reads softer", async ({ page })
   await estimate.screenshot({ path: "../outputs/e2e/web/explore-precision-low.png" });
 });
 
+test("a click outside the covered places offers a way to bring CHART there", async ({
+  page,
+}) => {
+  const { api } = await openExplore(page, "frame=geo-ke&outcome=lbw");
+  // Coverage is read from each country's own outline (its population map).
+  api.on(/^\/api\/chart\/heat-outlook\/[^/]+\/population$/, (route) =>
+    json(route, {
+      ...fixtures.mapFrame,
+      metric: "population_density",
+      unit: "people_per_km2",
+      year: 2025,
+      measure: "total",
+      source: "WorldPop",
+      source_uri: "https://hub.worldpop.org/project/categories?id=3",
+      license: "CC BY 4.0",
+      counts: {},
+    }),
+  );
+  const map = page.getByTestId("explore-map");
+  await expect(map.locator("canvas")).toBeVisible();
+  await expect(page.getByTestId("explore-estimate")).toBeVisible();
+
+  // The map's corner is Uganda and South Sudan: not a place CHART covers.
+  await map.click({ position: { x: 12, y: 12 } });
+  const card = page.getByTestId("explore-outside");
+  await expect(card).toContainText("CHART isn’t here yet");
+  await expect(card).toContainText("Kenya and Madhya Pradesh");
+  const link = card.getByRole("link", { name: /Help bring CHART here/ });
+  await expect(link).toHaveAttribute(
+    "href",
+    /^\/support\?near=-?\d+\.\d{2},-?\d+\.\d{2}$/,
+  );
+  await page.screenshot({ path: "../outputs/e2e/web/explore-outside.png" });
+  await card.getByRole("button", { name: "Close" }).click();
+  await expect(card).toHaveCount(0);
+
+  // The support page: what is covered, three ways to help, and a way to write.
+  await map.click({ position: { x: 12, y: 12 } });
+  await card.getByRole("link", { name: /Help bring CHART here/ }).click();
+  await expect(page).toHaveURL(/\/support\?near=/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Bring CHART to your area" }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2 })).toHaveText([
+    "Share health data",
+    "Climate and modelling work",
+    "Partner or fund",
+  ]);
+  await expect(
+    page.getByText(/You were looking near \d+\.\d° [NS], \d+\.\d° [EW]/),
+  ).toBeVisible();
+  const mail = page.getByRole("link", { name: "Get in touch" });
+  await expect(mail).toHaveAttribute("href", /^mailto:info@scopeimpact\.fi\?subject=/);
+  expect(decodeURIComponent((await mail.getAttribute("href")) ?? "")).toContain(
+    "Area: near ",
+  );
+  await page.screenshot({ path: "../outputs/e2e/web/support.png", fullPage: true });
+  await page.getByRole("link", { name: "Back to the map" }).click();
+  await expect(page).toHaveURL(/\/explore/);
+});
+
+test("the support page ignores a malformed point", async ({ page }) => {
+  await page.goto("/support?near=<script>");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Bring CHART to your area" }),
+  ).toBeVisible();
+  await expect(page.getByText(/You were looking near/)).toHaveCount(0);
+});
+
 test("the first map load says so, then clears", async ({ page }) => {
   await page.route("**/heat-outlook/geo-ke/observed/map**", async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 1200));
