@@ -154,7 +154,7 @@ export function ForecastLine({
       <div
         className={styles.forecastMonths}
         role="group"
-        aria-label="Forecast month"
+        aria-label="Months ahead"
         style={{
           paddingLeft: `${(PAD.left / WIDTH) * 100}%`,
           paddingRight: `${(PAD.right / WIDTH) * 100}%`,

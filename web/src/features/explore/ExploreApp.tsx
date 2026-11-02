@@ -696,12 +696,9 @@ export function ExploreApp() {
         high: null,
         tmax: null,
       }));
-  const forecastPanel =
+  const forecastBody =
     forecastPoints.length > 0 ? (
-      <section className={styles.section} data-testid="explore-forecast">
-        <h2>
-          Next 6 months <span className={styles.muted}>· forecast</span>
-        </h2>
+      <>
         <ForecastLine
           points={forecastPoints}
           selected={state.layer === "forecast" ? forecastMonth : null}
@@ -719,7 +716,7 @@ export function ExploreApp() {
             forecast issued {monthLabel(placeMonths.issue)}; refreshed every month.
           </p>
         )}
-      </section>
+      </>
     ) : null;
 
   return (
@@ -853,6 +850,46 @@ export function ExploreApp() {
                               : ""}
                     </span>
                   </label>
+                  {item.code === "forecast" &&
+                    state.layer === "forecast" &&
+                    forecastMonths.length > 0 && (
+                      <div
+                        className={styles.forecastPicker}
+                        role="group"
+                        aria-label="Forecast month"
+                      >
+                        {forecastMonths.map((key) => (
+                          <button
+                            key={key}
+                            type="button"
+                            aria-pressed={forecastMonth === key}
+                            aria-label={monthLabel(key)}
+                            title={monthLabel(key)}
+                            data-season={
+                              season?.months.includes(Number(key.slice(5, 7))) ||
+                              undefined
+                            }
+                            data-new-year={
+                              (key.endsWith("-01") && key !== forecastMonths[0]) ||
+                              undefined
+                            }
+                            onClick={() => update({ month: key })}
+                          >
+                            {MONTH_LABELS[Number(key.slice(5, 7)) - 1]}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  {item.code === "forecast" &&
+                    state.layer === "forecast" &&
+                    forecastBody && (
+                      <div
+                        className={styles.forecastInline}
+                        data-testid="explore-forecast"
+                      >
+                        {forecastBody}
+                      </div>
+                    )}
                 </Fragment>
               ))}
             </div>
@@ -930,8 +967,6 @@ export function ExploreApp() {
             </section>
           )}
 
-          {state.layer === "forecast" && forecastPanel}
-
           {state.layer === "population" && (
             <section className={styles.section}>
               <h2>Who</h2>
@@ -1004,23 +1039,27 @@ export function ExploreApp() {
             </section>
           )}
 
-          <div aria-busy={focusStale} className={focusStale ? styles.stale : undefined}>
-            <PlaceSummary
-              observed={observed}
-              outlook={outlook}
-              baseline={focusData?.baseline ?? null}
-              period={period}
-              length={state.length}
-              month={observedMonth}
-              seasonMonths={season?.months ?? []}
-              scenarioWord={scenario ? (tiers.get(scenario) ?? null) : null}
-              scenarioCode={scenario}
-              historical={state.layer !== "projection"}
-              year={observedMonth?.slice(0, 4) ?? null}
-            />
-          </div>
-
-          {state.layer !== "forecast" && forecastPanel}
+          {/* The forecast stands on its own: past months are for the other layers. */}
+          {state.layer !== "forecast" && (
+            <div
+              aria-busy={focusStale}
+              className={focusStale ? styles.stale : undefined}
+            >
+              <PlaceSummary
+                observed={observed}
+                outlook={outlook}
+                baseline={focusData?.baseline ?? null}
+                period={period}
+                length={state.length}
+                month={observedMonth}
+                seasonMonths={season?.months ?? []}
+                scenarioWord={scenario ? (tiers.get(scenario) ?? null) : null}
+                scenarioCode={scenario}
+                historical={state.layer !== "projection"}
+                year={observedMonth?.slice(0, 4) ?? null}
+              />
+            </div>
+          )}
 
           {focusPeople && peopleCounts && (
             <section className={styles.section} data-testid="explore-people">

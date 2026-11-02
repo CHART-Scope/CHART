@@ -87,11 +87,13 @@ rebuilds both countries when C3S publishes a new issue. Beyond six months
 forecast skill is too low to show; the projections start in the next
 five-year period.
 
-The panel draws the six months as one line, in the seasonal cycle's style:
-the central forecast, the range across systems shaded behind it and the heat
-season marked. Its month labels (the year written once, where it starts) pick
-the map's month and switch the map to the forecast layer; with that layer on,
-the panel sits directly under the layer list.
+Choosing the **Forecast heat share** layer puts the six months right under
+its option: a row of months (a firmer divider where the year turns,
+heat-season months underlined in amber), then the place's line, in the
+seasonal cycle's style, with the central forecast, the range across systems
+shaded behind it and the heat season marked. Either picks the map's month.
+Past months (the observed estimate, month and year pickers, seasonal cycle)
+give way while the forecast is on, and the forecast shows nowhere else.
 
 ## Population
 
@@ -166,11 +168,11 @@ Explore only reads stored, published estimates; nothing is downloaded or
 scored when a visitor opens a place (see [Observed climate data](observed-climate.md)).
 The API serves those reads without a sign-in when `CHART_PUBLIC_READ=true`:
 
-| Open to visitors | Still requires sign-in |
-|---|---|
-| `GET /heat-outlook/{place}`, `/map`, `/observed`, `/observed/map`, `/climate`, `/capabilities` | Predictions and climate pulls (`POST /climate/...`) |
-| `GET /vra/indicators`, `/vra/{place}/assessment`, `/map`, `/areas/{area}` | Model settings, VRA uploads and coverage, users, workspaces, audit |
-| `GET /geographies` (already public) | Saved plans and the planning dashboard |
+| Open to visitors                                                                               | Still requires sign-in                                             |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `GET /heat-outlook/{place}`, `/map`, `/observed`, `/observed/map`, `/climate`, `/capabilities` | Predictions and climate pulls (`POST /climate/...`)                |
+| `GET /vra/indicators`, `/vra/{place}/assessment`, `/map`, `/areas/{area}`                      | Model settings, VRA uploads and coverage, users, workspaces, audit |
+| `GET /geographies` (already public)                                                            | Saved plans and the planning dashboard                             |
 
 A visitor reads as the `public_viewer` role over every published place. The
 variable defaults to `false`: an installation holding data it may not publish

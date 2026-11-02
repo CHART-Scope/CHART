@@ -505,13 +505,24 @@ test("the next six months: forecast map, months and the place's range", async ({
   );
   await page.reload();
 
-  // The place's six coming months as one line with its range, whatever the
-  // layer; the year is written once, where it starts.
+  // On the observed layer nothing of the forecast shows but its own option.
   const panel = page.getByTestId("explore-forecast");
+  await expect(page.getByTestId("explore-estimate")).toBeVisible();
+  await expect(
+    page.getByText("Next 6 months · Copernicus C3S forecasts"),
+  ).toBeVisible();
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Forecast month" })).toHaveCount(0);
+
+  // Choosing it: past months give way to the six coming ones, right under
+  // the option - a row of months, then the line with its range, the year
+  // written once where it starts.
+  await page.getByRole("radio", { name: /^Forecast heat share/ }).check();
+  await expect(page.getByTestId("explore-estimate")).toHaveCount(0);
+  await expect(page.getByTestId("explore-seasonal-cycle")).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Month", exact: true })).toHaveCount(0);
   await expect(panel.getByRole("img", { name: /next six months/ })).toBeVisible();
-  const chips = panel
-    .getByRole("group", { name: "Forecast month" })
-    .getByRole("button");
+  const chips = panel.getByRole("group", { name: "Months ahead" }).getByRole("button");
   await expect(chips).toHaveCount(6);
   await expect(chips.first()).toHaveText("Oct2026");
   await expect(chips.nth(1)).toHaveText("Nov");
@@ -523,20 +534,34 @@ test("the next six months: forecast map, months and the place's range", async ({
   // Pointing at a month reads it out.
   await chips.nth(2).hover();
   await expect(panel).toContainText("Dec 2026: 14.0%");
-
-  // The forecast layer sits in its own group; the line moves up beside it
-  // and its months pick the map's month.
-  await expect(
-    page.getByText("Next 6 months · Copernicus C3S forecasts"),
-  ).toBeVisible();
-  await page.getByRole("radio", { name: /^Forecast heat share/ }).check();
   await expect(chips.first()).toHaveAttribute("aria-pressed", "true");
+  // Right under the forecast's radio, its six months in one row.
+  const picker = page.getByRole("group", { name: "Forecast month" });
+  const months6 = picker.getByRole("button");
+  await expect(months6).toHaveText(["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"]);
+  await expect(months6.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(months6.nth(3)).toHaveAttribute("title", "Jan 2027");
+  const rows = await months6.evaluateAll(
+    (items) =>
+      new Set(items.map((item) => Math.round(item.getBoundingClientRect().top))).size,
+  );
+  expect(rows).toBe(1);
+  const radioBox = await page
+    .getByRole("radio", { name: /^Forecast heat share/ })
+    .boundingBox();
+  const pickerBox = await picker.boundingBox();
+  expect(pickerBox!.y - (radioBox!.y + radioBox!.height)).toBeLessThan(16);
+  await picker.screenshot({ path: "../outputs/e2e/web/explore-forecast-picker.png" });
   await expect(page.getByTestId("explore-legend")).toContainText(
     "Oct 2026 · Copernicus C3S forecast",
   );
   await chips.nth(1).click();
   await expect(page).toHaveURL(/layer=forecast.*month=2026-11/);
   await expect(chips.nth(1)).toHaveAttribute("aria-pressed", "true");
+  // The row under the radio picks too, and the line follows.
+  await months6.nth(2).click();
+  await expect(page).toHaveURL(/layer=forecast.*month=2026-12/);
+  await expect(chips.nth(2)).toHaveAttribute("aria-pressed", "true");
   await expect
     .poll(() =>
       api.requests.some((item) =>
