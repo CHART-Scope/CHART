@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from chart.climate.seasonal_forecast import latest_document
 from chart.risk.schemas import MapResponse
+from chart.heat_outlook.schemas import Ratio
 from chart.risk.service import load_map_view
 from chart.shared.db.models import AppGeography
 
@@ -25,6 +26,9 @@ class ForecastMonth(BaseModel):
     value_percent: float | None = None
     low_percent: float | None = None
     high_percent: float | None = None
+    #: The model's ratio and 95% interval at the central forecast, with its
+    #: precision; absent for issues built before it was kept.
+    ratio: Ratio | None = None
 
 
 class ForecastResponse(BaseModel):
@@ -68,6 +72,11 @@ def _selected(place: dict, outcome: str, selector: str | None):
     return chosen, sorted(scored["values"]), scored["values"][chosen]
 
 
+def _ratios(place: dict, outcome: str, selector: str | None) -> dict:
+    scored = place.get(outcome) or {}
+    return scored.get("ratios", {}).get(selector or scored.get("selector"), {})
+
+
 def load_forecast(
     session: Session, geography_id: str, outcome: str, selector: str | None
 ) -> ForecastResponse:
@@ -76,6 +85,7 @@ def load_forecast(
     if place is None:
         raise OutlookNotAvailable(geography_id)
     chosen, selectors, values = _selected(place, outcome, selector)
+    ratios = _ratios(place, outcome, chosen)
     months = []
     for month in document["months"]:
         temps = place["tmax_c"].get(month, [None, None, None])
@@ -89,6 +99,7 @@ def load_forecast(
                 value_percent=share[0],
                 low_percent=share[1],
                 high_percent=share[2],
+                ratio=ratios.get(month),
             )
         )
     return ForecastResponse(

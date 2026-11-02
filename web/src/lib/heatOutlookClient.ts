@@ -311,6 +311,8 @@ export type ForecastMonth = {
   value_percent: number | null;
   low_percent: number | null;
   high_percent: number | null;
+  /** The model's ratio and 95% interval at the central forecast. */
+  ratio?: OutlookRatio | null;
 };
 
 export type PlaceForecast = {

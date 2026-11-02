@@ -441,6 +441,13 @@ def test_forecast_months_without_heat_excess_score_zero(release, factory) -> Non
         "2026-10": [0.0, 0.0, 0.0],
         "2026-11": [0.0, 0.0, 0.0],
     }
+    # The model's interval at the central forecast is kept for each month,
+    # so a forecast month shows its precision like an observed one.
+    october = scored["ratios"]["P"]["2026-10"]
+    assert october["kind"] == "odds_ratio"
+    assert october["low"] <= october["value"] <= october["high"]
+    assert october["precision"] in {"high", "moderate", "low"}
+    assert set(scored["ratios"]["P"]) == {"2026-10", "2026-11"}
 
 
 def test_kenya_as_a_whole_forecasts_the_mean_of_its_counties(release, factory) -> None:

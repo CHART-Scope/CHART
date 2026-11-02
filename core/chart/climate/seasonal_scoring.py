@@ -11,7 +11,9 @@ India's release scores one temperature repeated over its lags (its
 interactive profile); Kenya's is scored by shifting each 2006-2016 year's
 daily series for that month by the forecast's departure from the normal and
 averaging the years (a delta method). Each month is scored at the central,
-coolest and warmest system so a range travels with every value.
+coolest and warmest system so a range travels with every value; the central
+score also keeps the model's own 95% interval (its odds or risk ratio), so a
+forecast month carries the same precision as an observed one.
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ from chart.heat_outlook.service import (
     outlook_release,
 )
 from chart.model_registry.service import get_active_model_mapping
+from chart.risk.precision import precision_for_ci
 from chart.shared.db.models import AdminUnit, AppGeography
 
 from .model_scoring import score_association_model, score_lbw_model
@@ -170,12 +173,24 @@ def _share(estimate: observed.ObservedEstimate) -> float | None:
     return estimate.value_percent
 
 
+def _ratio(kind: str, value: float, low: float, high: float) -> dict:
+    """The model's ratio and 95% interval at the central forecast."""
+    return {
+        "kind": kind,
+        "value": round(value, 4),
+        "low": round(low, 4),
+        "high": round(high, 4),
+        "precision": precision_for_ci(low, high),
+    }
+
+
 def _kenya(session, unit, outcome, place, months) -> dict | None:
     release = outlook_release()
     cal = observed.calibration(release)
     selector = DEFAULT_SELECTOR[outcome]
     temps = place["tmax_c"]
     values: dict[str, list[float | None]] = {}
+    ratios: dict[str, dict] = {}
     if outcome == LBW_OUTCOME:
         history = observed._monthly_tmax(session, [unit.id]).get(unit.id, {})
         for month in months:
@@ -190,11 +205,14 @@ def _kenya(session, unit, outcome, place, months) -> dict | None:
                     if other_key in temps and other <= month:
                         series[other] = temps[other_key][variant]
                 found = observed._score_lbw(series, cal, unit, selector, release)
-                shares.append(
-                    _share(observed._estimate(outcome, selector, [found[key]], release))
+                estimate = (
+                    observed._estimate(outcome, selector, [found[key]], release)
                     if key in found
                     else None
                 )
+                shares.append(_share(estimate) if estimate else None)
+                if variant == 0 and estimate and estimate.ratio:
+                    ratios[key] = estimate.ratio.model_dump()
             values[key] = _triple(shares)
     else:
         daily = observed._daily_tmax(session, [unit.id]).get(unit.id, {})
@@ -223,13 +241,22 @@ def _kenya(session, unit, outcome, place, months) -> dict | None:
                     shifted = {day: daily[day] + delta for day in window}
                     found = observed._score_u5(shifted, cal, unit, selector, release)
                     years.extend(found.values())
-                shares.append(
-                    _share(observed._estimate(outcome, selector, years, release))
+                estimate = (
+                    observed._estimate(outcome, selector, years, release)
                     if years
                     else None
                 )
+                shares.append(_share(estimate) if estimate else None)
+                if variant == 0 and estimate and estimate.ratio:
+                    ratios[key] = estimate.ratio.model_dump()
             values[key] = _triple(shares)
-    return {"selector": selector, "values": {selector: values}} if values else None
+    if not values:
+        return None
+    return {
+        "selector": selector,
+        "values": {selector: values},
+        "ratios": {selector: ratios},
+    }
 
 
 def _live(session, unit, outcome, place, months) -> dict | None:
@@ -252,6 +279,7 @@ def _live(session, unit, outcome, place, months) -> dict | None:
     if outcome == LBW_OUTCOME:
         windows = tuple(mapping.validated_pregnancy_windows) or (1,)
         by_window: dict[str, dict[str, list[float | None]]] = {}
+        window_ratios: dict[str, dict[str, dict]] = {}
         for window in windows:
             code = f"window_{window}"
             for month in months:
@@ -272,6 +300,13 @@ def _live(session, unit, outcome, place, months) -> dict | None:
                         pregnancy_window=window,
                         temperatures_c=(lags[0], lags[1], lags[2]),
                     )
+                    if variant == 0:
+                        window_ratios.setdefault(code, {})[key] = _ratio(
+                            "odds_ratio",
+                            score.odds_ratio,
+                            score.ci95_low,
+                            score.ci95_high,
+                        )
                     shares.append(
                         attributable_fraction_milli(
                             score.odds_ratio,
@@ -282,9 +317,12 @@ def _live(session, unit, outcome, place, months) -> dict | None:
                     )
                 by_window.setdefault(code, {})[key] = _triple(shares)
         default = f"window_{1 if 1 in windows else windows[0]}"
-        return {"selector": default, "values": by_window} if by_window else None
+        if not by_window:
+            return None
+        return {"selector": default, "values": by_window, "ratios": window_ratios}
 
     values: dict[str, list[float | None]] = {}
+    ratios: dict[str, dict] = {}
     for month in months:
         key = month.strftime("%Y-%m")
         if key not in temps:
@@ -297,6 +335,13 @@ def _live(session, unit, outcome, place, months) -> dict | None:
                 outcome=outcome,
                 exposure_profiles_c=((value, value, value, value),),
             )
+            if variant == 0:
+                ratios[key] = _ratio(
+                    "risk_ratio",
+                    association.estimate,
+                    association.ci95_low,
+                    association.ci95_high,
+                )
             shares.append(
                 attributable_fraction_milli(
                     association.estimate,
@@ -306,4 +351,6 @@ def _live(session, unit, outcome, place, months) -> dict | None:
                 / 10
             )
         values[key] = _triple(shares)
-    return {"selector": "all", "values": {"all": values}} if values else None
+    if not values:
+        return None
+    return {"selector": "all", "values": {"all": values}, "ratios": {"all": ratios}}

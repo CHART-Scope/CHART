@@ -126,6 +126,19 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
                                     "2026-11": [12.0, 9.5, 14.1],
                                 }
                             },
+                            # October keeps the model's interval; November
+                            # stands for an issue built before it was kept.
+                            "ratios": {
+                                "P": {
+                                    "2026-10": {
+                                        "kind": "odds_ratio",
+                                        "value": 1.21,
+                                        "low": 1.04,
+                                        "high": 1.4,
+                                        "precision": "high",
+                                    }
+                                }
+                            },
                         },
                     }
                 },
@@ -171,6 +184,15 @@ def test_a_saved_issue_is_served_publicly_with_ranges(client) -> None:
         october["high_percent"],
     ) == (14.2, 11.0, 17.5)
     assert october["tmax_c"] == 29.1
+    # The model's own interval travels with the month, with its precision.
+    assert october["ratio"] == {
+        "kind": "odds_ratio",
+        "value": 1.21,
+        "low": 1.04,
+        "high": 1.4,
+        "precision": "high",
+    }
+    assert body["months"][1]["ratio"] is None
 
     mapped = client.get("/heat-outlook/geo-ke/forecast/map?outcome=lbw&month=2026-11")
     assert mapped.status_code == 200, mapped.text

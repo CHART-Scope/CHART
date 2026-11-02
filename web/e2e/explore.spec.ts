@@ -552,6 +552,17 @@ test("the next six months: forecast map, months and the place's range", async ({
         value_percent: 12 + index,
         low_percent: 9 + index,
         high_percent: 15 + index,
+        // The model's own interval: firm in October, wide in November.
+        ratio:
+          index < 2
+            ? {
+                kind: "odds_ratio",
+                value: 1.2,
+                low: index === 0 ? 1.05 : 0.6,
+                high: index === 0 ? 1.4 : 4.5,
+                precision: index === 0 ? "high" : "moderate",
+              }
+            : null,
       })),
     }),
   );
@@ -571,8 +582,12 @@ test("the next six months: forecast map, months and the place's range", async ({
   await expect(estimate).toContainText("12.0%");
   await expect(estimate).toContainText("Oct 2026 forecast");
   await expect(estimate).toContainText("Range 9.0%–15.0% across 3 forecast systems");
-  // The forecast has no model interval, so no precision bars.
-  await expect(estimate.getByRole("img", { name: /precision/ })).toHaveCount(0);
+  // The month's precision, from the model's own interval, like an observed one.
+  const forecastPrecision = estimate.getByRole("img", { name: /precision/ });
+  await expect(forecastPrecision).toHaveAttribute(
+    "aria-label",
+    "High precision: the 95% interval of the odds ratio is 1.05–1.40",
+  );
   // The seasonal cycle stays as context: the place's average year.
   await expect(page.getByTestId("explore-seasonal-cycle")).toContainText(
     "average year",
@@ -616,6 +631,11 @@ test("the next six months: forecast map, months and the place's range", async ({
   await expect(page).toHaveURL(/view=forecast.*month=2026-11/);
   await expect(chips.nth(1)).toHaveAttribute("aria-pressed", "true");
   await expect(estimate).toContainText("Nov 2026 forecast");
+  await expect(forecastPrecision).toHaveAttribute(
+    "aria-label",
+    "Moderate precision: the 95% interval of the odds ratio is 0.60–4.50",
+  );
+  await expect(forecastPrecision.locator("i[data-on]")).toHaveCount(2);
   // The row picks too, and the line follows.
   await months6.nth(2).click();
   await expect(page).toHaveURL(/view=forecast.*month=2026-12/);

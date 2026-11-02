@@ -787,7 +787,7 @@ export function ExploreApp() {
         placeMonths?.months[0];
       return {
         value: row?.value_percent ?? null,
-        ratio: null,
+        ratio: row?.ratio ?? null,
         when: row ? `${monthLabel(row.month)} forecast` : null,
         detail:
           row && row.low_percent !== null && row.high_percent !== null

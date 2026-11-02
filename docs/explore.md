@@ -75,8 +75,11 @@ computed by the API from the 95% interval of the odds or risk ratio
 (`core/chart/risk/precision.py`, thresholds agreed with the health team);
 hovering or focusing shows a small card with the level, the interval and what
 it means. They follow the estimate as the tab, month, period or scenario
-changes. The forecast has no model interval, so it shows none; its range is
-the spread across forecast systems, a different uncertainty. A low-precision
+changes. A forecast month carries the model's own interval at the central
+forecast (saved with each issue), so it shows its precision like an observed
+month; its "Range" line is a different uncertainty, the spread across
+forecast systems. A place shown as the mean of its places (Kenya as a whole)
+has no single interval and shows no bars. A low-precision
 figure is drawn a little softer. The map's colours do not carry precision.
 
 ## Next six months

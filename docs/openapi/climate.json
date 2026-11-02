@@ -6442,6 +6442,16 @@
               }
             ],
             "title": "High Percent"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ratio"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
