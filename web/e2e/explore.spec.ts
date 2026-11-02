@@ -481,6 +481,16 @@ test("population shows density on the map and counts for the place", async ({
     .getByRole("button", { name: "Under five" })
     .click();
   await expect(page).toHaveURL(/map=population.*people=under5/);
+  // The count sits apart from the map choice above it, not on top of it.
+  const showsBox = (await page
+    .getByRole("group", { name: "Map shows" })
+    .boundingBox())!;
+  const peopleBox = (await page.getByRole("group", { name: "People" }).boundingBox())!;
+  expect(peopleBox.y - (showsBox.y + showsBox.height)).toBeGreaterThanOrEqual(6);
+  await page
+    .getByRole("group", { name: "Map shows" })
+    .locator("xpath=..")
+    .screenshot({ path: "../outputs/e2e/web/explore-map-shows.png" });
   await expect
     .poll(() => api.requests.some((item) => item.includes("population?measure=under5")))
     .toBe(true);

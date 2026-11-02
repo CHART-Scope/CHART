@@ -1146,7 +1146,8 @@ export function ExploreApp() {
               ))}
             </div>
             {shown === "population" && (
-              <div className={styles.segmented} role="group" aria-label="People">
+              <div className={styles.subChoice} role="group" aria-label="People">
+                <span className={styles.subChoiceLabel}>Count</span>
                 {POPULATION_MEASURES.map((item) => (
                   <button
                     key={item.code}
