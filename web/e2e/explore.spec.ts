@@ -481,26 +481,38 @@ test("the next six months: forecast map, months and the place's range", async ({
   );
   await page.reload();
 
-  // The place's six coming months, each with its range, whatever the layer.
+  // The place's six coming months as one line with its range, whatever the
+  // layer; the year is written once, where it starts.
   const panel = page.getByTestId("explore-forecast");
-  await expect(panel.getByRole("listitem")).toHaveCount(6);
-  await expect(panel).toContainText("Oct 2026");
-  await expect(panel).toContainText("12.0%");
+  await expect(panel.getByRole("img", { name: /next six months/ })).toBeVisible();
+  const chips = panel
+    .getByRole("group", { name: "Forecast month" })
+    .getByRole("button");
+  await expect(chips).toHaveCount(6);
+  await expect(chips.first()).toHaveText("Oct2026");
+  await expect(chips.nth(1)).toHaveText("Nov");
+  await expect(chips.nth(3)).toHaveText("Jan2027");
+  await expect(panel).toContainText("Oct 2026: 12.0%");
+  await expect(panel).toContainText("(9.0%–15.0%)");
   await expect(panel).toContainText("3 forecast systems");
   await expect(panel.getByRole("link", { name: "Copernicus C3S" })).toBeVisible();
+  // Pointing at a month reads it out.
+  await chips.nth(2).hover();
+  await expect(panel).toContainText("Dec 2026: 14.0%");
 
-  // The forecast layer sits in its own group, with its six months.
+  // The forecast layer sits in its own group; the line moves up beside it
+  // and its months pick the map's month.
   await expect(
     page.getByText("Next 6 months · Copernicus C3S forecasts"),
   ).toBeVisible();
   await page.getByRole("radio", { name: /^Forecast heat share/ }).check();
-  const chips = page.getByRole("group", { name: "Forecast month" }).getByRole("button");
-  await expect(chips).toHaveCount(6);
+  await expect(chips.first()).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("explore-legend")).toContainText(
     "Oct 2026 · Copernicus C3S forecast",
   );
-  await chips.filter({ hasText: "Nov 26" }).click();
+  await chips.nth(1).click();
   await expect(page).toHaveURL(/layer=forecast.*month=2026-11/);
+  await expect(chips.nth(1)).toHaveAttribute("aria-pressed", "true");
   await expect
     .poll(() =>
       api.requests.some((item) =>
@@ -508,6 +520,26 @@ test("the next six months: forecast map, months and the place's range", async ({
       ),
     )
     .toBe(true);
+  await panel.screenshot({ path: "../outputs/e2e/web/explore-forecast-line.png" });
+
+  // On a phone the six months stay on one row inside the panel.
+  await page.setViewportSize({ width: 390, height: 860 });
+  await expect(chips).toHaveCount(6);
+  const box = await panel.boundingBox();
+  const tops = new Set<number>();
+  for (const chip of await chips.all()) {
+    const chipBox = await chip.boundingBox();
+    expect(chipBox).not.toBeNull();
+    tops.add(Math.round(chipBox!.y));
+    expect(chipBox!.x).toBeGreaterThanOrEqual(box!.x);
+    expect(chipBox!.x + chipBox!.width).toBeLessThanOrEqual(box!.x + box!.width + 1);
+  }
+  expect(tops.size).toBe(1);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+  ).toBe(true);
+  await panel.screenshot({ path: "../outputs/e2e/web/explore-forecast-phone.png" });
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.screenshot({
     path: "../outputs/e2e/web/explore-forecast.png",
     fullPage: true,

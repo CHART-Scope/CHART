@@ -1112,51 +1112,63 @@
   }
 }
 
-.forecastList {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 12px;
+.forecastBand {
+  fill: var(--color-seq-2);
+  opacity: 0.55;
 }
 
-.forecastList li {
+.forecastGuide {
+  stroke: var(--color-grey-mid);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+
+.forecastDotSelected {
+  fill: var(--color-maroon);
+  stroke: var(--surface-card);
+  stroke-width: 2;
+}
+
+/* Month labels under the line, one per point; they pick the map's month. */
+.forecastMonths {
   display: grid;
-  grid-template-columns: 64px 1fr 42px 32px;
-  gap: 6px;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+}
+
+.forecastMonths button {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-}
-
-.forecastList li[data-current] {
-  font-weight: 600;
-}
-
-.forecastList small {
+  padding: 2px 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
   color: var(--color-text-muted);
-  text-align: right;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
 }
 
-.forecastBar {
-  position: relative;
-  height: 10px;
-  background: var(--color-grey-light);
-  border-radius: 5px;
+.forecastMonths button small {
+  min-height: 1.1em;
+  font-size: 10px;
+  color: var(--color-text-faint);
 }
 
-.forecastRange {
-  position: absolute;
-  top: 2px;
-  bottom: 2px;
+.forecastMonths button:hover {
+  color: var(--color-text);
+}
+
+.forecastMonths button[aria-pressed="true"] {
+  color: var(--color-maroon);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--color-maroon);
+}
+
+.keyBand {
+  height: 8px !important;
   background: var(--color-seq-2);
-  border-radius: 3px;
-}
-
-.forecastPoint {
-  position: absolute;
-  top: 0;
-  width: 3px;
-  height: 10px;
-  margin-left: -1px;
-  background: var(--color-maroon);
+  opacity: 0.55;
 }

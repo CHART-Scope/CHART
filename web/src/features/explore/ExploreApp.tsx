@@ -35,6 +35,7 @@ import { fetchVraMap } from "@/lib/vraClient";
 import { ActionsDrawer, isHeatAction } from "./ActionsDrawer";
 import { ExploreMap } from "./ExploreMap";
 import { PlaceSearch } from "./PlaceSearch";
+import { ForecastLine, type ForecastPoint } from "./ForecastLine";
 import { SeasonalLine, type CyclePoint } from "./SeasonalLine";
 import { cached, prime } from "./exploreCache";
 import {
@@ -653,6 +654,53 @@ export function ExploreApp() {
     );
   };
 
+  // The place's next six months, as a line; its month labels pick the map's
+  // forecast month (switching to the forecast layer from any other).
+  const placeMonths =
+    placeForecast?.data && placeForecast.key === `${focusId}|${state.outcome}`
+      ? placeForecast.data
+      : null;
+  const forecastPoints: ForecastPoint[] = placeMonths
+    ? placeMonths.months.map((row) => ({
+        month: row.month,
+        value: row.value_percent,
+        low: row.low_percent,
+        high: row.high_percent,
+        tmax: row.tmax_c,
+      }))
+    : forecastMonths.map((month) => ({
+        month,
+        value: null,
+        low: null,
+        high: null,
+        tmax: null,
+      }));
+  const forecastPanel =
+    forecastPoints.length > 0 ? (
+      <section className={styles.section} data-testid="explore-forecast">
+        <h2>
+          Next 6 months <span className={styles.muted}>· forecast</span>
+        </h2>
+        <ForecastLine
+          points={forecastPoints}
+          selected={state.layer === "forecast" ? forecastMonth : null}
+          onSelect={(month) => update({ layer: "forecast", month })}
+          seasonMonths={season?.months ?? []}
+          systems={placeMonths?.systems.length ?? 0}
+        />
+        {placeMonths && (
+          <p className={styles.seasonNote}>
+            Share of {outcomeNoun(state.outcome).replace("of ", "")} linked to heat in
+            each coming month, from the{" "}
+            <a href={placeMonths.source_uri} target="_blank" rel="noreferrer">
+              Copernicus C3S
+            </a>{" "}
+            forecast issued {monthLabel(placeMonths.issue)}; refreshed every month.
+          </p>
+        )}
+      </section>
+    ) : null;
+
   return (
     <div className={styles.shell}>
       <IconSprite />
@@ -861,31 +909,7 @@ export function ExploreApp() {
             </section>
           )}
 
-          {state.layer === "forecast" && forecastMonths.length > 0 && (
-            <section className={styles.section}>
-              <h2>Forecast month</h2>
-              <div className={styles.months} role="group" aria-label="Forecast month">
-                {forecastMonths.map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    aria-pressed={forecastMonth === key}
-                    data-season={
-                      season?.months.includes(Number(key.slice(5, 7))) || undefined
-                    }
-                    onClick={() => update({ month: key })}
-                  >
-                    {MONTH_LABELS[Number(key.slice(5, 7)) - 1]} {key.slice(2, 4)}
-                  </button>
-                ))}
-              </div>
-              <p className={styles.seasonNote}>
-                Copernicus C3S forecast issued{" "}
-                {forecastInfo?.issue ? monthLabel(forecastInfo.issue) : ""}; refreshed
-                every month.
-              </p>
-            </section>
-          )}
+          {state.layer === "forecast" && forecastPanel}
 
           {state.layer === "population" && (
             <section className={styles.section}>
@@ -975,68 +999,7 @@ export function ExploreApp() {
             />
           </div>
 
-          {placeForecast?.data &&
-            placeForecast.key === `${focusId}|${state.outcome}` && (
-              <section className={styles.section} data-testid="explore-forecast">
-                <h2>
-                  Next 6 months <span className={styles.muted}>· forecast</span>
-                </h2>
-                <ul className={styles.forecastList}>
-                  {placeForecast.data.months.map((row) => {
-                    const top = Math.max(
-                      1,
-                      ...placeForecast.data!.months.map(
-                        (item) => item.high_percent ?? 0,
-                      ),
-                    );
-                    return (
-                      <li
-                        key={row.month}
-                        data-current={row.month === forecastMonth || undefined}
-                      >
-                        <span>{monthLabel(row.month)}</span>
-                        <span
-                          className={styles.forecastBar}
-                          title="Range across forecast systems"
-                        >
-                          <i
-                            className={styles.forecastRange}
-                            style={{
-                              left: `${((row.low_percent ?? 0) / top) * 100}%`,
-                              width: `${(((row.high_percent ?? 0) - (row.low_percent ?? 0)) / top) * 100}%`,
-                            }}
-                          />
-                          <i
-                            className={styles.forecastPoint}
-                            style={{
-                              left: `${((row.value_percent ?? 0) / top) * 100}%`,
-                            }}
-                          />
-                        </span>
-                        <strong>{formatPercent(row.value_percent)}</strong>
-                        <small>
-                          {row.tmax_c !== null ? `${row.tmax_c.toFixed(1)}°` : ""}
-                        </small>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <p className={styles.muted}>
-                  Share of {outcomeNoun(state.outcome).replace("of ", "")} linked to
-                  heat in each coming month, with the range across{" "}
-                  {placeForecast.data.systems.length} forecast systems, and the forecast
-                  mean daily maximum.{" "}
-                  <a
-                    href={placeForecast.data.source_uri}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Copernicus C3S
-                  </a>
-                  , issued {monthLabel(placeForecast.data.issue)}.
-                </p>
-              </section>
-            )}
+          {state.layer !== "forecast" && forecastPanel}
 
           {focusPeople && peopleCounts && (
             <section className={styles.section} data-testid="explore-people">

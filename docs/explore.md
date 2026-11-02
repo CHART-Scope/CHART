@@ -67,6 +67,12 @@ rebuilds both countries when C3S publishes a new issue. Beyond six months
 forecast skill is too low to show; the projections start in the next
 five-year period.
 
+The panel draws the six months as one line, in the seasonal cycle's style:
+the central forecast, the range across systems shaded behind it and the heat
+season marked. Its month labels (the year written once, where it starts) pick
+the map's month and switch the map to the forecast layer; with that layer on,
+the panel sits directly under the layer list.
+
 ## Population
 
 The **Population** layer shades people per km² for everyone, children under
