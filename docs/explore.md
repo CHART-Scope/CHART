@@ -52,7 +52,8 @@ info@scopeimpact.fi with the area filled in. The landing page links to it too.
 ## Precision
 
 Beside a place's estimate, signal bars show how firm it is: three for high,
-two for moderate, one for low precision. These are the dashboard's classes,
+two for moderate, one for low precision, in green, amber and red (the design
+system's precision colours). These are the dashboard's classes,
 computed by the API from the 95% interval of the odds or risk ratio
 (`core/chart/risk/precision.py`, thresholds agreed with the health team);
 hovering gives the interval. A low-precision figure is drawn a little softer.

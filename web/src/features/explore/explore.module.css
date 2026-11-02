@@ -340,8 +340,17 @@
   height: 14px;
 }
 
-.precision i[data-on] {
-  background: var(--color-text-muted);
+/* The design system's precision colours: green, amber, red. */
+.precision[data-level="high"] i[data-on] {
+  background: var(--color-success);
+}
+
+.precision[data-level="moderate"] i[data-on] {
+  background: var(--color-amber);
+}
+
+.precision[data-level="low"] i[data-on] {
+  background: var(--color-sem-low);
 }
 
 .muted {

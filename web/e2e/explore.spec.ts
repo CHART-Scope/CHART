@@ -39,6 +39,11 @@ test("a visitor explores Kenya's observed months without signing in", async ({
     "High precision: the 95% interval of the odds ratio is 1.02–1.35",
   );
   await expect(precision.locator("i[data-on]")).toHaveCount(3);
+  // Green for high precision (the design system's success colour).
+  await expect(precision.locator("i[data-on]").first()).toHaveCSS(
+    "background-color",
+    "rgb(62, 174, 80)",
+  );
   await expect(
     page.getByText(
       /Hot season: Dec–Mar, peak in Feb \(Kenya Meteorological Department\)/,
@@ -617,6 +622,11 @@ test("a low-precision estimate shows one bar and reads softer", async ({ page })
     "Low precision: the 95% interval of the odds ratio is 0.90–5.40",
   );
   await expect(precision.locator("i[data-on]")).toHaveCount(1);
+  // Red for low precision.
+  await expect(precision.locator("i[data-on]")).toHaveCSS(
+    "background-color",
+    "rgb(221, 46, 90)",
+  );
   await expect(estimate.locator("[data-precision='low']")).toHaveCSS("opacity", "0.7");
   await estimate.screenshot({ path: "../outputs/e2e/web/explore-precision-low.png" });
 });
