@@ -39,6 +39,16 @@ labelled "Days ≥ 40 °C", because IMD's full heatwave definition also needs
 on each area's mean daily maximum, so a single hot spot inside a large area
 can be missed.
 
+## Precision
+
+Beside a place's estimate, signal bars show how firm it is: three for high,
+two for moderate, one for low precision. These are the dashboard's classes,
+computed by the API from the 95% interval of the odds or risk ratio
+(`core/chart/risk/precision.py`, thresholds agreed with the health team);
+hovering gives the interval. A low-precision figure is drawn a little softer.
+The map's colours do not carry precision, and the forecast's shaded range is
+the spread across forecast systems, a different uncertainty.
+
 ## Next six months
 
 The **Forecast heat share** layer and each place's **Next 6 months** panel come

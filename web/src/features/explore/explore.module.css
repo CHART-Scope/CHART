@@ -306,6 +306,44 @@
   color: var(--color-maroon);
 }
 
+/* A low-precision estimate reads a little softer. */
+.bigNumber[data-precision="low"] {
+  opacity: 0.7;
+}
+
+/* Signal bars: three for high precision, two moderate, one low. */
+.precision {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  margin-left: 8px;
+  vertical-align: baseline;
+  cursor: help;
+}
+
+.precision i {
+  width: 4px;
+  border-radius: 1px;
+  background: var(--color-grey-mid);
+}
+
+.precision i:nth-child(1) {
+  height: 6px;
+}
+
+.precision i:nth-child(2) {
+  height: 10px;
+}
+
+.precision i:nth-child(3) {
+  height: 14px;
+}
+
+.precision i[data-on] {
+  background: var(--color-text-muted);
+}
+
 .muted {
   margin: 6px 0 0;
   font-size: 13px;

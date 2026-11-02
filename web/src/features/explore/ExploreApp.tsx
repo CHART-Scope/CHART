@@ -36,6 +36,7 @@ import { ActionsDrawer, isHeatAction } from "./ActionsDrawer";
 import { ExploreMap } from "./ExploreMap";
 import { PlaceSearch } from "./PlaceSearch";
 import { ForecastLine, type ForecastPoint } from "./ForecastLine";
+import { PrecisionMark } from "./PrecisionMark";
 import { SeasonalLine, type CyclePoint } from "./SeasonalLine";
 import { cached, prime } from "./exploreCache";
 import {
@@ -1304,10 +1305,16 @@ function PlaceSummary({
           <h2>
             {month ? `Observed · ${monthLabel(observed.month ?? month)}` : "Observed"}
           </h2>
-          <p className={styles.bigNumber}>
+          <p
+            className={styles.bigNumber}
+            data-precision={observed.estimate.ratio?.precision}
+          >
             {observed.estimate.value_percent === null
               ? "No heat excess"
               : formatPercent(observed.estimate.value_percent)}
+            {observed.estimate.value_percent !== null && observed.estimate.ratio && (
+              <PrecisionMark ratio={observed.estimate.ratio} />
+            )}
           </p>
           <p className={styles.muted}>
             {observed.estimate.value_percent === null

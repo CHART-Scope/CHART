@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { json } from "./support/fakeApi";
-import { fixtures, installKenya } from "./support/kenya";
+import { fixtures, installKenya, observedFixtures } from "./support/kenya";
 
 // The public Explore view: no sign-in, every request anonymous, the map
 // shaded from published estimates, and a place's estimate, seasonal cycle
@@ -32,6 +32,13 @@ test("a visitor explores Kenya's observed months without signing in", async ({
   await expect(estimate).toContainText("Aug 2026");
   await expect(estimate).toContainText("14.7%");
   await expect(estimate).toContainText("odds ratio 1.19");
+  // Beside the figure, how firm it is: the dashboard's precision, in bars.
+  const precision = estimate.getByRole("img", { name: /precision/ });
+  await expect(precision).toHaveAttribute(
+    "aria-label",
+    "High precision: the 95% interval of the odds ratio is 1.02–1.35",
+  );
+  await expect(precision.locator("i[data-on]")).toHaveCount(3);
   await expect(
     page.getByText(
       /Hot season: Dec–Mar, peak in Feb \(Kenya Meteorological Department\)/,
@@ -561,6 +568,32 @@ test("the next six months: forecast map, months and the place's range", async ({
     path: "../outputs/e2e/web/explore-forecast.png",
     fullPage: true,
   });
+});
+
+test("a low-precision estimate shows one bar and reads softer", async ({ page }) => {
+  await openExplore(page, "frame=geo-ke&outcome=lbw");
+  await page.route("**/api/chart/heat-outlook/geo-ke/observed?**", (route) => {
+    const body = structuredClone(observedFixtures.observed["geo-ke|lbw|P|latest"]);
+    (body.estimate as { ratio: unknown }).ratio = {
+      kind: "odds_ratio",
+      value: 1.6,
+      low: 0.9,
+      high: 5.4,
+      precision: "low",
+    };
+    return json(route, body);
+  });
+  await page.reload();
+
+  const estimate = page.getByTestId("explore-estimate");
+  const precision = estimate.getByRole("img", { name: /precision/ });
+  await expect(precision).toHaveAttribute(
+    "aria-label",
+    "Low precision: the 95% interval of the odds ratio is 0.90–5.40",
+  );
+  await expect(precision.locator("i[data-on]")).toHaveCount(1);
+  await expect(estimate.locator("[data-precision='low']")).toHaveCSS("opacity", "0.7");
+  await estimate.screenshot({ path: "../outputs/e2e/web/explore-precision-low.png" });
 });
 
 test("the first map load says so, then clears", async ({ page }) => {
