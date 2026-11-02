@@ -191,3 +191,14 @@ URL). Areas are CHART's own simplified boundaries. Heat shares use 5-point class
 up to 35%: projected shares in Madhya Pradesh run 25–34% across divisions, and
 the dashboard's top class ("over 15%") painted the whole state one colour. If the basemap cannot load, the areas are drawn on a plain
 background, so the map never comes up empty.
+
+## Phones and tablets
+
+Up to 860 px wide (phones, portrait tablets) Explore is one page that scrolls:
+the map on top at 58% of the screen height (at least 300 px), the panel full
+width beneath, its sections at most 680 px wide on tablets. The legend keeps to
+one line of band starts (0, 5, 10 … >35%). Wider screens, landscape tablets
+included, keep the panel beside the map. `web/e2e/explore-responsive.spec.ts`
+checks iPhone SE, iPhone 14, Pixel 7, iPad mini, iPad Air and iPad landscape:
+no sideways scroll, map and legend sizes, the panel's place, the forecast row,
+search and reaching the end of the panel.

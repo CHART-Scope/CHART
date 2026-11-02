@@ -661,40 +661,6 @@
   color: var(--color-text-faint);
 }
 
-@media (max-width: 860px) {
-  .topbar {
-    flex-wrap: wrap;
-    height: auto;
-    padding: 8px 16px;
-  }
-
-  .search {
-    order: 5;
-    max-width: none;
-    flex-basis: 100%;
-  }
-
-  .nav {
-    display: none;
-  }
-
-  .body {
-    flex-direction: column-reverse;
-  }
-
-  .panel {
-    width: auto;
-    border-right: 0;
-    border-top: 1px solid var(--color-grey-light);
-    flex: 1;
-  }
-
-  .mapArea {
-    flex: none;
-    height: 52vh;
-  }
-}
-
 .yearSelect {
   height: 32px;
   margin-bottom: 8px;
@@ -1453,4 +1419,85 @@
 /* With the forecast layer on, its line sits under the month row. */
 .forecastInline {
   margin: 0 0 6px 22px;
+}
+
+/* ---- Phones and portrait tablets (last, so it wins over the compact panel
+   above): one page that scrolls - the map on top, the panel full width
+   beneath - and a legend that keeps to one line. ---- */
+@media (max-width: 860px) {
+  .shell {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px 16px;
+  }
+
+  .search {
+    order: 5;
+    max-width: none;
+    flex-basis: 100%;
+  }
+
+  .nav {
+    display: none;
+  }
+
+  .body {
+    flex: none;
+    flex-direction: column-reverse;
+  }
+
+  .panel {
+    width: auto;
+    overflow: visible;
+    padding: 14px 16px 28px;
+    border-top: 1px solid var(--color-grey-light);
+    border-right: 0;
+  }
+
+  .mapArea {
+    flex: none;
+    height: 58svh;
+    min-height: 300px;
+  }
+
+  .legend {
+    left: 8px;
+    bottom: 8px;
+    width: min(300px, calc(100% - 16px));
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .legendBands {
+    gap: 2px;
+    margin: 6px 0 2px;
+  }
+
+  /* Each band's lower bound only ("0", "5", "10" ... ">35%"). */
+  .legendBands span {
+    gap: 2px;
+    font-size: 0;
+  }
+
+  .legendBands span::after {
+    content: attr(data-short);
+    font-size: 10px;
+    color: var(--color-text-dim);
+  }
+
+  .legend small {
+    display: none;
+  }
+}
+
+/* Portrait tablets: the panel's sections stay a readable width. */
+@media (min-width: 600px) and (max-width: 860px) {
+  .panel > * {
+    max-width: 680px;
+  }
 }

@@ -1237,7 +1237,7 @@ export function ExploreApp() {
             )}
             <div className={styles.legendBands}>
               {bands.map((band) => (
-                <span key={band.label}>
+                <span key={band.label} data-short={band.label.split("–")[0]}>
                   <i style={{ background: band.color }} />
                   {band.label}
                 </span>
