@@ -1,5 +1,5 @@
 {
-  "version": "vra-catalogue-2026-10-28",
+  "version": "vra-catalogue-2026-11-03",
   "source": "CEEW draft indicator list for the VRA (all sheets), with direction and placement fixes from docs/vra-integration-plan.md",
   "indicators": [
     {
@@ -123,10 +123,10 @@
       "name": "Change in extreme hot days, 2015–2024 vs 1982–2011",
       "unit": "days per year",
       "direction_to_risk": 1,
-      "route": "pull",
+      "route": "computed",
       "status": "included",
       "ceew_ref": "Hazard #4",
-      "rationale": "Rising temperatures can intensify the hydrological cycle and alter the transmission and seasonality of climate-sensitive diseases, including diarrhoeal diseases, malaria, dengue and cholera, with children being particularly vulnerable to these impacts.",
+      "rationale": "Computed by CHART from ERA5 daily maxima: days above the area's own 95th percentile for the calendar day (5-day window, 1982-2011, as the ETCCDI TX95p index), mean per year 2015-2024 minus mean per year 1982-2011. Rising temperatures can intensify the hydrological cycle and alter the transmission and seasonality of climate-sensitive diseases, including diarrhoeal diseases, malaria, dengue and cholera, with children being particularly vulnerable to these impacts.",
       "value_schema": {
         "type": "number",
         "minimum": null,
@@ -142,10 +142,10 @@
       "name": "Change in very hot days, 2015–2024 vs 1982–2011",
       "unit": "days per year",
       "direction_to_risk": 1,
-      "route": "pull",
+      "route": "computed",
       "status": "included",
       "ceew_ref": "Hazard #5",
-      "rationale": "Rising temperatures can intensify the hydrological cycle and alter the transmission and seasonality of climate-sensitive diseases, including diarrhoeal diseases, malaria, dengue and cholera, with children being particularly vulnerable to these impacts.",
+      "rationale": "Computed by CHART from ERA5 daily maxima: days above the area's own 90th percentile for the calendar day (5-day window, 1982-2011, as the ETCCDI TX90p index), mean per year 2015-2024 minus mean per year 1982-2011. Rising temperatures can intensify the hydrological cycle and alter the transmission and seasonality of climate-sensitive diseases, including diarrhoeal diseases, malaria, dengue and cholera, with children being particularly vulnerable to these impacts.",
       "value_schema": {
         "type": "number",
         "minimum": null,

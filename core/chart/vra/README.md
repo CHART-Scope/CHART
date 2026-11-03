@@ -42,6 +42,10 @@ Each run stores its parameters, per-indicator bounds, class breaks, an input
 hash (indicator directions plus every value and vintage used) and an output
 hash, so the same inputs reproduce the same output hash.
 
+Computed hazard: heatwave days and peak maximum temperature over the latest
+12 complete months (monthly ERA5), and the change in very hot and extreme hot
+days, 2015-2024 against 1982-2011 (daily ERA5, `hot_days.py`).
+
 ## Values
 
 - Uploads: `POST /vra/{geography_id}/values` accepts UTF-8 CSV (at most 2 MB).

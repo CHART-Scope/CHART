@@ -42,6 +42,7 @@ from chart.shared.db.models import (
     DataLabel,
     DataSource,
     DistrictClimate,
+    DistrictClimateDay,
     Geography,
     Provenance,
     VraIndicator,
@@ -1035,3 +1036,115 @@ def test_the_mp_district_dataset_is_a_clean_district_upload() -> None:
         assert rule.minimum is None or value >= rule.minimum, row
         assert rule.maximum is None or value <= rule.maximum, row
         assert row["source_url"].startswith("https://"), row
+
+
+# --- hot days against the 1982-2011 baseline -------------------------------
+
+
+def _seasonal_daily(first_year: int, last_year: int, warming_from: int, shift: float):
+    """A smooth seasonal daily maximum, warmed by ``shift`` from a year on."""
+
+    import math
+    from datetime import timedelta
+
+    day = date(first_year, 1, 1)
+    out = {}
+    while day.year <= last_year:
+        base = 32 + 6 * math.sin(2 * math.pi * (day.timetuple().tm_yday - 100) / 365)
+        # A small, repeating day-to-day wobble so percentiles have spread.
+        wobble = ((day.toordinal() * 7919) % 13 - 6) / 3
+        out[day] = base + wobble + (shift if day.year >= warming_from else 0.0)
+        day += timedelta(days=1)
+    return out
+
+
+def test_hot_days_change_counts_days_above_the_areas_own_thresholds() -> None:
+    from chart.vra import hot_days
+
+    steady = _seasonal_daily(1982, 2024, 9999, 0.0)
+    warmed = _seasonal_daily(1982, 2024, 2015, 2.0)
+    still = hot_days.hot_days_change(steady, 90)
+    hotter = hot_days.hot_days_change(warmed, 90)
+    assert still is not None and hotter is not None
+    # About a tenth of baseline days are above the 90th (fewer here: the
+    # synthetic wobble repeats exact values, and ties are not "above").
+    assert 25 <= still["baseline_days_per_year"] <= 40
+    assert abs(still["value"]) < 3
+    # Two degrees warmer since 2015: many more hot days a year.
+    assert hotter["value"] > 50
+    assert hotter["baseline_years"] == 30 and hotter["recent_years"] == 10
+    # Stricter threshold, fewer days.
+    assert hot_days.hot_days_change(warmed, 95)["baseline_days_per_year"] < (
+        hotter["baseline_days_per_year"]
+    )
+    # Without most of the baseline there is no value, not one from less.
+    short = {day: value for day, value in warmed.items() if day.year >= 2006}
+    assert hot_days.hot_days_change(short, 90) is None
+
+
+def test_a_run_stores_hot_day_change_from_the_daily_maxima(as_user, factory) -> None:
+    from sqlalchemy import insert
+
+    client = _prepared(as_user, factory)
+    with factory() as session:
+        units = {
+            unit.code: unit.id
+            for unit in session.scalars(
+                select(AdminUnit).where(AdminUnit.code.in_(("bhopal", "indore")))
+            )
+        }
+        source = DataSource(name="Copernicus ERA5 daily", kind="reanalysis")
+        session.add(source)
+        session.flush()
+        provenance = Provenance(source_uri="test://daily", input_hash="day1" * 8)
+        session.add(provenance)
+        session.flush()
+        run = ClimateRun(
+            data_source_id=source.id,
+            provenance_id=provenance.id,
+            tier="observed",
+            source_name="ERA5",
+            input_hash="day1" * 16,
+            data_label=DataLabel.reanalysis,
+            generated_at=datetime(2026, 7, 5, tzinfo=timezone.utc),
+        )
+        session.add(run)
+        session.flush()
+        for code, shift in (("bhopal", 2.0), ("indore", 0.0)):
+            series = _seasonal_daily(1982, 2024, 2015, shift)
+            session.execute(
+                insert(DistrictClimateDay),
+                [
+                    {
+                        "admin_unit_id": units[code],
+                        "climate_run_id": run.id,
+                        "period_date": day,
+                        "variable": "tmax_c",
+                        "value": value,
+                        "unit": "degC",
+                    }
+                    for day, value in series.items()
+                ],
+            )
+        session.commit()
+
+    assert client.post(f"/vra/{MP}/runs").status_code == 200
+    with factory() as session:
+        stored = {
+            (indicator.code, value.admin_unit_id): value
+            for value, indicator in session.execute(
+                select(VraIndicatorValue, VraIndicator).join(
+                    VraIndicator, VraIndicator.id == VraIndicatorValue.indicator_id
+                )
+            )
+            if indicator.code.endswith("hot_days_change")
+        }
+    warmed = stored[("haz.very_hot_days_change", units["bhopal"])]
+    steady = stored[("haz.very_hot_days_change", units["indore"])]
+    assert warmed.vintage == "2015-2024 vs 1982-2011"
+    assert warmed.value > 50 and abs(steady.value) < 3
+    assert warmed.method == "computed"
+    assert warmed.quality_flags["baseline_years"] == 30
+    assert ("haz.extreme_hot_days_change", units["bhopal"]) in stored
+    # Divisions without a long enough daily record get no value at all.
+    assert len({unit for _, unit in stored}) == 2

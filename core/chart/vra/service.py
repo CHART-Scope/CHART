@@ -25,6 +25,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from chart.risk.schemas import MapResponse
+from chart.vra import hot_days
 from chart.risk.service import load_map_view, resolve_map_frame
 from chart.shared.db.models import (
     AdminUnit,
@@ -33,6 +34,7 @@ from chart.shared.db.models import (
     DataLabel,
     DataSource,
     DistrictClimate,
+    DistrictClimateDay,
     VraIndicator,
     VraIndicatorValue,
     VraIngestion,
@@ -84,6 +86,11 @@ COMPUTED_HAZARD = {
     "haz.tmax_monthly_max_12m": ("tmax_monthly_max_c", "mean"),
 }
 WINDOW_MONTHS = 12
+#: Hot-day indices from the daily maxima (``hot_days``): code -> percentile.
+DAILY_HAZARD = {
+    "haz.extreme_hot_days_change": 95.0,
+    "haz.very_hot_days_change": 90.0,
+}
 
 
 class VraError(Exception):
@@ -370,7 +377,99 @@ def refresh_computed_hazard(session: Session, unit_ids: list[int]) -> None:
                 ingestion_id=None,
                 climate_run_id=run.id,
             )
+    _refresh_hot_days(session, unit_ids)
     session.flush()
+
+
+def _refresh_hot_days(session: Session, unit_ids: list[int]) -> None:
+    """Change in hot days, 2015-2024 against 1982-2011, from daily maxima.
+
+    Reads the stored ERA5 daily maxima (newest observed run per day, never
+    sample data). An area without most of both periods gets no value, and
+    a value from an older vintage is removed.
+    """
+
+    indicators = {
+        row.code: row
+        for row in session.scalars(
+            select(VraIndicator).where(VraIndicator.code.in_(DAILY_HAZARD))
+        )
+    }
+    if not indicators or not unit_ids:
+        return
+    rows = session.execute(
+        select(
+            DistrictClimateDay.admin_unit_id,
+            DistrictClimateDay.period_date,
+            DistrictClimateDay.value,
+            ClimateRun.id,
+            ClimateRun.source_name,
+            DataSource.source_uri,
+        )
+        .join(ClimateRun, ClimateRun.id == DistrictClimateDay.climate_run_id)
+        .join(DataSource, DataSource.id == ClimateRun.data_source_id)
+        .where(
+            DistrictClimateDay.admin_unit_id.in_(unit_ids),
+            DistrictClimateDay.variable == "tmax_c",
+            ClimateRun.tier == "observed",
+            ClimateRun.data_label != DataLabel.sample,
+        )
+        .order_by(ClimateRun.generated_at.desc().nulls_last(), ClimateRun.id.desc())
+    ).all()
+    daily: dict[int, dict[date, float]] = {}
+    runs: dict[int, set[int]] = {}
+    source: tuple[str | None, str | None] = (None, None)
+    for unit_id, day, value, run_id, source_name, source_uri in rows:
+        series = daily.setdefault(unit_id, {})
+        if day not in series:
+            series[day] = value
+            runs.setdefault(unit_id, set()).add(run_id)
+            source = (source_name, source_uri)
+    vintage = (
+        f"{hot_days.RECENT_YEARS.start}-{hot_days.RECENT_YEARS.stop - 1}"
+        f" vs {hot_days.BASELINE_YEARS.start}-{hot_days.BASELINE_YEARS.stop - 1}"
+    )
+    for code, percentile in DAILY_HAZARD.items():
+        indicator = indicators.get(code)
+        if indicator is None:
+            continue
+        session.execute(
+            delete(VraIndicatorValue).where(
+                VraIndicatorValue.indicator_id == indicator.id,
+                VraIndicatorValue.admin_unit_id.in_(unit_ids),
+                VraIndicatorValue.vintage != vintage,
+            )
+        )
+        for unit_id in unit_ids:
+            found = hot_days.hot_days_change(daily.get(unit_id, {}), percentile)
+            if found is None:
+                session.execute(
+                    delete(VraIndicatorValue).where(
+                        VraIndicatorValue.indicator_id == indicator.id,
+                        VraIndicatorValue.admin_unit_id == unit_id,
+                    )
+                )
+                continue
+            _upsert_value(
+                session,
+                indicator_id=indicator.id,
+                admin_unit_id=unit_id,
+                vintage=vintage,
+                value=found.pop("value"),
+                method="computed",
+                quality_flags={
+                    **found,
+                    "variable": "tmax_c",
+                    "percentile": percentile,
+                    "window_days": 2 * hot_days.WINDOW_DAYS + 1,
+                    "climate_run_ids": sorted(runs.get(unit_id, ())),
+                },
+                source_name=source[0],
+                source_url=source[1],
+                notes=None,
+                ingestion_id=None,
+                climate_run_id=max(runs[unit_id]),
+            )
 
 
 # --- uploads ---------------------------------------------------------------

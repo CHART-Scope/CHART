@@ -453,6 +453,22 @@ Agar Malwa has no Census 2011 rows and so no exposure), and
 indicators held back (all 10 divisions scored). The state map shows the
 divisions; a division's map shows its districts from the state-wide run.
 
+## 13. Hot days against the 1982-2011 baseline (3 Nov 2026)
+
+`haz.very_hot_days_change` and `haz.extreme_hot_days_change` are now computed
+by CHART (`core/chart/vra/hot_days.py`) from the stored ERA5 daily maxima,
+like the ETCCDI TX90p / TX95p indices: each area's 90th or 95th percentile
+for each calendar day (5-day window over 1982-2011), the days above it
+counted per year, and the indicator is the mean per year over 2015-2024 minus
+the mean per year over 1982-2011. Thresholds are each area's own, so "hot" is
+relative to its normal climate. A year counts with at least 360 days; an area
+needs 25 baseline and 8 recent years or gets no value. They are refreshed with
+the other computed hazard indicators on every run.
+
+They need ERA5 back to 1981: the backfill (`history backfill --years 45`)
+started on the sandbox on 3 Nov 2026. Warm nights (TN90p/TN95p) follow once
+daily minima are kept (same hourly downloads, no new pull).
+
 ## References
 
 - CEEW (2021), Mapping India's Climate Vulnerability.
