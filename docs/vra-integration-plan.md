@@ -446,6 +446,13 @@ and sanitation are held back until the household/population definition is
 settled. NFHS-6 (2023-24) replaces the NFHS-5 rows once extracted from its
 fact sheets; the vintage keeps both.
 
+Loaded on the sandbox (3 Nov 2026): the district file with
+`level=district` (50 of 52 districts scored; Niwari has no source rows,
+Agar Malwa has no Census 2011 rows and so no exposure), and
+`mp-divisions-v1/mp_divisions_vra.csv` at division level with the same two
+indicators held back (all 10 divisions scored). The state map shows the
+divisions; a division's map shows its districts from the state-wide run.
+
 ## References
 
 - CEEW (2021), Mapping India's Climate Vulnerability.
