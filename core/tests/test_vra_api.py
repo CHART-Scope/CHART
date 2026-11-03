@@ -850,3 +850,188 @@ def test_kenya_frame_is_isolated_from_madhya_pradesh_values(as_user, factory) ->
     mp = as_user(ADMIN).get(f"/vra/{MP}/coverage").json()
     density = next(i for i in mp["indicators"] if i["code"] == "exp.population_density")
     assert (density["present"], density["vintages"]) == (5, ["2011"])
+
+
+# --- districts compared across the state -----------------------------------
+
+DISTRICTS = {"bhopal": ("raisen", "sehore", "vidisha"), "indore": ("dhar", "khargone", "ratlam")}  # fmt: skip
+
+
+def _seed_districts(factory) -> dict[str, int]:
+    """Three districts under each of two divisions, with twelve ERA5 months."""
+
+    with factory() as session:
+        geography_id = session.scalar(select(AdminUnit.geography_id).limit(1))
+        source = DataSource(name="Copernicus ERA5 districts", kind="reanalysis")
+        session.add(source)
+        session.flush()
+        provenance = Provenance(source_uri="test://districts", input_hash="dist" * 8)
+        session.add(provenance)
+        session.flush()
+        run = ClimateRun(
+            data_source_id=source.id,
+            provenance_id=provenance.id,
+            tier="observed",
+            source_name="ERA5",
+            input_hash="dist" * 16,
+            data_label=DataLabel.reanalysis,
+            generated_at=datetime(2026, 7, 5, tzinfo=timezone.utc),
+        )
+        session.add(run)
+        session.flush()
+        ids: dict[str, int] = {}
+        step = 0
+        for parent, codes in DISTRICTS.items():
+            for code in codes:
+                place = f"{MP}-district-{code}"
+                session.add(
+                    AppGeography(
+                        id=place,
+                        country_code="IN",
+                        level="district",
+                        level_label="District",
+                        name=code.title(),
+                        parent_id=division(parent),
+                        path=f"/india/madhya-pradesh/{parent}/{code}",
+                        sort_order=step,
+                    )
+                )
+                session.flush()
+                unit = AdminUnit(
+                    geography_id=geography_id,
+                    app_geography_id=place,
+                    level="district",
+                    # CHART's district codes are opaque; uploads use them.
+                    code=f"d{step}{code[:3]}",
+                    name=code.title(),
+                    bbox_west=74.0 + step,
+                    bbox_south=23.0,
+                    bbox_east=75.0 + step,
+                    bbox_north=24.0,
+                    boundary=_square(step, session.bind.dialect.name == "postgresql"),
+                )
+                session.add(unit)
+                session.flush()
+                ids[code] = unit.id
+                for month in WINDOW:
+                    for variable, value in (
+                        ("heatwave_days", float(step)),
+                        ("tmax_monthly_max_c", 38.0 + step),
+                    ):
+                        session.add(
+                            DistrictClimate(
+                                admin_unit_id=unit.id,
+                                climate_run_id=run.id,
+                                period_month=month,
+                                variable=variable,
+                                value=value,
+                                unit="days" if variable == "heatwave_days" else "degC",
+                                observed_days=31,
+                                expected_days=31,
+                            )
+                        )
+                step += 1
+        session.commit()
+        return ids
+
+
+def test_districts_are_compared_across_the_state_and_read_per_division(
+    as_user, factory
+) -> None:
+    """NFHS district values: one upload and one run for the whole state rank
+    every district against every other, not four to eight within a division."""
+
+    _seed_districts(factory)
+    client = as_user(ADMIN)
+    with factory() as session:
+        codes = {
+            unit.name.lower(): unit.code
+            for unit in session.scalars(
+                select(AdminUnit).where(AdminUnit.level == "district")
+            )
+        }
+    rows = []
+    for step, name in enumerate(sorted(codes)):
+        rows += [
+            (codes[name], name.title(), "exp.population_density", 100 + 40 * step,
+             "2011", "Census of India 2011", "https://example.org/census", ""),
+            (codes[name], name.title(), "sens.child_stunting", 20 + 3 * step,
+             "2019-21", "NFHS-5", "https://example.org/nfhs", ""),
+            (codes[name], name.title(), "ac.women_10yr_schooling", 60 - 5 * step,
+             "2019-21", "NFHS-5", "https://example.org/nfhs", ""),
+        ]  # fmt: skip
+
+    # The state's own frame is its divisions: district codes are not its areas.
+    plain = _upload(client, _csv(rows))
+    assert plain.json()["rows_accepted"] == 0
+    # A level beneath it that does not exist is refused before any write.
+    wrong = client.post(f"/vra/{MP}/runs?level=ward")
+    assert wrong.status_code == 422
+    assert wrong.json()["error"] == "VRA_LEVEL_INVALID"
+
+    upload = client.post(
+        f"/vra/{MP}/values?file_name=districts.csv&level=district",
+        content=_csv(rows).encode(),
+        headers={"content-type": "text/csv"},
+    )
+    assert upload.status_code == 200, upload.text
+    assert upload.json()["rows_accepted"] == 18
+    template = client.get(f"/vra/{MP}/template.csv?level=district").text
+    assert all(code in template for code in codes.values())
+
+    run = client.post(f"/vra/{MP}/runs?level=district")
+    assert run.status_code == 200, run.text
+    assessed = run.json()["areas"]
+    assert {area["code"] for area in assessed} == set(codes.values())
+    # One ranking across both divisions.
+    assert sorted(area["rank"] for area in assessed) == list(range(1, 7))
+
+    # A division's map reads its districts from that state-wide run.
+    by_code = {area["code"]: area for area in assessed}
+    for parent, names in DISTRICTS.items():
+        body = as_user(PLANNER).get(f"/vra/{division(parent)}/map").json()
+        areas = {area["code"]: area for area in body["areas"]}
+        assert set(areas) == {codes[name] for name in names}
+        for code, area in areas.items():
+            assert area["value_percent"] == pytest.approx(by_code[code]["risk"] * 100)
+    # The state's own map still shows its divisions, which this run did not
+    # score, rather than borrowing district results.
+    state = as_user(PLANNER).get(f"/vra/{MP}/map").json()
+    assert {a["missing_reason"] for a in state["areas"]} == {"not_assessed"}
+
+
+def test_the_mp_district_dataset_is_a_clean_district_upload() -> None:
+    """The committed NFHS-5 / Census district file: CHART's district codes
+    only, published values within each indicator's rules, nothing invented
+    for Niwari and nothing held back slipping in."""
+
+    from pathlib import Path
+
+    from chart.vra.service import _value_schemas
+
+    folder = (
+        Path(__file__).resolve().parents[2]
+        / "pipelines"
+        / "vra"
+        / "data"
+        / "mp-districts-v1"
+    )
+    districts = {
+        row["area_code"]: row["name"]
+        for row in csv.DictReader((folder / "chart_districts.csv").open())
+    }
+    rows = list(csv.DictReader((folder / "mp_districts_vra.csv").open()))
+    rules = _value_schemas()
+    assert len(districts) == 52
+    assert {row["area_code"] for row in rows} <= set(districts)
+    assert len({row["area_code"] for row in rows}) == 51
+    assert "Niwari" not in {row["area_name"] for row in rows}
+    assert not {"ac.improved_water_source", "ac.improved_sanitation"} & {
+        row["indicator_code"] for row in rows
+    }
+    for row in rows:
+        value = float(row["value"])
+        rule = rules[row["indicator_code"]]
+        assert rule.minimum is None or value >= rule.minimum, row
+        assert rule.maximum is None or value <= rule.maximum, row
+        assert row["source_url"].startswith("https://"), row

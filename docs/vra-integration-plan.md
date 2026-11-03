@@ -430,6 +430,22 @@ discovery step should manufacture zeros for absent data or imply finer spatial
 reliability than its input supports. ERA5 downscaling remains future work as
 documented in [modelling](modeling.md).
 
+## 12. Districts compared across the state (3 Nov 2026)
+
+Madhya Pradesh's 52 districts are now an assessment universe of their own:
+the upload, template, coverage and run endpoints take `?level=district`, so
+one upload and one run cover every district and rank them against each other
+(not four to eight within each division). No schema change: the level is a
+run parameter (`comparison_level`). A division's map, and Explore's
+vulnerability overlay, read its districts from that state-wide run.
+
+`pipelines/vra/data/mp-districts-v1/mp_districts_vra.csv` loads the reviewed
+NFHS-5, Census 2011 and MPI rows at district level as published (51
+districts, 25 indicators). Niwari has no source rows and stays missing. Water
+and sanitation are held back until the household/population definition is
+settled. NFHS-6 (2023-24) replaces the NFHS-5 rows once extracted from its
+fact sheets; the vintage keeps both.
+
 ## References
 
 - CEEW (2021), Mapping India's Climate Vulnerability.

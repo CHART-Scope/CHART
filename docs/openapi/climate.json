@@ -2911,6 +2911,24 @@
               "type": "string",
               "title": "Geography Id"
             }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9_]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
           }
         ],
         "responses": {
@@ -2975,6 +2993,24 @@
                 }
               ],
               "title": "Indicator Code"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9_]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
             }
           }
         ],
@@ -3051,6 +3087,24 @@
               ],
               "title": "Indicator Code"
             }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9_]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
           }
         ],
         "responses": {
@@ -3094,6 +3148,7 @@
           "vra"
         ],
         "summary": "Run the vulnerability assessment for a frame's child areas",
+        "description": "For administrators: recomputes the climate-derived hazard indicators from stored ERA5 months, scores every child area with method vra-v1 (5th-95th percentile min-max, equal weights, two-thirds coverage rule, geometric mean of hazard, exposure and vulnerability, quartile classes) and stores the run with its bounds and input and output hashes. Synchronous. Requires the chart_admin role and access to the geography path.",
         "operationId": "create_run_vra__geography_id__runs_post",
         "security": [
           {
@@ -3108,6 +3163,24 @@
             "schema": {
               "type": "string",
               "title": "Geography Id"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9_]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
             }
           }
         ],
@@ -3132,8 +3205,7 @@
               }
             }
           }
-        },
-        "description": "For administrators: recomputes the climate-derived hazard indicators from stored ERA5 months, scores every child area with method vra-v1 (5th-95th percentile min-max, equal weights, two-thirds coverage rule, geometric mean of hazard, exposure and vulnerability, quartile classes) and stores the run with its bounds and input and output hashes. Synchronous. Requires the chart_admin role and access to the geography path."
+        }
       }
     },
     "/model-settings": {

@@ -128,9 +128,15 @@ def read_area(
     response_model=CoverageResponse,
     summary="Read indicator coverage and upload history (admin)",
 )
-def read_coverage(geography_id: str, user: CurrentUser) -> CoverageResponse:
+def read_coverage(
+    geography_id: str,
+    user: CurrentUser,
+    level: Annotated[
+        str | None, Query(max_length=64, pattern=r"^[A-Za-z0-9_]+$")
+    ] = None,
+) -> CoverageResponse:
     _require_admin(user, geography_id)
-    return _call(service.load_coverage, geography_id)
+    return _call(service.load_coverage, geography_id, level)
 
 
 @router.get(
@@ -142,9 +148,12 @@ def read_template(
     geography_id: str,
     user: CurrentUser,
     indicator_code: Annotated[str | None, Query(max_length=128)] = None,
+    level: Annotated[
+        str | None, Query(max_length=64, pattern=r"^[A-Za-z0-9_]+$")
+    ] = None,
 ) -> Response:
     _require_admin(user, geography_id)
-    body = _call(service.template_csv, geography_id, indicator_code)
+    body = _call(service.template_csv, geography_id, indicator_code, level)
     return Response(
         content=body,
         media_type="text/csv",
@@ -171,6 +180,9 @@ async def upload_values(
     user: CurrentUser,
     file_name: Annotated[str | None, Query(max_length=256)] = None,
     indicator_code: Annotated[str | None, Query(max_length=128)] = None,
+    level: Annotated[
+        str | None, Query(max_length=64, pattern=r"^[A-Za-z0-9_]+$")
+    ] = None,
 ) -> IngestionResult:
     await run_in_threadpool(_require_admin, user, geography_id)
     raw = await request.body()
@@ -188,6 +200,7 @@ async def upload_values(
         file_name,
         user.user_id,
         indicator_code,
+        level,
     )
 
 
@@ -196,6 +209,14 @@ async def upload_values(
     response_model=AssessmentResponse,
     summary="Refresh computed hazard and score the frame's areas (admin)",
 )
-def create_run(geography_id: str, user: CurrentUser) -> AssessmentResponse:
+def create_run(
+    geography_id: str,
+    user: CurrentUser,
+    level: Annotated[
+        str | None, Query(max_length=64, pattern=r"^[A-Za-z0-9_]+$")
+    ] = None,
+) -> AssessmentResponse:
+    """With ``level`` (e.g. ``district``) every area of that level beneath the
+    frame is scored together, not only the frame's children."""
     _require_admin(user, geography_id)
-    return _call(service.run_assessment, geography_id, user.user_id)
+    return _call(service.run_assessment, geography_id, user.user_id, level)

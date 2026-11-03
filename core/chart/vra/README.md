@@ -16,7 +16,12 @@ questions: [docs/vra-integration-plan.md](../../../docs/vra-integration-plan.md)
 ## Method (`vra-v1`)
 
 1. Universe: the frame's child areas, framed like the dashboard map (a leaf
-   is framed on its siblings).
+   is framed on its siblings). With `?level=<level>` on the upload, template,
+   coverage and run endpoints, it is every area of that level beneath the
+   frame instead (`level=district` on Madhya Pradesh: all 52 districts across
+   its 10 divisions, ranked together). The run records `comparison_level`;
+   reads for a child frame (a division's districts) use the newest run that
+   scored those areas, its own or such a run on an ancestor.
 2. For each included indicator with values in at least 3 areas: clip to the
    5th-95th percentile across the universe (linear interpolation), scale to
    0-1 and flip when direction is -1, so every score points towards risk. An
