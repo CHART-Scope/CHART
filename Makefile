@@ -2,14 +2,12 @@ NPM := $(shell command -v npm || command -v /opt/homebrew/bin/npm || command -v 
 DOCKER := $(shell command -v docker || command -v /Applications/Docker.app/Contents/Resources/bin/docker)
 export PATH := $(dir $(NPM)):$(PATH)
 
-CHART_REPOSITORY_DIR := chart-repository
-CHART_REPOSITORY_COMPOSE := $(DOCKER) compose -f $(CHART_REPOSITORY_DIR)/docker-compose.yml
 CHART_SERVICES ?= $(if $(wildcard .local/remote-dev.enabled),remote,local)
 ifeq ($(filter $(CHART_SERVICES),local remote),)
 $(error CHART_SERVICES must be local or remote)
 endif
 
-.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build e2e e2e-orchestration e2e-core e2e-web identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run wait-for-lbw bootstrap-token install-hooks
+.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build e2e e2e-orchestration e2e-core e2e-web identity-sync identity-test identity-restart identity-reset identity-down actions-publish actions-snapshot format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run wait-for-lbw bootstrap-token install-hooks
 
 help:
 	@printf "\nQuick start (climate pipeline)\n"
@@ -46,12 +44,9 @@ help:
 	@printf "  make climate-migrate    Run Alembic for climate spine tables\n"
 	@printf "  make climate-backfill COUNTRY=IN YEARS=2  Load observed climate history\n"
 	@printf "  make climate-verify COUNTRY=IN YEARS=2    List places missing months\n\n"
-	@printf "Chart repository commands\n"
-	@printf "  make chart-repo         Start repository Postgres, then run Payload on :3300\n"
-	@printf "  make chart-repo-db      Start repository Postgres only\n"
-	@printf "  make chart-repo-seed    Seed repository Payload content\n"
-	@printf "  make chart-repo-stop    Stop repository Postgres\n"
-	@printf "  make chart-repo-verify  Typecheck and build repository service\n\n"
+	@printf "Action repository commands (docs/actions.md; need AIRTABLE_TOKEN)\n"
+	@printf "  make actions-publish    Publish Published Airtable actions to the public feed\n"
+	@printf "  make actions-snapshot   Refresh the copy bundled with the API\n\n"
 
 all: local-setup verify
 
@@ -263,51 +258,15 @@ identity-down: check-docker
 	@if docker inspect chart-keycloak >/dev/null 2>&1; then docker stop chart-keycloak; fi
 endif
 
-chart-repo: chart-repo-install chart-repo-db chart-repo-db-wait
-	cd $(CHART_REPOSITORY_DIR) && $(NPM) run dev
 
-chart-repo-install:
-	cd $(CHART_REPOSITORY_DIR) && $(NPM) install
+# The action repository: Airtable (curation) -> public S3 feed -> API.
+# Publishing normally runs in .github/workflows/publish-actions.yml.
+actions-publish:
+	$(VENV_PYTHON) -m chart.actions.publish --out build/actions --upload
 
-chart-repo-db: check-docker
-	$(CHART_REPOSITORY_COMPOSE) up -d chart-repository-postgres
-
-chart-repo-db-wait:
-	@printf "Waiting for chart repository Postgres"
-	@for attempt in $$(seq 1 60); do \
-		if $(CHART_REPOSITORY_COMPOSE) exec -T chart-repository-postgres pg_isready -U chart_repository -d chart_repository >/dev/null 2>&1; then \
-			printf " ready\n"; \
-			exit 0; \
-		fi; \
-		printf "."; \
-		sleep 1; \
-	done; \
-	printf "\nTimed out waiting for chart repository Postgres on 127.0.0.1:5433\n"; \
-	exit 1
-
-chart-repo-seed: chart-repo-db chart-repo-db-wait
-	cd $(CHART_REPOSITORY_DIR) && $(NPM) run seed
-
-chart-repo-stop: check-docker
-	$(CHART_REPOSITORY_COMPOSE) stop
-
-chart-repo-typecheck:
-	cd $(CHART_REPOSITORY_DIR) && $(NPM) run typecheck
-
-chart-repo-build:
-	cd $(CHART_REPOSITORY_DIR) && $(NPM) run build
-
-chart-repo-verify: chart-repo-typecheck chart-repo-build
-
-solution-repo: chart-repo
-solution-repo-install: chart-repo-install
-solution-repo-db: chart-repo-db
-solution-repo-db-wait: chart-repo-db-wait
-solution-repo-seed: chart-repo-seed
-solution-repo-stop: chart-repo-stop
-solution-repo-typecheck: chart-repo-typecheck
-solution-repo-build: chart-repo-build
-solution-repo-verify: chart-repo-verify
+actions-snapshot:
+	$(VENV_PYTHON) -m chart.actions.publish --out build/actions
+	cp build/actions/actions.json core/chart/actions/actions.json
 
 format:
 	$(NPM) run format

@@ -1200,50 +1200,6 @@ class ClimateIngestionJob(Base):
     )
 
 
-class RecommendedAction(Base):
-    """A reviewed intervention seeded from the solution repository.
-
-    Populated at onboarding from the bundled ``solution_repository/seed.json``;
-    later a scheduler or an external repository API will refresh rows in
-    place. ``slug`` is the natural identity that survives that refresh.
-    """
-
-    __tablename__ = "recommended_action"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    slug: Mapped[str] = mapped_column(String(160), nullable=False, unique=True)
-    source_record_id: Mapped[str | None] = mapped_column(String(64))
-    title: Mapped[str] = mapped_column(String(256), nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    # JSONB on Postgres (matches migration 017); portable JSON on SQLite so
-    # unit tests that hit Base.metadata.create_all can render the table.
-    climate_hazards: Mapped[list] = mapped_column(
-        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
-    )
-    solution_types: Mapped[list] = mapped_column(
-        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
-    )
-    cost_of_implementation: Mapped[str | None] = mapped_column(String(32))
-    useful_links: Mapped[list] = mapped_column(
-        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
-    )
-    case_studies: Mapped[list] = mapped_column(
-        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
-    )
-    source: Mapped[str] = mapped_column(
-        String(32), nullable=False, server_default="seed"
-    )
-    synced_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-
 class LearningTrack(Base):
     """One stop on the Learning Hub pathway.
 
@@ -1280,9 +1236,8 @@ class LearningResource(Base):
     ``embeddable`` rows may be played inline, because the rest have not been
     checked for permission to reframe them.
 
-    ``tracks`` and ``tags`` are denormalised label arrays, matching
-    ``RecommendedAction``. The taxonomy is derived from them at read time
-    instead of being stored in join tables.
+    ``tracks`` and ``tags`` are denormalised label arrays. The taxonomy is
+    derived from them at read time instead of being stored in join tables.
     """
 
     __tablename__ = "learning_resource"
@@ -1617,4 +1572,62 @@ class VraResultIndicator(Base):
             "indicator_id",
             name="uq_vra_result_indicator_grain",
         ),
+    )
+
+
+class SavedPlan(Base):
+    """A dashboard view one user saved to plan from.
+
+    ``choices`` are the dashboard selections that reopen the view, resolved
+    by the API at save time. ``figure`` is the estimate the published model
+    gave for them then, so a plan keeps the modelling it was made from even
+    after a newer release replaces it. Plans are private to their owner.
+    """
+
+    __tablename__ = "saved_plan"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    geography_id: Mapped[str] = mapped_column(
+        ForeignKey("geographies.id", ondelete="CASCADE"), nullable=False
+    )
+    admin_unit_id: Mapped[str | None] = mapped_column(
+        ForeignKey("geographies.id", ondelete="CASCADE")
+    )
+    outcome: Mapped[str] = mapped_column(String(64), nullable=False)
+    choices: Mapped[dict] = mapped_column(_JSON, nullable=False)
+    figure: Mapped[dict] = mapped_column(_JSON, nullable=False)
+    # The last generated insight with the provider, model and ranking it was
+    # written for; reused until any of them changes, so a page view does not
+    # call the language model again.
+    insight: Mapped[dict | None] = mapped_column(_JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (Index("ix_saved_plan_user", "user_id", "created_at"),)
+
+
+class RecommendationSetting(Base):
+    """How the installation ranks actions and writes the insight beside them.
+
+    One row (id 1); no row means the rules ranking and the template insight.
+    Credentials never live here: provider keys and endpoints come from the
+    server environment (see ``chart.recommendations.providers``).
+    """
+
+    __tablename__ = "recommendation_setting"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ranker: Mapped[str] = mapped_column(String(32), nullable=False)
+    insight_provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    insight_model: Mapped[str | None] = mapped_column(String(200))
+    updated_by_user_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )

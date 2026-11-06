@@ -1,0 +1,49 @@
+name: Publish actions
+
+# Copies Published rows from the Airtable action repository to the public
+# feed on S3 (docs/actions.md). Runs hourly, on demand ("Run workflow"), and
+# when an Airtable automation sends a repository_dispatch "publish-actions".
+# Nothing is uploaded when the actions have not changed.
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+  repository_dispatch:
+    types: [publish-actions]
+
+concurrency:
+  group: publish-actions
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # lets the job assume the AWS role without stored keys
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - run: python -m pip install "pydantic>=2,<3"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ACTIONS_PUBLISH_ROLE_ARN }}
+          aws-region: eu-north-1
+
+      - name: Publish Published actions to S3
+        working-directory: core
+        env:
+          AIRTABLE_TOKEN: ${{ secrets.AIRTABLE_TOKEN }}
+        run: python -m chart.actions.publish --out ../build/actions --upload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: actions-feed
+          path: build/actions/actions.json
+          retention-days: 30

@@ -5,7 +5,7 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { Button } from "@/components/Button";
 import { InlineSelect } from "@/components/InlineSelect";
 import { Icon } from "@/components/Icon";
-import { PageHeader, SectionTitle } from "@/components/PageHeader";
+import { PageHeader } from "@/components/PageHeader";
 import type { GeographyRecord, ModelCatalogEntry } from "@/lib/planningClient";
 
 import type { PlanningSelection } from "./planningWireframe";
@@ -26,6 +26,8 @@ type Props = {
    * `<InlineContextSwitcher />` so the family flip is one control, no
    * separate context card taking up space. */
   contextSwitcher?: ReactNode;
+  /** The user's saved plans, listed under the sentence. */
+  savedPlans?: ReactNode;
 };
 
 export function PlanningSetup({
@@ -38,6 +40,7 @@ export function PlanningSetup({
   onChange,
   onStart,
   contextSwitcher,
+  savedPlans,
 }: Props) {
   const activeArea = useMemo(
     () => areas.find((area) => area.id === selection.area) ?? null,
@@ -148,16 +151,6 @@ export function PlanningSetup({
           if (canStart) onStart();
         }}
       >
-        <button
-          type="button"
-          className={styles.bookmark}
-          aria-label="Save this combination"
-          title="Save this combination"
-          disabled
-        >
-          <Icon name="bookmark" size={16} />
-        </button>
-
         <p className={styles.sentence}>
           <span>We&apos;re planning together for the impacts of </span>
           <PillSelect
@@ -241,16 +234,7 @@ export function PlanningSetup({
         </div>
       </form>
 
-      <section className={styles.saved} aria-labelledby="saved-scenarios">
-        <SectionTitle id="saved-scenarios">Saved scenarios</SectionTitle>
-        <div className={styles.empty}>
-          <Icon name="bookmark" size={18} />
-          <p>
-            No saved scenarios yet. Use the bookmark icon above to save a combination
-            you plan to revisit.
-          </p>
-        </div>
-      </section>
+      {savedPlans}
     </div>
   );
 }

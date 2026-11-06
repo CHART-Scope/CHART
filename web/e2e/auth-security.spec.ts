@@ -265,9 +265,6 @@ test("the setup wizard sends the setup token the administrator enters", async ({
       geographies: [testland],
     }),
   );
-  api.on(/^\/api\/setup\/action-repository$/, (route) =>
-    json(route, { actionCount: 0, trackedActionCount: 0 }),
-  );
   api.on(/^\/api\/setup\/bootstrap$/, (route) => route.continue());
   upstream.on("POST", "/setup/bootstrap", (request) =>
     request.headers["x-chart-bootstrap-token"] === "the-real-setup-token"

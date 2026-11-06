@@ -1,5 +1,7 @@
 import { type Page, type Route } from "@playwright/test";
 
+import { actionList } from "./actions";
+
 /**
  * The CHART API as the browser sees it, answered at the network boundary.
  *
@@ -101,7 +103,24 @@ export async function installFakeApi(
     if (/^\/api\/chart\/risk\/[^/]+\/monthly$/.test(path)) {
       return json(route, options.monthly?.(url) ?? { admin_unit_id: 1, months: {} });
     }
-    if (path === "/api/chart/recommended-actions") return json(route, { items: [] });
+    if (path === "/api/chart/actions") return json(route, actionList);
+    if (path === "/api/chart/saved-plans" && method === "GET")
+      return json(route, { items: [] });
+    if (path === "/api/chart/recommendation-settings" && method === "GET") {
+      return json(route, {
+        settings: {
+          ranker: "rules",
+          insight_provider: "template",
+          insight_model: null,
+        },
+        rankers: [{ id: "rules", label: "Rules", available: true, reason: null }],
+        providers: [
+          { id: "template", label: "Template (no AI)", available: true, reason: null },
+        ],
+        updated_by_user_id: null,
+        updated_at: null,
+      });
+    }
     // The vulnerability assessment, for specs that do not exercise it (see
     // vra.ts for the full service): nothing held, nothing assessed.
     if (/^\/api\/chart\/vra\/[^/]+\/coverage$/.test(path)) {

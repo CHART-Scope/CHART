@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "published_at": "2026-11-06T12:21:24+00:00",
+  "source": "CHART actions (Airtable)",
+  "actions": [
+    {
+      "id": "recTWQ7yrBSn2eXeB",
+      "countries": ["KE"],
+      "title": "Integrate health data and health-triggered early action into the NDMA early warning system",
+      "summary": "Integrate heat-health indicators and health-triggered early action into Kenya's existing NDMA early warning system.",
+      "description": "Embed heat-health indicators and health-triggered action into the existing NDMA early warning system (EWS), rather than building a parallel system. The Kenya Climate Change and Health Strategy 2024–2029 calls for comprehensive health risk and impact assessments and integrated disease surveillance and early warning systems to inform timely preparedness and response.\n\nKey steps:\n• Integrate health data: add heat-related illness and other climate-sensitive health indicators (acute malnutrition, diarrhoeal disease, respiratory illness, malaria, cholera, Rift Valley fever) to the monthly sentinel-site and county bulletins.\n• Link data systems: connect NDMA's data platform to the Kenya Health Information System (KHIS/DHIS2) and the Integrated Disease Surveillance and Response (IDSR) system through data-sharing agreements and interoperable formats.\n• Translate forecasts into health risk: combine Kenya Meteorological Department (KMD) seasonal and sub-seasonal forecasts, including heat, with health data so that hazard forecasts become health-risk forecasts.\n• Set health-based thresholds and triggers: agree thresholds for each phase (normal, alert, alarm, emergency) that combine a climate signal with a health signal, and link each to an early action protocol stating who does what, within how many days, and with which resources.\n• Strengthen county and community warning delivery: work with county health departments and county steering groups so that early warnings reach health facilities and community health promoters.\n• Communicate risk: with the health department, send targeted messages by SMS, radio and community health promoters, in local languages, tailored to pregnant women, children, older adults and pastoralists. Frame messages around practical actions and decision-making power, especially for women.\n\nBefore heat season: integrate data, agree thresholds and protocols, pre-position funds.\nDuring heat season: monitor forecasts and health signals, issue bulletins, activate early actions when triggers are met, send risk messages.\nAfter heat season: review triggers and response, update thresholds and indicators, report lessons.",
+      "cost_reasoning": "Costs fall mainly on one-off data integration and training, plus recurring costs for bulletins, SMS and radio messaging, and trigger-based contingency funding.",
+      "rationale": "Early Warnings for All aims to protect everyone on Earth from hazardous weather, water and climate events through life-saving early warning systems by the end of 2027.\n\nRising heat is making pregnancy more dangerous and increasing the risk of complications. Extreme heat stresses placental blood flow and the maternal cardiovascular system. Timely heat warnings prompt hydration, reduced physical exertion and clinical check-ins, which help protect pregnant women and newborns, though direct clinical proof that they lower rates of preterm birth or stillbirth is still emerging.\n\nNDMA already runs Kenya's drought early warning system in the arid and semi-arid (ASAL) counties, but it tracks mainly climate, food security and livelihood signals, with little health data. Adding health indicators turns forecasts into health-risk warnings, supports efficient use of resources, and enables targeted action before emergencies peak. Building on the existing system is faster and cheaper than creating a parallel one. Community messaging that stresses agency, particularly for women, makes advisories more likely to be acted on.",
+      "expected_outcomes": "Timely, local-language risk messages reaching vulnerable groups: women, children, older adults and pastoralists.\nReduced heat- and climate-related illness through earlier preparedness and response.",
+      "decision_trigger": "Trigger: a KMD forecast of heat above the agreed threshold, combined with a rise in a health signal such as heat-related illness, malnutrition admissions or diarrhoeal cases in the sentinel sites or KHIS/DHIS2. Phases (normal, alert, alarm, emergency) are to be calibrated using CHART vulnerability and resilience assessment outputs to identify the wards and groups most at risk.\nEvidence: the Kenya Climate Change and Health Strategy 2024–2029 identifies integrated disease surveillance and early warning systems as a key route to timely preparedness, surveillance and response decisions.",
+      "hazards": ["Extreme heat", "Drought"],
+      "health_outcomes": [
+        "Heatstroke and heat-related illness",
+        "Maternal heat illness and pregnancy complications",
+        "Malnutrition",
+        "Communicable disease outbreaks",
+        "Respiratory illness",
+        "Vector-borne disease"
+      ],
+      "target_populations": [
+        "General population",
+        "Pregnant women",
+        "Children",
+        "Elderly (60+)"
+      ],
+      "action_types": [
+        "Early warning and surveillance",
+        "Technology and data",
+        "Behaviour change and communication"
+      ],
+      "levels": ["National", "Sub-national (district / county)", "Community"],
+      "departments": [
+        "NDMA Kenya; county disaster units",
+        "Ministry of Health; county health departments"
+      ],
+      "stakeholders": ["NDMA", "KMD", "CHP"],
+      "trigger_sources": [
+        "Temperature forecast threshold",
+        "Health surveillance signal",
+        "CHART risk index / VRA"
+      ],
+      "seasons": ["before", "during", "after"],
+      "cost_level": "Variable",
+      "references": [
+        {
+          "citation": "Kenya Climate Change and Health Strategy 2024–2029",
+          "url": "https://health.go.ke/sites/default/files/2026-02/Kenya%20Climate%20Change%20%26%20health%20Strategy%20SIGNED.pdf"
+        },
+        {
+          "citation": "Pregnancy and extreme heat events: a rapid review of evidence related to health outcomes, risk factors and interventions",
+          "url": "https://www.sciencedirect.com/science/article/pii/S1871519225000654"
+        },
+        {
+          "citation": "Taking the Heat: Potential Fetal Health Effects of Hot Temperatures",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6910775/"
+        },
+        {
+          "citation": "Global Heat Health Information Network, Communicate",
+          "url": "https://heathealth.info/communicate/"
+        },
+        {
+          "citation": "Understanding the global landscape of heat early warning systems",
+          "url": "https://heathealth.info/resources/understanding-the-global-landscape-of-heat-early-warning-systems/"
+        },
+        {
+          "citation": "IFRC, Heat waves key messages",
+          "url": "https://www.ifrc.org/document/heat-waves-key-messages"
+        },
+        {
+          "citation": "WMO, Early Warnings for All",
+          "url": "https://wmo.int/all-activities/build-resilience/early-warnings-all"
+        }
+      ],
+      "case_studies": [],
+      "images": [],
+      "by_country": {}
+    },
+    {
+      "id": "reczqjV8AXlBqBXD7",
+      "countries": [],
+      "title": "Provide pregnancy-specific heat health counselling to pregnant women",
+      "summary": "Counsel pregnant women and their families on core heat-health actions through community health workers before and during the heat season.",
+      "description": "Provide counselling on core pregnancy heat-health actions through community health workers, during routine outreach sessions, home visits and antenatal contacts.\n\nThe core six messages to be delivered through counselling are as follows:\n1. Maintain hydration: drink water frequently through the day rather than waiting for thirst. Use Oral Rehydration Salts (ORS) if sweating heavily, dizzy, or after vomiting or loose stools. Eat water-rich fruits such as cucumber, watermelon, pineapple and coconut water where available. Account for safe drinking water access. Carry a water bottle when going out, including to health facility check-ups.\n2. Avoid peak heat exposure: help the woman and her family identify the hottest hours locally and plan outdoor tasks, market visits and household chores outside this window. Take short shaded breaks every 30–45 minutes during market or outdoor work that cannot be avoided. \n3. Advice on clothing: Wear light-coloured, loose, breathable clothing, a head covering and footwear outside, and carry an umbrella.\n4. Rest in a shaded or cool place: help identify the coolest available space at home or in a nearby community structure for rest during hot afternoons. Rest on the left side where possible. Get support from family and community members so rest time is protected.\n5. Cool the home: cross-ventilate during cooler morning and evening hours, block direct afternoon sun, use a damp cloth on the neck, wrists and forehead, wet the floor or hang a damp cloth near openings where feasible, and avoid cooking during peak heat.\n6. Seek help immediately on warning signs: feeling faint or confused, or no longer sweating; reduced fetal movements; contractions or cramps after being in the heat; vomiting that does not stop.\n\nClose every session by reviewing danger signs requiring facility care.",
+      "cost_reasoning": "Integrated into existing antenatal contacts. The main costs are orienting community health workers and adapting IEC materials. No new cadre or equipment is needed.",
+      "rationale": "Extreme heat during pregnancy is associated with a higher risk of preterm birth, low birth weight and stillbirth; each 1°C of warming is associated with up to a 5% rise in low birth weight, preterm birth or stillbirth risk. Rehydration and electrolyte supplementation, cool fluids, breathable clothing, left-side rest and self-dousing or cool compresses are recommended adaptive measures for pregnant people during extreme heat.\n\nCommunity health workers usually belong to the communities they serve. They speak the local language, understand local taboos, and can deliver information without judgement. This trust makes pregnant women much more willing to adopt healthy behaviours, so community health workers bridge the gap between vulnerable pregnant women and the formal health system.",
+      "expected_outcomes": "Improved hydration and ORS use among pregnant women during heat periods.\nLess time spent by pregnant women outdoors during peak heat.\nGreater uptake of feasible household cooling measures.\nMore family involvement in protecting rest time for pregnant women during heat.\nContribution to fewer heat-attributable adverse birth outcomes (preterm birth, low birth weight) and maternal complications.",
+      "decision_trigger": "Reminder for preparedness: ahead of the seasonal heat forecast (pre-summer and during summer), orient community health workers on the counselling messages, restock ORS in their kits, and prepare and translate IEC materials for outreach.\nTrigger for intensified action: the meteorological department issues a heat warning for the county or district, or the county or district heat action plan threshold is crossed.\nCHART rationale: consistent with CHART's IPCC AR6-aligned vulnerability and resilience triggers.",
+      "hazards": ["Extreme heat"],
+      "health_outcomes": [
+        "Dehydration",
+        "Low birth weight",
+        "Preterm birth",
+        "Stillbirth",
+        "Maternal heat illness and pregnancy complications"
+      ],
+      "target_populations": ["Pregnant women"],
+      "action_types": ["Behaviour change and communication"],
+      "levels": ["Community", "Household"],
+      "departments": ["Health"],
+      "stakeholders": [
+        "Community health worker",
+        "Frontline supervisor",
+        "Facility in-charge",
+        "Sub-national health management",
+        "Climate and disaster focal point",
+        "Household influencers"
+      ],
+      "trigger_sources": ["Met service heat alert", "Seasonal calendar date"],
+      "seasons": ["before", "during"],
+      "cost_level": "Low",
+      "references": [
+        {
+          "citation": "https://www.sciencedirect.com/science/article/pii/S1438463925000756",
+          "url": "https://www.sciencedirect.com/science/article/pii/S1438463925000756"
+        },
+        {
+          "citation": "WHO India, Beat the heat (IEC materials)",
+          "url": "https://www.who.int/india/beat-the-heat"
+        },
+        {
+          "citation": "WHO India, Heat waves (IEC materials)",
+          "url": "https://www.who.int/india/heat-waves"
+        },
+        {
+          "citation": "NPHI Kenya IEC materials",
+          "url": "https://www.nphi.go.ke/iec-materials"
+        },
+        {
+          "citation": "MoHFW & UNFPA India (2026). Heat and Pregnancy: Guidance for Healthcare Providers and Community Health Workers",
+          "url": "https://india.unfpa.org/en/publications/heat-and-pregnancy-guidance-healthcare-providers-and-community-health-workers"
+        }
+      ],
+      "case_studies": [
+        {
+          "citation": "Co-design workshop process paper, Kilifi (CHAMNHA)",
+          "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10501312/"
+        },
+        {
+          "citation": "Lusambili A. et al. (2025). Reducing extreme heat impacts on health in pregnant women and infants: a community-based intervention in Kilifi, Kenya. Health Policy and Planning 40(9), 943–954",
+          "url": "https://doi.org/10.1093/heapol/czaf028"
+        }
+      ],
+      "images": [],
+      "by_country": {
+        "IN": {
+          "description": "In India, deliver the counselling through ASHAs and ANMs during home visits and at platforms such as Village Health Sanitation and Nutrition Days (VHSND).",
+          "departments": ["Dept of Health & Family Welfare; NHM"],
+          "stakeholders": [
+            "ASHA",
+            "ANM",
+            "PHC Medical Officer",
+            "District RCH Officer",
+            "HAP nodal officer",
+            "Household influencers"
+          ]
+        },
+        "KE": {
+          "description": "In Kenya, deliver the counselling through Community Health Promoters (CHPs) during household visits and community days.",
+          "departments": ["Ministry of Health; county health departments"],
+          "stakeholders": [
+            "CHP",
+            "CHA",
+            "Dispensary in-charge",
+            "SCHMT",
+            "County disaster unit",
+            "Household influencers"
+          ]
+        }
+      }
+    },
+    {
+      "id": "recf4hP56MrCl7cQx",
+      "countries": [],
+      "title": "Safe heat protocols for pregnant women working in agriculture, construction, and other sectors",
+      "summary": "Implement heat-safety protocols at outdoor and heat-exposed worksites, with specific provisions for pregnant workers.",
+      "description": "Implement heat-safety protocols for outdoor and heat-exposed worksites that explicitly include pregnant women. Provisions for pregnant workers:\n• Additional, more frequent rest breaks\n• Priority access to rest areas and cooling\n• Priority access to safe drinking water\n• Emergency ice packs and heat-illness prevention materials at the worksite\n• Regular health check-ups, arranged with the health department\n• The right to request lighter or rescheduled duties on heat-alert days without loss of pay or employment status\n• Information on these provisions shared with pregnant workers in the local language\n\nKey steps: include the pregnancy-specific provisions in national worker heat advisories, ensure they are enforced, and train the officials concerned.\n\nDuring heat season: active enforcement, rest-break requirements triggered by heat alerts, and complaint handling.\nAfter heat season: review compliance and update rules and thresholds for the following year.",
+      "cost_reasoning": "Costs are concentrated in training the existing labour inspectorate on heat-alert triggers and the pregnancy-specific provisions, plus incremental monitoring and complaint handling. Employer-side costs (water points, shaded cool rest areas) are generally low, though they vary by sector and worksite.",
+      "rationale": "Outdoor work is a major source of heat exposure for pregnant women. Yet current labour heat advisories do not mention protections for pregnant women. Placing this action with the labour department uses the legal authority, inspection machinery and employer relationships that already exist for enforcing other workplace safety standards, and closes the gap in issued heat advisories.",
+      "expected_outcomes": "Explicit advisories on work-adjustment provisions specific to pregnant workers in place.\nReduced heat exposure during peak-heat hours for pregnant outdoor workers, helping to improve maternal health outcomes.",
+      "decision_trigger": "Evidence tier: heat season.\nTrigger: seasonal heat-alert issuance by IMD/NDMA (India) and the Kenya Meteorological Department, which activates the enforcement and rest-break requirements.",
+      "hazards": ["Extreme heat"],
+      "health_outcomes": [
+        "Heatstroke and heat-related illness",
+        "Low birth weight",
+        "Maternal heat illness and pregnancy complications"
+      ],
+      "target_populations": ["Pregnant women", "Outdoor workers"],
+      "action_types": ["Policy and regulation", "Capacity building and training"],
+      "levels": ["National", "Workplace"],
+      "departments": ["Labour and occupational safety"],
+      "stakeholders": [
+        "Employers and unions",
+        "Disaster authority",
+        "Meteorological service"
+      ],
+      "trigger_sources": ["Met service heat alert"],
+      "seasons": ["during", "after"],
+      "cost_level": "Medium",
+      "references": [
+        {
+          "citation": "PIB: Ministry of Labour & Employment nationwide heatwave advisory to States/UTs",
+          "url": "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2256186&reg=3&lang=2"
+        },
+        {
+          "citation": "Rekha S, Nalini SJ, Bhuvana S, Kanmani S, Hirst JE, Venugopal V. Heat stress and adverse pregnancy outcome: prospective cohort study. BJOG. 2024;131(5):612–622",
+          "url": "https://doi.org/10.1111/1471-0528.17680"
+        },
+        {
+          "citation": "Bonell A, Sonko B, Badjie J, et al. Environmental heat stress on maternal physiology and fetal blood flow in pregnant subsistence farmers in The Gambia, west Africa: an observational cohort study. Lancet Planetary Health. 2022;6(12):e968–e976 (corrected 2023, doi:10.1016/S2542-5196(23)00167-5)",
+          "url": "https://doi.org/10.1016/S2542-5196(22)00242-X"
+        },
+        {
+          "citation": "Curtis A. Expecting in Extremes: Protecting Pregnant Workers in Our Changing Climate. National Commission on Climate and Workforce Health / Health Action Alliance, June 2025",
+          "url": "https://www.healthaction.org/whatsnew/expecting-in-extremes-protecting-pregnant-workers-in-our-changing-climate"
+        },
+        {
+          "citation": "KIPPRA. An Overview of Workplace Safety and Health in Kenya (DOSHS mandate under OSHA 2007)",
+          "url": "https://kippra.or.ke/an-overview-of-workplace-safety-and-health-in-kenya/"
+        }
+      ],
+      "case_studies": [],
+      "images": [],
+      "by_country": {
+        "IN": {
+          "description": "In India, the Ministry of Labour & Employment's April 2025 nationwide heatwave advisory to States and UTs already covers all labourers (rescheduled hours, drinking water, rest areas, ice packs and coordination with the health department). The pregnancy-specific provisions need to be added to this advisory, enforced, and covered in training for the officials concerned.",
+          "rationale": "In India, a prospective cohort of 800 pregnant workers in moderate-to-heavy physical occupations in Tamil Nadu (Rekha et al., BJOG 2024) found occupational heat exposure associated with adverse pregnancy outcomes, including low birth weight. This is the direct evidence base for regulating outdoor and heat-exposed worksites in India.",
+          "departments": ["Ministry of Labour & Employment; State Labour Depts"],
+          "stakeholders": ["Employers and unions", "NDMA; SDMA", "IMD"]
+        },
+        "KE": {
+          "description": "In Kenya, there is no unified, legally binding national standard or official guideline on extreme heat thresholds or mandatory work-rest cycles for outdoor workers. Workplace safety falls under the general provisions of the Directorate of Occupational Safety and Health Services (DOSHS), which mandates safe working environments, but explicit climate-driven heat advisories are scarce. DOSHS should issue the same pregnancy-specific provisions.",
+          "rationale": "For Kenya, the closest evidence is a sub-Saharan parallel rather than a Kenyan study: a cohort of pregnant subsistence farmers in The Gambia (Bonell et al., Lancet Planetary Health 2022) found each 1°C rise in heat exposure associated with measurable fetal strain, supporting the same occupational pathway.",
+          "departments": ["MoLSP; DOSHS"],
+          "stakeholders": ["Employers and unions", "NDMA", "KMD"]
+        }
+      }
+    }
+  ]
+}

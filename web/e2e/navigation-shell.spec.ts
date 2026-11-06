@@ -113,6 +113,13 @@ test("sidebar navigation keeps one shell mounted across workspace pages", async 
   const nav = page.getByRole("navigation", { name: "Main" });
   const entry = (name: string) => nav.getByRole("link", { name, exact: true });
   await expect(entry("Start planning")).toHaveAttribute("aria-current", "page");
+  // Learning hub sits directly below Start planning.
+  await expect(nav.getByRole("link")).toHaveText([
+    "Start planning",
+    "Learning hub",
+    "Vulnerability",
+    "Settings",
+  ]);
   await expect(
     page.getByRole("combobox", { name: "State", exact: true }),
   ).toBeVisible();

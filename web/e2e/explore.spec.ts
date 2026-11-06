@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { actionItems } from "./support/actions";
 import { json } from "./support/fakeApi";
 import { fixtures, installKenya, observedFixtures } from "./support/kenya";
 
@@ -264,32 +265,35 @@ test("search reaches the other country, and a place leads to its actions and pla
   page,
 }) => {
   const { api } = await openExplore(page, "frame=geo-ke&outcome=lbw");
-  api.on(/^\/api\/chart\/recommended-actions$/, (route) =>
-    json(route, {
+  api.on(/^\/api\/chart\/actions$/, (route, url) => {
+    // Actions are asked for by place; the API answers with its country's.
+    expect(url.searchParams.get("geography")).toBe("geo-ke");
+    return json(route, {
+      country: "KE",
+      source: "feed",
+      published_at: "2026-11-06T10:00:00+00:00",
       items: [
         {
-          slug: "cool-roofs",
-          name: "Cool roofs for health facilities",
-          description: "Reflective roofing keeps maternity wards cooler.",
-          costOfImplementation: "low",
-          taxonomies: [
-            { type: "hazard", label: "Extreme heat" },
-            { type: "solution_type", label: "Infrastructure" },
-          ],
-          links: [{ url: "https://www.who.int/cool-roofs", label: "who.int" }],
+          ...actionItems[0],
+          id: "recCoolRoofs",
+          title: "Cool roofs for health facilities",
+          summary: "Reflective roofing keeps maternity wards cooler.",
+          action_types: ["Infrastructure: retrofit"],
+          cost_level: "Low",
+          references: [{ citation: "WHO", url: "https://www.who.int/cool-roofs" }],
         },
         {
-          slug: "flood-walls",
-          name: "Flood walls",
-          description: "Barriers against river floods.",
-          costOfImplementation: "high",
-          taxonomies: [{ type: "hazard", label: "Floods" }],
-          links: [],
+          ...actionItems[0],
+          id: "recFloodWalls",
+          title: "Flood walls",
+          summary: "Barriers against river floods.",
+          hazards: ["Floods"],
+          cost_level: "High",
+          references: [],
         },
       ],
-      total: 2,
-    }),
-  );
+    });
+  });
   await page.reload();
 
   // Regression: a list opening under a resting pointer highlighted the row

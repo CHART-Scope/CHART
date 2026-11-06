@@ -1,0 +1,14 @@
+.summary {
+  margin: 0;
+  font-size: var(--fs-body);
+}
+.error {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-body-sm);
+  color: var(--color-maroon);
+}
+.link {
+  align-self: center;
+  font-weight: 600;
+  color: var(--color-nexus);
+}

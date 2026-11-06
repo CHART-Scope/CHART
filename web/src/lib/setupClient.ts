@@ -1,3 +1,4 @@
+import { listActions } from "./actionsClient";
 import { authFetch } from "./authFetch";
 import type {
   OnboardingState,
@@ -29,7 +30,6 @@ export type SetupOptions = {
 
 export type ActionRepositoryStatus = {
   actionCount: number;
-  trackedActionCount: number;
 };
 
 export type BootstrapSetupResult = {
@@ -60,17 +60,13 @@ export async function getSetupOptions() {
   return (await response.json()) as SetupOptions;
 }
 
-export async function loadActionRepository() {
-  const response = await authFetch("/api/setup/action-repository", {
-    auth: false,
-    timeoutMs: 20_000,
-  });
-  if (!response.ok) {
-    throw new Error(
-      "The action repository could not be loaded. Check the repository service and try again.",
-    );
+export async function loadActionRepository(): Promise<ActionRepositoryStatus> {
+  try {
+    const { items } = await listActions();
+    return { actionCount: items.length };
+  } catch {
+    throw new Error("The action repository could not be loaded. Try again.");
   }
-  return (await response.json()) as ActionRepositoryStatus;
 }
 
 export async function bootstrapChartSetup(

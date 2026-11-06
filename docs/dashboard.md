@@ -111,3 +111,34 @@ Each row carries the model release and artifact checksum that produced it, the
 exposure vector it was scored on, and the reference it was measured against, so
 a figure on screen can be traced back to the fitted model and the observations
 behind it.
+
+## Saved plans and recommendations
+
+**Save plan** on the outlook card saves the outcome, place (with any sub-area)
+and the observed or projected selection under a name. The API resolves the
+selection and captures the estimate itself through the same outlook service
+the card reads: the attributable share with its 95% CI, the odds or risk ratio,
+the model release and the country's official heat season. A plan therefore
+keeps the modelling it was made from after a newer release is published.
+Observed views from India's live monthly model are saved without a figure, with
+the reason recorded. Plans are private to their owner, at most 100 per user,
+and hidden once their place leaves the user's geography scope
+(`/saved-plans`, see the API reference).
+
+Saved plans are listed on **Start planning**, where each reopens its dashboard
+view or its recommendations. The [action repository](actions.md) page opened
+with `?plan=<id>` ranks the repository's actions for the plan:
+
+- The API reads the figure as a **risk level**: *clearly raised* when the
+  ratio's 95% CI lies above 1, *possibly raised* when only the central estimate
+  does (or a share is reported without a ratio), *not detected* otherwise, and
+  *unknown* without a figure.
+- **Timing**: a projection plans ahead (*before the heat season*); an observed
+  month inside the official season is *during*, up to two months after it
+  *after*, otherwise *before*.
+- The API ranks the actions (rules by default, or a self-hosted classifier)
+  and shows the top three with the reasons they rank.
+
+The insight beside them is a template unless an administrator chose a
+language model; see [Recommendations and AI](recommendations.md). The figure
+and the ranking never depend on it.

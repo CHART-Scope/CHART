@@ -205,49 +205,16 @@ OPERATION_DOCUMENTATION: dict[
             "200": "The reset setup state ready for an authorized recovery workflow."
         },
     ),
-    ("get", "/hazards"): OperationDocumentation(
-        summary="List public climate-health hazards",
+    ("get", "/actions"): OperationDocumentation(
+        summary="List published recommended actions",
         description=(
-            "Returns the published hazard catalog from the configured solution "
-            "repository API or bundled public snapshot. Hazard identifiers connect "
-            "planning risks to the solution records returned by the repository routes."
+            "Returns the reviewed actions from the public action feed "
+            "(CHART_ACTIONS_URL), or the copy bundled with CHART when the feed "
+            "cannot be read. With a geography, only actions for its country are "
+            "returned, in that country's wording. Public; no sign-in required."
         ),
         success_responses={
-            "200": "The published public hazard catalog available to planning clients."
-        },
-    ),
-    ("get", "/hazards/{hazard_id}"): OperationDocumentation(
-        summary="Read one public hazard and its linked solutions",
-        description=(
-            "Looks up a published hazard by its stable identifier and includes the "
-            "public solution records associated with it. The route reads the configured "
-            "remote repository when available and otherwise uses the bundled snapshot."
-        ),
-        success_responses={
-            "200": "The requested hazard together with its currently published solutions."
-        },
-    ),
-    ("get", "/solutions"): OperationDocumentation(
-        summary="Search and filter the public solution repository",
-        description=(
-            "Returns published climate-health actions filtered by hazard, solution "
-            "type, cost, publication status, or free-text search. Results come from the "
-            "configured repository service or the bundled snapshot and remain public "
-            "without CHART sign-in."
-        ),
-        success_responses={
-            "200": "The public solutions matching the supplied filters and result limit."
-        },
-    ),
-    ("get", "/solutions/taxonomies"): OperationDocumentation(
-        summary="List public solution taxonomy values",
-        description=(
-            "Returns the controlled hazard, solution-type, cost, and status values used "
-            "to classify published actions. Clients can use this catalog to construct "
-            "valid solution filters without duplicating repository vocabularies."
-        ),
-        success_responses={
-            "200": "The current public taxonomy values used by solution filters."
+            "200": "The published actions, where they were read from and when they were published."
         },
     ),
     ("get", "/users"): OperationDocumentation(
@@ -768,6 +735,114 @@ OPERATION_DOCUMENTATION: dict[
                 "and who last changed them."
             )
         },
+    ),
+    ("get", "/saved-plans"): OperationDocumentation(
+        summary="List the user's saved plans",
+        description=(
+            "Returns the caller's own saved plans, newest first, each with the "
+            "dashboard choices that reopen it, the published estimate captured "
+            "when it was saved and the deterministic risk_level/timing signals "
+            "recommendations are keyed on. Plans for places no longer in the "
+            "caller's geography scope are omitted. Requires a dashboard reader role."
+        ),
+        success_responses={
+            "200": "The caller's saved plans for places they can still read, newest first; empty when none."
+        },
+    ),
+    ("post", "/saved-plans"): OperationDocumentation(
+        summary="Save a dashboard view with its published estimate",
+        description=(
+            "Stores a named plan for a geography (and optional sub-area within it), "
+            "outcome and observed or projected selection. The API resolves the "
+            "selection and captures the estimate through the same outlook service "
+            "as the dashboard; a view with no published estimate is saved with "
+            "figure.status unavailable and a reason. Refuses places outside the "
+            "caller's scope (GEOGRAPHY_OUT_OF_SCOPE), a sub-area outside its frame "
+            "(PLAN_AREA_INVALID), a selection the publication does not contain "
+            "(OUTLOOK_SELECTION_INVALID) and more than 100 plans per user "
+            "(SAVED_PLAN_LIMIT)."
+        ),
+        success_responses={
+            "201": "The new saved plan with the published figure and risk reading captured for it."
+        },
+    ),
+    ("get", "/saved-plans/{plan_id}"): OperationDocumentation(
+        summary="Open one of the caller's saved plans",
+        description=(
+            "Returns one of the caller's plans. Another user's plan is reported as "
+            "SAVED_PLAN_NOT_FOUND; a plan whose place has left the caller's scope "
+            "is refused with GEOGRAPHY_OUT_OF_SCOPE."
+        ),
+        success_responses={
+            "200": "The requested saved plan with its captured figure, choices and risk reading."
+        },
+    ),
+    ("delete", "/saved-plans/{plan_id}"): OperationDocumentation(
+        summary="Remove one of the caller's saved plans",
+        description=(
+            "Deletes one of the caller's plans for good. Another user's plan is "
+            "reported as SAVED_PLAN_NOT_FOUND and left untouched, as is a plan that "
+            "was already removed."
+        ),
+        success_responses={
+            "204": "The plan was removed; removing it again answers 404 SAVED_PLAN_NOT_FOUND."
+        },
+    ),
+    ("post", "/saved-plans/{plan_id}/recommendations"): OperationDocumentation(
+        summary="Rank repository actions for a saved plan, with an insight",
+        description=(
+            "Ranks the candidate actions the browser sends for one of the "
+            "caller's plans. The rules ranking (season, then cost unless heat "
+            "risk is clearly raised, then health-led) is the default; a "
+            "configured classifier replaces only the order and, if it fails, "
+            "ranker falls back to rules with ranker_note set. The insight is a "
+            "template unless an administrator chose a language model; it falls "
+            "back to the template on any provider failure (insight.note) and a "
+            "generated insight is reused until the provider, model or ranking "
+            "changes. Ownership and scope follow GET /saved-plans/{plan_id}."
+        ),
+        success_responses={
+            "200": "The plan's top-ranked published actions with their reasons, and the insight beside them."
+        },
+    ),
+    ("get", "/recommendation-settings"): OperationDocumentation(
+        summary="Read how recommendations are ranked and explained",
+        description=(
+            "Returns the chosen ranker and insight provider/model with every "
+            "option and whether the server environment enables it (credentials "
+            "are never stored or returned). Administrators only (chart_admin)."
+        ),
+        success_responses={
+            "200": "The current ranker and insight settings, with which options this server can offer."
+        },
+    ),
+    ("put", "/recommendation-settings"): OperationDocumentation(
+        summary="Choose the ranker and the insight provider and model",
+        description=(
+            "Stores the installation's ranker and insight provider/model. "
+            "Refuses unknown options (RANKER_UNKNOWN, INSIGHT_PROVIDER_UNKNOWN), "
+            "options the environment does not enable (RANKER_NOT_CONFIGURED, "
+            "INSIGHT_PROVIDER_NOT_CONFIGURED) and a language model provider "
+            "without a model (INSIGHT_MODEL_REQUIRED). Administrators only; "
+            "every change records a recommendation_settings_changed audit event."
+        ),
+        success_responses={
+            "200": "The saved ranker and insight settings as they now apply, with the available options."
+        },
+    ),
+    ("get", "/recommendation-settings/providers/{provider}/models"): (
+        OperationDocumentation(
+            summary="List the models an insight provider offers",
+            description=(
+                "Fetches the model list from the provider's API when it offers "
+                "one (source provider), otherwise returns CHART_INSIGHT_MODELS "
+                "(source configured). Fails with INSIGHT_MODELS_UNAVAILABLE when "
+                "neither is available. Administrators only."
+            ),
+            success_responses={
+                "200": "The models the provider offers and whether the list came from the provider or configuration."
+            },
+        )
     ),
     ("get", "/risk/{geography_id}/monthly"): OperationDocumentation(
         summary="Read month-keyed ERA5 maximum temperature and attributable impacts",

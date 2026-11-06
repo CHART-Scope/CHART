@@ -2,15 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import type { RecommendedAction } from "@/lib/planningClient";
+import { type Action, HEAT_HAZARD } from "@/lib/actionsClient";
 
 import styles from "./explore.module.css";
 
-/** Hazards that make an action relevant to heat and health. */
-export const HEAT_HAZARDS = ["Extreme heat", "Increased temperature", "Heatwave"];
-
-export function isHeatAction(action: RecommendedAction): boolean {
-  return action.hazards.some((hazard) => HEAT_HAZARDS.includes(hazard));
+export function isHeatAction(action: Action): boolean {
+  return action.hazards.includes(HEAT_HAZARD);
 }
 
 /**
@@ -23,7 +20,7 @@ export function ActionsDrawer({
   planHref,
   onClose,
 }: {
-  actions: RecommendedAction[];
+  actions: Action[];
   placeName: string;
   planHref: string;
   onClose: () => void;
@@ -41,17 +38,23 @@ export function ActionsDrawer({
   }, [onClose]);
 
   const categories = useMemo(
-    () => [...new Set(actions.flatMap((action) => action.categories))].sort(),
+    () => [...new Set(actions.flatMap((action) => action.action_types))].sort(),
+    [actions],
+  );
+  const costs = useMemo(
+    () => [...new Set(actions.flatMap((a) => (a.cost_level ? [a.cost_level] : [])))],
     [actions],
   );
   const shown = actions.filter((action) => {
     const needle = text.trim().toLowerCase();
     return (
       (!heatOnly || isHeatAction(action)) &&
-      (!category || action.categories.includes(category)) &&
-      (!cost || action.cost === cost) &&
+      (!category || action.action_types.includes(category)) &&
+      (!cost || action.cost_level === cost) &&
       (!needle ||
-        `${action.title} ${action.description}`.toLowerCase().includes(needle))
+        `${action.title} ${action.summary} ${action.description}`
+          .toLowerCase()
+          .includes(needle))
     );
   });
 
@@ -106,14 +109,14 @@ export function ActionsDrawer({
           ))}
         </div>
         <div className={styles.chips} role="group" aria-label="Cost">
-          {(["low", "medium", "high"] as const).map((item) => (
+          {costs.map((item) => (
             <button
               key={item}
               type="button"
               aria-pressed={cost === item}
               onClick={() => setCost(cost === item ? null : item)}
             >
-              {item[0].toUpperCase() + item.slice(1)} cost
+              {item === "No additional cost" ? item : `${item} cost`}
             </button>
           ))}
         </div>
@@ -123,34 +126,39 @@ export function ActionsDrawer({
       </p>
       <ul className={styles.actionList}>
         {shown.map((action) => (
-          <li key={action.slug}>
+          <li key={action.id}>
             <button
               type="button"
               className={styles.actionTitle}
-              aria-expanded={open === action.slug}
-              onClick={() => setOpen(open === action.slug ? null : action.slug)}
+              aria-expanded={open === action.id}
+              onClick={() => setOpen(open === action.id ? null : action.id)}
             >
               <strong>{action.title}</strong>
               <span>
-                {[...action.categories, action.cost && `${action.cost} cost`]
+                {[
+                  ...action.action_types,
+                  action.cost_level && `Cost: ${action.cost_level}`,
+                ]
                   .filter(Boolean)
                   .join(" · ")}
               </span>
             </button>
-            {open === action.slug && (
+            {open === action.id && (
               <div className={styles.actionBody}>
-                <p>{action.description}</p>
-                {action.links.length > 0 && (
+                <p>{action.summary || action.description}</p>
+                {action.references.some((ref) => ref.url) && (
                   <p>
                     Sources:{" "}
-                    {action.links.map((link, index) => (
-                      <span key={link.url}>
-                        {index > 0 && ", "}
-                        <a href={link.url} target="_blank" rel="noreferrer">
-                          {link.label}
-                        </a>
-                      </span>
-                    ))}
+                    {action.references
+                      .filter((ref) => ref.url)
+                      .map((ref, index) => (
+                        <span key={ref.url}>
+                          {index > 0 && ", "}
+                          <a href={ref.url!} target="_blank" rel="noreferrer">
+                            {hostname(ref.url!)}
+                          </a>
+                        </span>
+                      ))}
                   </p>
                 )}
               </div>
@@ -163,4 +171,12 @@ export function ActionsDrawer({
       </a>
     </aside>
   );
+}
+
+function hostname(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
 }

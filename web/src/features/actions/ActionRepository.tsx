@@ -5,10 +5,11 @@ import { useMemo, useState } from "react";
 import { InlineSelect } from "@/components/InlineSelect";
 import { Tabs } from "@/components/Tabs";
 
-import { costLevels, seasons, type Action, type Season } from "./actionCatalog";
+import { seasons, type Action, type Season } from "./actionCatalog";
 import { ActionCard } from "./ActionCard";
 import { ActionPanel } from "./ActionPanel";
-import styles from "./ActionsLibrary.module.css";
+import styles from "./ActionRepository.module.css";
+import { timingSeason } from "./planLabels";
 import { actionStatuses, statusLabels, type ActionProgress } from "./useActionProgress";
 
 type Filters = { department: string; actionType: string; cost: string; status: string };
@@ -22,16 +23,14 @@ type Props = {
   selectedId: string | null;
   onSelect: (actionId: string | null) => void;
   contextLabel: string;
-  hazardLabel: string;
-  outcomeLabel: string;
 };
 
 /**
- * Every recommended action for the current place, split by season and
- * narrowed by department, type, cost and status. Opening one shows its
- * detail panel; the panel's arrows walk the list as it is currently filtered.
+ * The action repository for the current place: every published heat action,
+ * split by season and narrowed by department, type, cost and status. Opening
+ * one shows its detail panel; the panel's arrows walk the list as it is currently filtered.
  */
-export function ActionsLibrary({
+export function ActionRepository({
   actions,
   progress,
   season,
@@ -39,25 +38,27 @@ export function ActionsLibrary({
   selectedId,
   onSelect,
   contextLabel,
-  hazardLabel,
-  outcomeLabel,
 }: Props) {
   const [filters, setFilters] = useState<Filters>(noFilters);
 
   const matchesFilters = (action: Action) =>
-    (!filters.department || action.department === filters.department) &&
-    (!filters.actionType || action.actionType === filters.actionType) &&
-    (!filters.cost || action.cost === filters.cost) &&
+    (!filters.department || action.departments.includes(filters.department)) &&
+    (!filters.actionType || action.action_types.includes(filters.actionType)) &&
+    (!filters.cost || action.cost_level === filters.cost) &&
     (!filters.status || progress.statusOf(action.id) === filters.status);
   const filtered = actions.filter(matchesFilters);
   const visible = filtered.filter((action) => action.seasons.includes(season));
 
   const departments = useMemo(
-    () => distinct(actions.map((a) => a.department)),
+    () => distinct(actions.flatMap((a) => a.departments)),
     [actions],
   );
   const actionTypes = useMemo(
-    () => distinct(actions.map((a) => a.actionType)),
+    () => distinct(actions.flatMap((a) => a.action_types)),
+    [actions],
+  );
+  const costs = useMemo(
+    () => distinct(actions.flatMap((a) => (a.cost_level ? [a.cost_level] : []))),
     [actions],
   );
 
@@ -91,7 +92,7 @@ export function ActionsLibrary({
         onChange={onSeasonChange}
         items={seasons.map((value) => ({
           value,
-          label: `${value} (${filtered.filter((a) => a.seasons.includes(value)).length})`,
+          label: `${timingSeason[value]} (${filtered.filter((a) => a.seasons.includes(value)).length})`,
         }))}
       >
         <div className={styles.filters} role="group" aria-label="Filter actions">
@@ -108,7 +109,7 @@ export function ActionsLibrary({
             "All action types",
             asOptions(actionTypes),
           )}
-          {filterSelect("cost", "Cost level", "All cost levels", asOptions(costLevels))}
+          {filterSelect("cost", "Cost level", "All cost levels", asOptions(costs))}
           {filterSelect(
             "status",
             "Status",
@@ -127,15 +128,12 @@ export function ActionsLibrary({
         </div>
 
         {visible.length > 0 ? (
-          <ul className={styles.cards} aria-label={`${season} actions`}>
+          <ul className={styles.cards} aria-label={`${timingSeason[season]} actions`}>
             {visible.map((action) => (
               <li key={action.id}>
                 <ActionCard
                   action={action}
                   status={progress.statusOf(action.id)}
-                  assignedCount={
-                    progress.assignmentOf(action.id)?.districts.length ?? 0
-                  }
                   selected={action.id === selectedId}
                   onOpen={() => onSelect(action.id)}
                 />
@@ -145,8 +143,8 @@ export function ActionsLibrary({
         ) : (
           <p className={styles.empty} role="status">
             {active
-              ? `No ${season.toLowerCase()} actions match these filters.`
-              : `No actions are recommended ${season.toLowerCase().replace(" heat season", "")} the heat season yet.`}
+              ? `No ${timingSeason[season].toLowerCase()} actions match these filters.`
+              : `No actions are recommended ${season} the heat season yet.`}
           </p>
         )}
       </Tabs>
@@ -154,8 +152,6 @@ export function ActionsLibrary({
       <ActionPanel
         action={selected}
         contextLabel={contextLabel}
-        hazardLabel={hazardLabel}
-        outcomeLabel={outcomeLabel}
         progress={progress}
         onClose={() => onSelect(null)}
         onPrevious={canStep ? () => step(-1) : undefined}

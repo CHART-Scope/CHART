@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import { InlineSelect } from "@/components/InlineSelect";
-import { RISK_BANDS } from "@/features/dashboard/SpatialRiskMap";
 
-import { costLevels, districtFill, type Action } from "./actionCatalog";
-import { AssignDistrictsForm } from "./AssignDistrictsForm";
+import { costDots, type Action } from "./actionCatalog";
 import styles from "./ActionPanel.module.css";
+import { timingSeason } from "./planLabels";
+import { RichText } from "./RichText";
 import {
   actionStatuses,
   statusLabels,
@@ -17,7 +17,6 @@ import {
 
 const sections = [
   { id: "overview", label: "Overview" },
-  { id: "priority", label: "Priority districts" },
   { id: "steps", label: "Steps" },
   { id: "stakeholders", label: "Stakeholders" },
   { id: "evidence", label: "Evidence" },
@@ -28,8 +27,6 @@ type Props = {
   action: Action | null;
   /** e.g. "Extreme heat · Maternal and child health · Madhya Pradesh". */
   contextLabel: string;
-  hazardLabel: string;
-  outcomeLabel: string;
   progress: ActionProgress;
   onClose: () => void;
   onPrevious?: () => void;
@@ -38,13 +35,11 @@ type Props = {
 
 /**
  * Right-hand detail panel for one recommended action. One scrolling body with
- * five sections; the tabs jump to a section and follow the reader's scroll.
+ * four sections; the tabs jump to a section and follow the reader's scroll.
  */
 export function ActionPanel({
   action,
   contextLabel,
-  hazardLabel,
-  outcomeLabel,
   progress,
   onClose,
   onPrevious,
@@ -53,8 +48,6 @@ export function ActionPanel({
   const bodyRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const [activeSection, setActiveSection] = useState<SectionId>("overview");
-  const [openDistrict, setOpenDistrict] = useState<string | null>(null);
-  const [assigning, setAssigning] = useState(false);
   const open = action !== null;
 
   useEffect(() => {
@@ -72,12 +65,10 @@ export function ActionPanel({
     };
   }, [open, onClose]);
 
-  // A new action starts at its overview with nothing half-edited.
+  // A new action starts at its overview.
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: 0 });
     setActiveSection("overview");
-    setOpenDistrict(null);
-    setAssigning(false);
   }, [action?.id]);
 
   function jumpTo(id: SectionId) {
@@ -101,7 +92,6 @@ export function ActionPanel({
   }
 
   const status = action ? progress.statusOf(action.id) : "not-started";
-  const assignment = action ? progress.assignmentOf(action.id) : null;
 
   return (
     <div className={styles.root} data-open={open || undefined} aria-hidden={!open}>
@@ -186,179 +176,95 @@ export function ActionPanel({
               </nav>
             </header>
 
-            <div
-              ref={bodyRef}
-              className={styles.body}
-              onScroll={followScroll}
-              onClick={() => setOpenDistrict(null)}
-            >
+            <div ref={bodyRef} className={styles.body} onScroll={followScroll}>
               <section data-section="overview" aria-label="Overview">
+                {action.summary ? <p>{action.summary}</p> : null}
                 <dl className={styles.metaGrid}>
-                  <Meta label="Responsible department" values={[action.department]} />
-                  <Meta label="Climate hazard" values={[hazardLabel]} />
-                  <Meta label="Action type" values={[action.actionType]} />
-                  <Meta
-                    label="Application level"
-                    values={[action.applicationLevel.join(" · ")]}
-                  />
+                  <Meta label="Responsible department" values={action.departments} />
+                  <Meta label="Climate hazard" values={action.hazards} />
+                  <Meta label="Action type" values={action.action_types} />
+                  <Meta label="Level" values={action.levels} />
+                  <Meta label="Who it protects" values={action.target_populations} />
+                  <Meta label="Health outcomes" values={action.health_outcomes} />
                 </dl>
                 <h3 className={styles.label}>Implementation cost</h3>
                 <p className={styles.cost}>
-                  <strong>{action.cost}</strong>
-                  <span className={styles.costDots} aria-hidden>
-                    {costLevels.map((level, index) => (
-                      <span
-                        key={level}
-                        data-filled={
-                          index <= costLevels.indexOf(action.cost) || undefined
-                        }
-                      />
-                    ))}
-                  </span>
+                  <strong>{action.cost_level ?? "Not yet assessed"}</strong>
+                  {action.cost_level && costDots[action.cost_level] !== undefined ? (
+                    <span className={styles.costDots} aria-hidden>
+                      {[1, 2, 3].map((dot) => (
+                        <span
+                          key={dot}
+                          data-filled={
+                            dot <= (costDots[action.cost_level!] ?? 0) || undefined
+                          }
+                        />
+                      ))}
+                    </span>
+                  ) : null}
                 </p>
-                <p className={styles.supporting}>{action.costNotes}</p>
+                {action.cost_reasoning ? (
+                  <p className={styles.supporting}>{action.cost_reasoning}</p>
+                ) : null}
                 <h3 className={styles.label}>Implementation timeframe</h3>
                 <div className={styles.pillRow}>
                   {action.seasons.map((season) => (
                     <span key={season} className={styles.pill}>
-                      {season}
+                      {timingSeason[season]}
                     </span>
                   ))}
                 </div>
-                <p className={styles.supporting}>{action.timeframeNotes}</p>
-              </section>
-
-              <section
-                data-section="priority"
-                aria-label="Priority districts"
-                className={styles.priority}
-              >
-                <div className={styles.priorityHead}>
-                  <h3 className={styles.priorityTitle}>
-                    Priority districts for this action
-                  </h3>
-                  {!assigning ? (
-                    <button
-                      type="button"
-                      className={styles.link}
-                      onClick={() => setAssigning(true)}
-                    >
-                      {assignment ? "Edit assignment" : "Assign to districts →"}
-                    </button>
-                  ) : null}
-                </div>
-                <ul className={styles.chipRow}>
-                  {action.priorityDistricts.map((item) => (
-                    <li key={item.district} className={styles.chipItem}>
-                      <button
-                        type="button"
-                        className={styles.chip}
-                        aria-expanded={openDistrict === item.district}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setOpenDistrict((current) =>
-                            current === item.district ? null : item.district,
-                          );
-                        }}
-                      >
-                        <span
-                          className={styles.dot}
-                          style={{ background: districtFill(item.percent) }}
-                        />
-                        {item.district}
-                        {assignment?.districts.includes(item.district) ? (
-                          <span className={styles.assigned} aria-label="assigned">
-                            ✓
-                          </span>
-                        ) : null}
-                      </button>
-                      {openDistrict === item.district ? (
-                        <p className={styles.tooltip} role="status">
-                          <strong>{item.percent}%</strong> of {outcomeLabel} cases in{" "}
-                          {item.district} may be attributable to heat exposure at an
-                          average maximum temperature of {item.temperatureC}°C.
-                        </p>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-                <p className={styles.legend}>
-                  {RISK_BANDS.map((band) => (
-                    <span key={band.label}>
-                      <span className={styles.dot} style={{ background: band.fill }} />
-                      {band.label}
-                    </span>
-                  ))}
-                </p>
-                {assignment && !assigning ? (
-                  <p className={styles.assignSummary} role="status">
-                    Assigned to {assignment.districts.length}{" "}
-                    {assignment.districts.length === 1 ? "district" : "districts"} ·{" "}
-                    {assignment.assignee} · Due {formatDue(assignment.dueDate)}
-                  </p>
-                ) : null}
-                {assigning ? (
-                  <AssignDistrictsForm
-                    districts={action.priorityDistricts}
-                    initial={assignment}
-                    onCancel={() => setAssigning(false)}
-                    onSave={(next) => {
-                      progress.setAssignment(action.id, next);
-                      setAssigning(false);
-                    }}
-                  />
+                {action.decision_trigger ? (
+                  <>
+                    <h3 className={styles.label}>When to act</h3>
+                    <RichText
+                      text={action.decision_trigger}
+                      listClassName={styles.list}
+                    />
+                  </>
                 ) : null}
               </section>
 
               <section data-section="steps" aria-label="Steps">
                 <h3 className={styles.label}>Description &amp; key steps</h3>
-                {action.description.map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
-                ))}
-                {action.stepsHeading ? (
-                  <p className={styles.stepsHeading}>{action.stepsHeading}</p>
-                ) : null}
-                <ul className={styles.list}>
-                  {action.steps.map((step) => (
-                    <li key={step.text}>
-                      {step.lead ? <strong>{step.lead}</strong> : null}
-                      {step.lead ? ` — ${step.text}` : step.text}
-                    </li>
-                  ))}
-                </ul>
+                <RichText text={action.description} listClassName={styles.list} />
               </section>
 
               <section data-section="stakeholders" aria-label="Stakeholders">
                 <h3 className={styles.label}>Responsible stakeholders</h3>
                 <ul className={styles.list}>
                   {action.stakeholders.map((person) => (
-                    <li key={person.role}>
-                      {person.role}
-                      {person.example ? (
-                        <span className={styles.example}>{person.example}</span>
-                      ) : null}
-                    </li>
+                    <li key={person}>{person}</li>
                   ))}
                 </ul>
-                <h3 className={styles.label}>Rationale</h3>
-                {action.rationale.map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
-                ))}
-                <h3 className={styles.label}>Expected outcomes</h3>
-                <ul className={styles.list}>
-                  {action.outcomes.map((outcome) => (
-                    <li key={outcome}>{outcome}</li>
-                  ))}
-                </ul>
+                {action.rationale ? (
+                  <>
+                    <h3 className={styles.label}>Rationale</h3>
+                    <RichText text={action.rationale} listClassName={styles.list} />
+                  </>
+                ) : null}
+                {action.expected_outcomes ? (
+                  <>
+                    <h3 className={styles.label}>Expected outcomes</h3>
+                    <ul className={styles.list}>
+                      {action.expected_outcomes
+                        .split("\n")
+                        .filter((line) => line.trim())
+                        .map((line) => (
+                          <li key={line}>{line.trim()}</li>
+                        ))}
+                    </ul>
+                  </>
+                ) : null}
               </section>
 
               <section data-section="evidence" aria-label="Evidence">
                 <h3 className={styles.label}>Source references</h3>
-                <References items={action.sources} />
-                {action.caseStudies.length > 0 ? (
+                <References items={action.references} />
+                {action.case_studies.length > 0 ? (
                   <>
                     <h3 className={styles.label}>Case studies</h3>
-                    <References items={action.caseStudies} />
+                    <References items={action.case_studies} />
                   </>
                 ) : null}
               </section>
@@ -371,6 +277,7 @@ export function ActionPanel({
 }
 
 function Meta({ label, values }: { label: string; values: string[] }) {
+  if (values.length === 0) return null;
   return (
     <div>
       <dt className={styles.label}>{label}</dt>
@@ -385,26 +292,21 @@ function Meta({ label, values }: { label: string; values: string[] }) {
   );
 }
 
-function References({ items }: { items: Action["sources"] }) {
+function References({ items }: { items: Action["references"] }) {
   return (
     <ul className={styles.references}>
-      {items.map((item) => (
-        <li key={item.citation}>
-          <a href={item.url} target="_blank" rel="noopener noreferrer">
-            <span>{item.citation}</span>
-            <span aria-hidden>↗</span>
-          </a>
-        </li>
-      ))}
+      {items.map((item) =>
+        item.url ? (
+          <li key={item.citation}>
+            <a href={item.url} target="_blank" rel="noopener noreferrer">
+              <span>{item.citation}</span>
+              <span aria-hidden>↗</span>
+            </a>
+          </li>
+        ) : (
+          <li key={item.citation}>{item.citation}</li>
+        ),
+      )}
     </ul>
   );
-}
-
-function formatDue(date: string) {
-  if (!date) return "no due date set";
-  return new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 }

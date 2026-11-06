@@ -45,7 +45,7 @@ COPY orchestration/src orchestration/src
 COPY orchestration/dagster.production.yaml /opt/dagster/dagster_home/dagster.yaml
 
 RUN python -m pip install --upgrade pip \
-  && python -m pip install ./core ./pipelines/era5_heat ./pipelines/seasonal_c3s ./pipelines/isimip_projection ./pipelines/boundaries ./orchestration \
+  && python -m pip install './core[bedrock]' ./pipelines/era5_heat ./pipelines/seasonal_c3s ./pipelines/isimip_projection ./pipelines/boundaries ./orchestration \
   && mkdir -p /opt/dagster/storage
 
 WORKDIR /app/core

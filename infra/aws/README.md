@@ -40,7 +40,10 @@ user's home directory.
 
 Set `MODEL_BUCKET_PUBLIC=0` and grant the EC2 instance role read access when the
 model S3 bucket is private. The default `MODEL_BUCKET_PUBLIC=1` uses anonymous
-read access. Ports 80 and 443 must be open, and the public domain must point to
+read access. Recommended actions are read from the public action feed in the
+`chart-actions-repository` bucket (see [docs/actions.md](../../docs/actions.md));
+set `CHART_ACTIONS_URL` in `.env.prod` only to use another feed, or empty to
+use the copy bundled with the image. Ports 80 and 443 must be open, and the public domain must point to
 the instance. Caddy uses port 80 for certificate issuance and HTTP-to-HTTPS
 redirects.
 

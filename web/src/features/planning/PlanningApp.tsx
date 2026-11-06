@@ -10,6 +10,11 @@ import {
   type ModelCatalogEntry,
 } from "@/lib/planningClient";
 import { rememberActiveGeography } from "@/lib/authClient";
+import {
+  deleteSavedPlan,
+  listSavedPlans,
+  type SavedPlan,
+} from "@/lib/savedPlansClient";
 import { isInScope } from "@/lib/geographyScope";
 import {
   computeFamilies,
@@ -18,6 +23,7 @@ import {
 } from "./contextFamilies";
 import { InlineContextSwitcher } from "./InlineContextSwitcher";
 import { PlanningSetup } from "./PlanningSetup";
+import { SavedPlansList } from "./SavedPlansList";
 import { defaultPlanningSelection, type PlanningSelection } from "./planningWireframe";
 
 type Props = {
@@ -35,6 +41,25 @@ export function PlanningApp({ geographyScopes, activeGeographyId }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [plans, setPlans] = useState<SavedPlan[] | null>(null);
+  const [plansError, setPlansError] = useState<string | null>(null);
+  const [plansLoad, setPlansLoad] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setPlansError(null);
+    listSavedPlans(controller.signal)
+      .then(setPlans)
+      .catch((failure: Error) => {
+        if (!controller.signal.aborted) setPlansError(failure.message);
+      });
+    return () => controller.abort();
+  }, [plansLoad]);
+
+  const removePlan = useCallback(async (planId: string) => {
+    await deleteSavedPlan(planId);
+    setPlans((current) => current?.filter((plan) => plan.id !== planId) ?? null);
+  }, []);
   // A stable key rather than the array: a parent re-render (a token refresh
   // used to cause one) hands over an equal but new array, and depending on
   // its identity reloaded the areas and reset the user's selection.
@@ -124,6 +149,14 @@ export function PlanningApp({ geographyScopes, activeGeographyId }: Props) {
       error={error}
       onChange={changeSelection}
       onStart={openDashboard}
+      savedPlans={
+        <SavedPlansList
+          plans={plans}
+          error={plansError}
+          onRetry={() => setPlansLoad((value) => value + 1)}
+          onRemove={removePlan}
+        />
+      }
       contextSwitcher={
         <InlineContextSwitcher
           geographyScopes={geographyScopes}

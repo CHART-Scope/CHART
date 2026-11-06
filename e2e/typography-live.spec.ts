@@ -371,11 +371,7 @@ for (const [name, width, height] of [
       "Fira",
       20,
     );
-    await typography(
-      page.getByRole("heading", { name: "Saved scenarios" }),
-      "Fira",
-      11,
-    );
+    await typography(page.getByRole("heading", { name: "Saved plans" }), "Fira", 11);
     const hazard = page.getByRole("combobox", { name: "Choose the climate hazard" });
     await expect(hazard).toBeEnabled();
     await typography(hazard, "Noto", 14);

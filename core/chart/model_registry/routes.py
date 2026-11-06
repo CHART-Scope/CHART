@@ -44,6 +44,13 @@ _DOMAIN_LABELS: dict[str, str] = {
     "maternal_newborn_child_health": "Maternal, newborn and child health",
     "child_health": "Child health",
 }
+# Published hand-over outcomes carry no manifest, so their domain is recorded
+# here; the values match the outcomes' model-release manifests in
+# pipelines/models/*/model-release.*.json.
+_PUBLISHED_DOMAINS: dict[str, str] = {
+    "lbw": "maternal_newborn_child_health",
+    "under_5_mortality": "child_health",
+}
 # Fallbacks only. A release's presentation block is the source of truth for
 # how its outcome is named, and _release_label prefers it; these are used when
 # a manifest ships no presentation. Codes here must correspond to a real
@@ -185,14 +192,25 @@ def list_catalog(
         for outcome in published.get(geo, {}).get("outcomes", [])
     }
     for outcome in sorted(outcomes):
+        replaced = next((item for item in items if item.outcome == outcome), None)
         items = [item for item in items if item.outcome != outcome]
-        domain = _domain_from_outcome(outcome)
+        # A live release's manifest names the domain; keep it. Otherwise use
+        # the published outcome's known domain instead of "unspecified".
+        domain = (
+            replaced.health_domain
+            if replaced and replaced.health_domain != "unspecified"
+            else _PUBLISHED_DOMAINS.get(outcome) or _domain_from_outcome(outcome)
+        )
         items.append(
             CatalogEntry(
                 climate_hazard="extreme_heat",
                 climate_hazard_label="Extreme heat",
                 health_domain=domain,
-                health_domain_label=_DOMAIN_LABELS.get(domain, domain),
+                health_domain_label=(
+                    replaced.health_domain_label
+                    if replaced and replaced.health_domain == domain
+                    else _label(domain, _DOMAIN_LABELS)
+                ),
                 outcome=outcome,
                 outcome_label=_OUTCOME_LABELS.get(outcome, outcome),
                 visualization_type="odds_ratio_icon_array",
@@ -208,6 +226,12 @@ def list_catalog(
             )
         )
     return CatalogResponse(items=items)
+
+
+def outcome_label(code: str) -> str:
+    """Display name of an outcome code when no release presentation is at hand."""
+
+    return _label(code, _OUTCOME_LABELS)
 
 
 def _label(code: str, overrides: dict[str, str]) -> str:
