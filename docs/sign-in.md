@@ -110,11 +110,32 @@ goes to the signed-in Keycloak administrator's email address, so give that
 account an address first. Then sign in to CHART with a real account and check
 the code arrives within a minute and is not in spam.
 
+## Inviting people
+
+An administrator invites people in **Settings → Users**: full name, email
+address, role and planning area (a country or its first level, such as a
+state or county; an area covers everything inside it).
+
+1. CHART creates the account, with no password (`POST /users`).
+2. Keycloak emails **You are invited to CHART** through the email settings
+   above. The link works for 7 days.
+3. The link opens **Accept your CHART invitation**; accepting confirms the
+   address and offers **Sign in to CHART**.
+4. They sign in with their email address and a code, and land on their
+   area's dashboard.
+
+If the email could not be sent, the account still exists and Settings says
+so. **Send invitation again** beside a person emails a fresh link
+(`POST /users/{id}/invitation`). An address that already has an account is
+refused. The emails use CHART's layout and wording: the `chart` email theme
+in `infra/keycloak/themes/chart/email/`.
+
 ## Administrators
 
-- Adding a person (`POST /users`) creates their Keycloak account with a role
-  and planning area and no password; they sign in with their email address.
 - Disabling a person (`POST /users/{id}/disable`) stops their codes.
+- The Keycloak administration console (`/identity/admin`) is for operators,
+  not everyday work. Its sign-in also uses CHART's look; the user is `admin`
+  and the password is `KEYCLOAK_ADMIN_PASSWORD` from `.env.prod`.
 - If the only administrator is locked out, re-enable them from an operator
   shell; they then sign in with a code as usual:
 

@@ -4,6 +4,7 @@ import {
   enterCode,
   inboxCount,
   inboxOf,
+  newestEmail,
   requestSignInCode,
   signInWithEmailCode,
 } from "./emailCode";
@@ -129,4 +130,77 @@ test("on a phone the sign-in screens fit, say where the code went and let you st
   );
   expect(code).toMatch(/^[A-Z0-9]{6}$/);
   await page.close();
+});
+
+test("an administrator invites someone, who accepts from the email and lands on their dashboard", async ({
+  browser,
+  request,
+}) => {
+  test.setTimeout(150_000);
+  const email = `invited-${Date.now()}@example.invalid`;
+  const admin = await browser.newPage();
+  await signInWithEmailCode(admin, "typography-admin");
+  await admin.goto("/settings?tab=users");
+  const form = admin.getByRole("form", { name: "Invite a person" });
+  await form.getByLabel("Full name").fill("Invited Planner");
+  await form.getByLabel("Email address").fill(email);
+  await form.getByRole("combobox", { name: "Planning area" }).click();
+  await admin.getByRole("option", { name: /^Kajiado · / }).click();
+  await form.getByRole("button", { name: "Send invitation" }).click();
+  await expect(admin.getByRole("status")).toHaveText(`Invitation sent to ${email}.`);
+  await admin.screenshot({ path: `${evidence}/people-invited.png`, fullPage: true });
+
+  // Persisted: the account exists, active, with the chosen role and area.
+  const people = await request.get(`${api}/users`, {
+    headers: await adminHeaders(request),
+  });
+  const person = (await people.json()).find(
+    (item: { email?: string }) => item.email === email,
+  );
+  expect(person).toMatchObject({ status: "active", roles: ["health_planning_lead"] });
+  expect(person.geographyScopes.map((scope: { name: string }) => scope.name)).toEqual([
+    "Kajiado",
+  ]);
+
+  const invitation = await newestEmail(admin, email);
+  expect(invitation.Subject).toBe("You are invited to CHART");
+  const link = invitation.Text.match(/https?:\/\/\S+/)![0];
+
+  // "Send invitation again" emails a second, working invitation.
+  await admin
+    .getByRole("button", { name: `Send invitation again to ${email}` })
+    .click();
+  await expect(admin.getByRole("status")).toHaveText(
+    `Invitation sent again to ${email}.`,
+  );
+  await newestEmail(admin, email, 1);
+  await admin.close();
+
+  const invitee = await browser.newPage();
+  await invitee.goto(link);
+  await expect(
+    invitee.getByRole("heading", { name: "Accept your CHART invitation" }),
+  ).toBeVisible();
+  await invitee.getByRole("link", { name: "Accept invitation" }).click();
+  await expect(
+    invitee.getByRole("heading", { name: "Invitation accepted" }),
+  ).toBeVisible();
+  await invitee.getByRole("link", { name: "Sign in to CHART" }).click();
+  await expect(
+    invitee.getByRole("heading", { name: "Sign in to CHART" }),
+  ).toBeVisible();
+  await signInWithEmailCode(invitee, email);
+  await invitee.waitForURL(/\/dashboard\/geo-ke/);
+  await invitee.close();
+});
+
+test("the Keycloak administration sign-in carries CHART's look", async ({ page }) => {
+  await page.goto(`${process.env.CHART_E2E_IDENTITY}/admin/master/console/`);
+  await expect(page.getByRole("heading", { name: "Sign in to CHART" })).toBeVisible();
+  await expect(page.locator("#kc-header-wrapper")).toHaveText("CHART");
+  await expect(page.locator("#kc-header")).toHaveCSS(
+    "background-color",
+    "rgb(43, 45, 49)",
+  );
+  await page.screenshot({ path: `${evidence}/keycloak-admin-sign-in.png` });
 });

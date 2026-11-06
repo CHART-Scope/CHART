@@ -101,8 +101,11 @@ test("web client settings use exact callback origins", () => {
   assert.deepEqual(buildWebClientSettings("https://chart.scopeimpact.fi"), {
     redirectUris: [
       "https://chart.scopeimpact.fi/auth/callback",
+      "https://chart.scopeimpact.fi/auth/signin",
       "http://localhost:3100/auth/callback",
+      "http://localhost:3100/auth/signin",
       "http://127.0.0.1:3100/auth/callback",
+      "http://127.0.0.1:3100/auth/signin",
     ],
     webOrigins: [
       "https://chart.scopeimpact.fi",
