@@ -505,7 +505,7 @@ climate-verify:
 
 # Maintainers only: share retained ERA5 grids so other installs skip the queue.
 climate-mirror-publish:
-	aws s3 sync $${ERA5_CACHE_DIR:-$(ERA5_DIR)/.cache} s3://chart-predictive-models/era5-cache/ --exclude "*.partial" --exclude ".*" --region eu-west-2
+	aws s3 sync $${ERA5_CACHE_DIR:-$(ERA5_DIR)/.cache} s3://chart-predictive-models/era5-cache/ --exclude "*.partial" --exclude ".*" --region eu-north-1
 
 climate-migrate: climate-install postgres-wait
 	PYTHON_BIN="$(VENV_PYTHON)" DATABASE_URL="$(CHART_DATABASE_URL)" \

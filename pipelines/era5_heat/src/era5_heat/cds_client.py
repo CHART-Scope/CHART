@@ -179,8 +179,10 @@ def _covering_cache(
 #: A public copy of retained acquisitions, laid out like the cache directory
 #: (``<key>.nc`` beside ``<key>.json``). An identical request is read from it
 #: instead of waiting in the Copernicus queue. ``ERA5_MIRROR_URL=`` disables it.
+#: The bucket is in eu-north-1: another region's endpoint answers 301 with no
+#: redirect to follow, so every lookup would miss.
 DEFAULT_MIRROR_URL = (
-    "https://chart-predictive-models.s3.eu-west-2.amazonaws.com/era5-cache"
+    "https://chart-predictive-models.s3.eu-north-1.amazonaws.com/era5-cache"
 )
 
 

@@ -157,7 +157,7 @@ make climate-mirror-publish ERA5_CACHE_DIR=<copy of /opt/chart/data/climate/era5
 ```
 
 The downloader reads `ERA5_MIRROR_URL` (default
-`https://chart-predictive-models.s3.eu-west-2.amazonaws.com/era5-cache`) before
+`https://chart-predictive-models.s3.eu-north-1.amazonaws.com/era5-cache`) before
 Copernicus. Mirrored files keep their cache keys and request sidecars, so
 provenance is unchanged. ERA5 is Copernicus data under the Copernicus licence,
 which permits redistribution with attribution.

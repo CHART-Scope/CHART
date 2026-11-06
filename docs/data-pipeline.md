@@ -95,7 +95,7 @@ validated windows; `python -m chart.climate.history score --country IN
 
 Before asking Copernicus, the downloader looks in the local cache and then in
 the public mirror `ERA5_MIRROR_URL` (default
-`https://chart-predictive-models.s3.eu-west-2.amazonaws.com/era5-cache`; set it
+`https://chart-predictive-models.s3.eu-north-1.amazonaws.com/era5-cache`; set it
 empty to disable). Mirrored files keep their cache keys and request sidecars,
 so provenance is unchanged. The server's model sync skips that prefix.
 
