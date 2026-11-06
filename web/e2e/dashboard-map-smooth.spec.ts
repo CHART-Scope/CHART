@@ -66,3 +66,33 @@ test("opening a place not loaded yet keeps the last map, never a blank", async (
   await expect(page.locator("svg path[data-interactive]").first()).toBeVisible();
   await expect(page.getByLabel("Loading the risk map")).toHaveCount(0);
 });
+
+test("a click never empties the risk card while the next place loads", async ({
+  page,
+}) => {
+  await openState(page);
+  await expect(page.getByText(/What share of/).first()).toBeVisible();
+  // Hold Gwalior's capabilities (which views it publishes) until checked.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(
+    "**/api/chart/heat-outlook/geo-in-mp-gwalior/capabilities**",
+    async (route) => {
+      await held;
+      await route.fallback();
+    },
+  );
+
+  await page
+    .getByRole("button", { name: /^Gwalior/ })
+    .first()
+    .click();
+  await page.waitForURL(/\/dashboard\/geo-in-mp-gwalior/);
+  // The card keeps its question and map instead of an empty placeholder.
+  await expect(page.getByTestId("dashboard-panel-placeholder")).toHaveCount(0);
+  await expect(page.getByText(/What share of/).first()).toBeVisible();
+  await expect(page.locator("svg path[data-interactive]").first()).toBeVisible();
+
+  release();
+  await expect(page.getByText(/What share of/).first()).toBeVisible();
+});

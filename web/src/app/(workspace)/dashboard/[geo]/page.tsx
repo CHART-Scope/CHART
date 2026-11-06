@@ -26,12 +26,28 @@ import {
   type DashboardSearch,
 } from "@/features/dashboard/dashboardNavigation";
 
+import { onAuthSessionCleared } from "@/lib/authClient";
 import {
   fetchOutlookCapabilities,
   type OutlookCapabilities,
 } from "@/lib/heatOutlookClient";
 
 import styles from "./page.module.css";
+
+// Which views each place and outcome publishes, kept for the session: a click
+// on the dashboard re-renders the page (a new place remounts it), and waiting
+// for these again blanked the whole risk card on every click. The last
+// answer stands in while the next place's arrives, so the card stays drawn.
+const capabilityCache = new Map<string, OutlookCapabilities>();
+let lastCapabilities: {
+  key: string;
+  data?: OutlookCapabilities;
+  error?: boolean;
+} | null = null;
+onAuthSessionCleared(() => {
+  capabilityCache.clear();
+  lastCapabilities = null;
+});
 
 type PageProps = {
   params: Promise<{ geo: string }>;
@@ -246,13 +262,21 @@ function Dashboard({
       }),
     );
   };
+  const capabilityKey = `${selectedGeographyId}:${outcome}`;
   const [capabilities, setCapabilities] = useState<{
     key: string;
     data?: OutlookCapabilities;
     error?: boolean;
-  } | null>(null);
-  const capabilityKey = `${selectedGeographyId}:${outcome}`;
+  } | null>(() => {
+    const cached = capabilityCache.get(capabilityKey);
+    return cached ? { key: capabilityKey, data: cached } : null;
+  });
   useEffect(() => {
+    const cached = capabilityCache.get(capabilityKey);
+    if (cached) {
+      setCapabilities({ key: capabilityKey, data: cached });
+      return;
+    }
     const controller = new AbortController();
     fetchOutlookCapabilities(
       selectedGeographyId,
@@ -260,15 +284,21 @@ function Dashboard({
       outcome,
       controller.signal,
     )
-      .then((data) => setCapabilities({ key: capabilityKey, data }))
+      .then((data) => {
+        capabilityCache.set(capabilityKey, data);
+        setCapabilities({ key: capabilityKey, data });
+      })
       .catch(() => {
         if (!controller.signal.aborted)
           setCapabilities({ key: capabilityKey, error: true });
       });
     return () => controller.abort();
   }, [selectedGeographyId, session.accessToken, outcome, capabilityKey]);
-  const resolvedCapabilities =
-    capabilities?.key === capabilityKey ? capabilities : null;
+  const current = capabilities?.key === capabilityKey ? capabilities : null;
+  if (current?.data) lastCapabilities = { key: capabilityKey, data: current.data };
+  // Until this place's answer arrives, the last one keeps the card drawn;
+  // only the very first load shows the placeholder.
+  const resolvedCapabilities = current ?? lastCapabilities;
   const publishedOutlook = resolvedCapabilities?.data?.published ?? false;
   const useOutlookPanel =
     publishedOutlook || Boolean(resolvedCapabilities?.data?.observed?.source);
@@ -478,7 +508,11 @@ function Dashboard({
           {cachedGeographies === null || resolvedCapabilities === null ? (
             // Wait for the geography and its published capabilities;
             // mounting now would load Kenya as a whole first, then the county.
-            <section className={styles.panelPlaceholder} aria-busy="true" />
+            <section
+              className={styles.panelPlaceholder}
+              aria-busy="true"
+              data-testid="dashboard-panel-placeholder"
+            />
           ) : resolvedCapabilities.error ? (
             <section role="alert">
               Available outlook views could not load. Reload to try again.
