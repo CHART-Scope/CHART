@@ -483,6 +483,8 @@ async function ensureWebClientSettings(token, clients, configuredOrigin) {
     body: JSON.stringify({
       ...existing,
       ...settings,
+      // The sign-in page's "Back to CHART" link.
+      baseUrl: publicOrigin,
       attributes: {
         ...(existing.attributes ?? {}),
         ...(settings.attributes ?? {}),

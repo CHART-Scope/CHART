@@ -32,6 +32,10 @@ upgrades.
 
 Local codes land in Mailpit at `http://127.0.0.1:8025`.
 
+The `chart` login theme (`themes/chart/login/`) styles both screens and
+overrides two templates: `login-username.ftl` (the email step) and
+`login-email-otp.ftl` (the provider's code step).
+
 ## Upstream SSO
 
 Keycloak is CHART's identity broker and token issuer. Configure Google Workspace or

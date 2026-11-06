@@ -140,7 +140,7 @@ test("two tabs signing in at once each finish with their own PKCE verifier", asy
     const api = await installFakeApi(tab);
     api.on(/^\/api\/auth\/keycloak-exchange$/, (route) => route.continue());
     await tab.goto(`/auth/callback?code=${code}&state=${attempts[index].state}`);
-    await tab.waitForURL("**/plan**");
+    await tab.waitForURL("**/dashboard/geo-in-mp");
   }
 
   const exchanges = upstream.requests.filter((request) =>

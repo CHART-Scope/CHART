@@ -270,7 +270,9 @@ async function signIn(page: Page, username = "india-planner") {
     "Fira",
     11,
   );
-  await typography(page.getByLabel("Email address"), "Noto", 13);
+  // Phones get 16px so iOS does not zoom into the field.
+  const phone = page.viewportSize()!.width <= 480;
+  await typography(page.getByLabel("Email address"), "Noto", phone ? 16 : 13);
   await capture(page, `signin-${username}-${page.viewportSize()!.width}`);
   await signInWithEmailCode(page, username);
 }
@@ -279,9 +281,15 @@ test("sign-in failure keeps the themed form readable and retryable", async ({
   page,
 }) => {
   await page.goto("/auth/signin");
-  await page.getByLabel("Email address").fill("missing-typography-account");
+  await page
+    .getByLabel("Email address")
+    .fill("missing-typography-account@example.invalid");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByText("Invalid username or email.")).toBeVisible();
+  await expect(
+    page.getByText(
+      "No CHART account uses that email address. Ask your CHART administrator to add you.",
+    ),
+  ).toBeVisible();
   await page.getByLabel("Email address").fill("");
   await typography(page.locator("#kc-page-title"), "Fira", 20);
   await capture(page, "signin-error");
