@@ -13,6 +13,9 @@ so it never starts on `admin`.
 
 ## First run
 
+Until setup is done, CHART's front page says this too, so whoever deployed it
+needs no server access to get in.
+
 1. Open CHART and choose **Set up CHART** (or **Sign in**).
 2. On **CHART login**, enter `admin` in the email field. The next page,
    **CHART admin**, asks for the first password; this account uses a password,

@@ -98,6 +98,20 @@ export function Login({
               {signedOutNotice}
             </p>
           ) : null}
+          {needsSetup ? (
+            // A new installation: whoever deployed it signs in first.
+            <p
+              className={styles.signedOutNotice}
+              role="note"
+              aria-label="First sign-in"
+            >
+              <strong>New installation.</strong> Choose <strong>Set up CHART</strong>{" "}
+              and sign in as <code>admin</code> with the first password from the
+              deployment settings (<code>CHART_ADMIN_INITIAL_PASSWORD</code>, or{" "}
+              <code>admin</code> if it was not set). You will then choose your own
+              password, set CHART up and invite everyone else.
+            </p>
+          ) : null}
           <section className={styles.hero} aria-labelledby="chart-landing-title">
             <div className={styles.heroInner}>
               <p className={styles.eyebrow}>Open source · Climate × health</p>
