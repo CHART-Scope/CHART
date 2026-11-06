@@ -94,12 +94,21 @@ export type MapScale = {
 const mapCache = new Map<string, MapResponse>();
 const mapFrameCache = new Map<string, MapResponse>();
 const mapRequests = new Map<string, Promise<MapResponse>>();
-const MAX_CACHED_MAPS = 12;
+// The last map shown for each measure: a drill to a place not loaded yet
+// keeps it on screen, dimmed, instead of blanking to the skeleton.
+const lastPainted = new Map<string, MapResponse>();
+// Enough for a country's places at a few months and outcomes; each entry is
+// one frame's simplified shapes.
+const MAX_CACHED_MAPS = 60;
+// How long a pointer rests on an area before its own map is fetched, so the
+// click that opens it finds it ready.
+const PREFETCH_DELAY_MS = 150;
 
 onAuthSessionCleared(() => {
   mapCache.clear();
   mapFrameCache.clear();
   mapRequests.clear();
+  lastPainted.clear();
 });
 
 function rememberMap(key: string, frameKey: string, data: MapResponse) {
@@ -179,6 +188,7 @@ export function SpatialRiskMap({
   // flashing its skeleton. A genuinely different country has no frame entry
   // and still gets the honest first-load placeholder.
   const frameKey = `${userKey}:${geographyId}:${scale.id}:${source?.cacheScope ?? "monthly"}`;
+  const paintKey = `${userKey}:${scale.id}:${source?.cacheScope ?? "monthly"}`;
   const [result, setResult] = useState<{
     key: string;
     data: MapResponse;
@@ -187,7 +197,7 @@ export function SpatialRiskMap({
     if (exact) return { key: requestKey, data: exact };
     // The frame seed is another month's or outcome's values, so it keeps a
     // key that never matches and renders as updating until the fetch lands.
-    const frame = mapFrameCache.get(frameKey);
+    const frame = mapFrameCache.get(frameKey) ?? lastPainted.get(paintKey);
     return frame ? { key: "", data: frame } : null;
   });
   // Keep the previous frame painted while a different geography arrives.
@@ -235,6 +245,7 @@ export function SpatialRiskMap({
       source,
     )
       .then((response) => {
+        lastPainted.set(paintKey, response);
         if (!cancelled) setResult({ key: requestKey, data: response });
       })
       .catch((cause: unknown) => {
@@ -254,9 +265,40 @@ export function SpatialRiskMap({
     refreshKey,
     requestKey,
     frameKey,
+    paintKey,
     dataRefreshKey,
     source,
   ]);
+
+  // Resting on an area fetches the map it opens, as Explore does, so the
+  // click finds it ready. Only the dashboard's own monthly maps: a custom
+  // source loads one fixed frame and cannot fetch another place's.
+  const prefetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prefetch = useCallback(
+    (areaId: string | null | undefined) => {
+      if (prefetchTimer.current) clearTimeout(prefetchTimer.current);
+      const token = tokenRef.current;
+      if (!areaId || !token || source || areaId === geographyId) return;
+      prefetchTimer.current = setTimeout(() => {
+        void loadMap(
+          `${userKey}:${areaId}:${outcome}:${month}`,
+          `${userKey}:${areaId}:${scale.id}:monthly`,
+          areaId,
+          token,
+          month,
+          outcome,
+          false,
+        ).catch(() => undefined);
+      }, PREFETCH_DELAY_MS);
+    },
+    [geographyId, month, outcome, scale.id, source, userKey],
+  );
+  useEffect(
+    () => () => {
+      if (prefetchTimer.current) clearTimeout(prefetchTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!data?.areas.some((area) => area.missing_reason === "running")) return;
@@ -523,8 +565,15 @@ export function SpatialRiskMap({
                         y: event.clientY - (box?.top ?? 0),
                       });
                     }}
-                    onMouseLeave={() => setHovered(null)}
-                    onFocus={() => setHovered({ area: shape.area, x: 0, y: 0 })}
+                    onMouseEnter={() => prefetch(shape.area.geography_id)}
+                    onMouseLeave={() => {
+                      setHovered(null);
+                      prefetch(null);
+                    }}
+                    onFocus={() => {
+                      setHovered({ area: shape.area, x: 0, y: 0 });
+                      prefetch(shape.area.geography_id);
+                    }}
                     onBlur={() => setHovered(null)}
                     tabIndex={onSelect && shape.area.geography_id ? 0 : undefined}
                     onClick={() => {
