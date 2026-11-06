@@ -33,8 +33,11 @@ The code step is the
 (Unlicense), committed as
 `infra/keycloak/providers/email-otp-authenticator-v1.8.1-kc-26.6.4.jar`
 (SHA-256 `8013758fe4f24dfb561d57f83c0853387fb18c9b35925c77fb60ccd9af7cedea`).
-It is built for Keycloak 26.6.4; when Keycloak is upgraded, replace the jar
-with the release built for the new version.
+`infra/keycloak/Dockerfile` builds it, the theme and the realm seed into the
+`chart-keycloak` image that deployments run (pre-built, so Keycloak starts in
+seconds), and the sync script into `chart-keycloak-config`. To upgrade
+Keycloak, change `KEYCLOAK_VERSION` there and replace the jar with the
+release built for that version.
 
 ## Email settings
 
