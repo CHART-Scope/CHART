@@ -16,13 +16,7 @@ export type ExplorePlace = {
 };
 
 export type ExploreLayer =
-  | "observed"
-  | "forecast"
-  | "projection"
-  | "tmax"
-  | "heat_days"
-  | "population"
-  | "vulnerability";
+  "observed" | "forecast" | "projection" | "tmax" | "heat_days" | "population";
 
 export const POPULATION_MEASURES = [
   { code: "total", label: "Everyone" },
@@ -76,7 +70,7 @@ export type Band = { upper: number; label: string; color: string };
  * Projected shares in Madhya Pradesh run 25-34% across its divisions; the
  * dashboard's top class (">15%") painted the whole state one colour.
  */
-export const SHARE_BANDS: Band[] = [
+const SHARE_BANDS: Band[] = [
   { upper: 5, label: "0–5%", color: "#fbecd6" },
   { upper: 10, label: "5–10%", color: "#f6cf95" },
   { upper: 15, label: "10–15%", color: "#f0a65e" },
@@ -87,20 +81,8 @@ export const SHARE_BANDS: Band[] = [
   { upper: Number.POSITIVE_INFINITY, label: ">35%", color: "#45101a" },
 ];
 
-/**
- * VRA index (0–1), read from ``value_percent`` = index × 100. Shown as index
- * ranges: the assessment's own risk classes are relative and live on the
- * Vulnerability page.
- */
-export const VULNERABILITY_BANDS: Band[] = [
-  { upper: 25, label: "0–0.25", color: "#dfe8f3" },
-  { upper: 50, label: "0.25–0.5", color: "#9db8db" },
-  { upper: 75, label: "0.5–0.75", color: "#4f78b4" },
-  { upper: Number.POSITIVE_INFINITY, label: "0.75–1", color: "#1f3c73" },
-];
-
 /** Monthly mean of daily maximum temperature, °C. */
-export const TEMPERATURE_BANDS: Band[] = [
+const TEMPERATURE_BANDS: Band[] = [
   { upper: 24, label: "<24°", color: "#2c7bb6" },
   { upper: 27, label: "24–27°", color: "#abd9e9" },
   { upper: 30, label: "27–30°", color: "#ffffbf" },
@@ -111,7 +93,7 @@ export const TEMPERATURE_BANDS: Band[] = [
 ];
 
 /** Heatwave days in the month, at the country's official threshold. */
-export const HEAT_DAY_BANDS: Band[] = [
+const HEAT_DAY_BANDS: Band[] = [
   { upper: 0, label: "0", color: "#f3efe9" },
   { upper: 3, label: "1–3", color: "#fdd49e" },
   { upper: 7, label: "4–7", color: "#fc8d59" },
@@ -120,7 +102,7 @@ export const HEAT_DAY_BANDS: Band[] = [
 ];
 
 /** People per km², roughly logarithmic: rural to dense urban. */
-export const DENSITY_BANDS: Band[] = [
+const DENSITY_BANDS: Band[] = [
   { upper: 50, label: "<50", color: "#f1eef6" },
   { upper: 150, label: "50–150", color: "#d4b9da" },
   { upper: 300, label: "150–300", color: "#c994c7" },
@@ -150,10 +132,9 @@ export function formatCount(value: number): string {
   return `${Math.round(value)}`;
 }
 
-export const NO_VALUE_COLOR = "#d9d6d0";
+const NO_VALUE_COLOR = "#d9d6d0";
 
 export function bandsFor(layer: ExploreLayer): Band[] {
-  if (layer === "vulnerability") return VULNERABILITY_BANDS;
   if (layer === "tmax") return TEMPERATURE_BANDS;
   if (layer === "heat_days") return HEAT_DAY_BANDS;
   if (layer === "population") return DENSITY_BANDS;
@@ -212,9 +193,6 @@ export function areaValueText(area: MapArea, layer: ExploreLayer): string {
     if (area.missing_reason === "no_model") return "No model for this area";
     if (area.missing_reason === "no_excess") return "No heat excess";
     return "Not reported";
-  }
-  if (layer === "vulnerability") {
-    return `Vulnerability ${(area.value_percent / 100).toFixed(2)}`;
   }
   if (layer === "tmax") return `${area.value_percent.toFixed(1)} °C mean daily maximum`;
   if (layer === "population")

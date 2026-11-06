@@ -17,7 +17,6 @@ import {
   fetchObservedRisk,
   fetchObservedRiskMap,
   type ClimateLayer,
-  type ClimateLayerMap,
   type HeatOutlook,
   type ObservedRisk,
   type OutlookRatio,
@@ -126,11 +125,6 @@ const LAYERS: { code: ExploreLayer; label: string; hint: string }[] = [
     code: "population",
     label: "Population",
     hint: "People per km², from WorldPop 2025 (1 km grid built from each census and UN-adjusted). Counts for each area are in the hover card and the panel.",
-  },
-  {
-    code: "vulnerability",
-    label: "Vulnerability",
-    hint: "Vulnerability and resilience assessment index, 0 (least) to 1 (most vulnerable).",
   },
 ];
 
@@ -573,8 +567,6 @@ export function ExploreApp() {
         key: `population|${geo}|${state.people}`,
         load: () => populationRead(geo, state.people),
       };
-    if (layer === "vulnerability")
-      return { key: `vra|${geo}`, load: () => fetchVraMap(geo, null) };
     if (climateView) {
       if (!climateMonth) return null;
       return {
@@ -623,11 +615,9 @@ export function ExploreApp() {
         if (cancelled) return;
         setMap(null);
         setMapError(
-          layer === "vulnerability"
-            ? "No vulnerability assessment is published for this area yet."
-            : climateView
-              ? "No ERA5-Land months are loaded for this area yet."
-              : "No published estimates for this area and choice.",
+          climateView
+            ? "No ERA5-Land months are loaded for this area yet."
+            : "No published estimates for this area and choice.",
         );
       })
       .finally(() => !cancelled && setMapLoading(false));
@@ -695,7 +685,6 @@ export function ExploreApp() {
     [climateView, climateMonths, observedMonths],
   );
   const year = month?.slice(0, 4) ?? [...years.keys()].at(-1) ?? null;
-  const focusArea = map?.areas.find((area) => area.geography_id === focusId);
   const planHref = dashboardHref({
     geographyId: state.frame,
     adminUnit: state.selected,
@@ -1186,7 +1175,6 @@ export function ExploreApp() {
               baseline={focusData?.baseline ?? null}
               period={period}
               length={state.length}
-              month={observedMonth}
               seasonMonths={season?.months ?? []}
               scenarioWord={scenario ? (tiers.get(scenario) ?? null) : null}
               scenarioCode={scenario}
@@ -1461,7 +1449,6 @@ function PlaceSummary({
   baseline,
   period,
   length,
-  month,
   seasonMonths,
   scenarioWord,
   scenarioCode,
@@ -1473,7 +1460,6 @@ function PlaceSummary({
   baseline: HeatOutlook | null;
   period: string | null;
   length: number;
-  month: string | null;
   seasonMonths: number[];
   scenarioWord: string | null;
   scenarioCode: string | null;

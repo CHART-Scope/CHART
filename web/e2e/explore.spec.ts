@@ -792,13 +792,21 @@ test("the support page ignores a malformed point", async ({ page }) => {
 });
 
 test("the first map load says so, then clears", async ({ page }) => {
+  await openExplore(page, "frame=geo-ke&outcome=lbw");
+  // Hold the map read until the message has been seen, then let it through.
+  // Registered after the fake API's own route, so it runs first (the latest
+  // route wins); before, the fake API answered at once and the message only
+  // flashed, so the test caught it some runs and not others.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
   await page.route("**/heat-outlook/geo-ke/observed/map**", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await held;
     await route.fallback();
   });
-  await openExplore(page, "frame=geo-ke&outcome=lbw");
+  await page.reload();
   const loading = page.getByRole("status").filter({ hasText: "Loading map" });
   await expect(loading).toBeVisible();
+  release();
   await expect(loading).toHaveCount(0);
   await expect(page.getByTestId("explore-estimate")).toBeVisible();
 });
