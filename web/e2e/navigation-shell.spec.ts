@@ -117,7 +117,6 @@ test("sidebar navigation keeps one shell mounted across workspace pages", async 
   await expect(nav.getByRole("link")).toHaveText([
     "Start planning",
     "Learning hub",
-    "Vulnerability",
     "Settings",
   ]);
   await expect(

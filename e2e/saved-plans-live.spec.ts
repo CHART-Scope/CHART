@@ -144,7 +144,7 @@ test("an administrator chooses the insight model from the provider's list", asyn
   // Learning hub sits directly below Start planning.
   await expect(
     page.getByRole("navigation", { name: "Main" }).getByRole("link"),
-  ).toHaveText(["Start planning", "Learning hub", "Vulnerability", "Settings"]);
+  ).toHaveText(["Start planning", "Learning hub", "Settings"]);
   await page.goto("/settings?tab=recommendations");
   const card = page.getByRole("region", {
     name: "How actions are ranked and explained",
