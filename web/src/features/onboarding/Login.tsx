@@ -114,12 +114,6 @@ export function Login({
                 <a className={buttonClassName({ size: "lg" })} href="/explore">
                   Explore the map <Icon name="arrow-right" size={16} />
                 </a>
-                <a
-                  className={buttonClassName({ size: "lg", variant: "secondary" })}
-                  href="mailto:info@scopeimpact.fi"
-                >
-                  Request access
-                </a>
               </div>
             </div>
             <ExplainerVideo className={styles.heroVideo} />

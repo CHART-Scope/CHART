@@ -9,7 +9,7 @@ make identity
 make identity-sync
 ```
 
-`make identity-sync` re-applies seed groups and users to an existing realm. Run it after changing `chart-realm.json` or after a volume reset.
+`make identity-sync` re-applies the realm settings, email-code sign-in, seed groups and users to an existing realm. Run it after changing `chart-realm.json` or `sync-realm.js`, or after a volume reset.
 
 Use `make identity-restart` after changing local theme files.
 
@@ -19,6 +19,18 @@ connects with its own `chart_keycloak` database role; it does not write to CHART
 application tables.
 
 Admin console: `http://localhost:8080` — `admin` / `admin` — realm `chart`
+
+## Sign-in
+
+People sign in with their email address and a code Keycloak emails to them;
+there are no passwords. `sync-realm.js` sets up the browser flow, the code
+limits and the realm's SMTP server from `SMTP_*` settings, and stops before
+changing anything when they are missing. The code step is the jar in
+`providers/`, mounted into every Keycloak container. See
+[sign-in and email](../../docs/sign-in.md) for the settings, providers, DNS and
+upgrades.
+
+Local codes land in Mailpit at `http://127.0.0.1:8025`.
 
 ## Upstream SSO
 
@@ -51,9 +63,9 @@ Google hosted-domain claim against `scopeimpact.fi`. Microsoft Entra can be adde
 later as a tenant-specific OpenID Connect provider. Cognito is not needed while
 Keycloak remains the broker.
 
-An SSO login proves identity but does not grant CHART data access. New brokered users
-must receive an approved CHART client role and geography group before protected
-prediction routes allow them.
+An SSO login proves identity but does not grant CHART data access. A brokered user
+sees the public map until an administrator gives them a CHART client role and
+geography group.
 
 `CHART_WEB_ORIGIN` is also the source of truth for the `chart-web` callback, web
 origins, and post-logout redirects. Use the canonical HTTPS origin in production;

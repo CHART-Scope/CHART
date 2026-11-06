@@ -67,7 +67,7 @@ function Dashboard({
   choices: OutlookChoices;
 }) {
   // The workspace layout restores the session and sends an account without a
-  // planning area to /access-pending before this renders.
+  // planning area to /explore before this renders.
   const session = useSession();
   const router = useRouter();
   const [mapRefresh, setMapRefresh] = useState(0);

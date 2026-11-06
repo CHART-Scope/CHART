@@ -58,7 +58,7 @@ def test_group_path_recovers_when_another_request_creates_the_group(
     assert root_reads == 2
 
 
-def test_recover_admin_resets_password_and_restores_roles(monkeypatch) -> None:
+def test_recover_admin_reenables_the_account_and_restores_roles(monkeypatch) -> None:
     calls: list[tuple[str, str, object]] = []
     config = _config()
 
@@ -83,7 +83,6 @@ def test_recover_admin_resets_password_and_restores_roles(monkeypatch) -> None:
     recovered = service.recover_admin(
         username="chart-admin",
         email="admin@example.org",
-        password="new-password",
     )
 
     assert recovered.user_id == "user-1"
@@ -96,15 +95,6 @@ def test_recover_admin_resets_password_and_restores_roles(monkeypatch) -> None:
                 "email": "admin@example.org",
                 "enabled": True,
                 "emailVerified": True,
-            },
-        ),
-        (
-            "PUT",
-            "/users/user-1/reset-password",
-            {
-                "type": "password",
-                "value": "new-password",
-                "temporary": False,
             },
         ),
         ("ROLES", "user-1", ["chart_admin", "content_editor"]),
@@ -124,7 +114,6 @@ def test_recover_admin_requires_an_existing_identity(monkeypatch) -> None:
         service.recover_admin(
             username="missing",
             email="missing@example.org",
-            password="new-password",
         )
     except service.IdentityError as error:
         assert error.code == "ADMIN_RECOVERY_USER_NOT_FOUND"

@@ -109,7 +109,6 @@ function toBootstrapInput(
     !state.primarySectorId ||
     !state.adminName.trim() ||
     !state.adminEmail.trim() ||
-    state.adminPassword.length < 8 ||
     !state.setupToken.trim()
   ) {
     throw new Error("Complete every setup step before launching CHART.");
@@ -158,7 +157,6 @@ function toBootstrapInput(
       name: state.adminName.trim(),
       email: adminEmail,
       username: adminEmail,
-      password: state.adminPassword,
     },
   };
 }
@@ -227,9 +225,6 @@ function setupErrorMessage(code?: string) {
       return "Another setup request is still running with different details. Wait a moment, then try again.";
     case "SETUP_PROVISIONING_LOST":
       return "The CHART setup session was interrupted. Try launching setup again.";
-    case "SETUP_ADMIN_PASSWORD_REQUIRED":
-    case "SETUP_IDENTITY_PASSWORD_REJECTED":
-      return "Use an administrator password with at least eight characters.";
     case "SETUP_IDENTITY_USER_CONFLICT":
       return "That administrator account already exists. Use a different email address.";
     case "SETUP_SECTOR_REQUIRED":

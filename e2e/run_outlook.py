@@ -67,7 +67,7 @@ def main() -> int:
         "working_tree": subprocess.check_output(
             ["git", "status", "--short"], cwd=ROOT, text=True
         ),
-        "fixtures": "Supplied handovers imported twice into disposable PostGIS; isolated real Keycloak realm with India/Kenya planners and denied-role user",
+        "fixtures": "Supplied handovers imported twice into disposable PostGIS; isolated real Keycloak realm with India/Kenya planners and denied-role user, given email-code sign-in by infra/keycloak/sync-realm.js; Mailpit receives the codes",
         "source": str(source),
         "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
@@ -80,7 +80,11 @@ def main() -> int:
     }
     with tempfile.TemporaryDirectory(prefix="chart-outlook-e2e-") as temp:
         temp_path = Path(temp)
-        db_port, identity_port, api_port, web_port = [free_port() for _ in range(4)]
+        db_port, identity_port, api_port, web_port, mail_port = [
+            free_port() for _ in range(5)
+        ]
+        network = "chart-e2e-" + run_id
+        mail_host = network + "-mail"
         identity = f"http://127.0.0.1:{identity_port}"
         origin = f"http://127.0.0.1:{web_port}"
         # Disposable credentials are generated, never included in saved evidence.
@@ -96,7 +100,8 @@ def main() -> int:
                     {"name": "health_planning_lead"},
                     {"name": "content_editor"},
                     {"name": "chart_admin"},
-                ]
+                ],
+                "client": {"chart-core": [{"name": "health_planning_lead"}]},
             },
             "groups": [
                 nested_group(
@@ -134,7 +139,10 @@ def main() -> int:
                             },
                         },
                     ],
-                }
+                },
+                # Accounts an administrator adds through the API get chart-core
+                # client roles, as in production.
+                {"clientId": "chart-core", "publicClient": False},
             ],
             "users": [
                 {
@@ -186,12 +194,21 @@ def main() -> int:
             "CHART_API_INTERNAL_URL": f"http://127.0.0.1:{api_port}",
             "CHART_REPOSITORY_URL": "",
             "KEYCLOAK_SERVER_URL": identity,
+            "KEYCLOAK_ADMIN_URL": identity,
+            "KEYCLOAK_ADMIN_USERNAME": "admin",
+            "KEYCLOAK_ADMIN_PASSWORD": password,
+            "CHART_E2E_MAILPIT": f"http://127.0.0.1:{mail_port}",
             "KEYCLOAK_BROWSER_URL": identity,
             "KEYCLOAK_WEB_CLIENT_ID": "chart-web",
             "KEYCLOAK_REALM": "chart",
             "CHART_WEB_ORIGIN": origin,
         }
         try:
+            subprocess.run(
+                ["docker", "network", "create", network],
+                check=True,
+                stdout=subprocess.DEVNULL,
+            )
             for name, args in [
                 (
                     "db",
@@ -208,15 +225,29 @@ def main() -> int:
                     ],
                 ),
                 (
+                    "mail",
+                    [
+                        "-p",
+                        f"127.0.0.1:{mail_port}:8025",
+                        "axllent/mailpit:v1.30.0",
+                    ],
+                ),
+                (
                     "identity",
                     [
+                        "-e",
+                        "KC_BOOTSTRAP_ADMIN_USERNAME=admin",
+                        "-e",
+                        f"KC_BOOTSTRAP_ADMIN_PASSWORD={password}",
                         "-p",
                         f"127.0.0.1:{identity_port}:8080",
                         "-v",
                         f"{realm_path}:/opt/keycloak/data/import/realm.json:ro",
                         "-v",
                         f"{ROOT / 'infra/keycloak/themes/chart'}:/opt/keycloak/themes/chart:ro",
-                        "quay.io/keycloak/keycloak:26.6.1",
+                        "-v",
+                        f"{ROOT / 'infra/keycloak/providers'}:/opt/keycloak/providers:ro",
+                        "quay.io/keycloak/keycloak:26.6.4",
                         "start-dev",
                         "--import-realm",
                     ],
@@ -224,7 +255,17 @@ def main() -> int:
             ]:
                 container = "chart-e2e-" + run_id + "-" + name
                 subprocess.run(
-                    ["docker", "run", "--rm", "-d", "--name", container, *args],
+                    [
+                        "docker",
+                        "run",
+                        "--rm",
+                        "-d",
+                        "--network",
+                        network,
+                        "--name",
+                        container,
+                        *args,
+                    ],
                     check=True,
                     stdout=subprocess.DEVNULL,
                 )
@@ -250,6 +291,26 @@ def main() -> int:
                     stderr=subprocess.STDOUT,
                 )
             wait_http(identity + "/realms/chart/.well-known/openid-configuration")
+            # The deploy's own realm sync turns on email-code sign-in.
+            with (evidence / "identity-sync.log").open("w") as log:
+                subprocess.run(
+                    ["node", "infra/keycloak/sync-realm.js"],
+                    cwd=ROOT,
+                    env={
+                        **env,
+                        "KEYCLOAK_REALM_FILE": str(realm_path),
+                        "SMTP_HOST": mail_host,
+                        "SMTP_PORT": "1025",
+                        "SMTP_SECURITY": "none",
+                        "SMTP_FROM": "no-reply@chart-e2e.invalid",
+                        # Each browser sign-in emails a code; the suite signs
+                        # the same accounts in many times within the window.
+                        "SIGN_IN_CODE_LIMIT": "100",
+                    },
+                    check=True,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                )
             with (evidence / "import.log").open("w") as log:
                 publication = temp_path / "models/outlooks"
                 if previous := os.environ.get("CHART_E2E_PUBLICATION"):
@@ -391,6 +452,11 @@ def main() -> int:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
+            subprocess.run(
+                ["docker", "network", "rm", network],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
             (evidence / "run.json").write_text(json.dumps(metadata, indent=2))
             print(f"E2E evidence: {evidence}")
 

@@ -290,7 +290,6 @@ def bootstrap(
             name=input_data.admin.name.strip(),
             email=input_data.admin.email.strip().lower(),
             username=input_data.admin.username.strip().lower(),
-            password=input_data.admin.password,
             roles=["chart_admin", "content_editor"],
             group_paths=list(dict.fromkeys(paths)),
             operation_id=operation_id,

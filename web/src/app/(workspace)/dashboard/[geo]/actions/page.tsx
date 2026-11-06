@@ -28,7 +28,7 @@ type PageProps = {
   searchParams: Promise<Query>;
 };
 
-/** Accounts without a planning area are sent to /access-pending by the
+/** Accounts without a planning area are sent to /explore by the
  * workspace layout before this renders. */
 export default function RecommendedActionsPage(props: PageProps) {
   const geographyId = use(props.params).geo;

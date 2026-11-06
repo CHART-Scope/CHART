@@ -1,6 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
+import { signInWithEmailCode } from "./emailCode";
+
 const frame = "geo-in-madhya-pradesh";
 const evidence = process.env.CHART_E2E_EVIDENCE!;
 
@@ -57,13 +59,7 @@ test("administrator stages and validates a CSV in the upload dialog, then sees r
     if (response.url().includes("/api/chart/vra/") && response.status() >= 500)
       failures.push(`${response.status()} ${new URL(response.url()).pathname}`);
   });
-  await page.goto("/auth/signin");
-  await page.getByLabel("Email address").fill("typography-admin");
-  await page
-    .getByLabel("Password", { exact: true })
-    .fill(process.env.CHART_E2E_PASSWORD!);
-  await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await page.waitForURL(/\/(plan|dashboard)/);
+  await signInWithEmailCode(page, "typography-admin");
   await page.goto(`/settings?tab=data&vra_frame=${frame}`);
   await expect(
     page.getByRole("heading", { name: "Indicator values per area", exact: true }),

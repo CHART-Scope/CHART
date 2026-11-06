@@ -13,11 +13,28 @@ const adminPassword = process.env.KEYCLOAK_ADMIN_PASSWORD ?? "admin";
 const realmFile =
   process.env.KEYCLOAK_REALM_FILE ?? path.resolve(__dirname, "chart-realm.json");
 
+// People sign in with their email address and a code sent to it
+// (docs/sign-in.md). The code step comes from the email-otp-form provider in
+// infra/keycloak/providers.
+const signInFlow = "chart email code";
+const signInFormsFlow = "chart email code forms";
+const signInRealmSettings = {
+  loginWithEmailAllowed: true,
+  duplicateEmailsAllowed: false,
+  registrationAllowed: false,
+  resetPasswordAllowed: false,
+};
+
 async function main() {
   const realmSeed = JSON.parse(fs.readFileSync(realmFile, "utf8"));
+  // Checked before any change: without mail, nobody could receive a code.
+  const smtpServer = buildSmtpServer(process.env);
+  const codeSettings = buildEmailCodeSettings(process.env);
   const token = await getAdminToken();
 
-  await syncRealmSettings(token, realmSeed, process.env.CHART_WEB_ORIGIN);
+  await syncRealmSettings(token, realmSeed, process.env.CHART_WEB_ORIGIN, smtpServer);
+  await ensureEmailCodeSignIn(token, codeSettings);
+  await makeLastNameOptional(token);
   await syncClientSettings(token, realmSeed.clients ?? []);
   await ensureClientRoles(token, realmSeed.roles?.client ?? {});
   await ensureClientProtocolMappers(token, realmSeed.clients ?? []);
@@ -86,11 +103,207 @@ function pickDefined(source, keys) {
   );
 }
 
-async function syncRealmSettings(token, realmSeed, configuredOrigin) {
+async function syncRealmSettings(token, realmSeed, configuredOrigin, smtpServer) {
   await fetchOk(`${keycloakUrl}/admin/realms/${targetRealm}`, {
     method: "PUT",
     headers: jsonHeaders(token),
-    body: JSON.stringify(buildRealmSettings(realmSeed, configuredOrigin)),
+    body: JSON.stringify({
+      ...buildRealmSettings(realmSeed, configuredOrigin),
+      ...signInRealmSettings,
+      smtpServer,
+    }),
+  });
+}
+
+function buildSmtpServer(env) {
+  const host = env.SMTP_HOST?.trim();
+  const from = env.SMTP_FROM?.trim();
+  if (!host || !from) {
+    throw new Error(
+      "Set SMTP_HOST and SMTP_FROM: CHART emails a sign-in code (docs/sign-in.md).",
+    );
+  }
+  const port = env.SMTP_PORT?.trim() || "587";
+  if (!/^\d{1,5}$/.test(port)) {
+    throw new Error("SMTP_PORT must be a port number.");
+  }
+  const security = (env.SMTP_SECURITY?.trim() || "starttls").toLowerCase();
+  if (!["starttls", "ssl", "none"].includes(security)) {
+    throw new Error("SMTP_SECURITY must be starttls, ssl or none.");
+  }
+  const user = env.SMTP_USERNAME?.trim() ?? "";
+  const password = env.SMTP_PASSWORD ?? "";
+  if (Boolean(user) !== Boolean(password)) {
+    throw new Error("Set SMTP_USERNAME and SMTP_PASSWORD together.");
+  }
+
+  return {
+    host,
+    port,
+    from,
+    fromDisplayName: env.SMTP_FROM_NAME?.trim() || "CHART",
+    replyTo: env.SMTP_REPLY_TO?.trim() ?? "",
+    starttls: String(security === "starttls"),
+    ssl: String(security === "ssl"),
+    auth: String(Boolean(user)),
+    ...(user ? { user, password } : {}),
+  };
+}
+
+function buildEmailCodeSettings(env) {
+  const limit = env.SIGN_IN_CODE_LIMIT?.trim() || "5";
+  if (!/^\d+$/.test(limit) || Number(limit) > 100) {
+    throw new Error("SIGN_IN_CODE_LIMIT must be a whole number from 0 to 100.");
+  }
+  return {
+    "code-length": "6",
+    "code-lifetime": "600",
+    "resend-cooldown": "60",
+    "issuance-limit": limit,
+    "issuance-limit-window": "900",
+  };
+}
+
+async function ensureEmailCodeSignIn(token, codeSettings) {
+  const realmUrl = `${keycloakUrl}/admin/realms/${targetRealm}`;
+  let executions = await findFlowExecutions(token, signInFlow);
+  const complete = ["auth-cookie", "auth-username-form", "email-otp-form"].every(
+    (provider) => executions?.some((execution) => execution.providerId === provider),
+  );
+
+  if (!complete) {
+    // A missing or half-created flow is rebuilt; the realm keeps Keycloak's
+    // built-in browser flow until the new one is whole.
+    if (executions) {
+      await fetchOk(realmUrl, {
+        method: "PUT",
+        headers: jsonHeaders(token),
+        body: JSON.stringify({ browserFlow: "browser" }),
+      });
+      const flows = await fetchJson(`${realmUrl}/authentication/flows`, {
+        headers: authHeaders(token),
+      });
+      const stale = flows.find((flow) => flow.alias === signInFlow);
+      await fetchOk(`${realmUrl}/authentication/flows/${stale.id}`, {
+        method: "DELETE",
+        headers: authHeaders(token),
+      });
+    }
+    await fetchOk(`${realmUrl}/authentication/flows`, {
+      method: "POST",
+      headers: jsonHeaders(token),
+      body: JSON.stringify({
+        alias: signInFlow,
+        description: "Email address, then a code sent to it",
+        providerId: "basic-flow",
+        topLevel: true,
+        builtIn: false,
+      }),
+    });
+    await addExecution(token, signInFlow, { provider: "auth-cookie" }, "ALTERNATIVE");
+    await addExecution(
+      token,
+      signInFlow,
+      {
+        alias: signInFormsFlow,
+        type: "basic-flow",
+        provider: "registration-page-form",
+      },
+      "ALTERNATIVE",
+    );
+    await addExecution(
+      token,
+      signInFormsFlow,
+      { provider: "auth-username-form" },
+      "REQUIRED",
+    );
+    await addExecution(
+      token,
+      signInFormsFlow,
+      { provider: "email-otp-form" },
+      "REQUIRED",
+    );
+    executions = await findFlowExecutions(token, signInFlow);
+  }
+
+  // Code settings are re-applied on every sync so changes reach the realm.
+  const codeStep = executions.find(
+    (execution) => execution.providerId === "email-otp-form",
+  );
+  const config = { alias: "chart email code settings", config: codeSettings };
+  if (codeStep.authenticationConfig) {
+    await fetchOk(
+      `${realmUrl}/authentication/config/${codeStep.authenticationConfig}`,
+      {
+        method: "PUT",
+        headers: jsonHeaders(token),
+        body: JSON.stringify({ ...config, id: codeStep.authenticationConfig }),
+      },
+    );
+  } else {
+    await fetchOk(`${realmUrl}/authentication/executions/${codeStep.id}/config`, {
+      method: "POST",
+      headers: jsonHeaders(token),
+      body: JSON.stringify(config),
+    });
+  }
+
+  await fetchOk(realmUrl, {
+    method: "PUT",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ browserFlow: signInFlow }),
+  });
+}
+
+// CHART keeps a person's whole name in firstName. A required last name would
+// stop every account an administrator or setup creates at a profile form on
+// its first sign-in.
+async function makeLastNameOptional(token) {
+  const profileUrl = `${keycloakUrl}/admin/realms/${targetRealm}/users/profile`;
+  const profile = await fetchJson(profileUrl, { headers: authHeaders(token) });
+  const lastName = profile.attributes?.find(
+    (attribute) => attribute.name === "lastName",
+  );
+  if (!lastName?.required) return;
+  delete lastName.required;
+  await fetchOk(profileUrl, {
+    method: "PUT",
+    headers: jsonHeaders(token),
+    body: JSON.stringify(profile),
+  });
+}
+
+async function findFlowExecutions(token, alias) {
+  const response = await fetch(
+    `${keycloakUrl}/admin/realms/${targetRealm}/authentication/flows/${encodeURIComponent(
+      alias,
+    )}/executions`,
+    { headers: authHeaders(token) },
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Could not read Keycloak flow '${alias}': ${response.status}`);
+  }
+  return response.json();
+}
+
+async function addExecution(token, parentAlias, execution, requirement) {
+  const executionsUrl = `${keycloakUrl}/admin/realms/${targetRealm}/authentication/flows/${encodeURIComponent(
+    parentAlias,
+  )}/executions`;
+  await fetchOk(`${executionsUrl}/${execution.alias ? "flow" : "execution"}`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify(execution),
+  });
+  // Keycloak adds every step disabled; the new step is the parent's last one.
+  const added = (await findFlowExecutions(token, parentAlias))
+    .filter((candidate) => candidate.level === 0)
+    .at(-1);
+  await fetchOk(executionsUrl, {
+    method: "PUT",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ ...added, requirement }),
   });
 }
 

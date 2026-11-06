@@ -117,6 +117,8 @@ jobs:
           KEYCLOAK_ADMIN_PASSWORD: test-password
           CHART_BOOTSTRAP_TOKEN: test-token
           MODEL_CONTROL_TOKEN: test-token
+          SMTP_HOST: smtp.example.test
+          SMTP_FROM: no-reply@example.test
         run: |
           IMAGE_PREFIX=ghcr.io/chart-scope/chart IMAGE_TAG=test docker compose -f infra/aws/docker-compose.yml config -q
           docker run --rm -e PUBLIC_ORIGIN -v "$PWD/infra/aws/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10-alpine caddy validate --config /etc/caddy/Caddyfile

@@ -222,11 +222,10 @@ test("route guards still apply inside the shared shell", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Models" })).toHaveCount(0);
 });
 
-test("an account without a planning area lands on access-pending", async ({ page }) => {
+test("an account without a planning area gets the public map", async ({ page }) => {
   await signInAs(page, { roles: ["health_planning_lead"], geographyScopes: [] });
   await page.goto("/dashboard/geo-in-mp?outcome=lbw");
-  await expect(page).toHaveURL(/\/access-pending$/);
-  await expect(
-    page.getByRole("heading", { name: "Your account has not been invited yet" }),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/\/explore(\?|$)/);
+  await page.goto("/access-pending");
+  await expect(page.getByRole("heading", { name: /not been invited/ })).toHaveCount(0);
 });

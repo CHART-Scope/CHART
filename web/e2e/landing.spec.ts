@@ -61,9 +61,8 @@ for (const width of [1440, 390]) {
     await expect(
       navigation.getByRole("button", { name: /Solutions Repository/ }),
     ).toBeDisabled();
-    await expect(
-      page.locator("main").getByRole("link", { name: "Request access" }),
-    ).toHaveAttribute("href", "mailto:info@scopeimpact.fi");
+    // Accounts are created by an administrator, so there is nothing to request.
+    await expect(page.getByRole("link", { name: "Request access" })).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Explore solutions" }),
     ).toBeDisabled();
