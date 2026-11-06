@@ -86,7 +86,7 @@ no sending reputation.
 ### Local development and E2E
 
 `make identity-sync` points Keycloak at Mailpit with no credentials. Read the
-codes at <http://127.0.0.1:8025> (also through the remote-dev tunnel). The
+codes at `http://127.0.0.1:8025` (also through the remote-dev tunnel). The
 live E2E suite (`make e2e-outlook`) runs its own Mailpit and reads each code
 through Mailpit's API, so browser tests sign in exactly as people do.
 
