@@ -92,6 +92,11 @@ never a blank. Up to 60 maps are kept for the session (cleared on sign-out).
 Custom maps with their own loader (outlook, vulnerability) keep the last-map
 behaviour but are not fetched ahead.
 
+A click never empties the risk card either. Which views a place and outcome
+publish (its capabilities) are kept for the session, and while the next
+place's arrive the current card stays drawn; only the first load of the
+dashboard shows its placeholder.
+
 For what the map queues by itself and what its four states mean, see
 [Data pipeline](data-pipeline.md#what-the-dashboard-queues-on-its-own).
 
