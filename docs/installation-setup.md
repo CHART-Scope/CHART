@@ -1,15 +1,21 @@
 # Installation setup
 
-Every installation starts with one administrator account:
+## The logins
 
-| Username | First password |
-| --- | --- |
-| `admin` | `admin`, or `CHART_ADMIN_INITIAL_PASSWORD` when set |
+| Who | Where | Username | Password |
+| --- | --- | --- | --- |
+| CHART's administrator | CHART, e.g. `https://chartforclimateaction.org` | `admin` | First `CHART_ADMIN_INITIAL_PASSWORD` (or `admin` if it was not set); you choose your own at the first sign-in |
+| Everyone else | CHART | their email address | none: a 6-character code by email |
+| Keycloak's operator account | `https://<domain>/identity/admin` | `admin` | `KEYCLOAK_ADMIN_PASSWORD` from `.env.prod` |
 
-`infra/keycloak/sync-realm.js` creates it once (local `make identity-sync`
-and every deploy) and never changes it afterwards. **Set
-`CHART_ADMIN_INITIAL_PASSWORD` in `.env.prod` before a server goes public**,
-so it never starts on `admin`.
+CHART's `admin` and Keycloak's `admin` are different accounts. Day-to-day
+work, including inviting people, happens in CHART; the Keycloak console is
+only for operating Keycloak and is not needed to set CHART up.
+
+`infra/keycloak/sync-realm.js` creates CHART's `admin` once (local
+`make identity-sync` and every deploy) and never changes it afterwards.
+**Set `CHART_ADMIN_INITIAL_PASSWORD` in `.env.prod` before the first deploy
+of a public server**, so it never starts on `admin`.
 
 ## First run
 
@@ -26,12 +32,55 @@ needs no server access to get in.
    area, primary sector and collaborating sectors, then **Launch CHART**. No
    setup token and no second administrator are needed: setup runs as `admin`
    (`POST /setup/complete`) and gives it the installed country.
-5. CHART opens the dashboard for that country. Invite everyone else from
-   **Settings → Users** ([inviting people](sign-in.md#inviting-people)); they
-   sign in with emailed codes.
+5. CHART opens the dashboard for that country. Invite everyone else (below).
 
 Before setup, `admin` lands on **Settings → Users**; only an administrator
 can open `/onboarding`.
+
+## Inviting people
+
+Signed in as `admin` (or any CHART administrator):
+
+1. Open **Settings → Users** and fill in **Invite a person**: full name,
+   email address, role and planning area.
+2. Choose **Send invitation**. They receive **You are invited to CHART**; the
+   link works for 7 days.
+3. They choose **Accept and sign in**, then sign in with their email address
+   and the code CHART emails them. They land on their area's dashboard.
+
+**Send invitation again** beside a person emails a fresh link. While Amazon
+SES is in sandbox mode, an invitee's address must be verified in SES first,
+or Settings reports that the invitation could not be sent. More detail:
+[inviting people](sign-in.md#inviting-people).
+
+## Passwords: what changing `.env.prod` does
+
+Both admin passwords in `.env.prod` are read **only when the account is first
+created**:
+
+- `CHART_ADMIN_INITIAL_PASSWORD` sets CHART's `admin` first password at the
+  deploy that creates the account. Changing it afterwards does nothing; the
+  password is whatever `admin` chose.
+- `KEYCLOAK_ADMIN_PASSWORD` is Keycloak's operator password from its very
+  first start. Every deploy signs in to Keycloak with it, so it must keep
+  matching: editing it in `.env.prod` without changing it in Keycloak makes
+  the next deploy fail.
+
+To change either one later, change it in Keycloak, and for the operator
+account update `.env.prod` to match. From the server, with the current
+operator password:
+
+```bash
+cd ~/chart-deploy/aws && set -a && . ./.env.prod && set +a
+K=/opt/keycloak/bin/kcadm.sh
+docker exec chart-keycloak $K config credentials --server http://localhost:8080/identity --realm master --user admin --password "$KEYCLOAK_ADMIN_PASSWORD"
+# CHART's admin: a temporary password, changed at its next sign-in
+docker exec chart-keycloak $K set-password -r chart --username admin --new-password 'Temp-ChangeMe-1' --temporary
+# Keycloak's operator account: then put the same value in KEYCLOAK_ADMIN_PASSWORD
+docker exec chart-keycloak $K set-password -r master --username admin --new-password '<new long password>'
+```
+
+Run one command per line; a long line wrapped in a terminal paste breaks.
 
 ## What setup does
 
