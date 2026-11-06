@@ -25,7 +25,7 @@ deploy) sets the `chart` realm up:
 - after the code, CHART opens the dashboard of the person's own area (the
   area Start planning would pick), or the page that asked them to sign in.
 
-The two screens, **Sign in to CHART** (email) and **Check your email** (code),
+The two screens, **CHART login** (email) and **Check your email** (code),
 use CHART's header, fonts and colours and fit a phone. They are the `chart`
 login theme: `infra/keycloak/themes/chart/login/` holds their templates
 (`login-username.ftl`, `login-email-otp.ftl`), wording
@@ -123,7 +123,7 @@ state or county; an area covers everything inside it).
 2. Keycloak emails **You are invited to CHART** through the email settings
    above. The link works for 7 days.
 3. The link opens **Accept your CHART invitation**; accepting confirms the
-   address and offers **Sign in to CHART**.
+   address and offers **Go to CHART login**.
 4. They sign in with their email address and a code, and land on their
    area's dashboard.
 
@@ -137,7 +137,7 @@ in `infra/keycloak/themes/chart/email/`.
 
 - Disabling a person (`POST /users/{id}/disable`) stops their codes.
 - The Keycloak administration console (`/identity/admin`) is for operators,
-  not everyday work. Its sign-in also uses CHART's look; the user is `admin`
+  not everyday work. Its sign-in, headed **CHART admin**, also uses CHART's look; the user is `admin`
   and the password is `KEYCLOAK_ADMIN_PASSWORD` from `.env.prod`. That is
   Keycloak's own administrator, a different account from CHART's `admin`.
 - If the only administrator is locked out, re-enable them from an operator
