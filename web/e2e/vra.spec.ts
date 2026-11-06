@@ -40,18 +40,16 @@ test("an assessed state shows its map, its ranking and one area opened up", asyn
   page,
 }) => {
   const api = await installVra(page, { ...planner, assessed: ["mp"] });
-  // The sidebar entry opens the planning area's state, not India.
+  // Vulnerability is out of the sidebar for now; its URL still opens the
+  // planning area's state, not India.
   await page.goto("/learning");
-  await page
-    .getByRole("navigation", { name: "Main" })
-    .getByRole("link", { name: "Vulnerability", exact: true })
-    .click();
-  await page.waitForURL(new RegExp(`/vulnerability/${MP}$`));
   await expect(
     page
       .getByRole("navigation", { name: "Main" })
       .getByRole("link", { name: "Vulnerability" }),
-  ).toHaveAttribute("aria-current", "page");
+  ).toHaveCount(0);
+  await page.goto("/vulnerability");
+  await page.waitForURL(new RegExp(`/vulnerability/${MP}$`));
 
   await expect(
     page.getByRole("heading", {

@@ -28,6 +28,9 @@ type NavDefinition = NavItem & {
   /** Administrators may open it without a planning area: the default
    * `admin` sets CHART up and invites people from Settings. */
   openToAdmins?: boolean;
+  /** Kept out of the sidebar for now; the route, its guard and highlighting
+   * still work, so the page opens from links and its own URL. */
+  hiddenFromSidebar?: boolean;
 };
 
 // One table, not two. The label/icon list and the id → route map used to be
@@ -49,6 +52,8 @@ const NAV: readonly NavDefinition[] = [
     href: "/vulnerability",
     requiredRoles: RISK_READER_ROLES,
     requiresGeographyScope: true,
+    // Not in the sidebar for now; remove this line to bring it back.
+    hiddenFromSidebar: true,
   },
   {
     id: "settings",
@@ -73,6 +78,7 @@ export function appNavForRoles(
   audience: NavAudience = {},
 ): NavItem[] {
   return NAV.filter((item) => {
+    if (item.hiddenFromSidebar) return false;
     if (
       item.requiredRoles &&
       !item.requiredRoles.some((role) => roles.includes(role))
@@ -89,7 +95,15 @@ export function appNavForRoles(
       return false;
     }
     return true;
-  }).map(({ requiredRoles, requiresGeographyScope, openToAdmins, ...item }) => item);
+  }).map(
+    ({
+      requiredRoles,
+      requiresGeographyScope,
+      openToAdmins,
+      hiddenFromSidebar,
+      ...item
+    }) => item,
+  );
 }
 
 /**
