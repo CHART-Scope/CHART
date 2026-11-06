@@ -25,6 +25,9 @@ type NavDefinition = NavItem & {
   /** Destinations that bounce an account with no planning area straight to
    * /explore (see `signedInHomePath`), so offering them is a dead end. */
   requiresGeographyScope?: boolean;
+  /** Administrators may open it without a planning area: the default
+   * `admin` sets CHART up and invites people from Settings. */
+  openToAdmins?: boolean;
 };
 
 // One table, not two. The label/icon list and the id → route map used to be
@@ -55,6 +58,7 @@ const NAV: readonly NavDefinition[] = [
     // Model settings are editable by any signed-in user with a planning
     // area; the installation cards on the page stay admin-only.
     requiresGeographyScope: true,
+    openToAdmins: true,
   },
 ] as const;
 
@@ -78,14 +82,14 @@ export function appNavForRoles(
     // Only judge scope when the caller actually supplied it — an absent list
     // means "unknown", which must not be read as "none".
     if (
-      item.requiresGeographyScope &&
+      needsScope(item, roles) &&
       audience.geographyScopes &&
       audience.geographyScopes.length === 0
     ) {
       return false;
     }
     return true;
-  }).map(({ requiredRoles, requiresGeographyScope, ...item }) => item);
+  }).map(({ requiredRoles, requiresGeographyScope, openToAdmins, ...item }) => item);
 }
 
 /**
@@ -123,7 +127,7 @@ export function redirectForPath(
   const entry = NAV.find((item) => item.id === activeNavForPath(pathname));
   if (!entry) return null;
   if (
-    entry.requiresGeographyScope &&
+    needsScope(entry, user.roles) &&
     (user.roles.length === 0 || user.geographyScopes.length === 0)
   ) {
     return "/explore";
@@ -135,4 +139,11 @@ export function redirectForPath(
     return "/plan";
   }
   return null;
+}
+
+function needsScope(entry: NavDefinition, roles: readonly string[]) {
+  return (
+    !!entry.requiresGeographyScope &&
+    !(entry.openToAdmins && roles.includes("chart_admin"))
+  );
 }

@@ -98,7 +98,12 @@ password for a `chart-web` token directly.
 
 ## Seed users
 
-None. The realm ships without any pre-seeded users. Create the first administrator by completing the CHART installation setup wizard at `/onboarding`.
+One: the default administrator `admin`, created by `sync-realm.js` when the
+realm has no `admin` (first password `CHART_ADMIN_INITIAL_PASSWORD`, default
+`admin`, which must be changed at the first sign-in). It has the
+`chart_admin` and `content_editor` roles, runs setup at `/onboarding` and
+invites everyone else. An existing `admin` is never modified. It signs in
+with a password; every other account signs in with an emailed code.
 
 ## Roles
 

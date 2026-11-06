@@ -32,15 +32,6 @@ export type ActionRepositoryStatus = {
   actionCount: number;
 };
 
-export type BootstrapSetupResult = {
-  setup: SetupStatus;
-  admin: {
-    userId: string;
-    username: string;
-    email: string;
-  };
-};
-
 export async function getSetupStatus() {
   const response = await authFetch("/api/setup", { auth: false, timeoutMs: 15_000 });
   if (!response.ok) {
@@ -69,19 +60,18 @@ export async function loadActionRepository(): Promise<ActionRepositoryStatus> {
   }
 }
 
-export async function bootstrapChartSetup(
+/** The signed-in administrator (the default `admin`) completes setup. */
+export async function completeChartSetup(
   state: OnboardingState,
   geographyCatalog: SetupCountryOption[],
+  accessToken: string,
 ) {
-  const response = await authFetch("/api/setup/bootstrap", {
+  const response = await authFetch("/api/setup/complete", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-chart-bootstrap-token": state.setupToken.trim(),
-    },
-    body: JSON.stringify(toBootstrapInput(state, geographyCatalog)),
-    auth: false,
-    timeoutMs: 30_000,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(toSetupInput(state, geographyCatalog)),
+    accessToken,
+    timeoutMs: 60_000,
   });
 
   if (!response.ok) {
@@ -91,22 +81,11 @@ export async function bootstrapChartSetup(
     throw new Error(setupErrorMessage(body?.error));
   }
 
-  return (await response.json()) as BootstrapSetupResult;
+  return (await response.json()) as SetupStatus;
 }
 
-function toBootstrapInput(
-  state: OnboardingState,
-  geographyCatalog: SetupCountryOption[],
-) {
-  if (
-    !state.country ||
-    !state.level ||
-    !state.geo ||
-    !state.primarySectorId ||
-    !state.adminName.trim() ||
-    !state.adminEmail.trim() ||
-    !state.setupToken.trim()
-  ) {
+function toSetupInput(state: OnboardingState, geographyCatalog: SetupCountryOption[]) {
+  if (!state.country || !state.level || !state.geo || !state.primarySectorId) {
     throw new Error("Complete every setup step before launching CHART.");
   }
 
@@ -141,7 +120,6 @@ function toBootstrapInput(
     sortOrder: place.sortOrder,
   }));
 
-  const adminEmail = state.adminEmail.trim().toLowerCase();
   return {
     countryCode: country.countryCode,
     countryName: country.countryName,
@@ -149,11 +127,6 @@ function toBootstrapInput(
     geographies,
     primarySectorId: state.primarySectorId,
     collaboratingSectorIds: [...state.collaboratingSectorIds],
-    admin: {
-      name: state.adminName.trim(),
-      email: adminEmail,
-      username: adminEmail,
-    },
   };
 }
 
@@ -209,35 +182,22 @@ function resetErrorMessage(code?: string) {
 
 function setupErrorMessage(code?: string) {
   switch (code) {
-    case "SETUP_BOOTSTRAP_FORBIDDEN":
-      return "The setup token is not correct. Ask whoever deployed CHART for its CHART_BOOTSTRAP_TOKEN.";
-    case "SETUP_BOOTSTRAP_DISABLED":
-      return "Installation setup is disabled because no CHART_BOOTSTRAP_TOKEN is configured on the server.";
-    case "SETUP_BOOTSTRAP_LOCKED":
-      return "This CHART installation has already been set up. Return to sign in.";
+    case "SETUP_FORBIDDEN":
+      return "Only a CHART administrator can set up CHART. Sign in as admin.";
+    case "AUTH_TOKEN_REQUIRED":
+    case "AUTH_TOKEN_INVALID":
+      return "Your session ended. Sign in again to finish setup.";
     case "SETUP_BOOTSTRAP_IN_PROGRESS":
-      return "A CHART setup attempt is already running. Wait a few minutes and retry.";
-    case "SETUP_BOOTSTRAP_REQUEST_MISMATCH":
-      return "Another setup request is still running with different details. Wait a moment, then try again.";
     case "SETUP_PROVISIONING_LOST":
-      return "The CHART setup session was interrupted. Try launching setup again.";
-    case "SETUP_IDENTITY_USER_CONFLICT":
-      return "That administrator account already exists. Use a different email address.";
+      return "Another setup attempt is running. Wait a few minutes and try again.";
     case "SETUP_SECTOR_REQUIRED":
       return "Choose the primary sector for this CHART installation.";
     case "SETUP_SECTOR_INVALID":
       return "One of the selected sectors is no longer available. Reload and choose again.";
     case "SETUP_GEOGRAPHY_MODEL_UNAVAILABLE":
       return "The selected geography does not have an installed model. Reload and choose an available area.";
-    case "SETUP_IDENTITY_ADMIN_AUTH_FAILED":
-    case "SETUP_IDENTITY_CONFIG_INVALID":
-    case "SETUP_IDENTITY_CLIENT_MISSING":
-    case "SETUP_IDENTITY_ROLE_MISSING":
-      return "Keycloak is not ready for the first administrator. Check the CHART identity configuration.";
     case "SETUP_IDENTITY_GROUP_FAILED":
-    case "SETUP_IDENTITY_UNAVAILABLE":
-    case "SETUP_IDENTITY_USER_CREATE_FAILED":
-      return "CHART could not create the first administrator in Keycloak. Try again.";
+      return "CHART could not give your account the installed country in Keycloak. Try again.";
     case "SETUP_MODEL_PREPARATION_FAILED":
       return "One or more installed models could not be verified and started. Check the model service and artifacts, then retry setup.";
     case "SETUP_SERVICE_UNAVAILABLE":

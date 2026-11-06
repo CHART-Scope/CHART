@@ -239,6 +239,9 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-CHART}
       SMTP_REPLY_TO: ${SMTP_REPLY_TO:-}
       SIGN_IN_CODE_LIMIT: ${SIGN_IN_CODE_LIMIT:-5}
+      # First password of the default `admin`, changed at first sign-in
+      # (docs/sign-in.md). Set it so a public server never starts on "admin".
+      CHART_ADMIN_INITIAL_PASSWORD: ${CHART_ADMIN_INITIAL_PASSWORD:-}
 
   chart-core:
     image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}

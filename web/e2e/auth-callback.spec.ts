@@ -104,3 +104,32 @@ test("when the areas cannot be read, sign-in still lands on Start planning", asy
   await page.goto(callback);
   await page.waitForURL("**/plan");
 });
+
+test("the default admin, before setup gives it an area, lands on Settings → Users, or back on setup", async ({
+  page,
+}) => {
+  const api = await installFakeApi(page);
+  api.on(/^\/api\/auth\/keycloak-exchange$/, (route) =>
+    json(route, { access_token: "unused" }, 200),
+  );
+  api.on(/^\/api\/chart\/auth\/me$/, (route) =>
+    json(route, {
+      userId: "admin-1",
+      username: "admin",
+      roles: ["chart_admin", "content_editor"],
+      geographyScopes: [],
+    }),
+  );
+  api.on(/^\/api\/setup$/, (route) => json(route, { requiresOnboarding: false }));
+
+  await page.goto(callback);
+  await page.waitForURL("**/settings?tab=users");
+  await expect(page.getByRole("heading", { name: "People and access" })).toBeVisible();
+
+  // "Set up CHART" asked for sign-in: the admin goes back to setup.
+  await page.evaluate(() =>
+    window.sessionStorage.setItem("chart.auth.returnTo", "/onboarding"),
+  );
+  await page.goto(callback);
+  await page.waitForURL("**/onboarding");
+});

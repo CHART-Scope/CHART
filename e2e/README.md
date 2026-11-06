@@ -40,7 +40,9 @@ unknown address gets an error and no email. An administrator invites someone
 in Settings → Users; the invitation arrives in Mailpit, its link is accepted,
 and the invited person signs in with a code and lands on their area's
 dashboard; "Send invitation again" emails a second link. The Keycloak
-administration sign-in is checked for CHART's look. API tests still take tokens by
+administration sign-in is checked for CHART's look. The default `admin` signs
+in with `admin`/`admin`, must choose a new password, lands on Settings → Users
+and can invite; the first password then stops working. API tests still take tokens by
 password grant, which only the disposable realm allows.
 
 An upgrade regression recreates the legacy fixed-level checks on the disposable

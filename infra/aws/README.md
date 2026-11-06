@@ -90,7 +90,12 @@ SMTP_HOST=email-smtp.eu-north-1.amazonaws.com
 SMTP_USERNAME=your-ses-smtp-username
 SMTP_PASSWORD=your-ses-smtp-password
 SMTP_FROM=no-reply@your-domain
+CHART_ADMIN_INITIAL_PASSWORD=a-long-random-first-password
 ```
+
+`CHART_ADMIN_INITIAL_PASSWORD` is the first password of the default `admin`
+account, changed at its first sign-in. Without it the account starts on
+`admin`, which a public server should never do.
 
 Save it, then copy that same file to the sandbox:
 
