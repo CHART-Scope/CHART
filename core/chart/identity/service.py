@@ -115,6 +115,37 @@ def upsert_user(
     )
 
 
+INVITATION_LIFESPAN_SECONDS = 7 * 24 * 3600
+
+
+def send_invitation(user_id: str) -> None:
+    """Have Keycloak email an invitation (docs/sign-in.md).
+
+    The link confirms the address and then opens CHART's sign-in, where the
+    person signs in with an emailed code; there is no password to set.
+    """
+    origin = os.getenv("CHART_WEB_ORIGIN", "").rstrip("/")
+    if not origin:
+        raise IdentityError("USER_INVITE_ORIGIN_MISSING", 500)
+    config = _config()
+    token = _admin_token(config)
+    query = urllib.parse.urlencode(
+        {
+            "client_id": "chart-web",
+            "redirect_uri": f"{origin}/auth/signin",
+            "lifespan": INVITATION_LIFESPAN_SECONDS,
+        }
+    )
+    _request(
+        config,
+        token,
+        "PUT",
+        f"/users/{urllib.parse.quote(user_id)}/execute-actions-email?{query}",
+        body=["VERIFY_EMAIL"],
+        expected={204},
+    )
+
+
 def disable_user(user_id: str) -> None:
     config = _config()
     token = _admin_token(config)

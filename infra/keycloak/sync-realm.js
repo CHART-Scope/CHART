@@ -19,6 +19,8 @@ const realmFile =
 const signInFlow = "chart email code";
 const signInFormsFlow = "chart email code forms";
 const signInRealmSettings = {
+  // Invitations and sign-in codes use CHART's email layout and wording.
+  emailTheme: "chart",
   loginWithEmailAllowed: true,
   duplicateEmailsAllowed: false,
   registrationAllowed: false,
@@ -35,6 +37,7 @@ async function main() {
   await syncRealmSettings(token, realmSeed, process.env.CHART_WEB_ORIGIN, smtpServer);
   await ensureEmailCodeSignIn(token, codeSettings);
   await makeLastNameOptional(token);
+  await brandAdminSignIn(token);
   await syncClientSettings(token, realmSeed.clients ?? []);
   await ensureClientRoles(token, realmSeed.roles?.client ?? {});
   await ensureClientProtocolMappers(token, realmSeed.clients ?? []);
@@ -252,6 +255,21 @@ async function ensureEmailCodeSignIn(token, codeSettings) {
     method: "PUT",
     headers: jsonHeaders(token),
     body: JSON.stringify({ browserFlow: signInFlow }),
+  });
+}
+
+// The Keycloak administration console signs in through the master realm;
+// give that page CHART's look too. Its username-and-password form is
+// Keycloak's own, styled by the same theme.
+async function brandAdminSignIn(token) {
+  await fetchOk(`${keycloakUrl}/admin/realms/${adminRealm}`, {
+    method: "PUT",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({
+      loginTheme: "chart",
+      displayName: "CHART",
+      displayNameHtml: "CHART",
+    }),
   });
 }
 
@@ -502,7 +520,11 @@ function buildWebClientSettings(configuredOrigin) {
   ]);
 
   return {
-    redirectUris: origins.map((origin) => `${origin}/auth/callback`),
+    // /auth/signin is where an invitation link lands after confirming the address.
+    redirectUris: origins.flatMap((origin) => [
+      `${origin}/auth/callback`,
+      `${origin}/auth/signin`,
+    ]),
     webOrigins: origins,
     attributes: {
       "post.logout.redirect.uris": origins
