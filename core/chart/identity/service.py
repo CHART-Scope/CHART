@@ -40,7 +40,6 @@ def upsert_user(
     name: str,
     email: str,
     username: str,
-    password: str,
     roles: list[str],
     group_paths: list[str],
     operation_id: str | None = None,
@@ -83,9 +82,9 @@ def upsert_user(
         if not created and not _matches_operation(user, operation_id):
             raise IdentityError("USER_IDENTITY_USER_CONFLICT", 409)
     elif not _matches_operation(user, operation_id):
-        # User creation must not silently become password reset and privilege
-        # escalation. Only an explicit retry of the same provisioning saga may
-        # resume an existing identity.
+        # User creation must not silently take over an existing account and
+        # escalate its privileges. Only an explicit retry of the same
+        # provisioning saga may resume an existing identity.
         raise IdentityError("USER_IDENTITY_USER_CONFLICT", 409)
     else:
         _request(
@@ -99,15 +98,6 @@ def upsert_user(
         )
 
     user_id = str(user["id"])
-    if created:
-        _request(
-            config,
-            token,
-            "PUT",
-            f"/users/{urllib.parse.quote(user_id)}/reset-password",
-            body={"type": "password", "value": password, "temporary": False},
-            expected={204},
-        )
     for group in groups:
         _request(
             config,
@@ -150,8 +140,8 @@ def delete_user(user_id: str) -> None:
     )
 
 
-def recover_admin(*, username: str, email: str, password: str) -> IdentityUser:
-    """Recover an existing administrator through an explicit operator action."""
+def recover_admin(*, username: str, email: str) -> IdentityUser:
+    """Re-enable an administrator; they sign in with a code sent to ``email``."""
     config = _config()
     token = _admin_token(config)
     user = _find_user(config, token, username, email)
@@ -170,14 +160,6 @@ def recover_admin(*, username: str, email: str, password: str) -> IdentityUser:
             "enabled": True,
             "emailVerified": True,
         },
-        expected={204},
-    )
-    _request(
-        config,
-        token,
-        "PUT",
-        f"/users/{urllib.parse.quote(user_id)}/reset-password",
-        body={"type": "password", "value": password, "temporary": False},
         expected={204},
     )
     _add_client_roles(

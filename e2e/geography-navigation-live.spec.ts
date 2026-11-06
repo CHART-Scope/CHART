@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { signInWithEmailCode } from "./emailCode";
+
 const cases = [
   {
     country: "IN",
@@ -85,13 +87,7 @@ for (const place of cases) {
     test(`${place.country} ${outcome}: map drilldown, parent return and history preserve both views`, async ({
       page,
     }) => {
-      await page.goto("/auth/signin");
-      await page.getByLabel("Email address").fill(place.username);
-      await page
-        .getByLabel("Password", { exact: true })
-        .fill(process.env.CHART_E2E_PASSWORD!);
-      await page.getByRole("button", { name: "Log in", exact: true }).click();
-      await page.waitForURL(/\/(plan|dashboard)/);
+      await signInWithEmailCode(page, place.username);
       const filters = {
         outcome,
         view: "projection",
@@ -271,13 +267,7 @@ test("district-only scope keeps its own route and outline in both views", async 
     )
       failures.push(`${response.status()} ${new URL(response.url()).pathname}`);
   });
-  await page.goto("/auth/signin");
-  await page.getByLabel("Email address").fill("district-planner");
-  await page
-    .getByLabel("Password", { exact: true })
-    .fill(process.env.CHART_E2E_PASSWORD!);
-  await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await page.waitForURL(/\/(plan|dashboard)/);
+  await signInWithEmailCode(page, "district-planner");
 
   const district = "geo-in-madhya-pradesh-district-bhopal";
   const filters = { outcome: "lbw", view: "projection", month: "2026-09" };

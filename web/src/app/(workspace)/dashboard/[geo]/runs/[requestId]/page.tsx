@@ -11,7 +11,7 @@ type PageProps = {
   params: Promise<{ geo: string; requestId: string }>;
 };
 
-/** Accounts without a planning area are sent to /access-pending by the
+/** Accounts without a planning area are sent to /explore by the
  * workspace layout before this renders. */
 export default function RunDetailPage(props: PageProps) {
   const params = use(props.params);

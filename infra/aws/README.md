@@ -56,7 +56,10 @@ Create the single local runtime file:
 vim infra/aws/.env.prod
 ```
 
-Paste these seven settings with their real values:
+Paste these settings with their real values. The SMTP lines deliver sign-in
+codes; without them the deploy stops, because nobody could sign in
+([sign-in and email](../../docs/sign-in.md) covers SES setup and other
+providers):
 
 ```dotenv
 PUBLIC_ORIGIN=https://your-domain
@@ -66,6 +69,10 @@ CHART_BOOTSTRAP_TOKEN=your-bootstrap-token
 MODEL_CONTROL_TOKEN=your-model-control-token
 CDSAPI_URL=https://cds.climate.copernicus.eu/api
 CDSAPI_KEY=your-copernicus-key
+SMTP_HOST=email-smtp.eu-north-1.amazonaws.com
+SMTP_USERNAME=your-ses-smtp-username
+SMTP_PASSWORD=your-ses-smtp-password
+SMTP_FROM=no-reply@your-domain
 ```
 
 Save it, then copy that same file to the sandbox:

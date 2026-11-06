@@ -289,10 +289,12 @@ export function takeSignedOutReason(): SignOutReason | null {
   return (reason as SignOutReason | null) ?? null;
 }
 
+/** Accounts are created with a role and planning area; one without (such as
+ * a brokered sign-in nobody has set up) gets the public map. */
 export function signedInHomePath(user: CurrentUser) {
   return user.roles.length > 0 && user.geographyScopes.length > 0
     ? "/plan"
-    : "/access-pending";
+    : "/explore";
 }
 
 /** Milliseconds until the token should be renewed (30 s before it expires). */

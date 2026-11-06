@@ -177,7 +177,7 @@ services:
       - --activate-model
 
   chart-keycloak:
-    image: quay.io/keycloak/keycloak:26.6.1
+    image: quay.io/keycloak/keycloak:26.6.4
     container_name: chart-keycloak
     restart: unless-stopped
     depends_on:
@@ -198,12 +198,15 @@ services:
     volumes:
       - ../keycloak/chart-realm.json:/opt/keycloak/data/import/chart-realm.json:ro
       - ../keycloak/themes/chart:/opt/keycloak/themes/chart:ro
+      - ../keycloak/providers:/opt/keycloak/providers:ro
     command: ["start", "--import-realm"]
     healthcheck:
       test: ["CMD-SHELL", "timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
       interval: 5s
       timeout: 5s
       retries: 30
+      # The first start after a provider change rebuilds Keycloak (minutes).
+      start_period: 300s
 
   chart-keycloak-config:
     image: node:22-alpine
@@ -223,6 +226,17 @@ services:
       KEYCLOAK_GOOGLE_CLIENT_ID: ${KEYCLOAK_GOOGLE_CLIENT_ID:-}
       KEYCLOAK_GOOGLE_CLIENT_SECRET: ${KEYCLOAK_GOOGLE_CLIENT_SECRET:-}
       KEYCLOAK_GOOGLE_HOSTED_DOMAIN: ${KEYCLOAK_GOOGLE_HOSTED_DOMAIN:-}
+      # Sign-in codes are emailed (docs/sign-in.md); without mail nobody can
+      # sign in, so the deploy stops at `compose config` until these are set.
+      SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST in .env.prod}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:?set SMTP_FROM in .env.prod}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-CHART}
+      SMTP_REPLY_TO: ${SMTP_REPLY_TO:-}
+      SIGN_IN_CODE_LIMIT: ${SIGN_IN_CODE_LIMIT:-5}
     volumes:
       - ../keycloak:/keycloak:ro
     command: ["node", "/keycloak/sync-realm.js"]

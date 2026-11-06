@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page, type Response } from "@playwright/test";
 
+import { signInWithEmailCode } from "./emailCode";
+
 type Place = { id: string; name: string; parentId: string | null; levelLabel: string };
 
 async function expectVulnerabilityFrame(
@@ -71,13 +73,7 @@ for (const [country, username, level] of [
       readFileSync(`${process.env.CHART_E2E_EVIDENCE}/browser-fixture.json`, "utf8"),
     );
     const place = fixtures[country];
-    await page.goto("/auth/signin");
-    await page.getByLabel("Email address").fill(username);
-    await page
-      .getByLabel("Password", { exact: true })
-      .fill(process.env.CHART_E2E_PASSWORD!);
-    await page.getByRole("button", { name: "Log in", exact: true }).click();
-    await page.waitForURL(/\/(plan|dashboard)/);
+    await signInWithEmailCode(page, username);
     await page.goto(`/dashboard/${place.parentId}?admin_unit=${place.id}&outcome=lbw`);
     const outlook = page.getByTestId("heat-outlook");
     await expect(outlook).toBeVisible();

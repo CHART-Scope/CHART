@@ -61,6 +61,7 @@ flowchart LR
 |---|---|
 | [Getting started](getting-started.md) | Install and run CHART locally |
 | [Installation setup](installation-setup.md) | Complete the first-run onboarding wizard, reset an installation, or recover from a stuck bootstrap |
+| [Sign-in and email](sign-in.md) | How people sign in with emailed codes, and the SMTP settings (SES, Resend, Mailpit) that deliver them |
 | [System architecture and requirements](system-architecture-and-requirements.md) | Review users, end-to-end boundaries, functional requirements, capacity targets, and production quality goals |
 | [Python core overview](python-core.md) | Build FastAPI modules |
 | [Modeling](modeling.md) | Understand the LBW model, inputs, outputs, and limitations |

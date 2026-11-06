@@ -390,7 +390,6 @@ def _bootstrap_request() -> dict:
             "name": "CHART administrator",
             "email": "chart-admin@example.org",
             "username": "chart-admin",
-            "password": "valid-password",
         },
     }
 

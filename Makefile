@@ -212,8 +212,12 @@ identity-wait: services
 	printf "\nTimed out waiting for local Keycloak on http://127.0.0.1:8080\n"; \
 	exit 1
 
+# Development Keycloak sends sign-in codes to Mailpit (http://127.0.0.1:8025);
+# the host is Mailpit's name on Keycloak's Docker network.
 identity-sync: identity-wait
-	$(NPM) run identity:sync
+	SMTP_HOST=$${SMTP_HOST:-$(if $(filter remote,$(CHART_SERVICES)),mailpit,chart-mailpit)} \
+	SMTP_PORT=$${SMTP_PORT:-1025} SMTP_SECURITY=$${SMTP_SECURITY:-none} \
+	SMTP_FROM=$${SMTP_FROM:-no-reply@chart.local} $(NPM) run identity:sync
 
 identity-test:
 	$(NPM) run identity:test

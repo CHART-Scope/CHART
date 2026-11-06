@@ -286,7 +286,8 @@ test("the setup wizard sends the setup token the administrator enters", async ({
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Full name").fill("CHART Administrator");
   await dialog.getByLabel("Email address").fill("admin@example.org");
-  await dialog.getByLabel("Administrator password").fill("a-long-password");
+  // The administrator signs in with emailed codes, so setup asks for no password.
+  await expect(dialog.locator('input[type="password"]')).toHaveCount(1);
   const create = dialog.getByRole("button", { name: "Create account & launch" });
   await expect(create).toBeDisabled();
 
@@ -301,10 +302,15 @@ test("the setup wizard sends the setup token the administrator enters", async ({
   expect(
     upstream.requests.map((request) => request.headers["x-chart-bootstrap-token"]),
   ).toEqual(["a-wrong-token", "the-real-setup-token"]);
+  expect(JSON.parse(upstream.requests[1].body).admin).toEqual({
+    name: "CHART Administrator",
+    email: "admin@example.org",
+    username: "admin@example.org",
+  });
   const persisted = await page.evaluate(() =>
     window.localStorage.getItem("chart:onboarding"),
   );
-  // Like the password, the token stays in memory only.
+  // The token stays in memory only.
   expect(persisted ?? "").not.toContain("setup-token");
   expect(persisted ?? "").not.toContain("setupToken");
 });
