@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Literal
 
 from sqlalchemy import delete, select
 
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import chart_roles
 from chart.identity import IdentityError, disable_user as disable_identity_user
-from chart.identity import upsert_user
+from chart.identity import send_invitation, upsert_user
 from chart.shared.db.models import (
     AppGeography,
     AppUser,
@@ -122,7 +123,7 @@ def create_user(input_data: CreateUserInput, actor: CurrentUserContext) -> UserR
                 )
             session.commit()
             persisted = True
-            return _response(session, record)
+            created = _response(session, record)
     except Exception as error:
         if identity.created and not persisted:
             try:
@@ -132,6 +133,31 @@ def create_user(input_data: CreateUserInput, actor: CurrentUserContext) -> UserR
                     "Failed to disable orphaned identity %s", identity.user_id
                 )
         raise UserServiceError("USER_PERSIST_FAILED", 500) from error
+    return created.model_copy(update={"invitation": _invite(created.userId)})
+
+
+def resend_invitation(user_id: str, actor: CurrentUserContext) -> UserResponse:
+    _require_admin(actor)
+    with get_session_factory()() as session:
+        record = session.get(AppUser, user_id)
+        if record is None:
+            raise UserServiceError("USER_NOT_FOUND", 404)
+        if record.status != "active":
+            raise UserServiceError("USER_DISABLED", 409)
+        response = _response(session, record)
+    if _invite(user_id) == "failed":
+        raise UserServiceError("USER_INVITE_FAILED", 502)
+    return response.model_copy(update={"invitation": "sent"})
+
+
+def _invite(user_id: str) -> Literal["sent", "failed"]:
+    try:
+        send_invitation(user_id)
+    except IdentityError:
+        # Logged without the address; the account stands and can be re-invited.
+        logger.exception("Invitation email for %s was not sent", user_id)
+        return "failed"
+    return "sent"
 
 
 def disable_user(user_id: str, actor: CurrentUserContext) -> UserResponse:

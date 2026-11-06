@@ -1260,7 +1260,7 @@
         },
         "responses": {
           "200": {
-            "description": "The created or invited user and their effective CHART access assignment.",
+            "description": "The invited user, their CHART access and whether the invitation was sent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1285,7 +1285,55 @@
             "bearerAuth": []
           }
         ],
-        "description": "Creates the CHART user assignment requested by an authorized administrator after validating role and geography boundaries. The route coordinates the application identity record without allowing the caller to delegate permissions they do not hold."
+        "description": "Creates the CHART user assignment requested by an authorized administrator after validating role and geography boundaries, with no password, and has Keycloak email the person an invitation to sign in with a code. The account stands even if the email fails; `invitation` says which, and `POST /users/{user_id}/invitation` sends it again."
+      }
+    },
+    "/users/{user_id}/invitation": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Email a person their CHART invitation again",
+        "operationId": "invitation_route_users__user_id__invitation_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The person and their CHART access, with invitation set to sent once Keycloak accepted the email.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Has Keycloak email the invitation again for an active account: a link that confirms the address and opens CHART's sign-in, where the person signs in with an emailed code. Administrators only. Answers 502 USER_INVITE_FAILED when the email could not be sent."
       }
     },
     "/users/{user_id}/disable": {
@@ -12677,6 +12725,21 @@
             },
             "type": "array",
             "title": "Geographyscopes"
+          },
+          "invitation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "sent",
+                  "failed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invitation"
           }
         },
         "type": "object",

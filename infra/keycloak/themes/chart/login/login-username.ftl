@@ -12,7 +12,7 @@
         <div id="kc-form">
             <div id="kc-form-wrapper">
                 <form id="kc-form-login" class="${properties.kcFormClass!}" onsubmit="login.disabled = true; return true;" action="${url.loginAction}" method="post">
-                    <@field.group name="username" label=msg("usernameOrEmail") error=messagesPerField.get("username")>
+                    <@field.group name="username" label=msg("chartEmailLabel") error=messagesPerField.get("username")>
                         <span class="${properties.kcInputClass} <#if messagesPerField.existsError('username')>${properties.kcError}</#if>">
                             <input id="username" name="username" value="${login.username!''}" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" autofocus aria-invalid="<#if messagesPerField.existsError('username')>true</#if>"/>
                         </span>

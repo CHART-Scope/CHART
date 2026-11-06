@@ -233,12 +233,25 @@ OPERATION_DOCUMENTATION: dict[
         summary="Create or invite a user within administrative scope",
         description=(
             "Creates the CHART user assignment requested by an authorized administrator "
-            "after validating role and geography boundaries. The route coordinates the "
-            "application identity record without allowing the caller to delegate "
-            "permissions they do not hold."
+            "after validating role and geography boundaries, with no password, and "
+            "has Keycloak email the person an invitation to sign in with a code. The "
+            "account stands even if the email fails; `invitation` says which, and "
+            "`POST /users/{user_id}/invitation` sends it again."
         ),
         success_responses={
-            "200": "The created or invited user and their effective CHART access assignment."
+            "200": "The invited user, their CHART access and whether the invitation was sent."
+        },
+    ),
+    ("post", "/users/{user_id}/invitation"): OperationDocumentation(
+        summary="Email a person their CHART invitation again",
+        description=(
+            "Has Keycloak email the invitation again for an active account: a link "
+            "that confirms the address and opens CHART's sign-in, where the person "
+            "signs in with an emailed code. Administrators only. Answers 502 "
+            "USER_INVITE_FAILED when the email could not be sent."
+        ),
+        success_responses={
+            "200": "The person and their CHART access, with invitation set to sent once Keycloak accepted the email."
         },
     ),
     ("post", "/users/{user_id}/disable"): OperationDocumentation(
