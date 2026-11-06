@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Literal
 
 import httpx
 
@@ -79,7 +80,9 @@ def rankers() -> list[ProviderStatus]:
     ]
 
 
-def list_models(provider: str) -> tuple[list[str], str]:
+def list_models(
+    provider: str,
+) -> tuple[list[str], Literal["provider", "configured", "none"]]:
     """The provider's models and where the list came from."""
 
     configured = [

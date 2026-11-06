@@ -745,7 +745,9 @@ OPERATION_DOCUMENTATION: dict[
             "recommendations are keyed on. Plans for places no longer in the "
             "caller's geography scope are omitted. Requires a dashboard reader role."
         ),
-        success_responses={"200": "The caller's saved plans; empty when none."},
+        success_responses={
+            "200": "The caller's saved plans for places they can still read, newest first; empty when none."
+        },
     ),
     ("post", "/saved-plans"): OperationDocumentation(
         summary="Save a dashboard view with its published estimate",
@@ -760,24 +762,31 @@ OPERATION_DOCUMENTATION: dict[
             "(OUTLOOK_SELECTION_INVALID) and more than 100 plans per user "
             "(SAVED_PLAN_LIMIT)."
         ),
-        success_responses={"201": "The saved plan with its captured figure."},
+        success_responses={
+            "201": "The new saved plan with the published figure and risk reading captured for it."
+        },
     ),
     ("get", "/saved-plans/{plan_id}"): OperationDocumentation(
-        summary="Open one saved plan",
+        summary="Open one of the caller's saved plans",
         description=(
             "Returns one of the caller's plans. Another user's plan is reported as "
             "SAVED_PLAN_NOT_FOUND; a plan whose place has left the caller's scope "
             "is refused with GEOGRAPHY_OUT_OF_SCOPE."
         ),
-        success_responses={"200": "The saved plan."},
+        success_responses={
+            "200": "The requested saved plan with its captured figure, choices and risk reading."
+        },
     ),
     ("delete", "/saved-plans/{plan_id}"): OperationDocumentation(
-        summary="Remove a saved plan",
+        summary="Remove one of the caller's saved plans",
         description=(
-            "Deletes one of the caller's plans. Another user's plan is reported as "
-            "SAVED_PLAN_NOT_FOUND and left untouched."
+            "Deletes one of the caller's plans for good. Another user's plan is "
+            "reported as SAVED_PLAN_NOT_FOUND and left untouched, as is a plan that "
+            "was already removed."
         ),
-        success_responses={"204": "The plan was removed."},
+        success_responses={
+            "204": "The plan was removed; removing it again answers 404 SAVED_PLAN_NOT_FOUND."
+        },
     ),
     ("post", "/saved-plans/{plan_id}/recommendations"): OperationDocumentation(
         summary="Rank repository actions for a saved plan, with an insight",
@@ -792,7 +801,9 @@ OPERATION_DOCUMENTATION: dict[
             "generated insight is reused until the provider, model or ranking "
             "changes. Ownership and scope follow GET /saved-plans/{plan_id}."
         ),
-        success_responses={"200": "The ranked actions with reasons and the insight."},
+        success_responses={
+            "200": "The plan's top-ranked published actions with their reasons, and the insight beside them."
+        },
     ),
     ("get", "/recommendation-settings"): OperationDocumentation(
         summary="Read how recommendations are ranked and explained",
@@ -801,7 +812,9 @@ OPERATION_DOCUMENTATION: dict[
             "option and whether the server environment enables it (credentials "
             "are never stored or returned). Administrators only (chart_admin)."
         ),
-        success_responses={"200": "The settings and the available options."},
+        success_responses={
+            "200": "The current ranker and insight settings, with which options this server can offer."
+        },
     ),
     ("put", "/recommendation-settings"): OperationDocumentation(
         summary="Choose the ranker and the insight provider and model",
@@ -813,7 +826,9 @@ OPERATION_DOCUMENTATION: dict[
             "without a model (INSIGHT_MODEL_REQUIRED). Administrators only; "
             "every change records a recommendation_settings_changed audit event."
         ),
-        success_responses={"200": "The settings as they now apply."},
+        success_responses={
+            "200": "The saved ranker and insight settings as they now apply, with the available options."
+        },
     ),
     ("get", "/recommendation-settings/providers/{provider}/models"): (
         OperationDocumentation(
@@ -824,7 +839,9 @@ OPERATION_DOCUMENTATION: dict[
                 "(source configured). Fails with INSIGHT_MODELS_UNAVAILABLE when "
                 "neither is available. Administrators only."
             ),
-            success_responses={"200": "The provider's models and their source."},
+            success_responses={
+                "200": "The models the provider offers and whether the list came from the provider or configuration."
+            },
         )
     ),
     ("get", "/risk/{geography_id}/monthly"): OperationDocumentation(

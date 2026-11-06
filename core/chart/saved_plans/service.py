@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from typing import Any, Literal
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -35,6 +36,8 @@ from .schemas import (
     SavedPlanResponse,
 )
 
+RiskLevel = Literal["elevated", "possible", "not_detected", "unknown"]
+PlanTiming = Literal["before", "during", "after"]
 MAX_PLANS_PER_USER = 100
 
 
@@ -53,14 +56,16 @@ def create_plan(
         raise SavedPlanError("GEOGRAPHY_NOT_FOUND", 404)
     place = frame
     if request.admin_unit_id:
-        place = session.get(AppGeography, request.admin_unit_id)
+        unit = session.get(AppGeography, request.admin_unit_id)
         # A sub-area must sit inside the frame it was chosen on.
-        if place is None or not place.path.startswith(frame.path.rstrip("/") + "/"):
+        if unit is None or not unit.path.startswith(frame.path.rstrip("/") + "/"):
             raise SavedPlanError("PLAN_AREA_INVALID", 422)
+        place = unit
     if not can_read_geography_path(user, place.path):
         raise SavedPlanError("GEOGRAPHY_OUT_OF_SCOPE", 403)
-    count = session.scalar(
-        select(func.count()).where(SavedPlan.user_id == user.user_id)
+    count = (
+        session.scalar(select(func.count()).where(SavedPlan.user_id == user.user_id))
+        or 0
     )
     if count >= MAX_PLANS_PER_USER:
         raise SavedPlanError("SAVED_PLAN_LIMIT", 409)
@@ -98,13 +103,14 @@ def list_plans(session: Session, user: CurrentUserContext) -> list[SavedPlanResp
         .order_by(SavedPlan.created_at.desc())
     ).all()
     place_ids = {plan.admin_unit_id or plan.geography_id for plan in plans}
-    paths = dict(
-        session.execute(
+    paths: dict[str, str] = {
+        row.id: row.path
+        for row in session.execute(
             select(AppGeography.id, AppGeography.path).where(
                 AppGeography.id.in_(place_ids)
             )
-        ).all()
-    )
+        )
+    }
     return [
         plan_response(plan)
         for plan in plans
@@ -149,7 +155,7 @@ def capture_figure(
     """Resolve the choices and read the estimate the dashboard shows for them."""
 
     season = heat_season(place.country_code)
-    seasonal = {
+    seasonal: dict[str, Any] = {
         "heat_season_label": season.label if season else None,
         "heat_season_months": list(season.months) if season else [],
     }
@@ -258,6 +264,7 @@ def _unavailable(reason: str, seasonal: dict) -> PlanFigure:
 
 
 def signals(choices: PlanChoices, figure: PlanFigure) -> PlanSignals:
+    risk: RiskLevel
     ratio = figure.ratio
     if ratio is not None:
         risk = (
@@ -272,7 +279,7 @@ def signals(choices: PlanChoices, figure: PlanFigure) -> PlanSignals:
     return PlanSignals(risk_level=risk, timing=_timing(choices, figure))
 
 
-def _timing(choices: PlanChoices, figure: PlanFigure) -> str:
+def _timing(choices: PlanChoices, figure: PlanFigure) -> PlanTiming:
     months = figure.heat_season_months
     if choices.view == "projection" or not choices.month or not months:
         return "before"

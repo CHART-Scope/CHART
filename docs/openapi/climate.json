@@ -3211,7 +3211,7 @@
         "operationId": "list_saved_plans_saved_plans_get",
         "responses": {
           "200": {
-            "description": "The caller's saved plans; empty when none.",
+            "description": "The caller's saved plans for places they can still read, newest first; empty when none.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3246,7 +3246,7 @@
         },
         "responses": {
           "201": {
-            "description": "The saved plan with its captured figure.",
+            "description": "The new saved plan with the published figure and risk reading captured for it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3279,7 +3279,7 @@
         "tags": [
           "saved-plans"
         ],
-        "summary": "Open one saved plan",
+        "summary": "Open one of the caller's saved plans",
         "operationId": "read_saved_plan_saved_plans__plan_id__get",
         "security": [
           {
@@ -3301,7 +3301,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The saved plan.",
+            "description": "The requested saved plan with its captured figure, choices and risk reading.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3327,7 +3327,7 @@
         "tags": [
           "saved-plans"
         ],
-        "summary": "Remove a saved plan",
+        "summary": "Remove one of the caller's saved plans",
         "operationId": "delete_saved_plan_saved_plans__plan_id__delete",
         "security": [
           {
@@ -3349,7 +3349,7 @@
         ],
         "responses": {
           "204": {
-            "description": "The plan was removed."
+            "description": "The plan was removed; removing it again answers 404 SAVED_PLAN_NOT_FOUND."
           },
           "422": {
             "description": "Validation Error",
@@ -3362,7 +3362,7 @@
             }
           }
         },
-        "description": "Deletes one of the caller's plans. Another user's plan is reported as SAVED_PLAN_NOT_FOUND and left untouched."
+        "description": "Deletes one of the caller's plans for good. Another user's plan is reported as SAVED_PLAN_NOT_FOUND and left untouched, as is a plan that was already removed."
       }
     },
     "/saved-plans/{plan_id}/recommendations": {
@@ -3402,7 +3402,7 @@
         },
         "responses": {
           "200": {
-            "description": "The ranked actions with reasons and the insight.",
+            "description": "The plan's top-ranked published actions with their reasons, and the insight beside them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3434,7 +3434,7 @@
         "operationId": "read_recommendation_settings_recommendation_settings_get",
         "responses": {
           "200": {
-            "description": "The settings and the available options.",
+            "description": "The current ranker and insight settings, with which options this server can offer.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3469,7 +3469,7 @@
         },
         "responses": {
           "200": {
-            "description": "The settings as they now apply.",
+            "description": "The saved ranker and insight settings as they now apply, with the available options.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3523,7 +3523,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The provider's models and their source.",
+            "description": "The models the provider offers and whether the list came from the provider or configuration.",
             "content": {
               "application/json": {
                 "schema": {
