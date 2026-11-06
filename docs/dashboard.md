@@ -85,6 +85,13 @@ imply a spatial resolution the model does not have.
 Geometry is simplified for drawing only (the response discloses the tolerance);
 every climate extraction uses the unsimplified boundary.
 
+Moving around it stays smooth, as in Explore: resting the pointer on an area
+for a moment fetches the map that clicking it opens, and opening a place whose
+map is not loaded yet keeps the last map on screen, dimmed, until it arrives,
+never a blank. Up to 60 maps are kept for the session (cleared on sign-out).
+Custom maps with their own loader (outlook, vulnerability) keep the last-map
+behaviour but are not fetched ahead.
+
 For what the map queues by itself and what its four states mean, see
 [Data pipeline](data-pipeline.md#what-the-dashboard-queues-on-its-own).
 
