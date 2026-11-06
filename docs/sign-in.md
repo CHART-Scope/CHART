@@ -18,15 +18,26 @@ deploy) sets the `chart` realm up:
   15 minutes, so nobody can flood an inbox;
 - self-registration and password reset are off. An unknown or disabled
   address gets an error and no email;
-- Keycloak sends the email itself through the SMTP server below.
+- Keycloak sends the email itself through the SMTP server below;
+- after the code, CHART opens the dashboard of the person's own area (the
+  area Start planning would pick), or the page that asked them to sign in.
+
+The two screens, **Sign in to CHART** (email) and **Check your email** (code),
+use CHART's header, fonts and colours and fit a phone. They are the `chart`
+login theme: `infra/keycloak/themes/chart/login/` holds their templates
+(`login-username.ftl`, `login-email-otp.ftl`), wording
+(`messages/messages_en.properties`) and styles (`resources/css/chart.css`).
 
 The code step is the
 [for-keycloak email OTP authenticator](https://github.com/for-keycloak/email-otp-authenticator)
 (Unlicense), committed as
 `infra/keycloak/providers/email-otp-authenticator-v1.8.1-kc-26.6.4.jar`
 (SHA-256 `8013758fe4f24dfb561d57f83c0853387fb18c9b35925c77fb60ccd9af7cedea`).
-It is built for Keycloak 26.6.4; when Keycloak is upgraded, replace the jar
-with the release built for the new version.
+`infra/keycloak/Dockerfile` builds it, the theme and the realm seed into the
+`chart-keycloak` image that deployments run (pre-built, so Keycloak starts in
+seconds), and the sync script into `chart-keycloak-config`. To upgrade
+Keycloak, change `KEYCLOAK_VERSION` there and replace the jar with the
+release built for that version.
 
 ## Email settings
 

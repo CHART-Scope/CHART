@@ -33,11 +33,14 @@ test("a wrong code is refused and the emailed code signs the planner in", async 
 }) => {
   const code = await requestSignInCode(page, "kenya-planner");
   await enterCode(page, code === "222222" ? "333333" : "222222");
-  await expect(page.getByText("Invalid code")).toBeVisible();
+  await expect(
+    page.getByText("That code is not right. Check the latest email and try again."),
+  ).toBeVisible();
   await expect(page).not.toHaveURL(/\/(plan|dashboard)/);
 
   await enterCode(page, code);
-  await page.waitForURL(/\/(plan|dashboard)/);
+  // Straight to the dashboard of the planner's own area.
+  await page.waitForURL(/\/dashboard\/geo-ke/);
   await page.screenshot({ path: `${evidence}/email-code-signed-in.png` });
 });
 
@@ -78,7 +81,7 @@ test("an account an administrator adds has no password, signs in by email and st
   await second.getByLabel("Email address").fill(email);
   await second.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(
-    second.getByText("Account is disabled, contact your administrator."),
+    second.getByText("This account is turned off. Ask your CHART administrator."),
   ).toBeVisible();
   await second.waitForTimeout(3_000);
   expect(await inboxCount(second, email)).toBe(sent);
@@ -90,8 +93,40 @@ test("an address with no account is refused and gets no email", async ({ page })
   await page.goto("/auth/signin");
   await page.getByLabel("Email address").fill(email);
   await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByText("Invalid username or email.")).toBeVisible();
+  await expect(
+    page.getByText(
+      "No CHART account uses that email address. Ask your CHART administrator to add you.",
+    ),
+  ).toBeVisible();
   await expect(page.getByLabel("Your access code")).toHaveCount(0);
   await page.waitForTimeout(3_000);
   expect(await inboxCount(page, email)).toBe(0);
+});
+
+test("on a phone the sign-in screens fit, say where the code went and let you start over", async ({
+  browser,
+}) => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const code = await requestSignInCode(page, "india-planner");
+  await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+  await expect(
+    page.getByText(/We sent a 6-character code to in\*+@ex\*+\.invalid/),
+  ).toBeVisible();
+  // Keycloak's read-only address-and-restart row is replaced by one link.
+  await expect(page.locator("#kc-attempted-username")).toBeHidden();
+  const field = page.getByLabel("Your access code");
+  await expect(field).toHaveCSS("font-size", "24px");
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+  ).toBe(true);
+  await page.screenshot({ path: `${evidence}/email-code-phone.png` });
+
+  await page.getByRole("link", { name: "Use a different email" }).click();
+  await expect(page.getByRole("heading", { name: "Sign in to CHART" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Back to CHART" })).toHaveAttribute(
+    "href",
+    new RegExp(`^${process.env.CHART_E2E_ORIGIN}`),
+  );
+  expect(code).toMatch(/^[A-Z0-9]{6}$/);
+  await page.close();
 });

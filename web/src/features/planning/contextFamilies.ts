@@ -55,6 +55,23 @@ export function defaultAreaForFamily(
   return place;
 }
 
+/** Where a planner starts: the family they last chose (`activeGeographyId`),
+ * else their first, opened at `defaultAreaForFamily`. Start planning and
+ * sign-in both use it, so they never disagree about a person's area. */
+export function defaultPlanningArea(
+  geographies: GeographyRecord[],
+  scopes: string[],
+  activeGeographyId?: string | null,
+): GeographyRecord | null {
+  const families = computeFamilies(geographies, scopes);
+  const family =
+    families.find(
+      (item) =>
+        activeGeographyId && familyContains(item, activeGeographyId, geographies),
+    ) ?? families[0];
+  return family ? defaultAreaForFamily(family, geographies) : null;
+}
+
 /** Match a geography id or family path against a family's subtree so
  * both `/india/madhya-pradesh` and `geo-in-madhya-pradesh-division-bhopal`
  * resolve to the same family.

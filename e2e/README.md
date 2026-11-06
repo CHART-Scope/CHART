@@ -29,7 +29,9 @@ selection errors, authentication/authorization, scope isolation, unavailable
 observed estimates, browser selectors and session restoration.
 
 Browsers sign in the way people do ([sign-in](../docs/sign-in.md)): the run
-applies `infra/keycloak/sync-realm.js` to its disposable realm, Keycloak emails
+builds the deployment's `chart-keycloak` and `chart-keycloak-config` images
+from `infra/keycloak/Dockerfile`, serves Keycloak under `/identity` with its own
+database, applies the sync image to its disposable realm, Keycloak emails
 each code to the run's own Mailpit, and `e2e/emailCode.ts` reads it through
 Mailpit's API. `email-code-signin-live.spec.ts` checks that a wrong code is
 refused, that an account an administrator adds through the API has no password

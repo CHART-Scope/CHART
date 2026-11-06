@@ -16,11 +16,7 @@ import {
   type SavedPlan,
 } from "@/lib/savedPlansClient";
 import { isInScope } from "@/lib/geographyScope";
-import {
-  computeFamilies,
-  defaultAreaForFamily,
-  familyContains,
-} from "./contextFamilies";
+import { defaultPlanningArea } from "./contextFamilies";
 import { InlineContextSwitcher } from "./InlineContextSwitcher";
 import { PlanningSetup } from "./PlanningSetup";
 import { SavedPlansList } from "./SavedPlansList";
@@ -74,13 +70,7 @@ export function PlanningApp({ geographyScopes, activeGeographyId }: Props) {
         const inScope = records.filter((area) => isInScope(area, geographyScopes));
         // Plan from the family the user last chose, at its broadest useful
         // level (Kenya, Madhya Pradesh), not from the first county or division.
-        const families = computeFamilies(records, geographyScopes);
-        const family =
-          families.find(
-            (item) =>
-              activeGeographyId && familyContains(item, activeGeographyId, records),
-          ) ?? families[0];
-        const active = family ? defaultAreaForFamily(family, records) : null;
+        const active = defaultPlanningArea(records, geographyScopes, activeGeographyId);
         setAreas(inScope);
         setSelection((current) => ({ ...current, area: active?.id ?? "" }));
         if (!active) {
