@@ -1,0 +1,145 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 820px;
+  margin-bottom: var(--space-6);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-card);
+}
+.eyebrow {
+  margin: 0;
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-nexus);
+}
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
+}
+.figure {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: 1.5;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  font-size: var(--fs-caption);
+  color: var(--color-charcoal);
+}
+.chip[data-risk="elevated"] {
+  background: var(--color-maroon-tint);
+  color: var(--color-maroon);
+}
+.chip[data-risk="possible"] {
+  background: var(--color-amber-tint);
+  color: var(--color-charcoal);
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.item {
+  display: flex;
+  gap: var(--space-3);
+}
+.rank {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-nexus-tint);
+  font-weight: 600;
+  color: var(--color-nexus);
+}
+.body {
+  min-width: 0;
+}
+.action {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-nexus);
+  text-align: left;
+  cursor: pointer;
+}
+.action:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.reasons {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-4);
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-muted);
+}
+.insight {
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-nexus-tint);
+}
+.insightHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-weight: 600;
+}
+.badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-card);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.insightText {
+  margin: 0;
+  font-size: var(--fs-body-sm);
+  line-height: 1.55;
+}
+.insightNote {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+}
+.status,
+.source {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+}
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--color-amber);
+  background: var(--surface-muted);
+  font-size: var(--fs-body-sm);
+}
+.error p {
+  margin: 0;
+}

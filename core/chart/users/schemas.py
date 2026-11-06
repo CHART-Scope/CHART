@@ -26,6 +26,5 @@ class CreateUserInput(BaseModel):
     email: str = Field(min_length=3)
     phone: str | None = None
     username: str = Field(min_length=2)
-    password: str = Field(min_length=8)
     roles: list[str] = Field(min_length=1)
     geographyIds: list[str] = Field(min_length=1)

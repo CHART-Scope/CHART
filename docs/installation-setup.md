@@ -24,8 +24,10 @@ itself, so a visitor who does not hold the token cannot bootstrap an
 installation.
 
 The person running the wizard enters the token in the **Setup token** field of
-the first-administrator dialog. It is kept in memory only, like the
-administrator password, and is never written to `localStorage`.
+the first-administrator dialog. It is kept in memory only and is never written
+to `localStorage`. The dialog asks for no password: the administrator signs in
+with a code emailed to the address they enter ([sign-in](sign-in.md)), so the
+installation's email settings must work before setup.
 
 - **Local development:** `make run` (through `make bootstrap-token`) generates
   the token once and stores it in `web/.env.local`. Read it with
@@ -51,8 +53,8 @@ The saga in order:
 
 Wizard state in the browser is held in a `zustand` store persisted to
 `localStorage` under the key `chart:onboarding`. Refreshing the page mid-wizard
-does not lose progress. The administrator password is deliberately excluded
-from the persisted slice and lives only in memory.
+does not lose progress. The setup token is deliberately excluded from the
+persisted slice and lives only in memory.
 
 ## Administrative area and fitted model area
 

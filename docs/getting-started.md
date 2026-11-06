@@ -45,7 +45,7 @@ After startup, open the service you need:
 | CHART API documentation | `http://127.0.0.1:3210/docs` |
 | Dagster | `http://127.0.0.1:3002` |
 | Keycloak | `http://127.0.0.1:8080` |
-| Mailpit inbox | `http://127.0.0.1:8025` |
+| Mailpit inbox (sign-in codes, see [sign-in](sign-in.md)) | `http://127.0.0.1:8025` |
 
 !!! important "These are local addresses"
     Addresses beginning with `127.0.0.1` only work on the computer running

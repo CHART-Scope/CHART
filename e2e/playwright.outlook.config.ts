@@ -11,6 +11,8 @@ export default defineConfig({
     "geography-navigation-live.spec.ts",
     "vra-values-live.spec.ts",
     "typography-live.spec.ts",
+    "saved-plans-live.spec.ts",
+    "email-code-signin-live.spec.ts",
   ],
   workers: 1,
   retries: 0,

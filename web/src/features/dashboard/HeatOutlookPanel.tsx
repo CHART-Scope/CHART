@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { type IconName } from "@/components/Icon";
+import { Button } from "@/components/Button";
+import { Icon, type IconName } from "@/components/Icon";
 import { IconArray } from "@/components/IconArray";
 import { PrecisionBadge } from "@/components/PrecisionBadge";
 import { PrecisionInfoModal } from "@/components/PrecisionInfoModal";
@@ -90,6 +91,8 @@ type Props = {
   onSelectionChange?: (selection: OutlookChoices) => void;
   figure?: IconName;
   onSelectArea?: (geographyId: string, selection: OutlookChoices) => void;
+  /** Offers "Save plan" for the view as currently resolved. */
+  onSavePlan?: (selection: OutlookChoices) => void;
 };
 
 /**
@@ -114,6 +117,7 @@ export function HeatOutlookPanel({
   selection,
   onSelectionChange,
   onSelectArea,
+  onSavePlan,
 }: Props) {
   // Choices are kept per outcome: a different outcome has different windows
   // and periods, while a different area keeps them for comparison.
@@ -251,7 +255,20 @@ export function HeatOutlookPanel({
       aria-busy={busy}
       data-testid="heat-outlook"
     >
-      <p className={base.eyebrow}>Climate attributable health risk</p>
+      <div className={styles.headRow}>
+        <p className={base.eyebrow}>Climate attributable health risk</p>
+        {onSavePlan && (
+          <Button
+            variant="secondary"
+            size="sm"
+            leadingIcon={<Icon name="bookmark" size={14} />}
+            disabled={busy}
+            onClick={() => onSavePlan(resolvedChoices)}
+          >
+            Save plan
+          </Button>
+        )}
+      </div>
       <h2 id="heat-outlook-title" className={base.question}>
         What share of{" "}
         <strong className={base.inlineStatic}>{outcomeLabel.toLowerCase()}</strong>{" "}

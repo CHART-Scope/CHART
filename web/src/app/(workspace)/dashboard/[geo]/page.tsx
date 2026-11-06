@@ -20,6 +20,8 @@ import { useModelCatalog } from "@/lib/useModelCatalog";
 import { type GeographyRecord } from "@/lib/planningClient";
 import { type OutlookChoices } from "@/features/dashboard/HeatOutlookPanel";
 import { resolveMonthlyRiskMonth } from "@/features/dashboard/HeatLbwLinkPanel";
+import { SavePlanDialog } from "@/features/dashboard/SavePlanDialog";
+import { type SavedPlanInput } from "@/lib/savedPlansClient";
 import {
   dashboardHref,
   readOutlookChoices,
@@ -67,10 +69,11 @@ function Dashboard({
   choices: OutlookChoices;
 }) {
   // The workspace layout restores the session and sends an account without a
-  // planning area to /access-pending before this renders.
+  // planning area to /explore before this renders.
   const session = useSession();
   const router = useRouter();
   const [mapRefresh, setMapRefresh] = useState(0);
+  const [planDraft, setPlanDraft] = useState<SavedPlanInput | null>(null);
   const month = choices.month ?? null;
   // Selecting sibling districts/constituencies should feel like direct
   // manipulation. The URL remains
@@ -509,6 +512,28 @@ function Dashboard({
               outcomeLabel={outcomeLabel}
               figure={iconArrayFigure(outcome)}
               onSelectArea={selectMapArea}
+              onSavePlan={(resolved) => {
+                const view = resolved.view ?? "projection";
+                setPlanDraft({
+                  name: [
+                    outcomeLabel,
+                    effectiveGeography?.name ?? stateLabel,
+                    view === "projection" ? "Projected" : "Observed",
+                  ].join(" · "),
+                  geography_id: geographyId,
+                  admin_unit_id: displayedAdminUnit,
+                  outcome,
+                  choices: {
+                    view,
+                    month: resolved.month,
+                    scenario: resolved.scenario,
+                    period: resolved.period,
+                    selector: resolved.selector,
+                    observed_selector: resolved.observedSelector,
+                    reference: resolved.reference,
+                  },
+                });
+              }}
             />
           ) : observedModelAvailable || !resolvedCapabilities.data?.observed ? (
             observedPanel
@@ -530,12 +555,12 @@ function Dashboard({
         placeId={displayedAdminUnit ?? geographyId}
         placeName={effectiveGeography?.name ?? stateLabel}
         outcome={outcome}
-        outcomeLabel={outcomeLabel}
         hazardLabel={selectedCatalog?.climate_hazard_label ?? "Climate hazard"}
         healthDomainLabel={
           selectedCatalog?.health_domain_label ?? "Climate-sensitive health"
         }
       />
+      <SavePlanDialog draft={planDraft} onClose={() => setPlanDraft(null)} />
     </main>
   );
 }

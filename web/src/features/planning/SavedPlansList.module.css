@@ -1,0 +1,141 @@
+.saved {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  animation: rise 0.45s var(--ease-out-soft) 0.12s both;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+
+.body {
+  display: flex;
+  flex: 1 1 320px;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.figure {
+  margin: 0;
+  color: var(--color-charcoal);
+  font-size: var(--fs-body-sm);
+  line-height: 1.5;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.chip {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--color-charcoal);
+  font-size: var(--fs-caption);
+}
+
+.chip[data-risk="elevated"] {
+  background: var(--color-maroon-tint);
+  color: var(--color-maroon);
+}
+
+.chip[data-risk="possible"] {
+  background: var(--color-amber-tint);
+}
+
+.meta {
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+}
+
+.actions,
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.empty,
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-card);
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+}
+
+.empty p,
+.error p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.error {
+  justify-content: space-between;
+  border-style: solid;
+  border-left: 3px solid var(--color-amber);
+  color: var(--color-charcoal);
+}
+
+.rowError {
+  margin: var(--space-1) 0 0;
+  color: var(--color-maroon);
+  font-size: var(--fs-caption);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saved {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .actions {
+    width: 100%;
+  }
+}

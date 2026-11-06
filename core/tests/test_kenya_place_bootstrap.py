@@ -130,7 +130,6 @@ def test_failed_bootstrap_can_be_retried_with_changed_details() -> None:
                 "name": "New Administrator",
                 "email": "new-admin@example.org",
                 "username": "new-admin@example.org",
-                "password": "new-password",
             },
         }
     )

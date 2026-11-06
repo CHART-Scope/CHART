@@ -219,118 +219,6 @@
   color: var(--color-text-muted);
 }
 
-.priority {
-  padding: 14px 16px;
-  border-radius: var(--radius-xl);
-  background: var(--color-nexus-tint);
-}
-.priorityHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  margin-bottom: 10px;
-}
-.priorityTitle {
-  font-family: var(--font-display);
-  margin: 0;
-  font-size: var(--fs-body-sm);
-  font-weight: 700;
-}
-.link {
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: var(--fs-caption);
-  font-weight: 600;
-  color: var(--color-nexus);
-  cursor: pointer;
-}
-.chipRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.chipItem {
-  position: relative;
-}
-.chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px 5px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-  background: var(--surface-card);
-  font-size: var(--fs-caption);
-  font-weight: 600;
-  color: var(--color-charcoal);
-  cursor: pointer;
-}
-.chip[aria-expanded="true"] {
-  border-color: var(--color-nexus);
-}
-.dot {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
-}
-.assigned {
-  color: var(--color-success);
-}
-.body .tooltip {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 5;
-  width: 240px;
-  margin: 0;
-  padding: 10px 13px;
-  border-radius: 9px;
-  background: var(--color-charcoal);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-  font-size: var(--fs-caption);
-  line-height: 1.55;
-  color: var(--color-white);
-}
-.tooltip strong {
-  font-family: var(--font-display);
-  font-size: var(--fs-body-lg);
-  color: var(--color-lime);
-}
-.body .legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 11px 0 0;
-  font-size: var(--fs-micro);
-  color: var(--color-text-muted);
-}
-.legend > span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.body .assignSummary {
-  margin: 12px 0 0;
-  padding: 9px 12px;
-  border: 1px solid var(--color-nexus);
-  border-radius: 9px;
-  background: var(--surface-card);
-  font-size: var(--fs-caption);
-}
-
-.body .stepsHeading {
-  font-family: var(--font-display);
-  margin-bottom: 4px;
-  font-weight: 600;
-}
 .list {
   margin: 8px 0 14px;
   padding-left: 18px;
@@ -339,11 +227,6 @@
 }
 .list li {
   margin-bottom: 4px;
-}
-.example {
-  display: block;
-  font-size: var(--fs-body-sm);
-  color: var(--color-text-muted);
 }
 .references {
   display: flex;

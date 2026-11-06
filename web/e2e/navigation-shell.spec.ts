@@ -113,6 +113,13 @@ test("sidebar navigation keeps one shell mounted across workspace pages", async 
   const nav = page.getByRole("navigation", { name: "Main" });
   const entry = (name: string) => nav.getByRole("link", { name, exact: true });
   await expect(entry("Start planning")).toHaveAttribute("aria-current", "page");
+  // Learning hub sits directly below Start planning.
+  await expect(nav.getByRole("link")).toHaveText([
+    "Start planning",
+    "Learning hub",
+    "Vulnerability",
+    "Settings",
+  ]);
   await expect(
     page.getByRole("combobox", { name: "State", exact: true }),
   ).toBeVisible();
@@ -222,11 +229,10 @@ test("route guards still apply inside the shared shell", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Models" })).toHaveCount(0);
 });
 
-test("an account without a planning area lands on access-pending", async ({ page }) => {
+test("an account without a planning area gets the public map", async ({ page }) => {
   await signInAs(page, { roles: ["health_planning_lead"], geographyScopes: [] });
   await page.goto("/dashboard/geo-in-mp?outcome=lbw");
-  await expect(page).toHaveURL(/\/access-pending$/);
-  await expect(
-    page.getByRole("heading", { name: "Your account has not been invited yet" }),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/\/explore(\?|$)/);
+  await page.goto("/access-pending");
+  await expect(page.getByRole("heading", { name: /not been invited/ })).toHaveCount(0);
 });

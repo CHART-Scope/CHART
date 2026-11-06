@@ -1,46 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { Icon, type IconName } from "@/components/Icon";
 import {
   ActionPanel,
-  heatHazardKey,
-  listActions,
   statusLabels,
   useActionProgress,
+  useHeatActions,
 } from "@/features/actions";
 
 import styles from "./RecommendedActionsPanel.module.css";
 
-type ToneKey =
-  | "behaviour"
-  | "environment"
-  | "policy"
-  | "energy"
-  | "infrastructure"
-  | "products"
-  | "service"
-  | "wash"
-  | "neutral";
+type Tone = { toneClass: string; icon: IconName };
 
-type CategoryStyle = {
-  toneClass: string;
-  icon: IconName;
+// Action types (the feed's vocabulary) by their first word.
+const TYPE_TONES: Record<string, Tone> = {
+  Behaviour: { toneClass: styles.tBehaviour, icon: "users" },
+  Capacity: { toneClass: styles.tBehaviour, icon: "users" },
+  Clinical: { toneClass: styles.tBehaviour, icon: "heart-handshake" },
+  Supplies: { toneClass: styles.tBehaviour, icon: "droplet" },
+  Environment: { toneClass: styles.tEnvironment, icon: "leaf" },
+  Infrastructure: { toneClass: styles.tEnvironment, icon: "building" },
+  Policy: { toneClass: styles.tPolicy, icon: "policy" },
+  Financing: { toneClass: styles.tPolicy, icon: "policy" },
+  Early: { toneClass: styles.tPolicy, icon: "alert-triangle" },
 };
-
-const CATEGORY_STYLES: Record<ToneKey, CategoryStyle> = {
-  behaviour: { toneClass: styles.tBehaviour, icon: "users" },
-  environment: { toneClass: styles.tEnvironment, icon: "leaf" },
-  policy: { toneClass: styles.tPolicy, icon: "policy" },
-  energy: { toneClass: styles.tPolicy, icon: "bolt" },
-  infrastructure: { toneClass: styles.tEnvironment, icon: "building" },
-  products: { toneClass: styles.tBehaviour, icon: "settings" },
-  service: { toneClass: styles.tBehaviour, icon: "heart-handshake" },
-  wash: { toneClass: styles.tEnvironment, icon: "droplet" },
-  neutral: { toneClass: styles.tNeutral, icon: "dots" },
-};
+const NEUTRAL: Tone = { toneClass: styles.tNeutral, icon: "dots" };
 
 type Props = {
   /** Page geography; the "See all" page is scoped to it. */
@@ -50,7 +37,6 @@ type Props = {
   placeId: string;
   placeName: string;
   outcome: string;
-  outcomeLabel: string;
   hazardLabel: string;
   healthDomainLabel: string;
 };
@@ -64,11 +50,10 @@ export function RecommendedActionsPanel({
   placeId,
   placeName,
   outcome,
-  outcomeLabel,
   hazardLabel,
   healthDomainLabel,
 }: Props) {
-  const actions = useMemo(() => listActions(heatHazardKey), []);
+  const { actions, loading, error, retry } = useHeatActions(geographyId);
   const progress = useActionProgress(placeId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const closePanel = useCallback(() => setSelectedId(null), []);
@@ -89,6 +74,19 @@ export function RecommendedActionsPanel({
             For {hazardLabel.toLowerCase()}
           </span>
         </header>
+        {loading ? (
+          <p className={styles.status} role="status">
+            Loading actions…
+          </p>
+        ) : null}
+        {error ? (
+          <p className={styles.status} role="alert">
+            {error}{" "}
+            <button type="button" className={styles.seeAll} onClick={retry}>
+              Try again
+            </button>
+          </p>
+        ) : null}
         <ul className={styles.list}>
           {actions.map((action) => (
             <li key={action.id}>
@@ -101,10 +99,14 @@ export function RecommendedActionsPanel({
                 <div className={styles.itemBody}>
                   <p className={styles.title}>{action.title}</p>
                   <div className={styles.pillRow}>
-                    <CategoryPill label={action.actionType} />
-                    <span className={`${styles.pill} ${styles.tNeutral}`}>
-                      {action.department} department
-                    </span>
+                    {action.action_types[0] ? (
+                      <CategoryPill label={action.action_types[0]} />
+                    ) : null}
+                    {action.departments[0] ? (
+                      <span className={`${styles.pill} ${styles.tNeutral}`}>
+                        {action.departments[0]}
+                      </span>
+                    ) : null}
                     <span className={styles.status}>
                       {statusLabels[progress.statusOf(action.id)]}
                     </span>
@@ -122,8 +124,6 @@ export function RecommendedActionsPanel({
       <ActionPanel
         action={actions.find((action) => action.id === selectedId) ?? null}
         contextLabel={`${hazardLabel} · ${healthDomainLabel} · ${placeName}`}
-        hazardLabel={hazardLabel}
-        outcomeLabel={outcomeLabel.toLowerCase()}
         progress={progress}
         onClose={closePanel}
       />
@@ -132,25 +132,11 @@ export function RecommendedActionsPanel({
 }
 
 function CategoryPill({ label }: { label: string }) {
-  const tone = toneForCategory(label);
-  const style = CATEGORY_STYLES[tone];
+  const tone = TYPE_TONES[label.split(/[\s:]/)[0]] ?? NEUTRAL;
   return (
-    <span className={`${styles.pill} ${style.toneClass}`}>
-      <Icon name={style.icon} size={12} />
+    <span className={`${styles.pill} ${tone.toneClass}`}>
+      <Icon name={tone.icon} size={12} />
       {label}
     </span>
   );
-}
-
-function toneForCategory(label: string): ToneKey {
-  const key = label.trim().toLowerCase();
-  if (key.startsWith("behaviour") || key.startsWith("behavior")) return "behaviour";
-  if (key === "environment") return "environment";
-  if (key === "policy" || key === "regulatory") return "policy";
-  if (key === "energy") return "energy";
-  if (key === "infrastructure") return "infrastructure";
-  if (key.startsWith("products")) return "products";
-  if (key.startsWith("service")) return "service";
-  if (key === "wash") return "wash";
-  return "neutral";
 }

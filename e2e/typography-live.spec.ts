@@ -1,6 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { signInWithEmailCode } from "./emailCode";
+
 const evidence = process.env.CHART_E2E_EVIDENCE!;
 const fixtures = () =>
   JSON.parse(readFileSync(`${evidence}/browser-fixture.json`, "utf8"));
@@ -270,12 +272,7 @@ async function signIn(page: Page, username = "india-planner") {
   );
   await typography(page.getByLabel("Email address"), "Noto", 13);
   await capture(page, `signin-${username}-${page.viewportSize()!.width}`);
-  await page.getByLabel("Email address").fill(username);
-  await page
-    .getByLabel("Password", { exact: true })
-    .fill(process.env.CHART_E2E_PASSWORD!);
-  await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await page.waitForURL(/\/(plan|dashboard)/);
+  await signInWithEmailCode(page, username);
 }
 
 test("sign-in failure keeps the themed form readable and retryable", async ({
@@ -283,15 +280,9 @@ test("sign-in failure keeps the themed form readable and retryable", async ({
 }) => {
   await page.goto("/auth/signin");
   await page.getByLabel("Email address").fill("missing-typography-account");
-  await page
-    .getByLabel("Password", { exact: true })
-    .fill("invalid-disposable-password");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(
-    page.getByText("Invalid username or password.", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("Invalid username or email.")).toBeVisible();
   await page.getByLabel("Email address").fill("");
-  await page.getByLabel("Password", { exact: true }).fill("");
   await typography(page.locator("#kc-page-title"), "Fira", 20);
   await capture(page, "signin-error");
 });
@@ -380,11 +371,7 @@ for (const [name, width, height] of [
       "Fira",
       20,
     );
-    await typography(
-      page.getByRole("heading", { name: "Saved scenarios" }),
-      "Fira",
-      11,
-    );
+    await typography(page.getByRole("heading", { name: "Saved plans" }), "Fira", 11);
     const hazard = page.getByRole("combobox", { name: "Choose the climate hazard" });
     await expect(hazard).toBeEnabled();
     await typography(hazard, "Noto", 14);

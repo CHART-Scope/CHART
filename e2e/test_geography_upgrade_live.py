@@ -6,6 +6,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
@@ -128,9 +130,13 @@ def test_legacy_level_checks_upgrade_and_publication_registration():
             assert any(
                 "FOREIGN KEY (country_code, level)" in value for value in after.values()
             )
+            # Upgraded through 029 to whatever the current head is.
+            config = Config()
+            config.set_main_option("script_location", str(ROOT / "core/alembic"))
+            head = ScriptDirectory.from_config(config).get_current_head()
             assert (
                 connection.scalar(text("SELECT version_num FROM alembic_version"))
-                == "029_configurable_geo_levels"
+                == head
             )
         for attempt in (1, 2):
             execute(registration, f"upgrade-registration-{attempt}.log")

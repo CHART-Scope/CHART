@@ -25,11 +25,8 @@ import {
   type PopulationMap,
   type PopulationMeasure,
 } from "@/lib/heatOutlookClient";
-import {
-  listGeographies,
-  listRecommendedActions,
-  type RecommendedAction,
-} from "@/lib/planningClient";
+import { type Action, listActions } from "@/lib/actionsClient";
+import { listGeographies } from "@/lib/planningClient";
 import { fetchVraMap } from "@/lib/vraClient";
 
 import { ActionsDrawer, isHeatAction } from "./ActionsDrawer";
@@ -308,7 +305,7 @@ export function ExploreApp() {
     outlook: HeatOutlook | null;
     baseline: HeatOutlook | null;
   } | null>(null);
-  const [actions, setActions] = useState<RecommendedAction[]>([]);
+  const [actions, setActions] = useState<Action[]>([]);
   const [showActions, setShowActions] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [frameView, setFrameView] = useState<"selection" | "frame">("selection");
@@ -341,17 +338,23 @@ export function ExploreApp() {
         ),
       )
       .catch(() => setPlaces([]));
-    cached("actions", () => listRecommendedActions({ limit: 100 }))
-      .then((items) =>
+  }, []);
+
+  const placeById = useMemo(() => new Map(places.map((p) => [p.id, p])), [places]);
+  const frame = placeById.get(state.frame);
+  // Actions differ by country (and its wording), not by place within it.
+  const actionCountry = frame?.countryCode;
+  useEffect(() => {
+    if (!actionCountry) return;
+    cached(`actions:${actionCountry}`, () => listActions(state.frame))
+      .then(({ items }) =>
         setActions(
           [...items].sort((a, b) => Number(isHeatAction(b)) - Number(isHeatAction(a))),
         ),
       )
       .catch(() => setActions([]));
-  }, []);
-
-  const placeById = useMemo(() => new Map(places.map((p) => [p.id, p])), [places]);
-  const frame = placeById.get(state.frame);
+    // The frame matters only through its country.
+  }, [actionCountry]);
   const focusId = state.selected ?? state.frame;
   const focus = placeById.get(focusId);
   const trail = useMemo(() => lineage(places, focusId), [places, focusId]);

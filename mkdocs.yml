@@ -65,6 +65,7 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Installation setup: installation-setup.md
+  - Sign-in and email: sign-in.md
   - Architecture:
       - System requirements and capacity: system-architecture-and-requirements.md
       - Observed climate data: observed-climate.md
@@ -87,6 +88,8 @@ nav:
   - VRA data and integration plan: vra-integration-plan.md
   - Explore (public map): explore.md
   - Dashboard: dashboard.md
+  - Action repository: actions.md
+  - Recommendations and AI: recommendations.md
   - Project:
       - Digital public good and licensing: licensing.md
 

@@ -13,7 +13,14 @@ import { installKenya, type KenyaApi } from "./support/kenya";
 
 const evidence = "../outputs/e2e/web/settings";
 const admin = { roles: ["chart_admin", "health_planning_lead"] };
-const tabs = ["Workspace", "Data", "Models", "Users", "Jobs"] as const;
+const tabs = [
+  "Workspace",
+  "Data",
+  "Models",
+  "Recommendations",
+  "Users",
+  "Jobs",
+] as const;
 
 type Job = {
   id: number;

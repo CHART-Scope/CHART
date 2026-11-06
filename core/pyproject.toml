@@ -29,6 +29,7 @@ chart-register-outlook-geographies = "chart.heat_outlook.geography:main"
 chart-publish-kenya = "chart.heat_outlook.publish:main"
 
 [project.optional-dependencies]
+bedrock = ["boto3>=1.34"]
 handover = ["numpy>=1.26", "xarray>=2024.1", "netCDF4>=1.6", "geopandas>=1.0", "pyproj>=3.6", "shapely>=2.0"]
 dev = [
   "black==25.1.0",
@@ -43,7 +44,7 @@ where = ["."]
 include = ["chart*"]
 
 [tool.setuptools.package-data]
-"chart.solution_repository" = ["seed.json"]
+"chart.actions" = ["actions.json"]
 "chart.learning" = ["seed.json"]
 "chart.heat_outlook" = ["releases/*/*.json", "releases/*/*.csv"]
 "chart.climate" = ["heat_seasons.json"]

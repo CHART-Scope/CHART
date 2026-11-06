@@ -50,7 +50,6 @@ from chart.shared.db.models import (
     ModelRelease,
     PredictionRequestRecord,
     PredictionResult,
-    RecommendedAction,
     SetupStateRecord,
     UserGeographyScopeRecord,
     UserRoleRecord,
@@ -64,7 +63,6 @@ from chart.shared.db.models import (
 )
 from chart.shared.db.session import get_session_factory
 from chart.vra.service import sync_catalogue as sync_vra_catalogue
-from chart.solution_repository.routes import SNAPSHOT_PATH as _SOLUTION_SEED_PATH
 
 from .model_configs import configs_for_country, deployed_configs
 from .place_bootstrap import (
@@ -290,7 +288,6 @@ def bootstrap(
             name=input_data.admin.name.strip(),
             email=input_data.admin.email.strip().lower(),
             username=input_data.admin.username.strip().lower(),
-            password=input_data.admin.password,
             roles=["chart_admin", "content_editor"],
             group_paths=list(dict.fromkeys(paths)),
             operation_id=operation_id,
@@ -337,70 +334,6 @@ def bootstrap(
             email=identity.email,
         ),
     )
-
-
-def _auto_seed_recommended_actions(session) -> None:
-    """Upsert the bundled solution repository into ``recommended_action``.
-
-    Idempotent on ``slug``. Best-effort: a broken bundle logs a warning
-    but does not fail setup. Later, a scheduler or an external API will
-    refresh the same rows; the natural key stays valid across sources.
-    """
-
-    try:
-        raw = json.loads(_SOLUTION_SEED_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        logger.exception(
-            "auto_seed: could not read %s; recommended_action left empty",
-            _SOLUTION_SEED_PATH,
-        )
-        return
-
-    items = raw.get("items") or []
-    if not items:
-        logger.warning("auto_seed: solution seed has no items, skipping")
-        return
-
-    now = datetime.now(timezone.utc)
-    upserts = 0
-    for item in items:
-        slug = str(item.get("slug") or "").strip()
-        title = str(item.get("title") or "").strip()
-        description = str(item.get("description") or "").strip()
-        if not slug or not title:
-            continue
-        existing = session.scalar(
-            select(RecommendedAction).where(RecommendedAction.slug == slug)
-        )
-        if existing is None:
-            session.add(
-                RecommendedAction(
-                    slug=slug,
-                    source_record_id=item.get("sourceRecordId"),
-                    title=title,
-                    description=description,
-                    climate_hazards=list(item.get("climateHazards") or []),
-                    solution_types=list(item.get("solutionTypes") or []),
-                    cost_of_implementation=item.get("costOfImplementation"),
-                    useful_links=list(item.get("usefulLinks") or []),
-                    case_studies=list(item.get("caseStudies") or []),
-                    source="seed",
-                    synced_at=now,
-                )
-            )
-        else:
-            existing.source_record_id = item.get("sourceRecordId")
-            existing.title = title
-            existing.description = description
-            existing.climate_hazards = list(item.get("climateHazards") or [])
-            existing.solution_types = list(item.get("solutionTypes") or [])
-            existing.cost_of_implementation = item.get("costOfImplementation")
-            existing.useful_links = list(item.get("usefulLinks") or [])
-            existing.case_studies = list(item.get("caseStudies") or [])
-            existing.source = "seed"
-            existing.synced_at = now
-        upserts += 1
-    logger.warning("auto_seed: recommended_action upserts=%d", upserts)
 
 
 def _auto_seed_learning(session) -> None:
@@ -754,12 +687,6 @@ def complete(
         for seed_country in seed_order:
             _auto_seed_deployed_models(session, seed_country, purge_stale=True)
         try:
-            _auto_seed_recommended_actions(session)
-        except Exception:  # noqa: BLE001 - best-effort, must not fail setup
-            logger.exception(
-                "auto_seed: recommended_action seed failed; setup will complete."
-            )
-        try:
             _auto_seed_learning(session)
         except Exception:  # noqa: BLE001 - best-effort, must not fail setup
             logger.exception(
@@ -861,9 +788,9 @@ def reset(user: CurrentUserContext) -> SetupStatus:
         # the previous reset only cleared workspace/user state and left the
         # model registry and its dependents behind, which is exactly what
         # tripped MODEL_RELEASE_IMMUTABLE on the second install. Order
-        # respects the FK graph (children first). Country config, seed
-        # reference tables (data_source, provenance), and RecommendedAction
-        # (upserted every setup) are intentionally not touched.
+        # respects the FK graph (children first). Country config and seed
+        # reference tables (data_source, provenance) are intentionally not
+        # touched.
         session.execute(delete(WorkspaceMemberRecord))
         session.execute(delete(WorkspaceRecord))
         # VRA values and results hang off admin units and geographies; the

@@ -146,9 +146,9 @@ SSP5-8.5 for the current handover. The seasonal cycle is a line of the
 typical share in each month for the chosen period, against the 1981–2010
 baseline, with the official heat season shaded.
 
-**Act on it** opens the action repository (heat actions first, searchable,
-filterable by type and cost, with sources) and links to the planning
-dashboard for the place. A visitor who is not signed in goes through sign-in
+**Act on it** opens the [action repository](actions.md) for the place's
+country (heat actions first, searchable, filterable by type and cost, with
+sources) and links to the planning dashboard for the place. A visitor who is not signed in goes through sign-in
 and returns to that place's dashboard (`chart.auth.returnTo`, same-site paths
 only).
 

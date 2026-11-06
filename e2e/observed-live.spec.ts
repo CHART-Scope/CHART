@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { signInWithEmailCode } from "./emailCode";
+
 for (const [country, username, frame, place, observedRelease] of [
   ["KE", "kenya-planner", "geo-ke", "geo-ke-kajiado", "v2_2026_10_06"],
   [
@@ -14,13 +16,7 @@ for (const [country, username, frame, place, observedRelease] of [
     test(`${country} ${outcome}: existing Observed and new Projected coexist`, async ({
       page,
     }) => {
-      await page.goto("/auth/signin");
-      await page.getByLabel("Email address").fill(username);
-      await page
-        .getByLabel("Password", { exact: true })
-        .fill(process.env.CHART_E2E_PASSWORD!);
-      await page.getByRole("button", { name: "Log in", exact: true }).click();
-      await page.waitForURL(/\/(plan|dashboard)/);
+      await signInWithEmailCode(page, username);
       const dashboard = `/dashboard/${frame}?admin_unit=${place}&outcome=${outcome}&month=2026-09`;
       await page.goto(dashboard);
       const panel = page.getByTestId("heat-outlook");

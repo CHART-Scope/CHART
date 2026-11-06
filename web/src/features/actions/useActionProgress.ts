@@ -13,17 +13,10 @@ export const statusLabels: Record<ActionStatus, string> = {
   completed: "Completed",
 };
 
-export type Assignment = {
-  districts: string[];
-  assignee: string;
-  dueDate: string;
-  notes: string;
-};
-
-type Progress = Record<string, { status?: ActionStatus; assignment?: Assignment }>;
+type Progress = Record<string, { status?: ActionStatus }>;
 
 // Per user as well as per place: a shared browser must not show one planner
-// another planner's statuses and assignees.
+// another planner's statuses.
 const storageKey = (userId: string, geographyId: string) =>
   `chart.actions.progress.${userId}.${geographyId}`;
 /** Before progress was per user. Adopted once by the first user to open it. */
@@ -39,8 +32,7 @@ function useSignedInUserId() {
 }
 
 /**
- * Status and district assignments a planner records against each action for
- * one place. Kept in this browser until the planning API stores them, so the
+ * The status a planner records against each action for one place. Kept in this browser until the planning API stores them, so the
  * dashboard list and the full actions page stay in step with each other.
  */
 export function useActionProgress(geographyId: string) {
@@ -75,10 +67,7 @@ export function useActionProgress(geographyId: string) {
   return {
     statusOf: (actionId: string): ActionStatus =>
       progress[actionId]?.status ?? "not-started",
-    assignmentOf: (actionId: string) => progress[actionId]?.assignment ?? null,
     setStatus: (actionId: string, status: ActionStatus) => update(actionId, { status }),
-    setAssignment: (actionId: string, assignment: Assignment) =>
-      update(actionId, { assignment }),
   };
 }
 

@@ -73,7 +73,6 @@ def create_user(input_data: CreateUserInput, actor: CurrentUserContext) -> UserR
             name=input_data.name.strip(),
             email=input_data.email.strip().lower(),
             username=input_data.username.strip().lower(),
-            password=input_data.password,
             roles=roles,
             group_paths=[place.path for place in places],
         )

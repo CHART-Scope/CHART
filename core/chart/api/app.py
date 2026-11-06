@@ -17,6 +17,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import text
 
+from chart.actions.routes import router as actions_router
 from chart.api.openapi import build_openapi_schema
 from chart.audit.routes import router as audit_router
 from chart.auth.routes import router as auth_router
@@ -35,9 +36,9 @@ from chart.model_registry.routes import (
 from chart.learning.routes import router as learning_router
 from chart.model_settings.routes import router as model_settings_router
 from chart.risk.routes import router as risk_router
+from chart.recommendations.routes import router as recommendations_router
+from chart.saved_plans.routes import router as saved_plans_router
 from chart.setup.routes import router as setup_router
-from chart.solution_repository.hazards import router as hazards_router
-from chart.solution_repository.routes import router as solutions_router
 from chart.shared.db.session import dispose_engines, get_session_factory
 from chart.users.routes import router as users_router
 from chart.vra.routes import router as vra_router
@@ -126,8 +127,7 @@ app.include_router(auth_router)
 app.include_router(geographies_router)
 app.include_router(climate_router)
 app.include_router(setup_router)
-app.include_router(hazards_router)
-app.include_router(solutions_router)
+app.include_router(actions_router)
 app.include_router(users_router)
 app.include_router(workspaces_router)
 app.include_router(risk_router)
@@ -136,6 +136,8 @@ app.include_router(heat_outlook_router)
 app.add_middleware(ReadCacheMiddleware)
 app.include_router(vra_router)
 app.include_router(model_settings_router)
+app.include_router(saved_plans_router)
+app.include_router(recommendations_router)
 app.include_router(learning_router)
 app.include_router(erf_registry_router)
 app.include_router(model_catalog_router)

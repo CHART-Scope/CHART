@@ -20,8 +20,9 @@ Create a GitHub environment named `dev` with these connection secrets:
 
 Application settings are written once in the gitignored
 `infra/aws/.env.prod`, then copied unchanged to
-`~/chart-deploy/aws/.env.prod` on EC2. The exact seven-line configuration and
-`vim` setup are documented once in `infra/aws/README.md`.
+`~/chart-deploy/aws/.env.prod` on EC2. The settings, including the email
+server that delivers sign-in codes ([sign-in](sign-in.md)), are listed once in
+`infra/aws/README.md`.
 
 ## Host setup
 

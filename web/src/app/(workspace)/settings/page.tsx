@@ -16,19 +16,21 @@ import { ResetInstallationCard } from "@/features/planning/ResetInstallationCard
 import { JobsCard } from "@/features/settings/JobsCard";
 import { ModelReleasesCard } from "@/features/settings/ModelReleasesCard";
 import { ModelSettingsCard } from "@/features/settings/ModelSettingsCard";
+import { RecommendationSettingsCard } from "@/features/settings/RecommendationSettingsCard";
 import { VraIndicatorsCard } from "@/features/vulnerability";
 import { isLive, useBackgroundJobs } from "@/lib/backgroundJobs";
 
 import styles from "./page.module.css";
 
-type Tab = "workspace" | "data" | "models" | "users" | "jobs";
+type Tab = "workspace" | "data" | "models" | "recommendations" | "users" | "jobs";
 
 /** Installation tabs, after Workspace; administrators only. */
-const ADMIN_TABS: Tab[] = ["data", "models", "users", "jobs"];
+const ADMIN_TABS: Tab[] = ["data", "models", "recommendations", "users", "jobs"];
 const LABELS: Record<Tab, string> = {
   workspace: "Workspace",
   data: "Data",
   models: "Models",
+  recommendations: "Recommendations",
   users: "Users",
   jobs: "Jobs",
 };
@@ -103,6 +105,7 @@ function Settings() {
       </>
     ),
     models: <ModelReleasesCard accessToken={session.accessToken} />,
+    recommendations: <RecommendationSettingsCard />,
     users: (
       <>
         <UserManagement accessToken={session.accessToken} />

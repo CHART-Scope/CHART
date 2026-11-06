@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { installFakeApi } from "./support/fakeApi";
+import { installFakeApi, json } from "./support/fakeApi";
+import { actionList } from "./support/actions";
 
 const actionsUrl =
   "/dashboard/geo-in-mp/actions?outcome=lbw&admin_unit=geo-in-mp-bhopal";
@@ -17,7 +18,9 @@ const cards = (page: Page) =>
   page.getByRole("list", { name: /actions$/ }).getByRole("button");
 const panel = (page: Page) => page.getByRole("dialog");
 
-test("see all opens the library for the same place and outcome", async ({ page }) => {
+test("see all opens the action repository for the same place and outcome", async ({
+  page,
+}) => {
   await installFakeApi(page);
   await page.goto("/dashboard/geo-in-mp?admin_unit=geo-in-mp-bhopal&outcome=lbw");
 
@@ -40,12 +43,12 @@ test("season tabs and filters narrow the list", async ({ page }) => {
   await page.goto(actionsUrl);
 
   await page.getByRole("tab", { name: /During heat season/ }).click();
-  await expect(page).toHaveURL(/season=During/);
+  await expect(page).toHaveURL(/season=during/);
   await expect(cards(page)).toHaveCount(3);
 
-  await choose(page, "Department", "Labour");
+  await choose(page, "Department", "Labour and occupational safety");
   await expect(cards(page)).toHaveCount(1);
-  await expect(cards(page).first()).toContainText("safe heat protocols");
+  await expect(cards(page).first()).toContainText("Safe heat protocols");
   // Counts follow the filters, so an empty season is visible before it is opened.
   await expect(page.getByRole("tab", { name: "Before heat season (0)" })).toBeVisible();
 
@@ -58,7 +61,7 @@ test("season tabs and filters narrow the list", async ({ page }) => {
   await expect(cards(page)).toHaveCount(3);
 
   await page.screenshot({
-    path: "../outputs/e2e/web/actions-library.png",
+    path: "../outputs/e2e/web/action-repository.png",
     fullPage: true,
   });
 });
@@ -70,9 +73,9 @@ test("the detail panel jumps between sections and walks the filtered list", asyn
   await page.goto(actionsUrl);
 
   await cards(page).first().click();
-  await expect(page).toHaveURL(/action=recCounselling/);
+  await expect(page).toHaveURL(/action=recCounsel/);
   await expect(panel(page).getByRole("heading", { level: 2 })).toHaveText(
-    "Provide pregnancy-specific health counselling to pregnant women",
+    "Provide pregnancy-specific heat health counselling to pregnant women",
   );
 
   const sections = panel(page).getByRole("navigation", { name: "Action sections" });
@@ -84,11 +87,18 @@ test("the detail panel jumps between sections and walks the filtered list", asyn
   await expect(
     panel(page).getByRole("link", { name: /NRDC \(2024\)/ }),
   ).toBeInViewport();
+  // A reference without a link is listed as plain text.
+  await expect(panel(page).getByText("A citation without a link")).toBeVisible();
   await expect(panel(page).getByText("Case studies")).toBeVisible();
 
-  // Stakeholders written "Role — Example" show the example under the role.
+  // Curators' "1." lines render as a list.
+  const steps = panel(page).getByRole("region", { name: "Steps" });
+  await expect(steps.getByRole("listitem")).toHaveText([
+    "Drink water often",
+    "Rest in a shaded place",
+  ]);
   await sections.getByRole("button", { name: "Stakeholders" }).click();
-  await expect(panel(page).getByText("India: ASHAs")).toBeVisible();
+  await expect(panel(page).getByText("ASHA", { exact: true })).toBeVisible();
 
   // A reload keeps the panel open on the same action.
   await page.reload();
@@ -100,7 +110,7 @@ test("the detail panel jumps between sections and walks the filtered list", asyn
   await expect(panel(page).getByRole("heading", { level: 2 })).toContainText(
     "basic equipment and medicines",
   );
-  await expect(page).toHaveURL(/action=recHospitalEquipment/);
+  await expect(page).toHaveURL(/action=recEquipment/);
   await panel(page).getByRole("button", { name: "Next action" }).click();
   await expect(panel(page).getByRole("heading", { level: 2 })).toContainText(
     "pregnancy-specific",
@@ -113,39 +123,16 @@ test("the detail panel jumps between sections and walks the filtered list", asyn
   await expect(panel(page)).toBeHidden();
 });
 
-test("status and district assignments persist and show on the cards", async ({
-  page,
-}) => {
+test("status persists and shows on the cards and the dashboard", async ({ page }) => {
   await installFakeApi(page);
-  await page.goto(`${actionsUrl}&action=recCounselling`);
+  await page.goto(`${actionsUrl}&action=recCounsel`);
 
   await panel(page).getByRole("combobox", { name: "Action status" }).click();
   await page.getByRole("option", { name: "In progress", exact: true }).click();
-
-  // District chips explain their share of cases on demand.
-  await panel(page).getByRole("button", { name: "Sheopur" }).click();
-  await expect(panel(page).getByRole("status")).toContainText(
-    "24.1% of low birth weight cases in Sheopur",
-  );
-
-  await panel(page).getByRole("button", { name: "Assign to districts →" }).click();
-  const form = panel(page).getByRole("form", { name: "Assign to districts" });
-  // Districts above 10% start ticked: Sheopur, Satna, Betul, Khargone, Panna, Damoh.
-  await expect(form.getByRole("checkbox", { checked: true })).toHaveCount(6);
-  await form.getByRole("checkbox", { name: /Damoh/ }).uncheck();
-  await form.getByRole("combobox", { name: "Assign to", exact: true }).click();
-  await page.getByRole("option", { name: "RCH Officer", exact: true }).click();
-  await form.getByLabel("Due date").fill("2027-03-01");
-  await form.getByRole("button", { name: "Assign to selected districts" }).click();
-
-  await expect(
-    panel(page).getByText(/Assigned to 5 districts · RCH Officer · Due 1 Mar 2027/),
-  ).toBeVisible();
   await page.keyboard.press("Escape");
 
   const card = cards(page).first();
   await expect(card).toContainText("In progress");
-  await expect(card).toContainText("assigned to 5");
 
   await choose(page, "Status", "Not started");
   await expect(cards(page)).toHaveCount(1);
@@ -158,15 +145,21 @@ test("status and district assignments persist and show on the cards", async ({
   ).toContainText("In progress");
 });
 
-test("a form with no districts ticked cannot be submitted", async ({ page }) => {
-  await installFakeApi(page);
-  await page.goto(`${actionsUrl}&action=recHospitalEquipment`);
+test("actions that fail to load say so and can be retried", async ({ page }) => {
+  const api = await installFakeApi(page);
+  let calls = 0;
+  api.on(/^\/api\/chart\/actions$/, (route) => {
+    calls += 1;
+    return calls === 1
+      ? json(route, { error: "INTERNAL_ERROR" }, 500)
+      : json(route, actionList);
+  });
+  await page.goto(actionsUrl);
 
-  await panel(page).getByRole("button", { name: "Assign to districts →" }).click();
-  const form = panel(page).getByRole("form", { name: "Assign to districts" });
-  for (const box of await form.getByRole("checkbox").all()) await box.uncheck();
-  await expect(form.getByText("Select at least one district to assign.")).toBeVisible();
-  await expect(
-    form.getByRole("button", { name: "Assign to selected districts" }),
-  ).toBeDisabled();
+  const alert = page.getByRole("main").getByRole("alert");
+  await expect(alert).toContainText("Recommended actions could not be loaded.");
+  await expect(cards(page)).toHaveCount(0);
+  await alert.getByRole("button", { name: "Try again" }).click();
+  await expect(alert).toBeHidden();
+  await expect(cards(page)).toHaveCount(2);
 });

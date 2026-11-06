@@ -23,7 +23,7 @@ type NavDefinition = NavItem & {
    * role — the destination itself imposes no role check. */
   requiredRoles?: readonly string[];
   /** Destinations that bounce an account with no planning area straight to
-   * /access-pending (see `signedInHomePath`), so offering them is a dead end. */
+   * /explore (see `signedInHomePath`), so offering them is a dead end. */
   requiresGeographyScope?: boolean;
 };
 
@@ -31,7 +31,6 @@ type NavDefinition = NavItem & {
 // separate declarations, so an id could exist in one and not the other and the
 // nav item would simply do nothing when clicked.
 const NAV: readonly NavDefinition[] = [
-  { id: "learning", label: "Learning hub", icon: "book", href: "/learning" },
   {
     id: "planning",
     label: "Start planning",
@@ -39,6 +38,7 @@ const NAV: readonly NavDefinition[] = [
     href: "/plan",
     requiresGeographyScope: true,
   },
+  { id: "learning", label: "Learning hub", icon: "book", href: "/learning" },
   {
     id: "vulnerability",
     label: "Vulnerability",
@@ -113,7 +113,7 @@ export function isPublicPath(pathname: string | null): boolean {
 /**
  * Where a signed-in user who may not use `pathname` is sent instead, or null.
  * Read from the same table as the nav, so a hidden entry and a guarded route
- * cannot disagree: no planning area means /access-pending, a missing role
+ * cannot disagree: no planning area means /explore, a missing role
  * falls back to planning.
  */
 export function redirectForPath(
@@ -126,7 +126,7 @@ export function redirectForPath(
     entry.requiresGeographyScope &&
     (user.roles.length === 0 || user.geographyScopes.length === 0)
   ) {
-    return "/access-pending";
+    return "/explore";
   }
   if (
     entry.requiredRoles &&

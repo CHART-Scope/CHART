@@ -108,7 +108,6 @@ export function OnboardingWizard({
   const adminReady =
     state.adminName.trim().length >= 2 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.adminEmail) &&
-    state.adminPassword.length >= 8 &&
     state.setupToken.trim().length > 0;
 
   const canContinue = (() => {
@@ -426,17 +425,6 @@ export function OnboardingWizard({
                 autoComplete="email"
               />
               <TextInput
-                id="setup-admin-password"
-                label="Administrator password"
-                type="password"
-                minLength={8}
-                value={state.adminPassword}
-                onChange={(event) =>
-                  setAdminField("adminPassword", event.currentTarget.value)
-                }
-                autoComplete="new-password"
-              />
-              <TextInput
                 id="setup-token"
                 label="Setup token"
                 type="password"
@@ -448,9 +436,9 @@ export function OnboardingWizard({
               />
             </div>
             <p className={styles.adminNote}>
-              Use at least eight characters. After setup, sign in with the email address
-              above. The setup token is the installation&apos;s CHART_BOOTSTRAP_TOKEN,
-              held by whoever deployed it.
+              After setup, sign in with the email address above: CHART emails a code to
+              it each time. The setup token is the installation&apos;s
+              CHART_BOOTSTRAP_TOKEN, held by whoever deployed it.
             </p>
             {launchError ? (
               <p className={styles.dialogError} role="alert">
@@ -567,7 +555,6 @@ function snapshot(state: OnboardingState): OnboardingState {
     collaboratingSectorIds: [...state.collaboratingSectorIds],
     adminName: state.adminName,
     adminEmail: state.adminEmail,
-    adminPassword: state.adminPassword,
     setupToken: state.setupToken,
     currentStep: state.currentStep,
   };

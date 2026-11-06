@@ -1,3 +1,4 @@
+import { listActions } from "./actionsClient";
 import { authFetch } from "./authFetch";
 import type {
   OnboardingState,
@@ -29,7 +30,6 @@ export type SetupOptions = {
 
 export type ActionRepositoryStatus = {
   actionCount: number;
-  trackedActionCount: number;
 };
 
 export type BootstrapSetupResult = {
@@ -60,17 +60,13 @@ export async function getSetupOptions() {
   return (await response.json()) as SetupOptions;
 }
 
-export async function loadActionRepository() {
-  const response = await authFetch("/api/setup/action-repository", {
-    auth: false,
-    timeoutMs: 20_000,
-  });
-  if (!response.ok) {
-    throw new Error(
-      "The action repository could not be loaded. Check the repository service and try again.",
-    );
+export async function loadActionRepository(): Promise<ActionRepositoryStatus> {
+  try {
+    const { items } = await listActions();
+    return { actionCount: items.length };
+  } catch {
+    throw new Error("The action repository could not be loaded. Try again.");
   }
-  return (await response.json()) as ActionRepositoryStatus;
 }
 
 export async function bootstrapChartSetup(
@@ -109,7 +105,6 @@ function toBootstrapInput(
     !state.primarySectorId ||
     !state.adminName.trim() ||
     !state.adminEmail.trim() ||
-    state.adminPassword.length < 8 ||
     !state.setupToken.trim()
   ) {
     throw new Error("Complete every setup step before launching CHART.");
@@ -158,7 +153,6 @@ function toBootstrapInput(
       name: state.adminName.trim(),
       email: adminEmail,
       username: adminEmail,
-      password: state.adminPassword,
     },
   };
 }
@@ -227,9 +221,6 @@ function setupErrorMessage(code?: string) {
       return "Another setup request is still running with different details. Wait a moment, then try again.";
     case "SETUP_PROVISIONING_LOST":
       return "The CHART setup session was interrupted. Try launching setup again.";
-    case "SETUP_ADMIN_PASSWORD_REQUIRED":
-    case "SETUP_IDENTITY_PASSWORD_REJECTED":
-      return "Use an administrator password with at least eight characters.";
     case "SETUP_IDENTITY_USER_CONFLICT":
       return "That administrator account already exists. Use a different email address.";
     case "SETUP_SECTOR_REQUIRED":

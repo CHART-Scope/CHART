@@ -32,11 +32,12 @@ Use `GET /live` for liveness and `GET /ready` for database, migration, and
 model-assignment readiness. A deployment is not ready until the single Alembic
 head (currently `015_reconcile_legacy_application_schema`) is applied.
 
-Recover an existing administrator only from an operator shell. The password is
-read from the environment so it is not placed in shell history:
+Recover an existing administrator only from an operator shell. It re-enables
+the account and its administrator roles; they then sign in with a code sent to
+the email address ([sign-in](../docs/sign-in.md)):
 
 ```bash
-CHART_ADMIN_RECOVERY_PASSWORD='<new-password>' chart-admin-recover \
+chart-admin-recover \
   --username chart-admin \
   --email chart-admin@example.org \
   --confirm chart-admin
@@ -69,38 +70,6 @@ model-control endpoint directly.
 
 This path is enabled locally with `CHART_ENABLE_REVIEW_MODELS=true`. Do not set
 that flag in production; the Kenya release still requires modeller approval.
-
-## Invitation emails
-
-Use the reusable invitation template when inviting a planner:
-
-```python
-from chart.email import (
-    InvitationEmail,
-    OutboundEmail,
-    build_email_service,
-    build_invitation_email,
-)
-
-email_service = build_email_service()
-message = build_invitation_email(
-    InvitationEmail(
-        recipient_email="planner@example.org",
-        recipient_name="Grace Lemayian",
-        inviter_name="Kenya Ministry of Health",
-        geography_name="Kajiado County",
-        role_name="County planning lead",
-        start_date="1 January 2026",
-        end_date="31 December 2026",
-        activation_url="https://chart.example.org/",
-    )
-)
-result = email_service.send_best_effort(message)
-```
-
-`send_best_effort` returns `sent`, `failed`, or `skipped`. It logs classified
-transport failures without logging the recipient or message body. Use `send`
-instead when the caller must handle a delivery failure.
 
 ## Monthly dashboard reads
 

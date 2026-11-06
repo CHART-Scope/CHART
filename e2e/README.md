@@ -11,8 +11,8 @@ evidence in `outputs/e2e/orchestration/recent-climate-top-up/`. `make e2e-core`
 builds the core wheel and checks it ships every runtime JSON file
 (`outputs/e2e/core/package-data.json`).
 
-Prerequisites: Docker with `chart-postgis:16` and
-`quay.io/keycloak/keycloak:26.6.1`, the repository Python and web dependencies,
+Prerequisites: Docker with `chart-postgis:16`,
+`quay.io/keycloak/keycloak:26.6.4` and `axllent/mailpit:v1.30.0`, the repository Python and web dependencies,
 Playwright Chromium, and the four extracted modeller handovers in
 `~/Downloads/OneDrive_1_26-10-2026` (override `CHART_HANDOVER_ROOT`). Install the
 Python handover extra as described in the modelling documentation. This suite
@@ -27,6 +27,15 @@ for separate India/Kenya planning users and a denied-role user. It verifies
 published district/constituency coverage, persisted parent relationships,
 selection errors, authentication/authorization, scope isolation, unavailable
 observed estimates, browser selectors and session restoration.
+
+Browsers sign in the way people do ([sign-in](../docs/sign-in.md)): the run
+applies `infra/keycloak/sync-realm.js` to its disposable realm, Keycloak emails
+each code to the run's own Mailpit, and `e2e/emailCode.ts` reads it through
+Mailpit's API. `email-code-signin-live.spec.ts` checks that a wrong code is
+refused, that an account an administrator adds through the API has no password
+and signs in with an emailed code, that disabling it stops sign-in, and that an
+unknown address gets an error and no email. API tests still take tokens by
+password grant, which only the disposable realm allows.
 
 An upgrade regression recreates the legacy fixed-level checks on the disposable
 database, proves that registration fails atomically, applies migration 029 and
@@ -77,12 +86,47 @@ They run an assessment and distinguish a recorded zero, a nonzero value with rel
 zero, a small positive score, and missing data. Synthetic CSVs, assessment hashes
 and screenshots are saved with the live suite evidence.
 
+Saved-plan regressions save plans through authenticated HTTP and check the
+persisted PostGIS rows against the dashboard's own projection figure and the
+validated Kajiado observed month. They cover privacy between users, geography
+scope (including a district-only planner), denied roles, invalid areas and
+selections without writes, and repeated deletes. The planning catalogue must
+never list a published outcome under an "unspecified" health domain. In the
+browser a planner saves a view from the dashboard, opens its ranked
+recommendations and placeholder AI insight, reopens it from Start planning,
+removes it and sees an explicit error for a missing plan.
+
+Recommendation regressions run against a local stand-in for an
+OpenAI-compatible model server and the classifier (`e2e/stub_ai_server.py`, on
+loopback; real provider keys are cleared for the run and no provider is
+contacted). They verify the rules ranking, ownership and roles, admin-only
+settings with persisted values and audit events, refused settings without
+writes, the provider's model list, classifier ordering, the generated insight
+and its reuse, and explicit fallbacks when the classifier or model fails. In
+the browser an administrator picks a model from the provider's list and the
+sidebar lists Learning hub below Start planning.
+
+The action repository runs end to end without Airtable or S3. The same
+stand-in plays Airtable over `e2e/fixtures/airtable_actions.json`, which has
+drafts, contact fields, an image and two rows per page. The real publisher
+(`chart.actions.publish`) turns those rows into the feed, and the stand-in
+serves it as the public file. `e2e/test_actions_live.py` checks that only
+Published rows and allowed fields are published, with images copied and
+references parsed. It also checks that an empty base or a bad token publishes
+nothing. Over HTTP it checks that a place gets its own country's actions in
+its own wording, that an unknown place gets a 404, and that a feed that goes
+down or turns invalid keeps the last good copy. A fresh API that cannot reach
+any feed serves the bundled copy. Recommendations rank these published
+actions, and the browser shows Kenya's wording and never India's actions or a
+draft. The feed and its publish log are kept under `actions-feed/` and
+`actions-publish.log` in the run's evidence.
+
 The same live browser suite checks shared typography at desktop and mobile widths
 across the landing page, learning search and player, onboarding, planning,
 settings, projections and action details/forms. It signs in through Keycloak,
 checks computed font families and token sizes, checks horizontal overflow,
 verifies saved settings and action progress after reload, and captures each
-screen, including CHART's Keycloak theme and invalid-login errors. An
+screen, including CHART's Keycloak theme and unknown-account errors. An
 administrator also visits every settings section. These checks use
 the real application and its bundled content fallback, with no intercepted
 requests. At desktop and mobile widths, the public landing checks verify that
