@@ -2,8 +2,9 @@
 
 The `App Deploy` workflow validates CHART, publishes commit-tagged images to
 GitHub Container Registry, and deploys those images to one EC2 host with Docker
-Compose. EC2 receives the small `infra/aws` and `infra/keycloak` deployment
-bundle; it does not clone or build the repository.
+Compose. EC2 receives only `docker-compose.yml` and `Caddyfile`, beside its
+own `.env.prod` and database backups; it does not clone or build the
+repository. Keycloak, its theme and the email-code plugin ship as images too.
 
 The operational setup is documented in
 [`infra/aws/README.md`](https://github.com/CHART-Scope/CHART/blob/dev/infra/aws/README.md).
