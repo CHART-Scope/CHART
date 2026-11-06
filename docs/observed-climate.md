@@ -78,6 +78,7 @@ load: one two-year round took between 50 seconds and 28 minutes.
 | 5 years | 69 | 45–60 min more | 316 MB | 367 MB | 0.90 M |
 | 10 years | 129 | 95 min more | 560 MB | 606 MB | 1.63 M |
 | 20 years | 249 | 3 h 15 min – 3 h 25 min more | 1,046 MB | 1,091 MB | 3.09 M |
+| 45 years (from Jan 1981, 3 Nov 2026) | 549 | 23.4 h (India), 17.8 h (Kenya) more | +1.2 GB | 2.93 GB | 5.8 M |
 
 - From nothing to 20 years for both countries took about **6 hours** of wall
   time with the two countries running side by side (12:56 to 19:18 UTC,
@@ -150,7 +151,9 @@ recalibrate, then a measured comparison.
 ## Sharing the downloads
 
 A maintainer with bucket write access can publish the retained grids so other
-installations skip the Copernicus queue entirely:
+installations skip the Copernicus queue entirely (first published 6 November
+2026: 1,205 files, 6.56 GB; see [data loading](data-loading.md) for storage,
+capacity and runbooks):
 
 ```bash
 make climate-mirror-publish ERA5_CACHE_DIR=<copy of /opt/chart/data/climate/era5-cache>
