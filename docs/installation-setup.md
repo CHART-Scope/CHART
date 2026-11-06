@@ -14,8 +14,9 @@ so it never starts on `admin`.
 ## First run
 
 1. Open CHART and choose **Set up CHART** (or **Sign in**).
-2. Enter `admin` in the email field, then the first password. This account is
-   asked for a password, not an emailed code.
+2. On **CHART login**, enter `admin` in the email field. The next page,
+   **CHART admin**, asks for the first password; this account uses a password,
+   not an emailed code.
 3. Keycloak makes you choose a new password straight away. The first password
    stops working.
 4. The setup wizard at `/onboarding` asks for the country, administrative

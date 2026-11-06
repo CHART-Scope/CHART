@@ -123,7 +123,7 @@ test("on a phone the sign-in screens fit, say where the code went and let you st
   await page.screenshot({ path: `${evidence}/email-code-phone.png` });
 
   await page.getByRole("link", { name: "Use a different email" }).click();
-  await expect(page.getByRole("heading", { name: "Sign in to CHART" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "CHART login" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Back to CHART" })).toHaveAttribute(
     "href",
     new RegExp(`^${process.env.CHART_E2E_ORIGIN}`),
@@ -185,10 +185,8 @@ test("an administrator invites someone, who accepts from the email and lands on 
   await expect(
     invitee.getByRole("heading", { name: "Invitation accepted" }),
   ).toBeVisible();
-  await invitee.getByRole("link", { name: "Sign in to CHART" }).click();
-  await expect(
-    invitee.getByRole("heading", { name: "Sign in to CHART" }),
-  ).toBeVisible();
+  await invitee.getByRole("link", { name: "Go to CHART login" }).click();
+  await expect(invitee.getByRole("heading", { name: "CHART login" })).toBeVisible();
   await signInWithEmailCode(invitee, email);
   await invitee.waitForURL(/\/dashboard\/geo-ke/);
   await invitee.close();
@@ -196,7 +194,7 @@ test("an administrator invites someone, who accepts from the email and lands on 
 
 test("the Keycloak administration sign-in carries CHART's look", async ({ page }) => {
   await page.goto(`${process.env.CHART_E2E_IDENTITY}/admin/master/console/`);
-  await expect(page.getByRole("heading", { name: "Sign in to CHART" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "CHART admin" })).toBeVisible();
   await expect(page.locator("#kc-header-wrapper")).toHaveText("CHART");
   await expect(page.locator("#kc-header")).toHaveCSS(
     "background-color",
@@ -213,6 +211,7 @@ test("a new installation's admin signs in with admin/admin, must choose a passwo
   await page.getByLabel("Email address").fill("admin");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
   // An account with a password is asked for it; no code is emailed.
+  await expect(page.getByRole("heading", { name: "CHART admin" })).toBeVisible();
   await page.getByLabel("Password", { exact: true }).fill("admin");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
   await page.getByLabel("New Password").fill("e2e-admin-chosen-password");
