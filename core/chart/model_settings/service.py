@@ -100,6 +100,7 @@ class LiveRestriction:
     windows: frozenset[int]
     scenarios: frozenset[str]
     data_modes: frozenset[str]
+    default_window: int | None = None
 
 
 @dataclass(frozen=True)
@@ -237,6 +238,12 @@ def live_restriction(
         ),
         scenarios=frozenset(values.scenarios),
         data_modes=frozenset(values.data_modes),
+        default_window=(
+            int(values.default_selector.removeprefix(LIVE_WINDOW_PREFIX))
+            if values.default_selector
+            and values.default_selector.startswith(LIVE_WINDOW_PREFIX)
+            else None
+        ),
     )
 
 

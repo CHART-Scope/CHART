@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from chart.climate.country_pull import configured_areas
 from chart.shared.db.models import (
     AdminUnit,
     AppGeography,
@@ -41,7 +42,7 @@ ERA5_PUBLICATION_LAG_DAYS = 6
 #: How far back the automatic top-up looks for a missing month.
 TOP_UP_MONTHS = 2
 
-#: A failed automatic pull is not retried sooner than this.
+#: An automatic pull is not repeated sooner than this after the last one.
 TOP_UP_RETRY_AFTER = timedelta(hours=24)
 
 TOP_UP_REQUESTER = "chart-auto-top-up"
@@ -184,49 +185,6 @@ def _country_name(session: Session, country_code: str) -> str:
     return root or country_code
 
 
-def areas_for_country(session: Session, country_code: str) -> list[AdminUnit]:
-    """Deployed areas with a boundary, which is what a pull can derive."""
-    return list(
-        session.scalars(
-            select(AdminUnit)
-            .join(AppGeography, AppGeography.id == AdminUnit.app_geography_id)
-            .where(
-                AppGeography.country_code == country_code,
-                AdminUnit.boundary.is_not(None),
-            )
-            .order_by(AdminUnit.name)
-        )
-    )
-
-
-def country_envelope(units: list[AdminUnit]) -> tuple[float, float, float, float]:
-    """The one bounding box a country's download must cover.
-
-    Returned north, west, south, east - the order CDS takes, which is the
-    reverse of the ``[west, south, east, north]`` the map endpoint returns.
-    Folded over the *deployed* areas, so India's box is Madhya Pradesh's
-    rather than the subcontinent's, and no territory is downloaded that no
-    area sits in.
-    """
-    # Unpacked rather than filtered in a comprehension so each corner is a
-    # local the type checker can narrow to a float.
-    boxes: list[tuple[float, float, float, float]] = []
-    for unit in units:
-        north, west = unit.bbox_north, unit.bbox_west
-        south, east = unit.bbox_south, unit.bbox_east
-        if north is None or west is None or south is None or east is None:
-            continue
-        boxes.append((north, west, south, east))
-    if not boxes:
-        raise ValueError("no area in this country has a bounding box")
-    return (
-        max(b[0] for b in boxes),
-        min(b[1] for b in boxes),
-        min(b[2] for b in boxes),
-        max(b[3] for b in boxes),
-    )
-
-
 def live_job_for(session: Session, country_code: str) -> ClimateIngestionJob | None:
     """A pull already under way for this country, if there is one."""
     return session.scalar(
@@ -256,7 +214,7 @@ def create_job(
     if existing is not None:
         return existing, False
 
-    units = areas_for_country(session, country_code)
+    units = configured_areas(session, country_code)
     job = ClimateIngestionJob(
         country_code=country_code,
         months=[month.strftime("%Y-%m") for month in sorted(months)],
@@ -407,7 +365,7 @@ def queue_recent_month_top_ups(
         missing = _missing_months(session, country_code, wanted)
         if not missing or live_job_for(session, country_code) is not None:
             continue
-        if _recent_failed_top_up(session, country_code, current):
+        if _recent_top_up(session, country_code, current):
             continue
         job, created = create_job(
             session,
@@ -424,7 +382,7 @@ def _missing_months(
     session: Session, country_code: str, wanted: list[date]
 ) -> list[date]:
     """Months some deployed area of the country holds no observation for."""
-    units = [unit.id for unit in areas_for_country(session, country_code)]
+    units = [unit.id for unit in configured_areas(session, country_code)]
     held = session.execute(
         select(
             DistrictClimate.period_month,
@@ -434,6 +392,8 @@ def _missing_months(
         .where(
             DistrictClimate.admin_unit_id.in_(units),
             DistrictClimate.period_month.in_(wanted),
+            # The models' own ERA5 input; ERA5-Land rows do not count.
+            DistrictClimate.variable == "tmax_monthly_mean_c",
             ClimateRun.data_label.in_((DataLabel.observed, DataLabel.reanalysis)),
         )
         .group_by(DistrictClimate.period_month)
@@ -442,7 +402,12 @@ def _missing_months(
     return [month for month in wanted if month not in complete]
 
 
-def _recent_failed_top_up(session: Session, country_code: str, now: datetime) -> bool:
+def _recent_top_up(session: Session, country_code: str, now: datetime) -> bool:
+    """An automatic pull finished, either way, within ``TOP_UP_RETRY_AFTER``.
+
+    A completed pull can still leave a place without the month (the grid does
+    not cover it); waiting keeps that from re-pulling every evaluation.
+    """
     last = session.scalar(
         select(ClimateIngestionJob)
         .where(
@@ -451,7 +416,7 @@ def _recent_failed_top_up(session: Session, country_code: str, now: datetime) ->
         )
         .order_by(ClimateIngestionJob.id.desc())
     )
-    if last is None or last.status != "failed":
+    if last is None or last.status not in ("completed", "failed"):
         return False
     finished = last.completed_at or last.updated_at
     if finished.tzinfo is None:

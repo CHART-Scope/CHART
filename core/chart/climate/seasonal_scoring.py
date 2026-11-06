@@ -1,0 +1,356 @@
+"""Score each place's forecast months with the models its observed months use.
+
+Kenya (counties and constituencies) goes through the calibrated national
+curves in ``chart.heat_outlook.observed``; India through its live R models,
+districts with their division's (``get_active_model_mapping`` inherits).
+
+Low birth weight reads monthly temperatures with lags, so a forecast month is
+scored with the forecast for it and the observed (or forecast) months before.
+Under-five reads daily temperatures, which a monthly forecast does not give:
+India's release scores one temperature repeated over its lags (its
+interactive profile); Kenya's is scored by shifting each 2006-2016 year's
+daily series for that month by the forecast's departure from the normal and
+averaging the years (a delta method). Each month is scored at the central,
+coolest and warmest system so a range travels with every value; the central
+score also keeps the model's own 95% interval (its odds or risk ratio), so a
+forecast month carries the same precision as an observed one.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from datetime import date, timedelta
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session, sessionmaker
+
+from chart.health_impact.derivation import attributable_fraction_milli
+from chart.heat_outlook import observed
+from chart.heat_outlook.service import (
+    DEFAULT_SELECTOR,
+    LBW_OUTCOME,
+    NO_EXCESS_HEAT,
+    NO_EXCESS_LBW,
+    U5_OUTCOME,
+    legacy_observed_supported,
+    outlook_release,
+)
+from chart.model_registry.service import get_active_model_mapping
+from chart.risk.precision import precision_for_ci
+from chart.shared.db.models import AdminUnit, AppGeography
+
+from .model_scoring import score_association_model, score_lbw_model
+
+YEARS = range(2006, 2017)
+
+
+def score_places(
+    factory: sessionmaker[Session],
+    country: str,
+    units: dict[str, AdminUnit],
+    places: dict[str, dict],
+    months: list[date],
+    *,
+    log: Callable[[str], None] = print,
+) -> None:
+    scored = 0
+    with factory() as session:
+        for key, place in places.items():
+            unit = units[key]
+            for outcome in (LBW_OUTCOME, U5_OUTCOME):
+                try:
+                    if legacy_observed_supported(session, key, outcome):
+                        result = _kenya(session, unit, outcome, place, months)
+                    else:
+                        result = _live(session, unit, outcome, place, months)
+                except Exception as error:  # noqa: BLE001 - one place must not stop all
+                    log(f"{key} {outcome}: not scored ({error})")
+                    continue
+                if result and _has_value(result):
+                    place[outcome] = result
+                    scored += 1
+        parents: dict[str, str | None] = {
+            key: parent
+            for key, parent in session.execute(
+                select(AppGeography.id, AppGeography.parent_id).where(
+                    AppGeography.id.in_(list(places))
+                )
+            )
+        }
+    filled = _fill_from_children(places, parents)
+    log(
+        f"{country}: scored {scored} place-outcomes for {len(months)} months"
+        f" ({filled} more from the mean of their places)"
+    )
+
+
+def _has_value(result: dict) -> bool:
+    """False for a place scored without a curve (every month empty)."""
+    return any(
+        triple[0] is not None
+        for months in result["values"].values()
+        for triple in months.values()
+    )
+
+
+def _fill_from_children(places: dict[str, dict], parents: dict[str, str | None]) -> int:
+    """A place without its own model (Kenya as a whole, a state without an
+    under-five curve) gets the mean of the places directly beneath it, as the
+    observed view averages Kenya's counties. Deepest places are filled first."""
+    children: dict[str, list[str]] = {}
+    for key, parent in parents.items():
+        if parent in places:
+            children.setdefault(parent, []).append(key)
+
+    def depth(key: str) -> int:
+        level = 0
+        while parents.get(key) in places:
+            key = parents[key]  # type: ignore[assignment]
+            level += 1
+        return level
+
+    filled = 0
+    for key in sorted(children, key=depth, reverse=True):
+        for outcome in (LBW_OUTCOME, U5_OUTCOME):
+            if outcome in places[key]:
+                continue
+            scored = [places[c][outcome] for c in children[key] if outcome in places[c]]
+            if not scored:
+                continue
+            values: dict[str, dict[str, list[float | None]]] = {}
+            for code in sorted({code for item in scored for code in item["values"]}):
+                months = sorted(
+                    {m for item in scored for m in item["values"].get(code, {})}
+                )
+                for month in months:
+                    triples = [
+                        item["values"][code][month]
+                        for item in scored
+                        if month in item["values"].get(code, {})
+                        and item["values"][code][month][0] is not None
+                    ]
+                    if triples:
+                        values.setdefault(code, {})[month] = [
+                            (
+                                round(sum(t[i] for t in triples) / len(triples), 2)
+                                if all(t[i] is not None for t in triples)
+                                else None
+                            )
+                            for i in range(3)
+                        ]
+            if values:
+                selector = scored[0]["selector"]
+                places[key][outcome] = {
+                    "selector": selector if selector in values else sorted(values)[0],
+                    "values": values,
+                    "from_children": len(scored),
+                }
+                filled += 1
+    return filled
+
+
+def _triple(values: list[float | None]) -> list[float | None]:
+    """[central, low, high] from the central, coolest and warmest scores."""
+    central, *others = values
+    known = [value for value in values if value is not None]
+    if central is None or not known:
+        return [central, None, None]
+    return [round(central, 2), round(min(known), 2), round(max(known), 2)]
+
+
+def _share(estimate: observed.ObservedEstimate) -> float | None:
+    """The estimate's share, 0 where the guide hides a negative one.
+
+    A month the model scores below a risk ratio of 1 has no heat excess; the
+    observed view says so in words, but a forecast month left empty would
+    read as missing data. India's scoring floors the same case at 0.
+    """
+    if estimate.value_percent is None and estimate.message in (
+        NO_EXCESS_LBW,
+        NO_EXCESS_HEAT,
+    ):
+        return 0.0
+    return estimate.value_percent
+
+
+def _ratio(kind: str, value: float, low: float, high: float) -> dict:
+    """The model's ratio and 95% interval at the central forecast."""
+    return {
+        "kind": kind,
+        "value": round(value, 4),
+        "low": round(low, 4),
+        "high": round(high, 4),
+        "precision": precision_for_ci(low, high),
+    }
+
+
+def _kenya(session, unit, outcome, place, months) -> dict | None:
+    release = outlook_release()
+    cal = observed.calibration(release)
+    selector = DEFAULT_SELECTOR[outcome]
+    temps = place["tmax_c"]
+    values: dict[str, list[float | None]] = {}
+    ratios: dict[str, dict] = {}
+    if outcome == LBW_OUTCOME:
+        history = observed._monthly_tmax(session, [unit.id]).get(unit.id, {})
+        for month in months:
+            key = month.strftime("%Y-%m")
+            if key not in temps:
+                continue
+            shares = []
+            for variant in range(3):
+                series = dict(history)
+                for other in months:
+                    other_key = other.strftime("%Y-%m")
+                    if other_key in temps and other <= month:
+                        series[other] = temps[other_key][variant]
+                found = observed._score_lbw(series, cal, unit, selector, release)
+                estimate = (
+                    observed._estimate(outcome, selector, [found[key]], release)
+                    if key in found
+                    else None
+                )
+                shares.append(_share(estimate) if estimate else None)
+                if variant == 0 and estimate and estimate.ratio:
+                    ratios[key] = estimate.ratio.model_dump()
+            values[key] = _triple(shares)
+    else:
+        daily = observed._daily_tmax(session, [unit.id]).get(unit.id, {})
+        normal = place["normal_c"]
+        for month in months:
+            key = month.strftime("%Y-%m")
+            if key not in temps:
+                continue
+            shares = []
+            for variant in range(3):
+                # Scored before the document is saved: months are int keys.
+                delta = temps[key][variant] - normal[month.month]
+                years: list[observed.CountyMonth] = []
+                for year in YEARS:
+                    first = date(year, month.month, 1)
+                    following = date(
+                        year + (month.month == 12), month.month % 12 + 1, 1
+                    )
+                    window = [first - timedelta(days=n) for n in range(3, 0, -1)]
+                    day = first
+                    while day < following:
+                        window.append(day)
+                        day += timedelta(days=1)
+                    if any(day not in daily for day in window):
+                        continue
+                    shifted = {day: daily[day] + delta for day in window}
+                    found = observed._score_u5(shifted, cal, unit, selector, release)
+                    years.extend(found.values())
+                estimate = (
+                    observed._estimate(outcome, selector, years, release)
+                    if years
+                    else None
+                )
+                shares.append(_share(estimate) if estimate else None)
+                if variant == 0 and estimate and estimate.ratio:
+                    ratios[key] = estimate.ratio.model_dump()
+            values[key] = _triple(shares)
+    if not values:
+        return None
+    return {
+        "selector": selector,
+        "values": {selector: values},
+        "ratios": {selector: ratios},
+    }
+
+
+def _live(session, unit, outcome, place, months) -> dict | None:
+    mapping = get_active_model_mapping(session, admin_unit_id=unit.id, outcome=outcome)
+    if mapping is None:
+        return None
+    temps = place["tmax_c"]
+    history = observed._monthly_tmax(session, [unit.id]).get(unit.id, {})
+
+    def temperature(month: date, variant: int) -> float | None:
+        key = month.strftime("%Y-%m")
+        if key in temps:
+            return temps[key][variant]
+        return history.get(month)
+
+    def previous(month: date, back: int) -> date:
+        index = month.year * 12 + month.month - 1 - back
+        return date(index // 12, index % 12 + 1, 1)
+
+    if outcome == LBW_OUTCOME:
+        windows = tuple(mapping.validated_pregnancy_windows) or (1,)
+        by_window: dict[str, dict[str, list[float | None]]] = {}
+        window_ratios: dict[str, dict[str, dict]] = {}
+        for window in windows:
+            code = f"window_{window}"
+            for month in months:
+                key = month.strftime("%Y-%m")
+                if key not in temps:
+                    continue
+                shares: list[float | None] = []
+                for variant in range(3):
+                    found = [
+                        temperature(previous(month, back), variant) for back in range(3)
+                    ]
+                    lags = [value for value in found if value is not None]
+                    if len(lags) != 3:
+                        shares.append(None)
+                        continue
+                    score = score_lbw_model(
+                        mapping,
+                        pregnancy_window=window,
+                        temperatures_c=(lags[0], lags[1], lags[2]),
+                    )
+                    if variant == 0:
+                        window_ratios.setdefault(code, {})[key] = _ratio(
+                            "odds_ratio",
+                            score.odds_ratio,
+                            score.ci95_low,
+                            score.ci95_high,
+                        )
+                    shares.append(
+                        attributable_fraction_milli(
+                            score.odds_ratio,
+                            temperature_c=max(lags),
+                            reference_temperature_c=score.reference_temperature_c,
+                        )
+                        / 10
+                    )
+                by_window.setdefault(code, {})[key] = _triple(shares)
+        default = f"window_{1 if 1 in windows else windows[0]}"
+        if not by_window:
+            return None
+        return {"selector": default, "values": by_window, "ratios": window_ratios}
+
+    values: dict[str, list[float | None]] = {}
+    ratios: dict[str, dict] = {}
+    for month in months:
+        key = month.strftime("%Y-%m")
+        if key not in temps:
+            continue
+        shares = []
+        for variant in range(3):
+            value = temps[key][variant]
+            association = score_association_model(
+                mapping,
+                outcome=outcome,
+                exposure_profiles_c=((value, value, value, value),),
+            )
+            if variant == 0:
+                ratios[key] = _ratio(
+                    "risk_ratio",
+                    association.estimate,
+                    association.ci95_low,
+                    association.ci95_high,
+                )
+            shares.append(
+                attributable_fraction_milli(
+                    association.estimate,
+                    temperature_c=value,
+                    reference_temperature_c=association.reference_temperature_c,
+                )
+                / 10
+            )
+        values[key] = _triple(shares)
+    if not values:
+        return None
+    return {"selector": "all", "values": {"all": values}, "ratios": {"all": ratios}}

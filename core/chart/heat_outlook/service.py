@@ -245,7 +245,8 @@ def legacy_observed_supported(
         return False
     path = dlnm.release_dir(outlook_release()) / "calibration.json"
     try:
-        counties = _read(path, path.stat().st_mtime_ns)["counties"]
+        document = _read(path, path.stat().st_mtime_ns)
+        counties = {**document["counties"], **document.get("constituencies", {})}
         model_selector_options(outcome, outlook_release())
         # The observed ratio conversion also reads the LBW reference prevalence.
         dlnm.lbw_model(outlook_release())
@@ -260,7 +261,8 @@ def legacy_observed_supported(
     if geography_id != "geo-ke" and geography_id not in covered:
         return False
     query = select(AdminUnit.id).where(
-        AdminUnit.level == "county", AdminUnit.app_geography_id.in_(covered)
+        AdminUnit.level.in_(("county", "constituency")),
+        AdminUnit.app_geography_id.in_(covered),
     )
     if geography_id != "geo-ke":
         query = query.where(AdminUnit.app_geography_id == geography_id)
@@ -279,7 +281,8 @@ def legacy_observed_geography(
     if outcome not in OUTCOMES:
         return False
     query = select(AdminUnit.id).where(
-        AdminUnit.level == "county", AdminUnit.app_geography_id.like("geo-ke-%")
+        AdminUnit.level.in_(("county", "constituency")),
+        AdminUnit.app_geography_id.like("geo-ke-%"),
     )
     if geography_id != "geo-ke":
         query = query.where(AdminUnit.app_geography_id == geography_id)
@@ -316,13 +319,12 @@ def load_capabilities(
         )
         release = session.get(ModelRelease, model.release_id) if model else None
         if model is not None and release is not None and release.status == "active":
-            contract = (model.input_spec or {}).get("input_contract") or {}
+            # Stored results, read in the same view as Kenya's observed months
+            # (``observed_stored``): nothing is scored when a place opens.
             observed = ObservedCapability(
-                source="monthly",
+                source="outlook",
                 release=model.release_id,
                 model_area_name=model.model_area_name,
-                batch_enabled=contract.get("batch_status")
-                != "blocked_pending_modeller_confirmation",
             )
             observed_enabled = monthly_observed_enabled
     if (

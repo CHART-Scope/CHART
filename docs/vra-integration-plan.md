@@ -430,6 +430,45 @@ discovery step should manufacture zeros for absent data or imply finer spatial
 reliability than its input supports. ERA5 downscaling remains future work as
 documented in [modelling](modeling.md).
 
+## 12. Districts compared across the state (3 Nov 2026)
+
+Madhya Pradesh's 52 districts are now an assessment universe of their own:
+the upload, template, coverage and run endpoints take `?level=district`, so
+one upload and one run cover every district and rank them against each other
+(not four to eight within each division). No schema change: the level is a
+run parameter (`comparison_level`). A division's map, and Explore's
+vulnerability overlay, read its districts from that state-wide run.
+
+`pipelines/vra/data/mp-districts-v1/mp_districts_vra.csv` loads the reviewed
+NFHS-5, Census 2011 and MPI rows at district level as published (51
+districts, 25 indicators). Niwari has no source rows and stays missing. Water
+and sanitation are held back until the household/population definition is
+settled. NFHS-6 (2023-24) replaces the NFHS-5 rows once extracted from its
+fact sheets; the vintage keeps both.
+
+Loaded on the sandbox (3 Nov 2026): the district file with
+`level=district` (50 of 52 districts scored; Niwari has no source rows,
+Agar Malwa has no Census 2011 rows and so no exposure), and
+`mp-divisions-v1/mp_divisions_vra.csv` at division level with the same two
+indicators held back (all 10 divisions scored). The state map shows the
+divisions; a division's map shows its districts from the state-wide run.
+
+## 13. Hot days against the 1982-2011 baseline (3 Nov 2026)
+
+`haz.very_hot_days_change` and `haz.extreme_hot_days_change` are now computed
+by CHART (`core/chart/vra/hot_days.py`) from the stored ERA5 daily maxima,
+like the ETCCDI TX90p / TX95p indices: each area's 90th or 95th percentile
+for each calendar day (5-day window over 1982-2011), the days above it
+counted per year, and the indicator is the mean per year over 2015-2024 minus
+the mean per year over 1982-2011. Thresholds are each area's own, so "hot" is
+relative to its normal climate. A year counts with at least 360 days; an area
+needs 25 baseline and 8 recent years or gets no value. They are refreshed with
+the other computed hazard indicators on every run.
+
+They need ERA5 back to 1981: the backfill (`history backfill --years 45`)
+started on the sandbox on 3 Nov 2026. Warm nights (TN90p/TN95p) follow once
+daily minima are kept (same hourly downloads, no new pull).
+
 ## References
 
 - CEEW (2021), Mapping India's Climate Vulnerability.

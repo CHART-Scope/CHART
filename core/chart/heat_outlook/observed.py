@@ -27,19 +27,25 @@ reduction the India under-five path uses.
 from __future__ import annotations
 
 import json
+import logging
+import os
+import threading
+import time
 from calendar import monthrange
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from functools import lru_cache
+from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from chart.risk.schemas import MapResponse
 from chart.risk.service import load_map_view
 from chart.shared.db.models import (
     AdminUnit,
+    AppGeography,
     ClimateRun,
     DataLabel,
     DistrictClimate,
@@ -64,6 +70,7 @@ from .service import (
     _shown,
     enabled_views,
     model_selector_options,
+    _calibrated,
     outlook_release,
 )
 
@@ -103,11 +110,12 @@ def calibration(release: str) -> Calibration:
     if not path.is_file():
         raise ObservedNotCalibrated(release)
     document = json.loads(path.read_text())
+    # Counties and constituencies, each calibrated from its own temperatures.
+    areas = {**document["counties"], **document.get("constituencies", {})}
     return Calibration(
-        offsets={key: value["offset_c"] for key, value in document["counties"].items()},
+        offsets={key: value["offset_c"] for key, value in areas.items()},
         u5_reference={
-            key: value["u5_reference_tmax_c"]
-            for key, value in document["counties"].items()
+            key: value["u5_reference_tmax_c"] for key, value in areas.items()
         },
         note=document["note"],
     )
@@ -157,11 +165,15 @@ def load_observed(
         )
         for key in available
     ]
-    place = "Kenya" if geography_id == KENYA else units[0].name
+    level = "country" if geography_id == KENYA else units[0].level
     return ObservedResponse(
         geography_id=geography_id,
-        place=place if geography_id == KENYA else f"{place} County",
-        level="country" if geography_id == KENYA else "county",
+        place=(
+            "Kenya"
+            if geography_id == KENYA
+            else f"{units[0].name} County" if level == "county" else units[0].name
+        ),
+        level=level,
         outcome=outcome,
         release=release,
         selectors=selectors,
@@ -193,7 +205,7 @@ def load_observed_map(
         raise ViewTurnedOff("observed")
     release = outlook_release()
     _, selector = _resolve_selector(outcome, release, selector, restriction)
-    units = _units(session, KENYA, outcome)
+    units = _frame_units(session, geography_id, outcome)
     scored = _score_units(session, units, outcome, selector, release)
     # Any month one county can score may be mapped: a county's newest month
     # is often newer than Kenya's, and the map shows the others as missing.
@@ -227,21 +239,6 @@ def load_observed_map(
         )
         area.odds_ratio = estimate.ratio.value if estimate.ratio else None
         area.on_training_support = not estimate.thin_data
-    frame.metric = "heat_attributable_share_observed_month"
-    return frame
-
-
-def load_observed_outline(
-    session: Session, geography_id: str, outcome: str, month: str | None
-) -> MapResponse:
-    """Keep unsupported places navigable without borrowing observed estimates."""
-    if outcome not in OUTCOMES:
-        raise OutlookNotAvailable(geography_id)
-    frame = load_map_view(
-        session, geography_id, month, outcome=outcome, with_values=False
-    )
-    for area in frame.areas:
-        area.missing_reason = "no_model"
     frame.metric = "heat_attributable_share_observed_month"
     return frame
 
@@ -292,17 +289,38 @@ def _available(scored: dict[int, dict[str, CountyMonth]]) -> list[str]:
 def _units(session: Session, geography_id: str, outcome: str) -> list[AdminUnit]:
     if outcome not in OUTCOMES:
         raise OutlookNotAvailable(geography_id)
-    query = select(AdminUnit).where(AdminUnit.level == "county")
     if geography_id == KENYA:
-        query = query.where(AdminUnit.app_geography_id.like(f"{KENYA}-%"))
+        query = select(AdminUnit).where(
+            AdminUnit.level == "county",
+            AdminUnit.app_geography_id.like(f"{KENYA}-%"),
+        )
     elif geography_id.startswith(f"{KENYA}-"):
-        query = query.where(AdminUnit.app_geography_id == geography_id)
+        query = select(AdminUnit).where(
+            AdminUnit.level.in_(("county", "constituency")),
+            AdminUnit.app_geography_id == geography_id,
+        )
     else:
         raise OutlookNotAvailable(geography_id)
     units = list(session.scalars(query.order_by(AdminUnit.name)))
     if not units:
         raise OutlookNotAvailable(geography_id)
     return units
+
+
+def _frame_units(session: Session, geography_id: str, outcome: str) -> list[AdminUnit]:
+    """The areas a frame's map shows: Kenya's counties, a county's
+    constituencies, or a constituency itself."""
+    if geography_id == KENYA:
+        return _units(session, KENYA, outcome)
+    children = list(
+        session.scalars(
+            select(AdminUnit)
+            .join(AppGeography, AppGeography.id == AdminUnit.app_geography_id)
+            .where(AppGeography.parent_id == geography_id)
+            .order_by(AdminUnit.name)
+        )
+    )
+    return children or _units(session, geography_id, outcome)
 
 
 def _resolve_selector(
@@ -330,6 +348,144 @@ def _score_units(
     selector: str,
     release: str,
 ) -> dict[int, dict[str, CountyMonth]]:
+    """Each county's scored months, from the cache when its climate is unchanged.
+
+    Scoring is pure given the stored ERA5 and the release, and expensive:
+    under-five scores every day of every county's history (about 350,000 DLNM
+    evaluations for twenty years of Kenya), which took longer than the proxy
+    allows. Results are kept per county until a new ERA5 run is stored.
+    """
+    version = (id(session.get_bind()), _climate_version(session))
+    keys = {unit.id: (unit.id, outcome, selector, release, version) for unit in units}
+    with _CACHE_LOCK:
+        missing = [unit for unit in units if keys[unit.id] not in _SCORED]
+    if missing:
+        # One computation per request shape; concurrent callers wait for it.
+        with _COMPUTE_LOCK:
+            with _CACHE_LOCK:
+                missing = [unit for unit in missing if keys[unit.id] not in _SCORED]
+            if missing:
+                # A restart keeps its scores: they are saved beside the models.
+                path = _disk_path(outcome, selector, release, version[1])
+                saved = _read_disk(path)
+                fresh = {
+                    unit.id: saved[unit.app_geography_id]
+                    for unit in missing
+                    if unit.app_geography_id in saved
+                }
+                todo = [unit for unit in missing if unit.id not in fresh]
+                if todo:
+                    computed = _compute_scores(
+                        session, todo, outcome, selector, release
+                    )
+                    fresh.update(computed)
+                    for unit in todo:
+                        saved[unit.app_geography_id or ""] = computed.get(unit.id, {})
+                    _write_disk(path, saved)
+                with _CACHE_LOCK:
+                    if any(key[4] != version for key in _SCORED):
+                        # A new climate version retires every older entry.
+                        for stale in [k for k in _SCORED if k[4] != version]:
+                            del _SCORED[stale]
+                    for unit in missing:
+                        _SCORED[keys[unit.id]] = fresh.get(unit.id, {})
+    with _CACHE_LOCK:
+        return {unit.id: _SCORED[keys[unit.id]] for unit in units}
+
+
+_SCORED: dict[tuple, dict[str, CountyMonth]] = {}
+#: Places the background warmer scores per turn of the lock.
+WARM_BATCH = 8
+
+
+def _disk_path(outcome: str, selector: str, release: str, version: int) -> Path | None:
+    """Where scores for one climate version are kept across restarts."""
+    root = os.getenv("CHART_OBSERVED_CACHE_DIR") or (
+        str(Path(os.environ["MODEL_CACHE_DIR"]) / "observed-scores")
+        if os.getenv("MODEL_CACHE_DIR")
+        else None
+    )
+    if not root:
+        return None
+    return Path(root) / f"{release}-{outcome}-{selector}-{version}.json"
+
+
+def _read_disk(path: Path | None) -> dict[str, dict[str, CountyMonth]]:
+    if path is None or not path.is_file():
+        return {}
+    try:
+        document = json.loads(path.read_text())
+        return {
+            geography_id: {
+                month: CountyMonth(
+                    value_percent=item["value_percent"],
+                    low_percent=item["low_percent"],
+                    high_percent=item["high_percent"],
+                    thin_data=item["thin_data"],
+                    inputs=[ObservedInput(**row) for row in item["inputs"]],
+                )
+                for month, item in months.items()
+            }
+            for geography_id, months in document.items()
+        }
+    except (OSError, ValueError, KeyError, TypeError):
+        logger.warning("observed score file %s unreadable; rescoring", path)
+        return {}
+
+
+def _write_disk(path: Path | None, scores: dict[str, dict[str, CountyMonth]]) -> None:
+    if path is None:
+        return
+    document = {
+        geography_id: {
+            month: {
+                "value_percent": item.value_percent,
+                "low_percent": item.low_percent,
+                "high_percent": item.high_percent,
+                "thin_data": item.thin_data,
+                "inputs": [row.model_dump() for row in item.inputs],
+            }
+            for month, item in months.items()
+        }
+        for geography_id, months in scores.items()
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.partial")
+        temporary.write_text(json.dumps(document))
+        os.replace(temporary, path)
+    except OSError:
+        logger.warning("observed scores not saved to %s", path, exc_info=True)
+
+
+_CACHE_LOCK = threading.Lock()
+_COMPUTE_LOCK = threading.Lock()
+logger = logging.getLogger(__name__)
+
+
+def _climate_version(session: Session) -> int:
+    """The newest observed ERA5 run; ERA5-Land context runs do not count."""
+    return (
+        session.scalar(
+            select(func.max(ClimateRun.id)).where(
+                ClimateRun.data_label.in_(OBSERVED_LABELS),
+                or_(
+                    ClimateRun.resolution.is_(None),
+                    ~ClimateRun.resolution.like("ERA5-Land%"),
+                ),
+            )
+        )
+        or 0
+    )
+
+
+def _compute_scores(
+    session: Session,
+    units: list[AdminUnit],
+    outcome: str,
+    selector: str,
+    release: str,
+) -> dict[int, dict[str, CountyMonth]]:
     cal = calibration(release)
     if outcome == LBW_OUTCOME:
         monthly = _monthly_tmax(session, [unit.id for unit in units])
@@ -342,6 +498,63 @@ def _score_units(
         unit.id: _score_u5(daily.get(unit.id, {}), cal, unit, selector, release)
         for unit in units
     }
+
+
+def warm_observed_cache(get_factory, *, interval_seconds: float = 600) -> None:
+    """Keep Kenya's default observed views scored, so no visitor waits for it.
+
+    Runs forever in a daemon thread: scores every county for each outcome's
+    default selector, then rechecks every ``interval_seconds`` and rescores
+    only after a new ERA5 run (the cache key changes).
+    """
+    while True:
+        try:
+            if _calibrated():
+                release = outlook_release()
+                # Resolved here, not at startup: a database that is not
+                # reachable yet must never stop the API from starting.
+                with get_factory()() as session:
+                    # Counties and constituencies, so every map opens warm.
+                    units = _units(session, KENYA, LBW_OUTCOME) + list(
+                        session.scalars(
+                            select(AdminUnit).where(
+                                AdminUnit.level == "constituency",
+                                AdminUnit.app_geography_id.like(f"{KENYA}-%"),
+                            )
+                        )
+                    )
+                    for outcome, selector in DEFAULT_SELECTOR.items():
+                        started = time.monotonic()
+                        # Small batches: a visitor's request waits for one
+                        # batch at most, not for every place in Kenya.
+                        for first in range(0, len(units), WARM_BATCH):
+                            _score_units(
+                                session,
+                                units[first : first + WARM_BATCH],
+                                outcome,
+                                selector,
+                                release,
+                            )
+                        logger.info(
+                            "observed cache warm: %s/%s in %.1fs",
+                            outcome,
+                            selector,
+                            time.monotonic() - started,
+                        )
+        except Exception:  # noqa: BLE001 - warming must never stop the API
+            logger.exception("observed cache warm failed; retrying later")
+        time.sleep(interval_seconds)
+
+
+def start_observed_cache_warmer(get_factory) -> threading.Thread:
+    thread = threading.Thread(
+        target=warm_observed_cache,
+        args=(get_factory,),
+        name="observed-cache-warmer",
+        daemon=True,
+    )
+    thread.start()
+    return thread
 
 
 def _score_lbw(

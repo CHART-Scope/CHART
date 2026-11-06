@@ -1,9 +1,12 @@
 """VRA workflows: catalogue sync, value uploads, climate-derived hazard, runs, reads.
 
-An assessment always covers the child areas of a frame geography, framed the
-way the dashboard risk map frames them (``resolve_map_frame``): Madhya
-Pradesh's divisions, Kenya's counties, or a leaf's siblings. Nothing here is
-country-specific.
+An assessment covers the child areas of a frame geography, framed the way the
+dashboard risk map frames them (``resolve_map_frame``): Madhya Pradesh's
+divisions, Kenya's counties, or a leaf's siblings. Given a ``level`` it covers
+every area of that level beneath the frame instead (Madhya Pradesh's 52
+districts across its divisions), so they are compared with each other, and a
+child frame's reads (a division's districts) use that wider run. Nothing here
+is country-specific.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from chart.risk.schemas import MapResponse
+from chart.vra import hot_days
 from chart.risk.service import load_map_view, resolve_map_frame
 from chart.shared.db.models import (
     AdminUnit,
@@ -30,6 +34,7 @@ from chart.shared.db.models import (
     DataLabel,
     DataSource,
     DistrictClimate,
+    DistrictClimateDay,
     VraIndicator,
     VraIndicatorValue,
     VraIngestion,
@@ -81,6 +86,11 @@ COMPUTED_HAZARD = {
     "haz.tmax_monthly_max_12m": ("tmax_monthly_max_c", "mean"),
 }
 WINDOW_MONTHS = 12
+#: Hot-day indices from the daily maxima (``hot_days``): code -> percentile.
+DAILY_HAZARD = {
+    "haz.extreme_hot_days_change": 95.0,
+    "haz.very_hot_days_change": 90.0,
+}
 
 
 class VraError(Exception):
@@ -172,18 +182,67 @@ def list_indicators(session: Session) -> list[IndicatorItem]:
 
 
 def frame_areas(
-    session: Session, geography_id: str
+    session: Session, geography_id: str, level: str | None = None
 ) -> tuple[AppGeography, list[tuple[AdminUnit, AppGeography]]]:
-    """The frame for ``geography_id`` and its child areas that have an admin unit."""
+    """The frame for ``geography_id`` and the areas it compares.
 
-    frame = resolve_map_frame(session, geography_id)
+    Without ``level``: its child areas that have an admin unit. With
+    ``level``: every area of that level anywhere beneath the frame, so areas
+    under different parents are compared with each other.
+    """
+
+    if level is None:
+        frame = resolve_map_frame(session, geography_id)
+        parents = {frame.id}
+    else:
+        found = session.get(AppGeography, geography_id)
+        if found is None:
+            raise VraError("VRA_GEOGRAPHY_NOT_FOUND", 404)
+        frame = found
+        parents = _descendant_ids(session, frame)
     rows = session.execute(
         select(AdminUnit, AppGeography)
         .join(AppGeography, AppGeography.id == AdminUnit.app_geography_id)
-        .where(AppGeography.parent_id == frame.id)
+        .where(AppGeography.parent_id.in_(parents))
         .order_by(AppGeography.sort_order, AdminUnit.name)
     ).all()
-    return frame, [(unit, geography) for unit, geography in rows]
+    areas = [(unit, geography) for unit, geography in rows]
+    if level is not None:
+        areas = [
+            (unit, geography) for unit, geography in areas if geography.level == level
+        ]
+        if not areas:
+            raise VraError("VRA_LEVEL_INVALID", 422)
+    return frame, areas
+
+
+def _descendant_ids(session: Session, frame: AppGeography) -> set[str]:
+    """The frame and every geography beneath it."""
+
+    found = {frame.id}
+    frontier = {frame.id}
+    while frontier:
+        frontier = (
+            set(
+                session.scalars(
+                    select(AppGeography.id).where(AppGeography.parent_id.in_(frontier))
+                )
+            )
+            - found
+        )
+        found |= frontier
+    return found
+
+
+def _ancestor_ids(session: Session, frame: AppGeography) -> list[str]:
+    ids: list[str] = []
+    parent = frame.parent_id
+    while parent and parent not in ids:
+        ids.append(parent)
+        parent = session.scalar(
+            select(AppGeography.parent_id).where(AppGeography.id == parent)
+        )
+    return ids
 
 
 def _latest_values(
@@ -318,18 +377,113 @@ def refresh_computed_hazard(session: Session, unit_ids: list[int]) -> None:
                 ingestion_id=None,
                 climate_run_id=run.id,
             )
+    _refresh_hot_days(session, unit_ids)
     session.flush()
+
+
+def _refresh_hot_days(session: Session, unit_ids: list[int]) -> None:
+    """Change in hot days, 2015-2024 against 1982-2011, from daily maxima.
+
+    Reads the stored ERA5 daily maxima (newest observed run per day, never
+    sample data). An area without most of both periods gets no value, and
+    a value from an older vintage is removed.
+    """
+
+    indicators = {
+        row.code: row
+        for row in session.scalars(
+            select(VraIndicator).where(VraIndicator.code.in_(DAILY_HAZARD))
+        )
+    }
+    if not indicators or not unit_ids:
+        return
+    rows = session.execute(
+        select(
+            DistrictClimateDay.admin_unit_id,
+            DistrictClimateDay.period_date,
+            DistrictClimateDay.value,
+            ClimateRun.id,
+            ClimateRun.source_name,
+            DataSource.source_uri,
+        )
+        .join(ClimateRun, ClimateRun.id == DistrictClimateDay.climate_run_id)
+        .join(DataSource, DataSource.id == ClimateRun.data_source_id)
+        .where(
+            DistrictClimateDay.admin_unit_id.in_(unit_ids),
+            DistrictClimateDay.variable == "tmax_c",
+            ClimateRun.tier == "observed",
+            ClimateRun.data_label != DataLabel.sample,
+        )
+        .order_by(ClimateRun.generated_at.desc().nulls_last(), ClimateRun.id.desc())
+    ).all()
+    daily: dict[int, dict[date, float]] = {}
+    runs: dict[int, set[int]] = {}
+    source: tuple[str | None, str | None] = (None, None)
+    for unit_id, day, value, run_id, source_name, source_uri in rows:
+        series = daily.setdefault(unit_id, {})
+        if day not in series:
+            series[day] = value
+            runs.setdefault(unit_id, set()).add(run_id)
+            source = (source_name, source_uri)
+    vintage = (
+        f"{hot_days.RECENT_YEARS.start}-{hot_days.RECENT_YEARS.stop - 1}"
+        f" vs {hot_days.BASELINE_YEARS.start}-{hot_days.BASELINE_YEARS.stop - 1}"
+    )
+    for code, percentile in DAILY_HAZARD.items():
+        indicator = indicators.get(code)
+        if indicator is None:
+            continue
+        session.execute(
+            delete(VraIndicatorValue).where(
+                VraIndicatorValue.indicator_id == indicator.id,
+                VraIndicatorValue.admin_unit_id.in_(unit_ids),
+                VraIndicatorValue.vintage != vintage,
+            )
+        )
+        for unit_id in unit_ids:
+            found = hot_days.hot_days_change(daily.get(unit_id, {}), percentile)
+            if found is None:
+                session.execute(
+                    delete(VraIndicatorValue).where(
+                        VraIndicatorValue.indicator_id == indicator.id,
+                        VraIndicatorValue.admin_unit_id == unit_id,
+                    )
+                )
+                continue
+            _upsert_value(
+                session,
+                indicator_id=indicator.id,
+                admin_unit_id=unit_id,
+                vintage=vintage,
+                value=found.pop("value"),
+                method="computed",
+                quality_flags={
+                    **found,
+                    "variable": "tmax_c",
+                    "percentile": percentile,
+                    "window_days": 2 * hot_days.WINDOW_DAYS + 1,
+                    "climate_run_ids": sorted(runs.get(unit_id, ())),
+                },
+                source_name=source[0],
+                source_url=source[1],
+                notes=None,
+                ingestion_id=None,
+                climate_run_id=max(runs[unit_id]),
+            )
 
 
 # --- uploads ---------------------------------------------------------------
 
 
 def template_csv(
-    session: Session, geography_id: str, indicator_code: str | None = None
+    session: Session,
+    geography_id: str,
+    indicator_code: str | None = None,
+    level: str | None = None,
 ) -> str:
-    """One blank row per child area and indicator that is entered by hand."""
+    """One blank row per compared area and indicator that is entered by hand."""
 
-    _, areas = frame_areas(session, geography_id)
+    _, areas = frame_areas(session, geography_id, level)
     catalogue = _catalogue(session)
     if indicator_code is None:
         indicators = [row for row in catalogue if _uploadable(row)]
@@ -434,6 +588,7 @@ def ingest_csv(
     file_name: str | None,
     user_id: str | None,
     indicator_code: str | None = None,
+    level: str | None = None,
 ) -> IngestionResult:
     """Validate an upload row by row and upsert the valid rows.
 
@@ -443,7 +598,7 @@ def ingest_csv(
     indicator restricts accepted rows without changing the other validation.
     """
 
-    frame, area_rows = frame_areas(session, geography_id)
+    frame, area_rows = frame_areas(session, geography_id, level)
     areas = {unit.code.lower(): unit for unit, _ in area_rows}
     indicators = {row.code: row for row in _catalogue(session)}
     if indicator_code is not None:
@@ -566,11 +721,14 @@ def ingest_csv(
 
 
 def run_assessment(
-    session: Session, geography_id: str, user_id: str | None
+    session: Session,
+    geography_id: str,
+    user_id: str | None,
+    level: str | None = None,
 ) -> AssessmentResponse:
     """Refresh computed hazard, score the frame's areas and store the run."""
 
-    frame, area_rows = frame_areas(session, geography_id)
+    frame, area_rows = frame_areas(session, geography_id, level)
     catalogue = _catalogue(session)
     unit_ids = [unit.id for unit, _ in area_rows]
     refresh_computed_hazard(session, unit_ids)
@@ -635,6 +793,8 @@ def run_assessment(
             "class_breaks": result.class_breaks,
             "scored_indicators": result.scored_indicators,
             "area_count": len(unit_ids),
+            # None: the frame's children; else every area of this level below.
+            "comparison_level": level,
         },
         input_hash=input_hash,
         output_hash=output_hash,
@@ -675,19 +835,30 @@ def run_assessment(
                 )
             )
     session.commit()
-    return load_assessment(session, geography_id)
+    return load_assessment(session, geography_id, level)
 
 
 # --- reads -----------------------------------------------------------------
 
 
-def _latest_run(session: Session, frame_id: str) -> VraRun | None:
-    return session.scalar(
+def _latest_run(
+    session: Session, frame: AppGeography, area_level: str | None
+) -> VraRun | None:
+    """The newest run that scored these areas: the frame's own, or one on an
+    ancestor that compared every area of this level beneath it."""
+
+    owners = [frame.id, *_ancestor_ids(session, frame)]
+    for run in session.scalars(
         select(VraRun)
-        .where(VraRun.frame_geography_id == frame_id)
+        .where(VraRun.frame_geography_id.in_(owners))
         .order_by(VraRun.id.desc())
-        .limit(1)
-    )
+        .limit(50)
+    ):
+        level = (run.params or {}).get("comparison_level")
+        own = run.frame_geography_id == frame.id
+        if (own and level in (None, area_level)) or (not own and level == area_level):
+            return run
+    return None
 
 
 def _area_item(
@@ -753,9 +924,11 @@ def _driver_scores(
     return {(unit_id, code): value for unit_id, code, value in rows}
 
 
-def load_assessment(session: Session, geography_id: str) -> AssessmentResponse:
-    frame, area_rows = frame_areas(session, geography_id)
-    run = _latest_run(session, frame.id)
+def load_assessment(
+    session: Session, geography_id: str, level: str | None = None
+) -> AssessmentResponse:
+    frame, area_rows = frame_areas(session, geography_id, level)
+    run = _latest_run(session, frame, area_rows[0][1].level if area_rows else level)
     catalogue = {row.code: row for row in _catalogue(session)}
     stored: dict[int, VraResult] = {}
     driver_scores: dict[tuple[int, str], float | None] = {}
@@ -813,7 +986,7 @@ def load_area(
     unit, geography = match
     catalogue = _catalogue(session)
     by_code = {row.code: row for row in catalogue}
-    run = _latest_run(session, frame.id)
+    run = _latest_run(session, frame, geography.level)
     stored = (
         None
         if run is None
@@ -894,7 +1067,8 @@ def load_map(session: Session, geography_id: str) -> MapResponse:
 
     frame = resolve_map_frame(session, geography_id)
     shapes = load_map_view(session, geography_id, with_values=False)
-    run = _latest_run(session, frame.id)
+    _, area_rows = frame_areas(session, geography_id)
+    run = _latest_run(session, frame, area_rows[0][1].level if area_rows else None)
     stored = (
         {}
         if run is None
@@ -918,8 +1092,10 @@ def load_map(session: Session, geography_id: str) -> MapResponse:
     )
 
 
-def load_coverage(session: Session, geography_id: str) -> CoverageResponse:
-    frame, area_rows = frame_areas(session, geography_id)
+def load_coverage(
+    session: Session, geography_id: str, level: str | None = None
+) -> CoverageResponse:
+    frame, area_rows = frame_areas(session, geography_id, level)
     rules = _value_schemas()
     unit_ids = [unit.id for unit, _ in area_rows]
     rows = session.scalars(

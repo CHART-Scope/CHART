@@ -79,6 +79,34 @@ wizard finishes.
 The wizard, reset flow, and troubleshooting for stuck bootstraps are covered
 in [Installation setup](installation-setup.md).
 
+## Load climate history
+
+The dashboard reads observed climate and observed estimates from the database;
+it does not fetch them when a place is opened. After installation setup, load
+the history once for each country you use, with `make run` still running:
+
+```bash
+make climate-backfill COUNTRY=IN YEARS=2
+```
+
+This fills every place the model configuration lists for the country (its
+state, divisions and districts; for Kenya the country, counties and
+constituencies) from January `YEARS` years ago to the newest month ERA5 has
+published. It also stores India's observed estimates for every modelled area
+and month. Two years is enough to try CHART; use 5, 10 or 20 for planning work.
+Running it again with more years only downloads the years it adds, and
+`make climate-verify COUNTRY=IN YEARS=2` lists any place still missing a month.
+
+Grids are read from CHART's public mirror when it holds them; otherwise they
+come from the Copernicus Climate Data Store, which needs a free account and its
+API key in `~/.cdsapirc` ([how to](https://cds.climate.copernicus.eu/how-to-api)).
+Measured on the sandbox, two years for India took 28 minutes and needed about
+200 MB; twenty years for both countries about six hours and 2.2 GB (ERA5 cache
+plus database). Times are
+mostly Copernicus queue time. After that, the six-hourly top-up keeps the
+newest months current. Architecture, timings and storage:
+[Observed climate data](observed-climate.md).
+
 ## Climate pipeline only
 
 To work on the climate data path without starting the complete web application:

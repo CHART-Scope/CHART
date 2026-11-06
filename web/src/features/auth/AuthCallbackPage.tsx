@@ -9,6 +9,7 @@ import {
   restoreAuthSession,
   signedInHomePath,
   startKeycloakSignIn,
+  takeReturnPath,
 } from "@/lib/authClient";
 import { BrandMark, ChartLoader } from "@/components/BrandMark";
 import styles from "./AuthState.module.css";
@@ -66,7 +67,12 @@ export function AuthCallbackPage() {
     if (code && !pending) pendingExchanges.set(code, signIn);
 
     signIn
-      .then((session) => router.replace(signedInHomePath(session.user)))
+      .then((session) => {
+        // Back to the page that asked for sign-in, when the user may use it.
+        const home = signedInHomePath(session.user);
+        const back = takeReturnPath();
+        router.replace(home === "/plan" && back ? back : home);
+      })
       .catch(() => setError("The sign-in response could not be completed."));
   }, [router]);
 

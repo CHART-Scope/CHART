@@ -39,6 +39,7 @@ rebuilt.
 
 Open:
 
+- Explore (public map, no sign-in): `http://127.0.0.1:3100/explore`
 - Planning app: `http://127.0.0.1:3100/plan`
 - Risk dashboard: `http://127.0.0.1:3100/dashboard/<place>`
 - Design system: `http://127.0.0.1:3100/design-system`
@@ -71,13 +72,15 @@ make verify
 
 Adding a place or model: [docs/add-geography-and-model.md](docs/add-geography-and-model.md).
 
-What the dashboard shows and what it queues on its own:
-[docs/dashboard.md](docs/dashboard.md). Worth reading before changing the
-spatial map — opening a country's dashboard queues a **small, capped** number
-of missing areas (three per visit), because climate is fetched per area and an
-uncached month takes minutes against Copernicus. The cap is what keeps page
-load cheap as the number of areas grows; the explicit _Prepare remaining_
-action is how a planner asks for the rest.
+Load observed climate history once per country after setup (see
+[Getting started](docs/getting-started.md#load-climate-history)):
+
+```bash
+make climate-backfill COUNTRY=IN YEARS=2
+```
+
+The dashboard reads stored data only; a six-hourly Dagster sensor keeps the
+newest months current. What the dashboard shows: [docs/dashboard.md](docs/dashboard.md).
 
 ## Digital public good and licence
 

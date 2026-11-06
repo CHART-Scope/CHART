@@ -51,6 +51,7 @@ def test_parallel_cached_era5_pull_persists_monthly_results(tmp_path: Path) -> N
     environment = os.environ.copy()
     # Any unexpected cache miss must not contact CDS with real credentials.
     environment["CDSAPI_URL"] = "http://127.0.0.1:1/no-network-expected"
+    environment["ERA5_MIRROR_URL"] = ""
     environment["CDSAPI_KEY"] = "disposable-cache-test"
     record = {
         "revision": subprocess.check_output(
@@ -142,3 +143,21 @@ def test_parallel_cached_era5_pull_persists_monthly_results(tmp_path: Path) -> N
         raise
     finally:
         manifest.write_text(json.dumps(record, indent=2) + "\n")
+
+
+def test_the_public_mirror_serves_a_retained_grid(tmp_path: Path) -> None:
+    """Regression: the mirror address named eu-west-2 while the bucket is in
+    eu-north-1; S3 answered 301 with nothing to follow, so every install
+    missed the mirror and queued at Copernicus for grids already published."""
+    from era5_heat import cds_client
+
+    # A grid published to the mirror on 6 Nov 2026 (Madhya Pradesh ERA5).
+    key = "000c00a337495bad"
+    nc_path = tmp_path / f"{key}.nc"
+    meta_path = tmp_path / f"{key}.json"
+    os.environ.pop("ERA5_MIRROR_URL", None)
+
+    assert cds_client._fetch_mirror(key, nc_path, meta_path)
+    assert cds_client._cached_path_ok(nc_path)
+    assert json.loads(meta_path.read_text())
+    assert nc_path.stat().st_size > 100_000

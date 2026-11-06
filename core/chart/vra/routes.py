@@ -16,6 +16,7 @@ from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import (
     require_any_role,
     require_current_user,
+    require_reader,
     require_geography_access,
 )
 from chart.risk.routes import (
@@ -40,6 +41,8 @@ router = APIRouter(prefix="/vra", tags=["vra"])
 
 MAX_UPLOAD_BYTES = 2_000_000
 CurrentUser = Annotated[CurrentUserContext, Depends(require_current_user)]
+#: Published assessments are public reads on an open installation.
+Reader = Annotated[CurrentUserContext, Depends(require_reader)]
 
 
 def _require_admin(user: CurrentUserContext, geography_id: str) -> None:
@@ -83,7 +86,7 @@ def _call(fn, *args):
 @router.get(
     "/indicators", response_model=IndicatorList, summary="List the VRA catalogue"
 )
-def read_indicators(user: CurrentUser) -> IndicatorList:
+def read_indicators(user: Reader) -> IndicatorList:
     require_any_role(user, risk_reader_roles)
     return IndicatorList(items=_call(service.list_indicators))
 
@@ -93,7 +96,7 @@ def read_indicators(user: CurrentUser) -> IndicatorList:
     response_model=AssessmentResponse,
     summary="Read the latest assessment of a frame's child areas",
 )
-def read_assessment(geography_id: str, user: CurrentUser) -> AssessmentResponse:
+def read_assessment(geography_id: str, user: Reader) -> AssessmentResponse:
     _require_reader(user, geography_id)
     return _call(service.load_assessment, geography_id)
 
@@ -103,7 +106,7 @@ def read_assessment(geography_id: str, user: CurrentUser) -> AssessmentResponse:
     response_model=MapResponse,
     summary="Read the frame's areas shaded by VRA risk",
 )
-def read_map(geography_id: str, user: CurrentUser) -> MapResponse:
+def read_map(geography_id: str, user: Reader) -> MapResponse:
     _require_reader(user, geography_id)
     return _call(service.load_map, geography_id)
 
@@ -114,7 +117,7 @@ def read_map(geography_id: str, user: CurrentUser) -> MapResponse:
     summary="Read one area's scores and indicator values",
 )
 def read_area(
-    geography_id: str, area_geography_id: str, user: CurrentUser
+    geography_id: str, area_geography_id: str, user: Reader
 ) -> AreaDetailResponse:
     _require_reader(user, geography_id)
     return _call(service.load_area, geography_id, area_geography_id)
@@ -125,9 +128,15 @@ def read_area(
     response_model=CoverageResponse,
     summary="Read indicator coverage and upload history (admin)",
 )
-def read_coverage(geography_id: str, user: CurrentUser) -> CoverageResponse:
+def read_coverage(
+    geography_id: str,
+    user: CurrentUser,
+    level: Annotated[
+        str | None, Query(max_length=64, pattern=r"^[A-Za-z0-9_]+$")
+    ] = None,
+) -> CoverageResponse:
     _require_admin(user, geography_id)
-    return _call(service.load_coverage, geography_id)
+    return _call(service.load_coverage, geography_id, level)
 
 
 @router.get(
@@ -139,9 +148,12 @@ def read_template(
     geography_id: str,
     user: CurrentUser,
     indicator_code: Annotated[str | None, Query(max_length=128)] = None,
+    level: Annotated[
+        str | None, Query(max_length=64, pattern=r"^[A-Za-z0-9_]+$")
+    ] = None,
 ) -> Response:
     _require_admin(user, geography_id)
-    body = _call(service.template_csv, geography_id, indicator_code)
+    body = _call(service.template_csv, geography_id, indicator_code, level)
     return Response(
         content=body,
         media_type="text/csv",
@@ -168,6 +180,9 @@ async def upload_values(
     user: CurrentUser,
     file_name: Annotated[str | None, Query(max_length=256)] = None,
     indicator_code: Annotated[str | None, Query(max_length=128)] = None,
+    level: Annotated[
+        str | None, Query(max_length=64, pattern=r"^[A-Za-z0-9_]+$")
+    ] = None,
 ) -> IngestionResult:
     await run_in_threadpool(_require_admin, user, geography_id)
     raw = await request.body()
@@ -185,6 +200,7 @@ async def upload_values(
         file_name,
         user.user_id,
         indicator_code,
+        level,
     )
 
 
@@ -193,6 +209,14 @@ async def upload_values(
     response_model=AssessmentResponse,
     summary="Refresh computed hazard and score the frame's areas (admin)",
 )
-def create_run(geography_id: str, user: CurrentUser) -> AssessmentResponse:
+def create_run(
+    geography_id: str,
+    user: CurrentUser,
+    level: Annotated[
+        str | None, Query(max_length=64, pattern=r"^[A-Za-z0-9_]+$")
+    ] = None,
+) -> AssessmentResponse:
+    """With ``level`` (e.g. ``district``) every area of that level beneath the
+    frame is scored together, not only the frame's children."""
     _require_admin(user, geography_id)
-    return _call(service.run_assessment, geography_id, user.user_id)
+    return _call(service.run_assessment, geography_id, user.user_id, level)

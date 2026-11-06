@@ -154,7 +154,7 @@ export async function fetchHeatOutlook(
   if (selection.selector) params.set("selector", selection.selector);
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}?${params}`,
-    { accessToken, signal },
+    { accessToken, signal, cache: "default" },
   );
   if (response.status === 404) throw new OutlookNotPublished(geographyId);
   if (!response.ok) throw new Error("The heat outlook could not load.");
@@ -174,7 +174,7 @@ export async function fetchHeatOutlookMap(
   if (selection.reference) params.set("reference", selection.reference);
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/map?${params}`,
-    { accessToken },
+    { accessToken, cache: "default" },
   );
   if (!response.ok) throw new Error("The heat outlook map could not load.");
   return (await response.json()) as MapResponse;
@@ -196,7 +196,7 @@ export async function fetchObservedRisk(
 ): Promise<ObservedRisk> {
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/observed?${observedParams(selection)}`,
-    { accessToken, signal },
+    { accessToken, signal, cache: "default" },
   );
   if (response.status === 404) throw new OutlookNotPublished(geographyId);
   if (!response.ok) throw new Error("The observed estimate could not load.");
@@ -211,7 +211,7 @@ export async function fetchObservedRiskMap(
 ): Promise<MapResponse> {
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/observed/map?${observedParams(selection)}`,
-    { accessToken },
+    { accessToken, cache: "default" },
   );
   if (!response.ok) throw new Error("The observed map could not load.");
   return (await response.json()) as MapResponse;
@@ -239,8 +239,127 @@ export async function fetchOutlookCapabilities(
   const params = new URLSearchParams({ outcome });
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/capabilities?${params}`,
-    { accessToken, signal },
+    { accessToken, signal, cache: "default" },
   );
   if (!response.ok) throw new Error("Available outlook views could not load.");
   return response.json() as Promise<OutlookCapabilities>;
+}
+
+export type ClimateLayer = "tmax" | "heat_days";
+
+export type ClimateLayerMap = MapResponse & {
+  available_months: string[];
+  source: string;
+};
+
+/** ERA5-Land temperature or heatwave days per area: a map layer, not a model input. */
+export async function fetchClimateLayer(
+  geographyId: string,
+  accessToken: string | null | undefined,
+  layer: ClimateLayer,
+  month?: string | null,
+): Promise<ClimateLayerMap> {
+  const params = new URLSearchParams({ layer });
+  if (month) params.set("month", month);
+  const response = await authFetch(
+    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/climate?${params}`,
+    { accessToken, cache: "default" },
+  );
+  if (!response.ok) throw new Error("The climate layer could not load.");
+  return (await response.json()) as ClimateLayerMap;
+}
+
+export type PopulationMeasure = "total" | "under5" | "women_15_49";
+
+export type PlacePopulation = {
+  total: number;
+  under5: number;
+  women_15_49: number;
+  area_km2: number;
+};
+
+export type PopulationMap = MapResponse & {
+  measure: PopulationMeasure;
+  measure_label: string;
+  place: PlacePopulation | null;
+  counts: Record<string, PlacePopulation>;
+  source: string;
+  source_uri: string;
+  license: string;
+  citation: string;
+  year: number;
+};
+
+/** WorldPop people per area: shaded by density, with counts per area. */
+export async function fetchPopulation(
+  geographyId: string,
+  measure: PopulationMeasure,
+): Promise<PopulationMap> {
+  const response = await authFetch(
+    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/population?measure=${measure}`,
+    { auth: false, cache: "default" },
+  );
+  if (!response.ok) throw new Error("Population could not load.");
+  return (await response.json()) as PopulationMap;
+}
+
+export type ForecastMonth = {
+  month: string;
+  tmax_c: number | null;
+  tmax_low_c: number | null;
+  tmax_high_c: number | null;
+  value_percent: number | null;
+  low_percent: number | null;
+  high_percent: number | null;
+  /** The model's ratio and 95% interval at the central forecast. */
+  ratio?: OutlookRatio | null;
+};
+
+export type PlaceForecast = {
+  geography_id: string;
+  outcome: string;
+  issue: string;
+  selector: string | null;
+  selectors: string[];
+  months: ForecastMonth[];
+  systems: string[];
+  source: string;
+  source_uri: string;
+  method: string;
+};
+
+export type ForecastMap = MapResponse & {
+  issue: string;
+  months: string[];
+  ranges: Record<string, [number | null, number | null]>;
+  tmax_c: Record<string, number>;
+};
+
+/** The next six months for one place, from the C3S multi-system forecast. */
+export async function fetchForecast(
+  geographyId: string,
+  outcome: string,
+): Promise<PlaceForecast> {
+  const response = await authFetch(
+    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/forecast?outcome=${outcome}`,
+    { auth: false, cache: "default" },
+  );
+  if (!response.ok) throw new Error("The forecast could not load.");
+  return (await response.json()) as PlaceForecast;
+}
+
+/** The frame's areas shaded by one forecast month's heat share. */
+export async function fetchForecastMap(
+  geographyId: string,
+  outcome: string,
+  month?: string | null,
+): Promise<ForecastMap> {
+  const params = new URLSearchParams({ outcome });
+  if (month) params.set("month", month);
+  const response = await authFetch(
+    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/forecast/map?${params}`,
+    { auth: false, cache: "default" },
+  );
+  if (!response.ok) throw new Error("The forecast map could not load.");
+  return (await response.json()) as ForecastMap;
 }

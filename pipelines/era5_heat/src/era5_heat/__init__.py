@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import hashlib
+import math
 import json
 import os
 import time
@@ -25,6 +26,8 @@ from .aggregate import (
 )
 from .cds_client import (
     DATASET,
+    DATASETS,
+    LAND_DATASET,
     VARIABLE,
     BBox,
     download_metadata,
@@ -44,6 +47,7 @@ __all__ = [
     "District",
     "BBox",
     "DATASET",
+    "LAND_DATASET",
     "VARIABLE",
     "CELL_CENTRE",
     "CELL_OVERLAP",
@@ -238,6 +242,7 @@ def compute_heat_series_for_areas(
     refresh: bool = False,
     max_workers: int | None = None,
     grid_transform: Callable[[xr.Dataset], xr.Dataset] | None = None,
+    dataset: str = DATASET,
 ) -> dict[int, tuple[pd.DataFrame, dict, pd.Series]]:
     """Download one grid covering ``bbox``, then derive every area from it.
 
@@ -276,21 +281,24 @@ def compute_heat_series_for_areas(
     if not 1 <= worker_count <= 8:
         raise ValueError("max_workers must be between 1 and 8")
 
-    acquisition_bbox = bbox
-    if any(area.aggregation_method == CELL_OVERLAP for area in areas):
-        # CDS clips by grid-cell centres. Include one native ERA5 cell around
-        # the requested outline so every intersecting footprint is available.
-        north, west, south, east = bbox
-        acquisition_bbox = (
-            min(90.0, north + 0.25),
-            max(-180.0, west - 0.25),
-            max(-90.0, south - 0.25),
-            min(180.0, east + 0.25),
-        )
+    # CDS clips by grid-cell centres. One native ERA5 cell around the outline,
+    # snapped outward to the 0.25 deg grid, makes every intersecting footprint
+    # available (overlap areas, and centre areas too small to hold a centre),
+    # and keeps the request - so its cache key - stable as areas are added.
+    north, west, south, east = bbox
+    cell = DATASETS[dataset]
+    steps = round(1 / cell)
+    acquisition_bbox = (
+        min(90.0, round(math.ceil(north * steps) / steps + cell, 4)),
+        max(-180.0, round(math.floor(west * steps) / steps - cell, 4)),
+        max(-90.0, round(math.floor(south * steps) / steps - cell, 4)),
+        min(180.0, round(math.ceil(east * steps) / steps + cell, 4)),
+    )
     t_start = time.monotonic()
     downloads = download_years(
         year_list,
         acquisition_bbox,
+        dataset=dataset,
         cache_dir=cache_dir,
         months_by_year=months_by_year,
         no_cache=no_cache,
@@ -307,6 +315,7 @@ def compute_heat_series_for_areas(
     # data and forty-seven.
     daily_parts: dict[int, list[pd.Series]] = {area.id: [] for area in areas}
     skipped: dict[int, str] = {}
+    methods: dict[int, str] = {}
     for item in downloads:
         with xr.open_dataset(item.path) as ds:
             ds = _requested_grid(ds, item.months)
@@ -315,14 +324,27 @@ def compute_heat_series_for_areas(
             for area in areas:
                 if area.id in skipped:
                     continue
+                method = methods.get(area.id, area.aggregation_method)
                 try:
-                    daily_parts[area.id].append(
-                        aggregate_daily_tmax_c(
+                    try:
+                        series = aggregate_daily_tmax_c(
                             daily_grid,
                             geometry=area.geometry,
-                            aggregation_method=area.aggregation_method,
+                            aggregation_method=method,
                         )
-                    )
+                    except ValueError as error:
+                        # An area smaller than one grid cell (Mombasa, Vihiga)
+                        # holds no centre; weight the cells it overlaps instead.
+                        if str(error) != "ERA5_AREA_HAS_NO_GRID_CENTRES":
+                            raise
+                        method = CELL_OVERLAP
+                        series = aggregate_daily_tmax_c(
+                            daily_grid,
+                            geometry=area.geometry,
+                            aggregation_method=method,
+                        )
+                    methods[area.id] = method
+                    daily_parts[area.id].append(series)
                 except ValueError as error:
                     # Missing spatial coverage or invalid geometry must not
                     # invent zero temperatures or lose the other areas.
@@ -352,8 +374,12 @@ def compute_heat_series_for_areas(
         frame = add_handoff_metadata(
             frame,
             climate_source="Copernicus Climate Data Store",
-            climate_dataset=DATASET,
-            climate_source_version="ERA5 hourly data on single levels",
+            climate_dataset=dataset,
+            climate_source_version=(
+                "ERA5 hourly data on single levels"
+                if dataset == DATASET
+                else "ERA5-Land hourly data"
+            ),
             climate_variable=VARIABLE,
             data_status="observed_reanalysis",
             generated_at=generated_at,
@@ -375,13 +401,17 @@ def compute_heat_series_for_areas(
             {
                 "schema_version": 1,
                 "source": "Copernicus Climate Data Store",
-                "source_version": "ERA5 hourly data on single levels",
+                "source_version": (
+                    "ERA5 hourly data on single levels"
+                    if dataset == DATASET
+                    else "ERA5-Land hourly data"
+                ),
                 "data_status": "observed_reanalysis",
                 "district": area.name,
                 "bbox": list(bbox),
                 "acquisition_bbox": list(acquisition_bbox),
                 "bbox_order": "north,west,south,east",
-                "aggregation_method": area.aggregation_method,
+                "aggregation_method": methods.get(area.id, area.aggregation_method),
                 "boundary_sha256": hashlib.sha256(
                     json.dumps(
                         area.geometry, sort_keys=True, separators=(",", ":")
@@ -390,7 +420,7 @@ def compute_heat_series_for_areas(
                 "downscaling_method": (
                     "expert_analytics_pending" if grid_transform is not None else "none"
                 ),
-                "dataset": DATASET,
+                "dataset": dataset,
                 "variable": VARIABLE,
                 "window": {
                     "start_year": year_list[0],

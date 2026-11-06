@@ -35,9 +35,9 @@ OneDrive ZIPs. With the default deployment bucket:
 
 ```bash
 aws s3 sync pipelines/models/outlooks/ s3://chart-predictive-models/outlooks/ \
-  --exclude index.json --region eu-west-2
+  --exclude index.json --region eu-north-1
 aws s3 cp pipelines/models/outlooks/index.json \
-  s3://chart-predictive-models/outlooks/index.json --region eu-west-2
+  s3://chart-predictive-models/outlooks/index.json --region eu-north-1
 ```
 
 Publish the index only after the other uploads succeed. Use the actual
@@ -143,7 +143,7 @@ aws s3 sync "s3://$MODEL_BUCKET/" /models/ --exclude "archive/*" --exclude "medi
 | --- | --- | --- |
 | `MODEL_BUCKET` | `chart-predictive-models` | Bucket mirrored onto the volume. |
 | `MODEL_BUCKET_PUBLIC` | `1` | `1` reads anonymously (`--no-sign-request`). `0` signs with the EC2 instance role, which needs `s3:ListBucket` and `s3:GetObject`. |
-| `AWS_REGION` | `eu-west-2` | Region of the bucket. |
+| `AWS_REGION` | `eu-west-2` | Region for AWS calls. The default `chart-predictive-models` bucket is in `eu-north-1`; the AWS CLI follows S3's redirect, plain HTTPS reads must use that region's endpoint. |
 
 - **What it copies.** The whole bucket except `archive/` and `media/`. Both
   the `.rds` artifacts used by the live scorer and the outlook JSON files

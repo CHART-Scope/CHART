@@ -22,7 +22,12 @@ import pytest
 import xarray as xr
 
 import era5_heat
-from era5_heat import AreaSpec, compute_heat_series_for_areas
+from era5_heat import (
+    CELL_CENTRE,
+    CELL_OVERLAP,
+    AreaSpec,
+    compute_heat_series_for_areas,
+)
 
 
 def _square(west: float, south: float, size: float = 1.0) -> dict:
@@ -116,24 +121,29 @@ def test_each_area_keeps_its_own_name_in_the_metadata(one_grid) -> None:
     assert results[1][1]["cache"] == results[2][1]["cache"]
 
 
-def test_an_area_with_no_grid_centre_is_omitted_not_zeroed(one_grid) -> None:
-    """A place smaller than a cell is a data limitation, not a failure.
+def test_an_area_with_no_grid_centre_uses_the_cells_it_overlaps(one_grid) -> None:
+    """A place smaller than a cell (Mombasa, Vihiga) still gets its climate.
 
-    Returning an empty frame would write a row of nothing; dropping the whole
-    country would lose the areas that did work. It is omitted and logged, so
-    the caller can report it.
+    It holds no cell centre, so the cells it overlaps are weighted instead,
+    and its metadata records that method. A place the grid does not cover at
+    all is omitted, never zeroed, and the other areas are kept.
     """
     real = AreaSpec(id=1, code="west", name="West", geometry=_square(34.0, 0.0))
     tiny = AreaSpec(
         id=2, code="tiny", name="Tiny", geometry=_square(37.0, 0.2, size=0.01)
     )
+    outside = AreaSpec(id=3, code="far", name="Far", geometry=_square(60.0, 0.0))
 
     results = compute_heat_series_for_areas(
-        [real, tiny], bbox=(2.0, 34.0, 0.0, 41.0), target_months=(date(2026, 6, 1),)
+        [real, tiny, outside],
+        bbox=(2.0, 34.0, 0.0, 41.0),
+        target_months=(date(2026, 6, 1),),
     )
 
-    assert 1 in results
-    assert 2 not in results
+    assert results[1][1]["aggregation_method"] == CELL_CENTRE
+    assert results[2][1]["aggregation_method"] == CELL_OVERLAP
+    assert not results[2][0]["tmax_monthly_mean_c"].isna().any()
+    assert 3 not in results
 
 
 def test_only_the_requested_months_survive(one_grid) -> None:
