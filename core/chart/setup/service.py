@@ -14,7 +14,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
 from chart.auth.schemas import CurrentUserContext
-from chart.identity import IdentityError, delete_user, upsert_user
+from chart.identity import IdentityError, add_to_groups, delete_user, upsert_user
 from chart.model_registry.runtime import prepare_model_release
 from chart.model_registry.schemas import (
     GeographyPlaceSpec,
@@ -559,6 +559,9 @@ def _auto_seed_deployed_models(
             raise SetupError("SETUP_MODEL_PREPARATION_FAILED", 503) from error
 
 
+DEFAULT_ADMIN_USERNAME = "admin"
+
+
 def complete(
     input_data: CompleteSetupInput,
     user: CurrentUserContext,
@@ -576,6 +579,17 @@ def complete(
     country_code = input_data.countryCode.strip().upper()
     root_id = release_geography.root_id
     root_path = release_geography.root_path
+    if provisioning_token is None and not any(
+        scope.rstrip("/") == root_path.rstrip("/")
+        or scope.startswith(root_path.rstrip("/") + "/")
+        for scope in user.geography_scopes
+    ):
+        # The signed-in administrator who runs setup (the default `admin`)
+        # manages the installed country; bootstrap gives its admin the same.
+        try:
+            add_to_groups(user.user_id, [root_path])
+        except IdentityError as error:
+            raise SetupError("SETUP_IDENTITY_GROUP_FAILED", 502) from error
     session_factory = session_factory or get_session_factory()
     with session_factory() as session:
         state = session.get(SetupStateRecord, SETUP_ID, with_for_update=True)
@@ -783,6 +797,15 @@ def reset(user: CurrentUserContext) -> SetupStatus:
     with get_session_factory()() as session:
         state = session.get(SetupStateRecord, SETUP_ID)
         first_admin_user_id = state.first_admin_user_id if state else None
+        # The default `admin` (infra/keycloak/sync-realm.js) runs setup again
+        # after a reset, so its account stays; a bootstrap-made admin goes.
+        if first_admin_user_id:
+            first_admin = session.get(AppUser, first_admin_user_id)
+            if (
+                first_admin is not None
+                and first_admin.username == DEFAULT_ADMIN_USERNAME
+            ):
+                first_admin_user_id = None
 
         # Nuke everything a re-run of setup/bootstrap could collide with —
         # the previous reset only cleared workspace/user state and left the

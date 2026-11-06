@@ -104,7 +104,13 @@ def main() -> int:
                     {"name": "content_editor"},
                     {"name": "chart_admin"},
                 ],
-                "client": {"chart-core": [{"name": "health_planning_lead"}]},
+                "client": {
+                    "chart-core": [
+                        {"name": "health_planning_lead"},
+                        {"name": "chart_admin"},
+                        {"name": "content_editor"},
+                    ]
+                },
             },
             "groups": [
                 nested_group(

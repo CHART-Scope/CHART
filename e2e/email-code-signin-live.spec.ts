@@ -204,3 +204,36 @@ test("the Keycloak administration sign-in carries CHART's look", async ({ page }
   );
   await page.screenshot({ path: `${evidence}/keycloak-admin-sign-in.png` });
 });
+
+test("a new installation's admin signs in with admin/admin, must choose a password, then can invite", async ({
+  browser,
+}) => {
+  const page = await browser.newPage();
+  await page.goto("/auth/signin");
+  await page.getByLabel("Email address").fill("admin");
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  // An account with a password is asked for it; no code is emailed.
+  await page.getByLabel("Password", { exact: true }).fill("admin");
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await page.getByLabel("New Password").fill("e2e-admin-chosen-password");
+  await page.getByLabel("Confirm password").fill("e2e-admin-chosen-password");
+  await page.getByRole("button", { name: "Submit" }).click();
+  // No planning area before setup: the admin manages people.
+  await page.waitForURL(/\/settings\?tab=users/);
+  await expect(page.getByRole("form", { name: "Invite a person" })).toBeVisible();
+  await page.screenshot({
+    path: `${evidence}/default-admin-people.png`,
+    fullPage: true,
+  });
+  await page.close();
+
+  // The first password is gone: admin/admin no longer signs in.
+  const again = await browser.newPage();
+  await again.goto("/auth/signin");
+  await again.getByLabel("Email address").fill("admin");
+  await again.getByRole("button", { name: "Log in", exact: true }).click();
+  await again.getByLabel("Password", { exact: true }).fill("admin");
+  await again.getByRole("button", { name: "Log in", exact: true }).click();
+  await expect(again.getByText(/Invalid (username or )?password/)).toBeVisible();
+  await again.close();
+});

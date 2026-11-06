@@ -1,7 +1,10 @@
 # Sign-in and email
 
-CHART has no passwords. A person types their email address, Keycloak emails
-them a six-character code, and the code signs them in. Anyone can use
+People sign in without passwords: they type their email address, Keycloak
+emails them a six-character code, and the code signs them in. The one
+exception is the default administrator, `admin`, which has a password and
+must change it at its first sign-in
+([installation setup](installation-setup.md)). Anyone can use
 [Explore](explore.md) without an account; signing in is for people an
 administrator has added (the first administrator is created by the
 [installation wizard](installation-setup.md)).
@@ -135,7 +138,8 @@ in `infra/keycloak/themes/chart/email/`.
 - Disabling a person (`POST /users/{id}/disable`) stops their codes.
 - The Keycloak administration console (`/identity/admin`) is for operators,
   not everyday work. Its sign-in also uses CHART's look; the user is `admin`
-  and the password is `KEYCLOAK_ADMIN_PASSWORD` from `.env.prod`.
+  and the password is `KEYCLOAK_ADMIN_PASSWORD` from `.env.prod`. That is
+  Keycloak's own administrator, a different account from CHART's `admin`.
 - If the only administrator is locked out, re-enable them from an operator
   shell; they then sign in with a code as usual:
 

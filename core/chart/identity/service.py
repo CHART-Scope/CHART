@@ -115,6 +115,21 @@ def upsert_user(
     )
 
 
+def add_to_groups(user_id: str, group_paths: list[str]) -> None:
+    """Give an existing account geography groups (its planning areas)."""
+    config = _config()
+    token = _admin_token(config)
+    for path in group_paths:
+        group = _ensure_group_path(config, token, path)
+        _request(
+            config,
+            token,
+            "PUT",
+            f"/users/{urllib.parse.quote(user_id)}/groups/{urllib.parse.quote(group['id'])}",
+            expected={204},
+        )
+
+
 INVITATION_LIFESPAN_SECONDS = 7 * 24 * 3600
 
 

@@ -6,15 +6,13 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button";
 import {
   completeKeycloakSignIn,
-  type CurrentUser,
   restoreAuthSession,
   signedInHomePath,
   startKeycloakSignIn,
   takeReturnPath,
 } from "@/lib/authClient";
-import { listGeographies } from "@/lib/planningClient";
 import { BrandMark, ChartLoader } from "@/components/BrandMark";
-import { defaultPlanningArea } from "@/features/planning/contextFamilies";
+import { dashboardPath } from "./dashboardPath";
 import styles from "./AuthState.module.css";
 
 // An authorization code is single-use and a successful exchange clears the
@@ -73,10 +71,11 @@ export function AuthCallbackPage() {
       .then(async (session) => {
         // Back to the page that asked for sign-in, when the user may use it;
         // otherwise straight to the dashboard of their own area.
+        // An administrator without an area yet may still go back (to setup).
         const home = signedInHomePath(session.user);
         const back = takeReturnPath();
+        if (back && home !== "/explore") return router.replace(back);
         if (home !== "/plan") return router.replace(home);
-        if (back) return router.replace(back);
         router.replace(await dashboardPath(session.user).catch(() => home));
       })
       .catch(() => setError("The sign-in response could not be completed."));
@@ -102,14 +101,4 @@ export function AuthCallbackPage() {
       </section>
     </main>
   );
-}
-
-/** The dashboard of the area Start planning would open for this person. */
-async function dashboardPath(user: CurrentUser) {
-  const area = defaultPlanningArea(
-    await listGeographies(),
-    user.geographyScopes,
-    user.activeGeographyId,
-  );
-  return area ? `/dashboard/${encodeURIComponent(area.id)}` : "/plan";
 }

@@ -1,60 +1,56 @@
 # Installation setup
 
-CHART ships without any pre-seeded users, groups, or workspaces. The first time
-you open the web application after `make run`, the browser redirects to the
-installation setup wizard at `/onboarding`. The wizard collects the country,
-administrative area, primary sector, collaborating sectors, and the first
-administrator account, then provisions Keycloak and Postgres in one atomic
-saga.
+Every installation starts with one administrator account:
 
-## What the wizard does
+| Username | First password |
+| --- | --- |
+| `admin` | `admin`, or `CHART_ADMIN_INITIAL_PASSWORD` when set |
 
-Backend endpoint: `POST /setup/bootstrap` (proxied through the web app at
-`/api/setup/bootstrap`).
+`infra/keycloak/sync-realm.js` creates it once (local `make identity-sync`
+and every deploy) and never changes it afterwards. **Set
+`CHART_ADMIN_INITIAL_PASSWORD` in `.env.prod` before a server goes public**,
+so it never starts on `admin`.
 
-Handler: `bootstrap()` in `core/chart/setup/service.py`.
+## First run
 
-### Setup token
+1. Open CHART and choose **Set up CHART** (or **Sign in**).
+2. Enter `admin` in the email field, then the first password. This account is
+   asked for a password, not an emailed code.
+3. Keycloak makes you choose a new password straight away. The first password
+   stops working.
+4. The setup wizard at `/onboarding` asks for the country, administrative
+   area, primary sector and collaborating sectors, then **Launch CHART**. No
+   setup token and no second administrator are needed: setup runs as `admin`
+   (`POST /setup/complete`) and gives it the installed country.
+5. CHART opens the dashboard for that country. Invite everyone else from
+   **Settings → Users** ([inviting people](sign-in.md#inviting-people)); they
+   sign in with emailed codes.
 
-`POST /setup/bootstrap` requires the `X-CHART-Bootstrap-Token` header to match
-the API's `CHART_BOOTSTRAP_TOKEN` (`403 SETUP_BOOTSTRAP_FORBIDDEN` otherwise;
-`503 SETUP_BOOTSTRAP_DISABLED` when the API has no token configured). The web
-proxy only forwards the header the browser sent; it never adds the token
-itself, so a visitor who does not hold the token cannot bootstrap an
-installation.
+Before setup, `admin` lands on **Settings → Users**; only an administrator
+can open `/onboarding`.
 
-The person running the wizard enters the token in the **Setup token** field of
-the first-administrator dialog. It is kept in memory only and is never written
-to `localStorage`. The dialog asks for no password: the administrator signs in
-with a code emailed to the address they enter ([sign-in](sign-in.md)), so the
-installation's email settings must work before setup.
+## What setup does
 
-- **Local development:** `make run` (through `make bootstrap-token`) generates
-  the token once and stores it in `web/.env.local`. Read it with
-  `sed -n 's/^CHART_BOOTSTRAP_TOKEN=//p' web/.env.local`.
-- **Production:** the token is the `CHART_BOOTSTRAP_TOKEN` value in
-  `~/chart-deploy/aws/.env.prod`, which only the API container receives. Share
-  it with the installation's first administrator out of band, and rotate it
-  after setup if it was shared widely.
+`complete()` in `core/chart/setup/service.py`, called as the signed-in
+administrator:
 
-The saga in order:
-
-1. **Claim** — `_claim_bootstrap` acquires a lock on the `setup_state` row,
-   mints an `operation_id`, and moves `phase` from `uninitialized` to
-   `provisioning`. Concurrent bootstrap calls with the same payload resume the
-   same saga; mismatched payloads return `409 SETUP_BOOTSTRAP_REQUEST_MISMATCH`.
-2. **Identity** — `upsert_user` creates or updates the Keycloak user in the
-   `chart` realm, sets a `chartProvisioningOperation` attribute matching the
-   `operation_id`, assigns geography groups, and grants the `chart_admin` +
-   `content_editor` client roles.
-3. **Complete** — `complete()` upserts geography rows, creates the default
-   workspace, inserts the admin `AppUser` row, marks setup `completed`, and
-   returns the fresh status.
+1. **Identity** — when the administrator's token does not already cover the
+   chosen country, adds the account to that country's Keycloak group
+   (`502 SETUP_IDENTITY_GROUP_FAILED` if Keycloak refuses; nothing is written).
+2. **Complete** — upserts geography rows, creates the default workspace,
+   records the administrator's `AppUser` row and scope, prepares the installed
+   models, and marks setup `completed`.
 
 Wizard state in the browser is held in a `zustand` store persisted to
-`localStorage` under the key `chart:onboarding`. Refreshing the page mid-wizard
-does not lose progress. The setup token is deliberately excluded from the
-persisted slice and lives only in memory.
+`localStorage` under the key `chart:onboarding`, so refreshing mid-wizard does
+not lose progress.
+
+### Scripted installs
+
+`POST /setup/bootstrap` with the `X-CHART-Bootstrap-Token` header
+(`CHART_BOOTSTRAP_TOKEN`) still provisions an email-code administrator and
+completes setup in one call, for automated installs. The web app no longer
+uses it.
 
 ## Administrative area and fitted model area
 
@@ -212,13 +208,14 @@ The user-management page exposes a **Reset installation** button. It calls
 `POST /setup/reset` (requires `chart_admin`) and:
 
 - Deletes every workspace and workspace member.
-- Deletes the first administrator's `AppUser` row (cascades to `user_roles`
-  and `user_geography_scopes`).
-- Best-effort deletes the same user from Keycloak via the admin REST API.
+- Deletes every `AppUser` row (cascades to `user_roles` and
+  `user_geography_scopes`).
+- Best-effort deletes the first administrator from Keycloak, unless it is the
+  default `admin`, which stays to run setup again.
 - Clears every field on `setup_state` — `phase` returns to `uninitialized`,
   tokens, hashes, and admin identifiers are nulled.
 
-After reset, the same admin email may be reused for a fresh onboarding.
+After reset, `admin` signs in and runs the wizard again.
 
 ## Troubleshooting
 
@@ -227,7 +224,7 @@ After reset, the same admin email may be reused for a fresh onboarding.
 The Python API side almost always returns a specific `SETUP_*` code. The web
 client at `web/src/lib/setupClient.ts` maps every known code to a targeted
 message; the generic fallback only appears when the code is unrecognised.
-Check the API logs for the actual `POST /setup/bootstrap` response.
+Check the API logs for the actual `POST /setup/complete` response.
 
 ### `409 SETUP_BOOTSTRAP_LOCKED`
 

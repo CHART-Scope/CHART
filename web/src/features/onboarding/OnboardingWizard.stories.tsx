@@ -64,9 +64,6 @@ export const WorkspaceReview: Story = {
         geo: "Madhya Pradesh",
         primarySectorId: "water",
         collaboratingSectorIds: ["agriculture"],
-        adminName: "CHART Administrator",
-        adminEmail: "admin@example.org",
-        setupToken: "example-setup-token",
       }}
     />
   ),
