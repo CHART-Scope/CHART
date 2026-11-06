@@ -18,7 +18,15 @@ deploy) sets the `chart` realm up:
   15 minutes, so nobody can flood an inbox;
 - self-registration and password reset are off. An unknown or disabled
   address gets an error and no email;
-- Keycloak sends the email itself through the SMTP server below.
+- Keycloak sends the email itself through the SMTP server below;
+- after the code, CHART opens the dashboard of the person's own area (the
+  area Start planning would pick), or the page that asked them to sign in.
+
+The two screens, **Sign in to CHART** (email) and **Check your email** (code),
+use CHART's header, fonts and colours and fit a phone. They are the `chart`
+login theme: `infra/keycloak/themes/chart/login/` holds their templates
+(`login-username.ftl`, `login-email-otp.ftl`), wording
+(`messages/messages_en.properties`) and styles (`resources/css/chart.css`).
 
 The code step is the
 [for-keycloak email OTP authenticator](https://github.com/for-keycloak/email-otp-authenticator)

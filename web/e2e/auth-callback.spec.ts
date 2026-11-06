@@ -35,11 +35,11 @@ test("reloading after a successful sign-in reuses the session, not the code", as
   });
 
   await page.goto(callback);
-  await page.waitForURL("**/plan**");
+  await page.waitForURL("**/dashboard/geo-in-mp");
 
   // Back to the same callback URL, as a reload or history step would.
   await page.goto(callback);
-  await page.waitForURL("**/plan**");
+  await page.waitForURL("**/dashboard/geo-in-mp");
 
   expect(exchanges).toBe(1);
   expect(api.requests).toContain("POST /api/auth/keycloak-refresh");
@@ -74,6 +74,33 @@ test("signing in returns to the page that asked for it, never off-site", async (
   // Another site, or another sign-in round, is never a destination.
   await remember("//evil.example/steal");
   await page.goto(callback);
-  await page.waitForURL("**/plan**");
+  await page.waitForURL("**/dashboard/geo-in-mp");
   expect(new URL(page.url()).host).toBe("127.0.0.1:" + new URL(page.url()).port);
+});
+
+test("signing in opens the dashboard of the planner's own area", async ({ page }) => {
+  const api = await installFakeApi(page);
+  api.on(/^\/api\/auth\/keycloak-exchange$/, (route) =>
+    json(route, { access_token: "unused" }, 200),
+  );
+
+  // India scope: Madhya Pradesh is its one modelled state, so that is the area.
+  await page.goto(callback);
+  await page.waitForURL("**/dashboard/geo-in-mp");
+  await expect(page.getByRole("heading", { name: "Sign-in failed" })).toHaveCount(0);
+});
+
+test("when the areas cannot be read, sign-in still lands on Start planning", async ({
+  page,
+}) => {
+  const api = await installFakeApi(page);
+  api.on(/^\/api\/auth\/keycloak-exchange$/, (route) =>
+    json(route, { access_token: "unused" }, 200),
+  );
+  api.on(/^\/api\/chart\/geographies$/, (route) =>
+    json(route, { error: "GEOGRAPHIES_UNAVAILABLE" }, 503),
+  );
+
+  await page.goto(callback);
+  await page.waitForURL("**/plan");
 });

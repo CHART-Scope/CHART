@@ -39,7 +39,8 @@ export async function requestSignInCode(page: Page, account: string) {
   const since = Date.now();
   await page.goto("/auth/signin");
   await expect(page.locator('input[type="password"]')).toHaveCount(0);
-  await page.getByLabel("Email address").fill(account);
+  // People sign in with their address; the field only takes an email.
+  await page.getByLabel("Email address").fill(inboxOf(account));
   await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByLabel("Your access code")).toBeVisible();
   let code: string | undefined;

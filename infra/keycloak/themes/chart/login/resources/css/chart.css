@@ -4,6 +4,8 @@
   --chart-ivory: #f7f5f3;
   --chart-white: #ffffff;
   --chart-charcoal: #2b2d31;
+  --chart-lime: #bef274;
+  --chart-danger: #b42318;
   --chart-nexus: #383ee9;
   --chart-nexus-hover: #2a30c4;
   --chart-grey-mid: #d4d2ce;
@@ -45,37 +47,55 @@ body {
 }
 
 .pf-v5-c-login {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
   min-height: 100vh;
-  padding: 32px 20px;
+  /* Below the fixed brand bar, near the top: not adrift in the middle. */
+  padding: calc(64px + clamp(32px, 9vh, 96px)) 20px 48px;
   background: var(--chart-ivory);
 }
 
 .pf-v5-c-login__container {
-  align-self: center;
-  width: min(408px, 100%);
+  width: min(420px, 100%);
   padding: 0;
-  grid-template-areas:
-    "header"
-    "main";
+  grid-template-areas: "main";
   grid-template-columns: minmax(0, 1fr);
-  row-gap: 22px;
 }
 
+/* The app's header: charcoal bar, maroon-and-lime mark, lime wordmark. */
 #kc-header {
-  padding: 0;
-  grid-area: header;
-  text-align: center;
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  height: 64px;
+  margin: 0;
+  padding: 0 clamp(20px, 6vw, 96px);
+  background: var(--chart-charcoal);
 }
 
 #kc-header-wrapper {
+  display: inline-flex;
+  margin: 0;
+  align-items: center;
+  gap: 10px;
   padding: 0;
-  color: var(--chart-charcoal);
+  color: var(--chart-lime);
   font-family: var(--chart-font-display);
-  font-size: var(--fs-h1);
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  line-height: 1.4;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1;
   text-shadow: none;
+}
+
+#kc-header-wrapper::before {
+  width: 28px;
+  height: 28px;
+  background: url("../img/chart-mark.svg") center / contain no-repeat;
+  content: "";
 }
 
 .pf-v5-c-login__main {
@@ -93,7 +113,7 @@ body {
 }
 
 .pf-v5-c-login__main > .pf-v5-c-login__main-body {
-  padding: 22px 34px 32px;
+  padding: 8px 34px 32px;
 }
 
 .pf-v5-c-login__main > .pf-v5-c-login__main-footer {
@@ -107,7 +127,71 @@ body {
   font-size: var(--fs-h1);
   font-weight: 500;
   line-height: var(--lh-tight);
+}
+
+.chart-lede {
+  margin: 0 0 20px;
+  color: var(--chart-text-muted);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+/* The code: large, spaced and centred, so six characters read at a glance. */
+.pf-v5-c-form-control.chart-code > input {
+  min-height: 52px;
+  font-family: var(--chart-font-display);
+  font-size: 24px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.35em;
   text-align: center;
+  text-transform: uppercase;
+}
+
+.chart-field-error {
+  display: block;
+  margin-top: 6px;
+  color: var(--chart-danger);
+  font-size: var(--fs-caption);
+}
+
+.chart-code-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.chart-link-button {
+  padding: 0;
+  border: 0;
+  color: var(--chart-nexus);
+  background: none;
+  font: inherit;
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.chart-link-button:hover,
+.chart-link-button:focus-visible {
+  text-decoration: underline;
+}
+
+.chart-back {
+  font-size: var(--fs-caption);
+  text-decoration: none;
+}
+
+.chart-back::before {
+  content: "\2190\00a0";
+}
+
+/* The code step shows its own "Use a different email"; Keycloak's read-only
+   address-and-restart row would repeat it. */
+.pf-v5-c-login__main-body > .pf-v5-c-form:has(#kc-attempted-username) {
+  display: none;
 }
 
 .pf-v5-c-form {
@@ -184,6 +268,19 @@ body {
   background: var(--chart-nexus-hover);
 }
 
+/* Keycloak draws button borders with an ::after overlay, which left a dark
+   rule under the primary button; the button's own border is enough. */
+.pf-v5-c-button.pf-m-primary::after,
+#kc-login::after {
+  display: none;
+}
+
+.pf-v5-c-button.pf-m-primary:focus-visible,
+#kc-login:focus-visible {
+  outline: 2px solid var(--chart-nexus);
+  outline-offset: 2px;
+}
+
 #kc-social-providers {
   margin-top: 4px;
 }
@@ -248,26 +345,53 @@ a {
   color: var(--chart-nexus);
 }
 
+.pf-v5-c-form-control.pf-m-error {
+  border-color: var(--chart-danger);
+}
+
+.pf-v5-c-helper-text__item.pf-m-error,
+.pf-v5-c-form__helper-text .pf-m-error {
+  color: var(--chart-danger);
+  font-size: var(--fs-caption);
+}
+
 .pf-v5-c-alert {
   border-radius: var(--chart-radius-md);
   font-family: var(--chart-font-body);
   font-size: var(--fs-caption);
 }
 
+/* Phones: the form fills the screen under the bar, with no floating card. */
 @media (max-width: 480px) {
   .pf-v5-c-login {
-    padding: 24px 16px;
+    padding: calc(56px + 24px) 0 32px;
+    background: var(--chart-white);
+  }
+
+  #kc-header {
+    height: 56px;
+    padding: 0 16px;
+  }
+
+  .pf-v5-c-login__main {
+    border: 0;
+    border-radius: 0;
   }
 
   .pf-v5-c-login__main > .pf-v5-c-login__main-header {
-    padding: 28px 24px 0;
+    padding: 8px 16px 0;
   }
 
   .pf-v5-c-login__main > .pf-v5-c-login__main-body {
-    padding: 20px 24px 28px;
+    padding: 8px 16px 24px;
   }
 
   .pf-v5-c-login__main > .pf-v5-c-login__main-footer {
-    padding: 0 24px 24px;
+    padding: 0 16px 24px;
+  }
+
+  .pf-v5-c-form-control:not(.chart-code) > input {
+    /* Under 16px, iOS zooms into the field on focus. */
+    font-size: 16px;
   }
 }

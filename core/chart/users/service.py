@@ -94,7 +94,10 @@ def create_user(input_data: CreateUserInput, actor: CurrentUserContext) -> UserR
             record.phone = input_data.phone.strip() if input_data.phone else None
             record.display_name = input_data.name.strip()
             record.status = "active"
-            record.created_by_user_id = actor.user_id
+            # The creator's own row exists only once they have used the app;
+            # an administrator working through the API alone may have none.
+            if session.get(AppUser, actor.user_id) is not None:
+                record.created_by_user_id = actor.user_id
             session.execute(
                 delete(UserRoleRecord).where(UserRoleRecord.user_id == record.id)
             )
