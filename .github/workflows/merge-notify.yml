@@ -1,0 +1,38 @@
+name: Merge notify
+
+# Posts to Slack when a pull request is merged into dev or main. The message
+# goes to the channel the SLACK_WEBHOOK_URL incoming webhook was created for
+# (docs/aws-sandbox.md); without the secret the job does nothing.
+on:
+  pull_request:
+    types: [closed]
+    branches: [dev, main]
+
+permissions: {}
+
+jobs:
+  notify:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Post to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          # Event fields go through the environment, never into the script,
+          # so a PR title cannot change the command.
+          TITLE: ${{ github.event.pull_request.title }}
+          URL: ${{ github.event.pull_request.html_url }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          MERGER: ${{ github.event.pull_request.merged_by.login }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "SLACK_WEBHOOK_URL is not set; skipping the Slack message."
+            exit 0
+          fi
+          jq -n \
+            --arg text ":rocket: <$URL|#$NUMBER $TITLE> merged into \`$BASE\` by $MERGER (author: $AUTHOR)" \
+            '{text: $text}' \
+            | curl -fsS --retry 3 -X POST -H 'Content-type: application/json' --data @- "$SLACK_WEBHOOK_URL"

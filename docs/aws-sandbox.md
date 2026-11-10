@@ -19,6 +19,12 @@ Create a GitHub environment named `dev` with these connection secrets:
 | `AWS_APP_USER` | EC2 deployment user. |
 | `AWS_APP_SSH_KEY` | Private SSH key for that user. |
 
+To post merges to Slack, add a repository secret `SLACK_WEBHOOK_URL`: an
+incoming webhook from the Chart-MVP Slack app (api.slack.com/apps →
+Incoming Webhooks → Add New Webhook, then pick the channel). The
+`Merge notify` workflow then posts each pull request merged into `dev` or
+`main`; without the secret it skips the message.
+
 Application settings are written once in the gitignored
 `infra/aws/.env.prod`, then copied unchanged to
 `~/chart-deploy/aws/.env.prod` on EC2. The settings, including the email
