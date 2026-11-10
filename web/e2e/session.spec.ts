@@ -358,11 +358,13 @@ test("a token rotation keeps the planning selection", async ({ page }) => {
   const tokens = rotateTokens(page, api, { lifetimeSeconds: 600 });
 
   await page.goto("/plan");
-  const outcome = page.getByRole("combobox", { name: "Choose the health outcome" });
-  await expect(outcome).toBeEnabled();
-  await outcome.click();
-  await page.getByRole("option", { name: "Under-five mortality", exact: true }).click();
-  await expect(outcome).toHaveText(/Under-five mortality/);
+  const hazard = page.getByRole("combobox", { name: "Choose a climate hazard" });
+  const domain = page.getByRole("combobox", { name: "Choose a health domain" });
+  await hazard.click();
+  await page.getByRole("option", { name: "Heat", exact: true }).click();
+  await domain.click();
+  await page.getByRole("option", { name: "Maternal and child health" }).click();
+  await expect(domain).toHaveText(/Maternal and child health/);
   await settle(page, api);
   const geographyReads = count(api, /\/api\/chart\/geographies/);
 
@@ -371,7 +373,8 @@ test("a token rotation keeps the planning selection", async ({ page }) => {
   await settle(page, api);
 
   // The areas were not reloaded, which is what reset the selection.
-  await expect(outcome).toHaveText(/Under-five mortality/);
+  await expect(hazard).toHaveText(/Heat/);
+  await expect(domain).toHaveText(/Maternal and child health/);
   expect(count(api, /\/api\/chart\/geographies/)).toBe(geographyReads);
 });
 

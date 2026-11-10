@@ -48,23 +48,12 @@
 }
 
 .sectionTitle {
+  margin: 28px 0 0;
   font-family: var(--font-display);
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin: 0;
-  font-size: var(--fs-eyebrow);
+  font-size: 19px;
   font-weight: 600;
-  letter-spacing: var(--ls-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.sectionTitle::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(90deg, var(--border-subtle), transparent);
+  line-height: 1.3;
+  color: var(--color-charcoal);
 }
 
 @keyframes rise {

@@ -16,7 +16,8 @@ import {
   type SavedPlan,
 } from "@/lib/savedPlansClient";
 import { isInScope } from "@/lib/geographyScope";
-import { defaultPlanningArea } from "./contextFamilies";
+import { dashboardHref } from "@/features/dashboard/dashboardNavigation";
+import { dashboardTarget, defaultPlanningArea } from "./contextFamilies";
 import { InlineContextSwitcher } from "./InlineContextSwitcher";
 import { PlanningSetup } from "./PlanningSetup";
 import { SavedPlansList } from "./SavedPlansList";
@@ -33,6 +34,7 @@ export function PlanningApp({ geographyScopes, activeGeographyId }: Props) {
     defaultPlanningSelection,
   );
   const [areas, setAreas] = useState<GeographyRecord[]>([]);
+  const [allGeographies, setAllGeographies] = useState<GeographyRecord[]>([]);
   const [catalog, setCatalog] = useState<ModelCatalogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,6 +74,7 @@ export function PlanningApp({ geographyScopes, activeGeographyId }: Props) {
         // level (Kenya, Madhya Pradesh), not from the first county or division.
         const active = defaultPlanningArea(records, geographyScopes, activeGeographyId);
         setAreas(inScope);
+        setAllGeographies(records);
         setSelection((current) => ({ ...current, area: active?.id ?? "" }));
         if (!active) {
           setError(
@@ -112,13 +115,17 @@ export function PlanningApp({ geographyScopes, activeGeographyId }: Props) {
   }, [selection.area]);
 
   const openDashboard = useCallback(() => {
-    if (!selection.area) return;
+    const area = allGeographies.find((geo) => geo.id === selection.area);
+    if (!area) return;
     setIsSubmitting(true);
-    const query = selection.outcome
-      ? `?outcome=${encodeURIComponent(selection.outcome)}`
-      : "";
-    router.push(`/dashboard/${encodeURIComponent(selection.area)}${query}`);
-  }, [router, selection.area]);
+    router.push(
+      dashboardHref({
+        ...dashboardTarget(area, allGeographies, geographyScopes),
+        outcome: selection.outcome,
+        choices: {},
+      }),
+    );
+  }, [allGeographies, geographyScopes, router, selection.area, selection.outcome]);
 
   function changeSelection(next: PlanningSelection) {
     if (next.area !== selection.area) {

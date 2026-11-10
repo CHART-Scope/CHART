@@ -254,7 +254,7 @@ test("signed-in Learning Hub keeps workspace navigation", async ({ page }) => {
   );
   await page.goto("/learning");
   await expect(
-    page.getByRole("link", { name: "Start planning", exact: true }),
+    page.getByRole("link", { name: "Planning center", exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("searchbox")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in", exact: true })).toHaveCount(

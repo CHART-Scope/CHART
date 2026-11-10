@@ -141,10 +141,10 @@ test("an administrator chooses the insight model from the provider's list", asyn
 }) => {
   test.setTimeout(120_000);
   await signIn(page, "typography-admin");
-  // Learning hub sits directly below Start planning.
+  // About CHART first, then Learning hub above the Planning center.
   await expect(
     page.getByRole("navigation", { name: "Main" }).getByRole("link"),
-  ).toHaveText(["Start planning", "Learning hub", "Settings"]);
+  ).toHaveText(["About CHART", "Learning hub", "Planning center", "Settings"]);
   await page.goto("/settings?tab=recommendations");
   const card = page.getByRole("region", {
     name: "How actions are ranked and explained",

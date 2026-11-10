@@ -90,7 +90,7 @@ test("signing in opens the dashboard of the planner's own area", async ({ page }
   await expect(page.getByRole("heading", { name: "Sign-in failed" })).toHaveCount(0);
 });
 
-test("when the areas cannot be read, sign-in still lands on Start planning", async ({
+test("when the areas cannot be read, sign-in still lands on the Planning center", async ({
   page,
 }) => {
   const api = await installFakeApi(page);
