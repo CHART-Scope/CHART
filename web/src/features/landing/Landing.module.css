@@ -3,6 +3,11 @@
    "CHART user flow" design canvas, frame 01 · Landing. */
 
 .page {
+  /* Side gutter: 24px on phones, growing with the window to 120px, so
+     content never runs to the edge on a laptop. Content stays at most
+     1592px wide, as in the design. */
+  --gutter: clamp(24px, 6vw, 120px);
+  --content: calc(1592px + 2 * var(--gutter));
   min-height: 100dvh;
   background: #f6f5f3;
   color: var(--color-charcoal);
@@ -16,10 +21,10 @@
 }
 
 .nav {
-  max-width: 1640px;
+  max-width: var(--content);
   min-height: 68px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 var(--gutter);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -131,7 +136,8 @@
 }
 
 .notice {
-  max-width: 1640px;
+  width: calc(100% - 2 * var(--gutter));
+  max-width: 1592px;
   margin: 16px auto 0;
   padding: 12px 24px;
   border-radius: var(--radius-md);
@@ -140,9 +146,9 @@
 }
 
 .hero {
-  max-width: 1640px;
+  max-width: var(--content);
   margin: 0 auto;
-  padding: 72px 24px 90px;
+  padding: 72px var(--gutter) 90px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -224,9 +230,9 @@
 }
 
 .inner {
-  max-width: 1640px;
+  max-width: var(--content);
   margin: 0 auto;
-  padding: 88px 24px;
+  padding: 88px var(--gutter);
 }
 
 .section h2 {
@@ -477,9 +483,9 @@
 }
 
 .footerTop {
-  max-width: 1640px;
+  max-width: var(--content);
   margin: 0 auto;
-  padding: 56px 24px 0;
+  padding: 56px var(--gutter) 0;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -520,18 +526,13 @@
 }
 
 .footerBottom {
+  width: calc(100% - 2 * var(--gutter));
   max-width: 1592px;
   margin: 44px auto 0;
   padding: 22px 0 32px;
   border-top: 1px solid #44464b;
   color: var(--color-text-light);
   font-size: 13px;
-}
-
-@media (max-width: 1640px) {
-  .footerBottom {
-    margin-inline: 24px;
-  }
 }
 
 /* ---- Contact dialog ---- */

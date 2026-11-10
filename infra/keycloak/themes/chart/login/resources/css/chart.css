@@ -395,3 +395,194 @@ a {
     font-size: 16px;
   }
 }
+
+/* ---- The design's two-column sign-in (frame 04) ----
+   Wide screens: a charcoal brand panel on the left (the wordmark from
+   #kc-header sits on it) and the form on ivory to its right, with no card.
+   Narrow screens keep the bar-and-form layout above and hide the panel. */
+
+.chart-brand {
+  display: none;
+}
+
+.chart-info {
+  margin: 0 0 8px;
+}
+
+.chart-explore {
+  display: block;
+  margin-bottom: 14px;
+  font-size: var(--fs-caption);
+  text-decoration: none;
+}
+
+.chart-explore:hover,
+.chart-back:hover {
+  text-decoration: underline;
+}
+
+@media (min-width: 960px) {
+  .pf-v5-c-login {
+    align-items: center;
+    padding: 48px 24px 48px calc(min(46vw, 760px) + 24px);
+  }
+
+  .pf-v5-c-login__container {
+    width: min(400px, 100%);
+  }
+
+  #kc-header {
+    right: auto;
+    width: min(46vw, 760px);
+    height: auto;
+    padding: 40px 56px;
+    background: transparent;
+  }
+
+  .chart-brand {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 32px;
+    width: min(46vw, 760px);
+    padding: 120px 56px 96px;
+    box-sizing: border-box;
+    color: var(--chart-white);
+    background: var(--chart-charcoal);
+    animation: chart-enter 0.45s ease-out both;
+  }
+
+  .chart-brand-title {
+    max-width: 460px;
+    margin: 0;
+    color: var(--chart-white);
+    font-family: var(--chart-font-display);
+    font-size: 36px;
+    font-weight: 600;
+    line-height: 1.15;
+  }
+
+  .chart-brand-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-width: 420px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: chart-step;
+  }
+
+  .chart-brand-steps li {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-left: 46px;
+    counter-increment: chart-step;
+  }
+
+  .chart-brand-steps li::before {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--chart-radius-md);
+    color: var(--chart-lime);
+    background: #3a3c41;
+    font-family: var(--chart-font-display);
+    font-size: 14px;
+    font-weight: 600;
+    content: counter(chart-step);
+  }
+
+  .chart-brand-steps strong {
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .chart-brand-steps span {
+    color: #c9c7c2;
+    font-size: 14px;
+  }
+
+  .chart-brand-note {
+    position: absolute;
+    bottom: 40px;
+    left: 56px;
+    right: 56px;
+    margin: 0;
+    color: var(--chart-text-light);
+    font-size: 12px;
+  }
+
+  /* The header wordmark stays above the panel. */
+  #kc-header {
+    z-index: 10;
+  }
+
+  .pf-v5-c-login__main {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    /* Opacity only: a transform here would make it the containing block of
+       the fixed brand panel inside it. */
+    animation: chart-fade 0.35s ease-out both;
+  }
+
+  .pf-v5-c-login__main > .pf-v5-c-login__main-header,
+  .pf-v5-c-login__main > .pf-v5-c-login__main-body,
+  .pf-v5-c-login__main > .pf-v5-c-login__main-footer {
+    padding-inline: 0;
+  }
+
+  #kc-page-title {
+    font-size: 26px;
+    font-weight: 600;
+  }
+
+  .chart-lede {
+    color: #5a5853;
+    font-size: 14px;
+  }
+
+  .pf-v5-c-form-control > input {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .pf-v5-c-button.pf-m-primary,
+  #kc-login {
+    min-height: 46px;
+    border-radius: var(--chart-radius-md);
+    font-size: 15px;
+    font-weight: 600;
+  }
+}
+
+@keyframes chart-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes chart-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-brand,
+  .pf-v5-c-login__main {
+    animation: none;
+  }
+}
