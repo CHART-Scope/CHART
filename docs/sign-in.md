@@ -37,6 +37,12 @@ administrator adds accounts. They are the `chart` login theme:
 panel), wording (`messages/messages_en.properties`) and styles
 (`resources/css/chart.css`).
 
+Keycloak serves theme files under a path that changes only with the
+Keycloak version, and browsers keep them for 30 days. So `theme.properties`
+names the stylesheet as `css/chart.css?v=<date>`. **Change that date
+whenever `chart.css` changes**; otherwise people who have signed in before
+keep the old styles next to the new templates.
+
 The code step is the
 [for-keycloak email OTP authenticator](https://github.com/for-keycloak/email-otp-authenticator)
 (Unlicense), committed as
