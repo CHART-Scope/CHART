@@ -234,6 +234,12 @@ function signInTitleSize(page: Page) {
 
 async function signIn(page: Page, username = "india-planner") {
   await page.goto("/auth/signin");
+  // A versioned stylesheet URL, so browsers holding a cached older copy
+  // fetch the new one (theme.properties).
+  await expect(page.locator('link[href*="/css/chart.css"]')).toHaveAttribute(
+    "href",
+    /\/css\/chart\.css\?v=\d{4}-\d{2}-\d{2}$/,
+  );
   await typography(page.locator("#kc-page-title"), "Fira", signInTitleSize(page));
   const panel = page.getByRole("complementary", {
     name: "Plan for climate-health risk, together.",
