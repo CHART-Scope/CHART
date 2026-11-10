@@ -226,9 +226,29 @@ async function breadcrumbBounds(page: Page) {
   }).toPass({ timeout: 10_000 });
 }
 
+/** The sign-in heading: 26px beside the brand panel (960px and wider, the
+ * design's frame 04), the shared 20px h1 on narrower screens. */
+function signInTitleSize(page: Page) {
+  return page.viewportSize()!.width >= 960 ? 26 : 20;
+}
+
 async function signIn(page: Page, username = "india-planner") {
   await page.goto("/auth/signin");
-  await typography(page.locator("#kc-page-title"), "Fira", 20);
+  await typography(page.locator("#kc-page-title"), "Fira", signInTitleSize(page));
+  const panel = page.getByRole("complementary", {
+    name: "Plan for climate-health risk, together.",
+  });
+  if (page.viewportSize()!.width >= 960) {
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole("listitem")).toHaveCount(3);
+  } else {
+    await expect(panel).toBeHidden();
+  }
+  await expect(
+    page.getByRole("link", {
+      name: "Just looking? Explore the map without an account",
+    }),
+  ).toHaveAttribute("href", /\/explore$/);
   await typography(
     page.locator('label[for="username"] .pf-v5-c-form__label-text'),
     "Fira",
@@ -255,7 +275,7 @@ test("sign-in failure keeps the themed form readable and retryable", async ({
     ),
   ).toBeVisible();
   await page.getByLabel("Email address").fill("");
-  await typography(page.locator("#kc-page-title"), "Fira", 20);
+  await typography(page.locator("#kc-page-title"), "Fira", signInTitleSize(page));
   await capture(page, "signin-error");
 });
 

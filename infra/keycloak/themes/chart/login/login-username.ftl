@@ -22,6 +22,8 @@
             </div>
         </div>
     <#elseif section = "info">
+        <p class="chart-info">${msg("chartNoAccount")}</p>
+        <a class="chart-explore" href="${client.baseUrl?remove_ending("/")}/explore">${msg("chartExploreWithoutAccount")}</a>
         <a class="chart-back" href="${client.baseUrl}">${msg("chartBackToChart")}</a>
     <#elseif section = "socialProviders">
         <#if social.providers?? && social.providers?has_content>

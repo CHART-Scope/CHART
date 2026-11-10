@@ -26,10 +26,16 @@ deploy) sets the `chart` realm up:
   area Start planning would pick), or the page that asked them to sign in.
 
 The two screens, **CHART login** (email) and **Check your email** (code),
-use CHART's header, fonts and colours and fit a phone. They are the `chart`
-login theme: `infra/keycloak/themes/chart/login/` holds their templates
-(`login-username.ftl`, `login-email-otp.ftl`), wording
-(`messages/messages_en.properties`) and styles (`resources/css/chart.css`).
+use CHART's fonts and colours. On screens 960px and wider they follow the
+design's sign-in frame: a charcoal panel on the left with the wordmark,
+"Plan for climate-health risk, together." and the three steps, and the form
+on its right. Narrower screens keep the bar and a full-width form. The email
+step also offers **Explore the map without an account** and says that an
+administrator adds accounts. They are the `chart` login theme:
+`infra/keycloak/themes/chart/login/` holds their templates
+(`login-username.ftl`, `login-email-otp.ftl`, and `footer.ftl` for the brand
+panel), wording (`messages/messages_en.properties`) and styles
+(`resources/css/chart.css`).
 
 The code step is the
 [for-keycloak email OTP authenticator](https://github.com/for-keycloak/email-otp-authenticator)
