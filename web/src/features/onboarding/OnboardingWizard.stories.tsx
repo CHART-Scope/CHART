@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { InvitationEmail } from "./InvitationEmail";
 import { InvitationEmailTemplate } from "./InvitationEmailTemplate";
-import { Login } from "./Login";
+import { Landing } from "@/features/landing";
 import { OnboardingFlow } from "./OnboardingFlow";
 import { OnboardingWizard } from "./OnboardingWizard";
 
@@ -22,10 +22,10 @@ export const InvitationTemplate: Story = {
   ),
 };
 export const LandingAndSignIn: Story = {
-  render: () => <Login setupMode="configured" />,
+  render: () => <Landing setupMode="configured" />,
 };
 export const FreshInstallationLanding: Story = {
-  render: () => <Login setupMode="required" />,
+  render: () => <Landing setupMode="required" />,
 };
 export const InstallationSetup: Story = {
   render: () => <OnboardingWizard initialState={{ country: "India" }} />,

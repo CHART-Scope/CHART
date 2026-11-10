@@ -22,6 +22,6 @@ test("once set up, the front page shows no first-run hint", async ({ page }) => 
   const api = await installFakeApi(page);
   api.on(/^\/api\/setup$/, (route) => json(route, { requiresOnboarding: false }));
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
   await expect(page.getByRole("note", { name: "First sign-in" })).toHaveCount(0);
 });

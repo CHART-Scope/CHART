@@ -1,35 +1,22 @@
 {
-  "scope.png": {
-    "page": "https://scopeimpact.fi/",
-    "asset": "https://scopeimpact.fi/wp-content/themes/scopeimpact/img/logo-scope-impact-light.png",
-    "presentation": "Original transparent logo, displayed in black using CSS on the light landing page."
-  },
-  "ceew.png": {
-    "page": "https://www.ceew.in/",
-    "asset": "https://www.ceew.in/sites/default/files/CEEW%20-%20Transparent%20Logo%20in%20PNG%2017Apr18_0_0.png"
-  },
-  "path.png": {
-    "page": "https://www.path.org/",
-    "asset": "https://media.path.org/images/PATH_Logo_2018_PATH_Logo_Color.width-2880.png"
-  },
-  "ubs.png": {
-    "page": "https://www.ubs.com/global/en/sustainability-impact/social-impact-and-philanthropy/optimus-foundation.html",
-    "capture": "Logo cropped from the official page header; foundation name is a separate text label."
-  },
-  "gdi.svg": {
-    "page": "https://globaldevincubator.org/south-asia/",
-    "asset": "https://globaldevincubator.org/wp-content/themes/_gdi2023/img/logo.svg"
+  "amref.png": {
+    "page": "https://amref.org/",
+    "capture": "Full-colour logo from the CHART user-flow design canvas (coalition row)."
   },
   "amp-health.png": {
     "page": "https://amphealth.org/",
-    "asset": "https://images.squarespace-cdn.com/content/v1/615e93d4a3d17752eac865e6/7a3c89e9-6093-438a-8b72-6cd53af0b8ab/Amphealth-PrimaryLogo-4.png?format=500w"
+    "capture": "Full-colour logo from the CHART user-flow design canvas (coalition row)."
   },
-  "amref.png": {
-    "page": "https://amref.org/about-amref-health-africa/",
-    "asset": "https://i0.wp.com/amref.org/wp-content/uploads/2020/05/white.png?resize=500%2C295&ssl=1"
+  "scope.png": {
+    "page": "https://scopeimpact.fi/",
+    "capture": "Full-colour logo from the CHART user-flow design canvas (coalition row)."
   },
-  "expert-analytics.png": {
-    "page": "https://www.expert-analytics.com/",
-    "asset": "https://static.wixstatic.com/media/9b8fbe_3e90f12545e6424dbfac3a17a44eeb9b~mv2.png"
+  "path.png": {
+    "page": "https://www.path.org/",
+    "capture": "Full-colour logo from the CHART user-flow design canvas (coalition row)."
+  },
+  "ceew.png": {
+    "page": "https://www.ceew.in/",
+    "capture": "Full-colour logo from the CHART user-flow design canvas (coalition row)."
   }
 }
