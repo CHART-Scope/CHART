@@ -27,12 +27,42 @@ jobs:
           AUTHOR: ${{ github.event.pull_request.user.login }}
           MERGER: ${{ github.event.pull_request.merged_by.login }}
           BASE: ${{ github.event.pull_request.base.ref }}
+          BODY: ${{ github.event.pull_request.body }}
         run: |
           if [ -z "$SLACK_WEBHOOK_URL" ]; then
             echo "SLACK_WEBHOOK_URL is not set; skipping the Slack message."
             exit 0
           fi
-          jq -n \
-            --arg text ":rocket: <$URL|#$NUMBER $TITLE> merged into \`$BASE\` by $MERGER (author: $AUTHOR)" \
-            '{text: $text}' \
+          # The description in Slack's markup: & < > escaped, the Claude Code
+          # footer dropped, then GitHub quotes, headings, bold, links and
+          # bullets rewritten. Long descriptions are cut (a block holds 3000
+          # characters) with a link to the rest.
+          jq -n --arg title "$TITLE" --arg url "$URL" --arg number "$NUMBER" \
+            --arg author "$AUTHOR" --arg merger "$MERGER" --arg base "$BASE" \
+            --arg body "$BODY" '
+            def esc: gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
+            def slack:
+              gsub("\r"; "")
+              | gsub("\n*🤖 Generated with \\[Claude Code\\]\\([^)]*\\)\\s*$"; "")
+              | (if length > 2600 then .[0:2600] + "…" else . end)
+              | esc
+              | gsub("(?m)^&gt; ?"; "> ")
+              | gsub("(?m)^#{1,6} +(?<h>.+)$"; "*\(.h)*")
+              | gsub("\\*\\*(?<b>[^*\n]+)\\*\\*"; "*\(.b)*")
+              | gsub("\\[(?<t>[^\\]\n]+)\\]\\((?<u>https?://[^)\\s]+)\\)"; "<\(.u)|\(.t)>")
+              | gsub("(?m)^(?<i> *)[-*] +"; "\(.i)• ")
+              | gsub("\n{3,}"; "\n\n")
+              | sub("^\\s+"; "") | sub("\\s+$"; "");
+            ($body | slack) as $desc
+            | ":rocket: <\($url)|#\($number) \($title | esc)> merged into `\($base)` by \($merger) (author: \($author))" as $head
+            | {
+                text: $head,
+                blocks: (
+                  [{type: "section", text: {type: "mrkdwn", text: $head}}]
+                  + (if $desc == "" then [] else [{type: "section", text: {type: "mrkdwn", text: $desc}}] end)
+                  + (if ($body | length) > 2600 then
+                      [{type: "context", elements: [{type: "mrkdwn", text: "<\($url)|Read the full description on GitHub>"}]}]
+                    else [] end)
+                )
+              }' \
             | curl -fsS --retry 3 -X POST -H 'Content-type: application/json' --data @- "$SLACK_WEBHOOK_URL"
