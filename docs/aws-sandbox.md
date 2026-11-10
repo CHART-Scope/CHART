@@ -23,7 +23,9 @@ To post merges to Slack, add a repository secret `SLACK_WEBHOOK_URL`: an
 incoming webhook from the Chart-MVP Slack app (api.slack.com/apps →
 Incoming Webhooks → Add New Webhook, then pick the channel). The
 `Merge notify` workflow then posts each pull request merged into `dev` or
-`main`; without the secret it skips the message.
+`main`: its title, a details line, the **Summary** section of the pull
+request template (or the description's first paragraph) and links to the
+pull request and deploys. Without the secret it skips the message.
 
 Application settings are written once in the gitignored
 `infra/aws/.env.prod`, then copied unchanged to
