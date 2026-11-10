@@ -85,7 +85,7 @@ test("an unreachable bucket leaves the poster and the page intact", async ({
   await expect(video).toBeVisible();
   await expectPosterLoaded(page);
   await expect(
-    page.getByRole("heading", { name: "Explore the CHART toolkit" }),
+    page.getByRole("heading", { name: "Explore CHART toolkit" }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });

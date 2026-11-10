@@ -7,18 +7,19 @@ for (const width of [1440, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
     const partners = page.getByRole("list", { name: "Partners" });
-    await expect(partners.getByRole("link")).toHaveCount(8);
-    await expect(partners.getByRole("link").nth(0)).toHaveAccessibleName(
-      "UBS Optimus Foundation",
-    );
-    await expect(partners.getByRole("link").nth(1)).toHaveAccessibleName(
-      "SCOPE Impact",
-    );
-    for (const [name, href] of [
-      ["AMP Health", "https://amphealth.org/"],
+    // The coalition row, in the order of the design.
+    const coalition = [
       ["Amref Health Africa", "https://amref.org/"],
-      ["Expert Analytics", "https://www.expert-analytics.com/"],
-    ]) {
+      ["AMP Health", "https://amphealth.org/"],
+      ["SCOPE Impact", "https://scopeimpact.fi/"],
+      ["PATH", "https://www.path.org/"],
+      ["CEEW", "https://www.ceew.in/"],
+    ];
+    await expect(partners.getByRole("link")).toHaveCount(coalition.length);
+    for (const [index, [name]] of coalition.entries()) {
+      await expect(partners.getByRole("link").nth(index)).toHaveAccessibleName(name);
+    }
+    for (const [name, href] of coalition) {
       const link = partners.getByRole("link", { name, exact: true });
       await expect(link).toBeVisible();
       await expect(link).toHaveAttribute("href", href);
