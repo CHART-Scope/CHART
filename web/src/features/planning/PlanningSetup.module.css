@@ -1,36 +1,77 @@
+/* The Planning center, from the design's frame 07 in the landing page's
+   type: Fira Sans semibold headings, Noto body, nexus pills. */
+
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  max-width: 880px;
+  gap: 28px;
+  max-width: 940px;
+  animation: rise 0.4s var(--ease-out-soft) both;
 }
 
-.card {
-  position: relative;
-  padding: var(--space-6);
-  border: 1px solid var(--border-card, var(--border-subtle));
-  border-radius: var(--radius-card);
-  background:
-    radial-gradient(36rem 12rem at 0% 0%, rgb(190 242 116 / 9%), transparent 70%),
-    var(--surface-card);
-  box-shadow: var(--shadow-card);
+.header {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  animation: rise 0.45s var(--ease-out-soft) 0.06s both;
-  transition: box-shadow 0.2s ease;
+  align-items: flex-start;
+  gap: 16px;
 }
 
-.card:focus-within {
-  box-shadow: var(--shadow-card-hover);
+.title {
+  margin: 14px 0 0;
+  color: var(--color-charcoal);
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.lede {
+  max-width: 760px;
+  margin: 0;
+  color: #5a5853;
+  font-size: 16px;
+  line-height: 1.85;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
 }
 
 .sentence {
   margin: 0;
+  padding: 30px 36px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background: #ecebe8;
   color: var(--color-charcoal);
   font-family: var(--font-body);
-  font-size: var(--fs-body-lg);
-  line-height: 2.1;
+  font-size: 19px;
+  line-height: 2.4;
+  transition: box-shadow 0.2s var(--ease-out-soft);
+}
+
+.sentence:focus-within {
+  box-shadow: var(--shadow-card);
+}
+
+/* The two choices: a wide light-nexus pill, as in the design. */
+.pill {
+  vertical-align: middle;
+}
+
+.pill :is(button, select) {
+  min-width: 280px;
+  min-height: 40px;
+  padding: 7px 16px;
+  border-radius: var(--radius-pill);
+  background: #e6e6f5;
+  color: var(--color-nexus);
+  font-family: var(--font-body);
+  font-size: 17px;
+  font-weight: 500;
+  justify-content: space-between;
 }
 
 .error {
@@ -38,31 +79,22 @@
   border-left: 3px solid var(--color-amber);
   background: rgba(201, 102, 47, 0.08);
   color: var(--color-charcoal);
-  font-size: var(--fs-caption);
-  line-height: var(--lh-body);
-}
-
-.notice {
-  padding: var(--space-3) var(--space-4);
-  border-left: 3px solid var(--color-nexus);
-  background: var(--color-nexus-tint);
-  color: var(--color-charcoal);
-  font-size: var(--fs-caption);
+  font-size: 14px;
   line-height: var(--lh-body);
 }
 
 .ctaRow {
   display: flex;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  gap: 16px;
   align-items: center;
   justify-content: space-between;
-  margin-top: var(--space-2);
 }
 
 .ctaHint {
   margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-caption);
+  color: #8a877f;
+  font-size: 15px;
 }
 
 @keyframes rise {
@@ -70,26 +102,27 @@
     opacity: 0;
     transform: translateY(6px);
   }
-  to {
-    opacity: 1;
-    transform: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card {
+  .wrap {
     animation: none;
+  }
+  .sentence {
+    transition: none;
   }
 }
 
 @media (max-width: 640px) {
-  .card {
-    padding: var(--space-5);
+  .sentence {
+    padding: 20px;
+    font-size: 17px;
+    line-height: 2.2;
   }
 
-  .sentence {
-    padding-right: 0;
-    font-size: var(--fs-body-lg);
+  .pill :is(button, select) {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .ctaRow {

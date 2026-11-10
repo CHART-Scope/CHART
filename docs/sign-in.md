@@ -23,7 +23,8 @@ deploy) sets the `chart` realm up:
   address gets an error and no email;
 - Keycloak sends the email itself through the SMTP server below;
 - after the code, CHART opens the dashboard of the person's own area (the
-  area Start planning would pick), or the page that asked them to sign in.
+  area the Planning center would pick; for Kenya, Kajiado), or the page that
+  asked them to sign in.
 
 The two screens, **CHART login** (email) and **Check your email** (code),
 use CHART's fonts and colours. On screens 960px and wider they follow the

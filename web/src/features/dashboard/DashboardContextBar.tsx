@@ -8,7 +8,7 @@ import { type ModelCatalogEntry } from "@/lib/planningClient";
 import { useGeographies } from "@/lib/useGeographies";
 import {
   computeFamilies,
-  defaultAreaForFamily,
+  familyFrame,
   familyContains,
   familyLabel,
   type Family,
@@ -93,7 +93,7 @@ export function DashboardContextBar({
     }
     const pickers = [];
     let parent = activeFamily.root;
-    const defaultArea = defaultAreaForFamily(activeFamily, geographies);
+    const defaultArea = familyFrame(activeFamily, geographies);
     const visited = new Set<string>();
     while (!visited.has(parent.id)) {
       visited.add(parent.id);
@@ -169,7 +169,7 @@ export function DashboardContextBar({
     if (!families || !geographies) return;
     const nextFamily = families.find((family) => family.root.path === nextFamilyPath);
     if (!nextFamily) return;
-    const target = defaultAreaForFamily(nextFamily, geographies);
+    const target = familyFrame(nextFamily, geographies);
     if (!target) return;
     rememberActiveGeography(nextFamily.root.path);
     // Outcome may not exist in the new family's catalog — clear it so

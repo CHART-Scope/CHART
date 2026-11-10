@@ -3,7 +3,7 @@ import type { NavItem } from "@/components/AppShell";
 /** The ids the shell knows about. A union rather than `string` so a typo in
  * `activeNav` or a route lookup is a compile error instead of a
  * silently dead nav item. */
-export type NavId = "learning" | "planning" | "vulnerability" | "settings";
+export type NavId = "about" | "learning" | "planning" | "vulnerability" | "settings";
 
 /** Roles that may read the risk map, and so the vulnerability assessment
  * (the API checks the same list). */
@@ -37,14 +37,16 @@ type NavDefinition = NavItem & {
 // separate declarations, so an id could exist in one and not the other and the
 // nav item would simply do nothing when clicked.
 const NAV: readonly NavDefinition[] = [
+  // What CHART is: the public landing page.
+  { id: "about", label: "About CHART", icon: "info-circle", href: "/" },
+  { id: "learning", label: "Learning hub", icon: "book", href: "/learning" },
   {
     id: "planning",
-    label: "Start planning",
+    label: "Planning center",
     icon: "users",
     href: "/plan",
     requiresGeographyScope: true,
   },
-  { id: "learning", label: "Learning hub", icon: "book", href: "/learning" },
   {
     id: "vulnerability",
     label: "Vulnerability",
@@ -108,12 +110,13 @@ export function appNavForRoles(
 
 /**
  * Which nav entry a path belongs to. The dashboard and its run detail pages
- * live under /dashboard but are reached from "Start planning", so they have to
+ * live under /dashboard but are reached from "Planning center", so they have to
  * map back to that entry or the sidebar highlights nothing while a user is
  * deep in the product.
  */
 export function activeNavForPath(pathname: string | null): NavId | null {
   if (!pathname) return null;
+  if (pathname === "/") return "about";
   if (pathname.startsWith("/plan") || pathname.startsWith("/dashboard")) {
     return "planning";
   }
