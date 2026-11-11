@@ -45,6 +45,10 @@ export function actionTypeIcon(actionType: string | undefined): IconName {
  * The heat actions for a place, in its country's wording, from the API.
  * `retry` reloads after a failure.
  */
+/** Heat actions per geography for the session: the feed changes hourly at
+ * most, so returning to a place shows its list at once. */
+const heatActionCache = new Map<string, Action[]>();
+
 export function useHeatActions(geographyId: string) {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<{
@@ -57,12 +61,13 @@ export function useHeatActions(geographyId: string) {
   useEffect(() => {
     const controller = new AbortController();
     listActions(geographyId, controller.signal)
-      .then((list) =>
-        setState({
-          key,
-          actions: list.items.filter((action) => action.hazards.includes(HEAT_HAZARD)),
-        }),
-      )
+      .then((list) => {
+        const actions = list.items.filter((action) =>
+          action.hazards.includes(HEAT_HAZARD),
+        );
+        heatActionCache.set(geographyId, actions);
+        setState({ key, actions });
+      })
       .catch((error: Error) => {
         if (!controller.signal.aborted) setState({ key, error: error.message });
       });
@@ -70,9 +75,16 @@ export function useHeatActions(geographyId: string) {
   }, [geographyId, key]);
 
   const current = state?.key === key ? state : undefined;
+  // While another place's list loads, keep this place's cached list, else
+  // the last one shown, rather than emptying the panel.
+  const actions =
+    current?.actions ??
+    (current?.error ? undefined : heatActionCache.get(geographyId)) ??
+    (current?.error ? [] : state?.actions) ??
+    [];
   return {
-    actions: current?.actions ?? [],
-    loading: current === undefined,
+    actions,
+    loading: current === undefined && actions.length === 0,
     error: current?.error ?? null,
     retry: () => setAttempt((n) => n + 1),
   };

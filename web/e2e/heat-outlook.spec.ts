@@ -39,9 +39,15 @@ test("Kenya LBW: the map, icon array, odds ratio and precision follow the select
   await expect(
     outlook.getByRole("img", { name: "11 of 100 newborn figures highlighted" }),
   ).toBeVisible();
-  await expect(outlook.getByRole("group", { name: "Time horizon" })).toContainText(
-    "1981–2010 (baseline)",
+  // Several window lengths: one "Time horizon" row of lengths, the period
+  // itself named in the sentence.
+  const horizon = outlook.getByRole("group", { name: "Time horizon" });
+  await expect(horizon.getByRole("button")).toHaveText(["10 years", "20 years"]);
+  await expect(horizon.getByRole("button", { name: "20 years" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
   );
+  await expect(estimate).toContainText("in 2041–2060");
 
   // Choosing a county on the map moves every figure to it.
   await outlook.getByRole("button", { name: /^Garissa: 36\.16% attributable/ }).click();

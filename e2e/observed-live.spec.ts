@@ -30,7 +30,7 @@ for (const [country, username, frame, place, observedRelease] of [
         (outcome === "lbw"
           ? "lbw-mp-1.0.1-compact-review"
           : "under5-mortality-mp-0.1.0-review");
-      await expect(panel.getByTestId("outlook-source")).toContainText(release);
+      await expect(panel).toHaveAttribute("data-release", new RegExp(release));
       // Both countries share the compact observed view and month strip.
       const estimate = panel.getByTestId("outlook-estimate");
       await expect(estimate).toContainText("Sep 2026");
@@ -59,33 +59,34 @@ for (const [country, username, frame, place, observedRelease] of [
       });
       await projected.click();
       await expect(projected).toHaveAttribute("aria-selected", "true");
-      await expect(panel.getByTestId("outlook-source")).toContainText("2026-10-22");
+      await expect(panel).toHaveAttribute("data-release", new RegExp("2026-10-22"));
       await expect(panel.getByTestId("monthly-risk")).toHaveCount(0);
       for (const duration of [5, 10]) {
         const choice = panel
-          .getByRole("group", { name: "Period length", exact: true })
+          .getByRole("group", { name: "Time horizon", exact: true })
           .getByRole("button", { name: `${duration} years`, exact: true });
         await choice.click();
         await expect(choice).toHaveAttribute("aria-pressed", "true");
         await expect(panel.getByTestId("outlook-estimate")).toBeVisible();
       }
       await observed.click();
-      await expect(panel.getByTestId("outlook-source")).toContainText(release);
+      await expect(panel).toHaveAttribute("data-release", new RegExp(release));
       await expect(panel.getByRole("alert")).toHaveCount(0);
       await page.reload();
       await expect(observed).toBeEnabled();
       await observed.click();
-      await expect(panel.getByTestId("outlook-source")).toContainText(release);
+      await expect(panel).toHaveAttribute("data-release", new RegExp(release));
       if (country === "IN") {
         await expect(panel.getByTestId("outlook-estimate")).toContainText("Sep 2026");
         // A month scored by an earlier release names that release.
         await page.goto(dashboard.replace("month=2026-09", "month=2026-08"));
-        await expect(panel.getByTestId("outlook-source")).toContainText(
-          `e2e-prior-${outcome}`,
+        await expect(panel).toHaveAttribute(
+          "data-release",
+          new RegExp(`e2e-prior-${outcome}`),
         );
         await expect(panel.getByTestId("outlook-estimate")).toContainText("Aug 2026");
         await page.goto(dashboard);
-        await expect(panel.getByTestId("outlook-source")).toContainText(release);
+        await expect(panel).toHaveAttribute("data-release", new RegExp(release));
       }
       await page.setViewportSize({ width: 360, height: 800 });
       await expect(

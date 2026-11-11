@@ -76,6 +76,7 @@ nav:
       - Climate API: climate-api.md
       - API explorer: api-reference.md
   - Modeling:
+      - How the estimates are made: methodology.md
       - Overview: modeling.md
       - Model releases: model-updates.md
   - Model integration:

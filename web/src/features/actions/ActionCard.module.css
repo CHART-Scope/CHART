@@ -84,10 +84,6 @@
   background: var(--color-success-tint);
   color: var(--color-success);
 }
-.summary {
-  font-size: 14.5px;
-  color: var(--color-text-muted);
-}
 @media (max-width: 560px) {
   .thumb {
     display: none;

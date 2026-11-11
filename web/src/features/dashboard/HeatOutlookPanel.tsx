@@ -52,6 +52,8 @@ const SIDE_LABEL = {
   cool: "Cooler than usual",
   total: "Total temperature effect",
 } as const;
+/** The concise modelling methodology in the published documentation. */
+const METHODOLOGY_URL = "https://chart-scope.github.io/CHART/docs/methodology/";
 const RATIO_LABEL = { odds_ratio: "Odds ratio", risk_ratio: "Risk ratio" } as const;
 const VIEW_TABS = [
   { value: "observed", label: "Observed" },
@@ -165,19 +167,12 @@ export function HeatOutlookPanel({
     [geographyId, accessToken, outcome, scenario, period, selector, projectionEnabled],
   );
 
-  // Never carry another place or outcome's figures into this selection.
-  const observedData =
-    outlookObserved &&
-    observed.data?.outcome === outcome &&
-    observed.data.geography_id === geographyId
-      ? observed.data
-      : null;
-  const projectedData =
-    projectionEnabled &&
-    projected.data?.outcome === outcome &&
-    projected.data.geography_id === geographyId
-      ? projected.data
-      : null;
+  // Another outcome's figures are never shown. Another place's stay on
+  // screen, dimmed and still named after their place, only while this
+  // place's answer loads, so switching area does not blank the card; a place
+  // with nothing to show then clears them.
+  const observedData = outlookObserved ? currentData(observed, outcome) : null;
+  const projectedData = projectionEnabled ? currentData(projected, outcome) : null;
 
   const projectedOpen =
     projectionEnabled &&
@@ -207,10 +202,7 @@ export function HeatOutlookPanel({
         : Promise.reject(new OutlookNotPublished(geographyId)),
     [geographyId, accessToken, outcome, forecastOpen],
   );
-  const forecastData =
-    forecast.data?.outcome === outcome && forecast.data.geography_id === geographyId
-      ? forecast.data
-      : null;
+  const forecastData = currentData(forecast, outcome);
   const resolvedChoices: Choices = {
     ...choice,
     view,
@@ -293,6 +285,14 @@ export function HeatOutlookPanel({
       aria-labelledby="heat-outlook-title"
       aria-busy={busy}
       data-testid="heat-outlook"
+      // Not shown: the release behind the figures, for checks and support.
+      data-release={
+        view === "observed"
+          ? (observedData?.release ?? observedCapability?.release)
+          : view === "forecast"
+            ? forecastData?.issue
+            : (projectedData?.release ?? projectionRelease ?? undefined)
+      }
     >
       <div className={styles.headRow}>
         <p className={base.eyebrow}>Climate attributable health risk</p>
@@ -340,15 +340,6 @@ export function HeatOutlookPanel({
         <p className={styles.note} role="status">
           Projected estimates are unavailable for this place and outcome or turned off
           in model settings.
-        </p>
-      )}
-      {!showMonthlyObserved && (
-        <p className={styles.note} data-testid="outlook-source">
-          {view === "observed"
-            ? `Observed · ERA5 with model release ${observedData?.release ?? observedCapability?.release ?? "not available"}`
-            : view === "forecast"
-              ? `Forecasted · ${forecastData ? `${forecastData.source}, issued ${monthLabel(forecastData.issue)}` : "C3S seasonal forecast"}`
-              : `Projected · Published model release ${projectedData?.release ?? projectionRelease ?? "loading"}`}
         </p>
       )}
 
@@ -433,13 +424,7 @@ export function HeatOutlookPanel({
             </div>
           )}
 
-          {view !== "projection" && viewData && (
-            <MonthLegend
-              unavailable={
-                view === "forecast" ? "Outside forecast window" : "No data yet"
-              }
-            />
-          )}
+          {view === "observed" && viewData && <MonthLegend unavailable="No data yet" />}
 
           {shown.note && (
             <p className={styles.warning} role="note">
@@ -531,9 +516,6 @@ export function HeatOutlookPanel({
             </div>
           </div>
 
-          {view === "observed" && observedData && (
-            <ObservedDetails observed={observedData} />
-          )}
           {view === "projection" && projectedData && (
             <details className={base.details}>
               <summary>Seasonal pattern and all periods</summary>
@@ -542,6 +524,14 @@ export function HeatOutlookPanel({
                 <TypicalMonths outlook={projectedData} />
               )}
               <PeriodSummary outlook={projectedData} />
+              <a
+                className={styles.methodology}
+                href={METHODOLOGY_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                How these estimates are made
+              </a>
             </details>
           )}
         </>
@@ -554,6 +544,15 @@ export function HeatOutlookPanel({
       />
     </section>
   );
+}
+
+/** The view's figures for this outcome. Another place's are kept only
+ * mid-switch: `useLoaded` clears them when the new place fails or has none. */
+function currentData<T extends { outcome: string }>(
+  load: Load<T>,
+  outcome: string,
+): T | null {
+  return load.data?.outcome === outcome ? load.data : null;
 }
 
 /**
@@ -871,14 +870,23 @@ function ForecastControls({
   const last = months.at(-1)?.month;
   return (
     <>
-      <MonthYearPicker
-        idPrefix="forecast-month"
-        available={months.map((item) => item.month)}
-        value={month ?? ""}
-        unavailableTitle="Outside the forecast window"
-        renderRow={controlRow}
-        onChange={onMonth}
-      />
+      {/* Only the forecast's own months, in order; the year is written on
+      the first month and on January rather than chosen from a dropdown. */}
+      <ControlRow label="Month">
+        <Choice
+          label="Forecast month"
+          value={month ?? ""}
+          options={months.map((item, index) => {
+            const [year, number] = item.month.split("-");
+            const name = MONTHS[Number(number) - 1];
+            return {
+              value: item.month,
+              label: index === 0 || number === "01" ? `${name} ${year}` : name,
+            };
+          })}
+          onChange={onMonth}
+        />
+      </ControlRow>
       {first && last && (
         <p className={styles.note}>
           Forecasts are available for the next {months.length} months (
@@ -930,18 +938,18 @@ function ProjectedControls({
     ),
   );
   const selectedLength = periodLength(outlook.period);
-  const selectablePeriods = outlook.periods.filter(
-    (period) =>
-      durations.length < 2 ||
-      period.code === baseline ||
-      selectedLength === periodLength(period.code),
-  );
+  // One "Time horizon" row: the period lengths when the release publishes
+  // several (picking one opens its first future period), else the periods.
+  const periodOptions = outlook.periods.map((option) => ({
+    value: option.code,
+    label: option.code === baseline ? `${option.label} (baseline)` : option.label,
+  }));
   return (
     <>
-      {durations.length > 1 && (
-        <ControlRow label="Period length">
+      <ControlRow label="Time horizon">
+        {durations.length > 1 ? (
           <Choice
-            label="Period length"
+            label="Time horizon"
             value={String(selectedLength)}
             options={durations.map((years) => ({
               value: String(years),
@@ -961,29 +969,18 @@ function ProjectedControls({
               if (nextPeriod) choose({ period: nextPeriod.code, reference: "annual" });
             }}
           />
-        </ControlRow>
-      )}
-      <ControlRow label="Time horizon">
-        {selectablePeriods.length > 6 ? (
+        ) : periodOptions.length > 6 ? (
           <Select
             aria-label="Time horizon"
             value={outlook.period}
-            options={selectablePeriods.map((option) => ({
-              value: option.code,
-              label:
-                option.code === baseline ? `${option.label} (baseline)` : option.label,
-            }))}
+            options={periodOptions}
             onChange={(next) => choose({ period: next })}
           />
         ) : (
           <Choice
             label="Time horizon"
             value={outlook.period}
-            options={selectablePeriods.map((option) => ({
-              value: option.code,
-              label:
-                option.code === baseline ? `${option.label} (baseline)` : option.label,
-            }))}
+            options={periodOptions}
             onChange={(next) => choose({ period: next })}
           />
         )}
@@ -1015,11 +1012,6 @@ function ProjectedControls({
           onChange={(next) => choose({ reference: next })}
         />
       </ControlRow>
-      <p className={styles.note}>
-        {seasonNote(outlook)}
-        Projections average the selected years under a climate scenario. They do not
-        predict the conditions in any individual year.
-      </p>
     </>
   );
 }
@@ -1060,63 +1052,6 @@ function ScenarioChoice({
       })}
     </div>
   );
-}
-
-function ObservedDetails({ observed }: { observed: ObservedRisk }) {
-  return (
-    <details className={base.details}>
-      <summary>Temperatures behind this estimate</summary>
-      <p className={styles.note}>{observed.reference_note}</p>
-      {observed.inputs.length > 0 && (
-        <div className={styles.block}>
-          <table className={styles.table} aria-label="Temperatures used">
-            <thead>
-              <tr>
-                <th scope="col">{observed.outcome === "lbw" ? "Month" : "Measure"}</th>
-                <th scope="col">ERA5</th>
-                <th scope="col">On the model&apos;s scale</th>
-              </tr>
-            </thead>
-            <tbody>
-              {observed.inputs.map((item) => (
-                <tr key={item.label} data-counted={item.counted || undefined}>
-                  <th scope="row">
-                    {item.label}
-                    {!item.counted && (
-                      <span className={styles.flag}> not in window</span>
-                    )}
-                  </th>
-                  <td>{item.era5_c === null ? "–" : `${item.era5_c.toFixed(1)} °C`}</td>
-                  <td>
-                    {item.era5_c === null
-                      ? item.model_scale_c.toFixed(0)
-                      : `${item.model_scale_c.toFixed(1)} °C`}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <p className={styles.note}>{observed.calibration_note}</p>
-      <p className={styles.source}>
-        Copernicus ERA5, scored on request with the modelling team&apos;s DLNM (release{" "}
-        {observed.release}).
-      </p>
-    </details>
-  );
-}
-
-function seasonNote(outlook: HeatOutlook): string {
-  const season = outlook.heat_season;
-  if (!season) return "";
-  const first = MONTHS[season.months[0] - 1];
-  const last = MONTHS[season.months[season.months.length - 1] - 1];
-  const exposure =
-    outlook.outcome === "lbw"
-      ? " Highest-risk months are birth months, so they follow the heat their pregnancies were exposed to."
-      : "";
-  return `${season.label} (${season.source_name}): ${first}–${last}, peaking in ${MONTHS[season.peak_month - 1]}.${exposure} `;
 }
 
 function TypicalMonths({ outlook }: { outlook: HeatOutlook }) {
