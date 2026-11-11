@@ -22,10 +22,7 @@ type Props = {
   placeHref?: string;
   hazardLabel: string;
   healthDomainLabel: string;
-  /** Optional inline element rendered in place of the country name — the
-   * dashboard passes an `<InlineContextSwitcher />` here so users can
-   * flip between installed families straight from the breadcrumb without
-   * a separate settings-style card taking up vertical space. */
+  /** Optional element shown in place of the country name. */
   countrySlot?: ReactNode;
 };
 

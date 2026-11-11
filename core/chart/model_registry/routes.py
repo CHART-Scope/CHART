@@ -42,14 +42,17 @@ _HAZARD_LABELS: dict[str, str] = {
 }
 _DOMAIN_LABELS: dict[str, str] = {
     "maternal_newborn_child_health": "Maternal, newborn and child health",
-    "child_health": "Child health",
 }
+# Child health is planned under maternal, newborn and child health: low birth
+# weight and under-five mortality are two outcomes of one domain, chosen on the
+# dashboard. Releases registered before the change still store child_health.
+_DOMAIN_ALIASES: dict[str, str] = {"child_health": "maternal_newborn_child_health"}
 # Published hand-over outcomes carry no manifest, so their domain is recorded
 # here; the values match the outcomes' model-release manifests in
 # pipelines/models/*/model-release.*.json.
 _PUBLISHED_DOMAINS: dict[str, str] = {
     "lbw": "maternal_newborn_child_health",
-    "under_5_mortality": "child_health",
+    "under_5_mortality": "maternal_newborn_child_health",
 }
 # Fallbacks only. A release's presentation block is the source of truth for
 # how its outcome is named, and _release_label prefers it; these are used when
@@ -137,9 +140,9 @@ def list_catalog(
         # health_domain is optional in the spec; when a release omits it,
         # bucket every entry under the outcome-derived domain so the UI
         # still shows a coherent pair.
-        domain = (
+        domain = _canonical_domain(
             release.health_domain or _domain_from_outcome(release.outcome)
-        ).strip()
+        )
         outcome = release.outcome.strip()
         key = (hazard, domain, outcome)
         grouped.setdefault(key, []).append(release)
@@ -151,9 +154,7 @@ def list_catalog(
                 releases[0], "climate_hazard_label", hazard, _HAZARD_LABELS
             ),
             health_domain=domain,
-            health_domain_label=_release_label(
-                releases[0], "health_domain_label", domain, _DOMAIN_LABELS
-            ),
+            health_domain_label=_domain_label(releases[0], domain),
             outcome=outcome,
             outcome_label=_release_label(
                 releases[0], "outcome_label", outcome, _OUTCOME_LABELS
@@ -196,7 +197,7 @@ def list_catalog(
         items = [item for item in items if item.outcome != outcome]
         # A live release's manifest names the domain; keep it. Otherwise use
         # the published outcome's known domain instead of "unspecified".
-        domain = (
+        domain = _canonical_domain(
             replaced.health_domain
             if replaced and replaced.health_domain != "unspecified"
             else _PUBLISHED_DOMAINS.get(outcome) or _domain_from_outcome(outcome)
@@ -280,6 +281,19 @@ def _input_contract_value(release: ModelRelease, field: str) -> str | None:
     contract = (release.input_spec or {}).get("input_contract") or {}
     value = contract.get(field)
     return str(value) if isinstance(value, str) and value.strip() else None
+
+
+def _canonical_domain(code: str) -> str:
+    code = code.strip()
+    return _DOMAIN_ALIASES.get(code, code)
+
+
+def _domain_label(release: ModelRelease, domain: str) -> str:
+    """The release's own label, unless its domain was folded into another."""
+
+    if (release.health_domain or "").strip() != domain:
+        return _label(domain, _DOMAIN_LABELS)
+    return _release_label(release, "health_domain_label", domain, _DOMAIN_LABELS)
 
 
 def _domain_from_outcome(outcome: str) -> str:
@@ -399,14 +413,13 @@ def list_releases(
                     if release.climate_hazard
                     else None
                 ),
-                health_domain=release.health_domain,
+                health_domain=(
+                    _canonical_domain(release.health_domain)
+                    if release.health_domain
+                    else None
+                ),
                 health_domain_label=(
-                    _release_label(
-                        release,
-                        "health_domain_label",
-                        release.health_domain or "",
-                        _DOMAIN_LABELS,
-                    )
+                    _domain_label(release, _canonical_domain(release.health_domain))
                     if release.health_domain
                     else None
                 ),

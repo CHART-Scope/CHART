@@ -1,5 +1,4 @@
 export { GeographyContextCard } from "./GeographyContextCard";
-export { InlineContextSwitcher } from "./InlineContextSwitcher";
 export { PlanningApp } from "./PlanningApp";
 export { PlanningResult } from "./PlanningResult";
 export { PlanningSetup } from "./PlanningSetup";

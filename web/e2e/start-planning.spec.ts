@@ -40,6 +40,8 @@ test("India plans for Madhya Pradesh once a hazard and a domain are chosen", asy
   await expect(page.getByText(/Bhopal|Gwalior/)).toHaveCount(0);
   // The sidebar is navigation only.
   await expect(page.getByText("Planning for")).toHaveCount(0);
+  // No country switch here: the dashboard has its own.
+  await expect(page.getByRole("combobox", { name: "Country" })).toHaveCount(0);
 
   // Nothing is chosen for the planner, so nothing can start yet.
   const hazard = page.getByRole("combobox", { name: "Choose a climate hazard" });

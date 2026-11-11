@@ -66,8 +66,12 @@ def test_published_outcomes_name_their_health_domain(client, geography):
     assert all(item["health_domain"] != "unspecified" for item in items.values())
     assert items["lbw"]["health_domain"] == "maternal_newborn_child_health"
     assert items["lbw"]["health_domain_label"] == "Maternal, newborn and child health"
-    assert items["under_5_mortality"]["health_domain"] == "child_health"
-    assert items["under_5_mortality"]["health_domain_label"] == "Child health"
+    assert (
+        items["under_5_mortality"]["health_domain"] == "maternal_newborn_child_health"
+    )
+    assert items["under_5_mortality"]["health_domain_label"] == (
+        "Maternal, newborn and child health"
+    )
 
 
 def test_projection_plan_persists_the_dashboard_estimate(client, tokens, created):
