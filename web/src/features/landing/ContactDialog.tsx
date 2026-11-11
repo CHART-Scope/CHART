@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 
+import { buttonClassName } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import styles from "./Landing.module.css";
 
@@ -84,7 +85,7 @@ export function ContactDialog({
     >
       {sent ? (
         <div className={styles.formActions}>
-          <button type="button" className={styles.primary} onClick={onClose}>
+          <button type="button" className={buttonClassName()} onClick={onClose}>
             Done
           </button>
         </div>
@@ -122,10 +123,14 @@ export function ContactDialog({
             <textarea name="message" rows={3} />
           </label>
           <div className={styles.formActions}>
-            <button type="button" className={styles.outline} onClick={onClose}>
+            <button
+              type="button"
+              className={buttonClassName({ variant: "secondary" })}
+              onClick={onClose}
+            >
               Cancel
             </button>
-            <button type="submit" className={styles.primary}>
+            <button type="submit" className={buttonClassName()}>
               Send
             </button>
           </div>

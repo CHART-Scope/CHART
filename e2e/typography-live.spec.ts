@@ -262,7 +262,13 @@ async function signIn(page: Page, username = "india-planner") {
   );
   // Phones get 16px so iOS does not zoom into the field.
   const phone = page.viewportSize()!.width <= 480;
-  await typography(page.getByLabel("Email address"), "Noto", phone ? 16 : 13);
+  // 14px beside the brand panel (960px and wider), 13px between.
+  const wide = page.viewportSize()!.width >= 960;
+  await typography(
+    page.getByLabel("Email address"),
+    "Noto",
+    phone ? 16 : wide ? 14 : 13,
+  );
   await capture(page, `signin-${username}-${page.viewportSize()!.width}`);
   await signInWithEmailCode(page, username);
 }

@@ -50,6 +50,7 @@ test("India plans for Madhya Pradesh once a hazard and a domain are chosen", asy
   await expect(sentence(page).getByRole("combobox")).toHaveCount(2);
   const start = page.getByRole("button", { name: "Start planning together" });
   await expect(start).toBeDisabled();
+  await expect(start).toHaveCSS("background-color", "rgb(185, 184, 242)");
   await expect(
     page.getByText("Choose a climate hazard and health domain to continue"),
   ).toBeVisible();
@@ -87,6 +88,9 @@ test("India plans for Madhya Pradesh once a hazard and a domain are chosen", asy
     ),
   ).toBeVisible();
   await expect(start).toBeEnabled();
+  // Design system: the page's main action is Button L, solid nexus once enabled.
+  await expect(start).toHaveCSS("height", "48px");
+  await expect(start).toHaveCSS("background-color", "rgb(56, 62, 233)");
   await page.screenshot({
     path: "../outputs/e2e/web/planning-center.png",
     fullPage: true,
