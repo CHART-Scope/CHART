@@ -4,12 +4,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { AppShell } from "@/components/AppShell";
-import { Button } from "@/components/Button";
 import { IconSprite } from "@/components/Icon";
 import { IdleWarning } from "@/features/auth/IdleWarning";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { WorkspaceSessionProvider } from "@/features/auth/WorkspaceSession";
-import loginStyles from "@/features/onboarding/Login.module.css";
+import publicStyles from "@/features/landing/Landing.module.css";
 import {
   getStoredAuthSession,
   restoreAuthSession,
@@ -166,14 +165,28 @@ function RouteGuard({
 
 function PublicFrame({ children }: { children: ReactNode }) {
   return (
-    <div className={loginStyles.page}>
-      <header className={loginStyles.header}>
-        <a className={loginStyles.brand} href="/" aria-label="CHART home">
-          CHART
-        </a>
-        <Button onClick={startKeycloakSignIn}>Sign in</Button>
+    <div className={publicStyles.page}>
+      <header className={publicStyles.header}>
+        <nav className={publicStyles.nav} aria-label="Main navigation">
+          <a className={publicStyles.brand} href="/" aria-label="CHART home">
+            CHART
+          </a>
+          <div className={publicStyles.navLinks}>
+            <a href="/explore">Explore the map</a>
+            <a href="/learning" aria-current="page">
+              Learning Hub
+            </a>
+          </div>
+          <button
+            type="button"
+            className={publicStyles.signIn}
+            onClick={startKeycloakSignIn}
+          >
+            Sign in
+          </button>
+        </nav>
       </header>
-      <div className={loginStyles.publicContent}>{children}</div>
+      <div className={publicStyles.publicContent}>{children}</div>
     </div>
   );
 }

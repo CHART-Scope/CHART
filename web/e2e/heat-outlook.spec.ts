@@ -150,7 +150,7 @@ test("planning for Kenya starts on Kenya, not on its first county", async ({
   expect(page.url()).not.toContain("geo-ke-baringo");
   expect(page.url()).not.toContain("admin_unit");
   await expect(panel(page).getByTestId("outlook-estimate")).toContainText(
-    /in Kenya.*averaged over \d+ counties/,
+    /averaged over \d+ counties, [\d.]+% of .* in Kenya/,
   );
   await page.waitForTimeout(400);
   await page.screenshot({

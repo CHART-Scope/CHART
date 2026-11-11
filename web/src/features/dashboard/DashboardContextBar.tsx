@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
 
+import { buttonClassName } from "@/components/Button";
+import { Icon } from "@/components/Icon";
 import { InlineSelect } from "@/components/InlineSelect";
 import { rememberActiveGeography } from "@/lib/authClient";
 import { type ModelCatalogEntry } from "@/lib/planningClient";
@@ -38,6 +41,8 @@ type Props = {
   /** Only the place selectors: for pages that share the dashboard's place
    * but not its models (the vulnerability assessment). */
   placeOnly?: boolean;
+  /** Ends the bar with "Configure plan", opening the recommended actions. */
+  configureHref?: string;
   /** Fires when the user picks a different family, area, sub-area,
    * hazard, or outcome. Dashboard `router.push` uses this to navigate
    * the whole page in one click. */
@@ -60,6 +65,7 @@ export function DashboardContextBar({
   outcome = "",
   catalog = NO_CATALOG,
   placeOnly = false,
+  configureHref,
   onNavigate,
 }: Props) {
   const { geographies } = useGeographies();
@@ -148,11 +154,36 @@ export function DashboardContextBar({
       "",
     [catalog, outcome, hazards],
   );
+  const domains = useMemo(
+    () => [
+      ...dedupe(
+        catalog
+          .filter((entry) => entry.climate_hazard === activeHazard)
+          .map((entry) => ({
+            value: entry.health_domain,
+            label: entry.health_domain_label,
+          })),
+        (item) => item.value,
+      ),
+      ...COMING_SOON_DOMAINS.filter(
+        (soon) => !catalog.some((entry) => entry.health_domain === soon.value),
+      ),
+    ],
+    [catalog, activeHazard],
+  );
+  const activeDomain =
+    catalog.find((entry) => entry.outcome === outcome)?.health_domain ??
+    domains[0]?.value ??
+    "";
   const outcomes = useMemo(
     () =>
       dedupe(
         catalog
-          .filter((entry) => entry.climate_hazard === activeHazard)
+          .filter(
+            (entry) =>
+              entry.climate_hazard === activeHazard &&
+              entry.health_domain === activeDomain,
+          )
           .map((entry) => ({
             value: entry.outcome,
             label:
@@ -162,7 +193,7 @@ export function DashboardContextBar({
           })),
         (item) => item.value,
       ),
-    [catalog, activeHazard],
+    [catalog, activeHazard, activeDomain],
   );
 
   function handleFamilyChange(nextFamilyPath: string) {
@@ -193,6 +224,14 @@ export function DashboardContextBar({
     const nextOutcome =
       catalog.find((entry) => entry.climate_hazard === nextHazard)?.outcome ?? "";
     onNavigate({ geographyId, adminUnit, outcome: nextOutcome });
+  }
+
+  function handleDomainChange(nextDomain: string) {
+    const nextOutcome = catalog.find(
+      (entry) =>
+        entry.climate_hazard === activeHazard && entry.health_domain === nextDomain,
+    )?.outcome;
+    if (nextOutcome) onNavigate({ geographyId, adminUnit, outcome: nextOutcome });
   }
 
   function handleOutcomeChange(nextOutcome: string) {
@@ -256,6 +295,16 @@ export function DashboardContextBar({
 
           <InlineSelect
             menu
+            label="Health domain"
+            aria-label="Health domain"
+            value={activeDomain}
+            onChange={handleDomainChange}
+            options={domains}
+            disabled={catalog.length === 0}
+          />
+
+          <InlineSelect
+            menu
             label="Health outcome"
             aria-label="Health outcome"
             value={outcome}
@@ -265,11 +314,32 @@ export function DashboardContextBar({
           />
         </>
       )}
+      {configureHref ? (
+        <Link href={configureHref} className={buttonClassName()}>
+          <Icon name="edit" size={16} />
+          Configure plan
+        </Link>
+      ) : null}
     </div>
   );
 }
 
 const NO_CATALOG: ModelCatalogEntry[] = [];
+
+/** Domains the design lists before any model covers them; never selectable. */
+const COMING_SOON_DOMAINS = [
+  {
+    value: "vector_borne",
+    label: "Vector borne diseases (coming soon)",
+    disabled: true,
+  },
+  {
+    value: "heat_illness",
+    label: "Heat-related illnesses (coming soon)",
+    disabled: true,
+  },
+  { value: "ncd", label: "Non-communicable diseases (coming soon)", disabled: true },
+];
 
 function allAreasLabel(levelLabel: string): string {
   const level = levelLabel.trim().toLowerCase();

@@ -2,13 +2,13 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px 4px 12px;
+  padding: 2px 6px 2px 12px;
   border-radius: var(--radius-pill);
-  border: 1px solid;
+  border: 1.5px solid;
   font-size: var(--fs-caption);
   font-weight: 500;
   cursor: pointer;
-  background: transparent;
+  background: var(--surface-card);
   font-family: var(--font-body);
 }
 .badge:focus-visible {
@@ -16,36 +16,32 @@
   outline-offset: 2px;
 }
 
+/* Darker than the semantic tokens so the label passes 4.5:1 on white. */
 .high {
-  border-color: var(--color-success);
-  color: var(--color-success);
+  --tone: #2e7d3b;
 }
 .moderate {
-  border-color: var(--color-amber);
-  color: var(--color-amber);
+  --tone: #b5531f;
 }
 .low {
-  border-color: var(--color-sem-low);
-  color: var(--color-sem-low);
+  --tone: #c93a5a;
+}
+.high,
+.moderate,
+.low {
+  border-color: var(--tone);
+  color: var(--tone);
 }
 
 .info {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--color-white);
-}
-.high .info {
-  background: var(--color-success);
-}
-.moderate .info {
-  background: var(--color-amber);
-}
-.low .info {
-  background: var(--color-sem-low);
+  background: var(--tone);
 }

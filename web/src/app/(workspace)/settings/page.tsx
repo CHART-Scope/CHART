@@ -13,6 +13,7 @@ import {
   UserManagement,
 } from "@/features/planning";
 import { ResetInstallationCard } from "@/features/planning/ResetInstallationCard";
+import { HeatSeasonsCard } from "@/features/settings/HeatSeasonsCard";
 import { JobsCard } from "@/features/settings/JobsCard";
 import { ModelReleasesCard } from "@/features/settings/ModelReleasesCard";
 import { ModelSettingsCard } from "@/features/settings/ModelSettingsCard";
@@ -22,14 +23,23 @@ import { isLive, useBackgroundJobs } from "@/lib/backgroundJobs";
 
 import styles from "./page.module.css";
 
-type Tab = "workspace" | "data" | "models" | "recommendations" | "users" | "jobs";
+type Tab =
+  "workspace" | "data" | "models" | "seasons" | "recommendations" | "users" | "jobs";
 
 /** Installation tabs, after Workspace; administrators only. */
-const ADMIN_TABS: Tab[] = ["data", "models", "recommendations", "users", "jobs"];
+const ADMIN_TABS: Tab[] = [
+  "data",
+  "models",
+  "seasons",
+  "recommendations",
+  "users",
+  "jobs",
+];
 const LABELS: Record<Tab, string> = {
   workspace: "Workspace",
   data: "Data",
   models: "Models",
+  seasons: "Heat seasons",
   recommendations: "Recommendations",
   users: "Users",
   jobs: "Jobs",
@@ -105,6 +115,7 @@ function Settings() {
       </>
     ),
     models: <ModelReleasesCard accessToken={session.accessToken} />,
+    seasons: <HeatSeasonsCard canEdit />,
     recommendations: <RecommendationSettingsCard />,
     users: (
       <>

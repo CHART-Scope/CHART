@@ -57,10 +57,10 @@ test("Kenya LBW opens on the newest observed month, scored from ERA5", async ({
   const value = latest.estimate.value_percent;
   expect(value).not.toBeNull();
   await expect(estimate).toContainText(
-    `${value!.toFixed(1)}% of low birth weight cases in Kajiado County may be attributed to heat in ${label(latest.month)}`,
+    `in ${label(latest.month)}, ${value!.toFixed(1)}% of low birth weight cases in Kajiado County may be attributable to heat exposure.`,
   );
   await expect(estimate).toContainText(
-    `(95% CI ${latest.estimate.low_percent!.toFixed(1)} to ${latest.estimate.high_percent!.toFixed(1)}%)`,
+    `95% CI ${latest.estimate.low_percent!.toFixed(1)} to ${latest.estimate.high_percent!.toFixed(1)}%`,
   );
   await expect(outlook.getByTestId("outlook-ratio")).toContainText(
     `Odds ratio ${latest.estimate.ratio!.value.toFixed(2)}`,
@@ -259,7 +259,7 @@ test("the projected highest-risk months rank by share, not temperature", async (
     "in the highest-risk months (Jul–Sep) of 2041–2060",
   );
   await expect(outlook.getByTestId("outlook-estimate")).toContainText(
-    "climate-model range",
+    "Climate-model range",
   );
   await expect
     .poll(() => api.requests.some((request) => request.includes("reference=peak")))

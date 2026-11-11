@@ -4,9 +4,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/Button";
+import { Landing } from "@/features/landing";
 import {
   exampleSetupSectors,
-  Login,
   OnboardingWizard,
   type OnboardingState,
   type SetupSector,
@@ -95,7 +95,7 @@ export default function OnboardingPage() {
   }
 
   if (pageState.phase === "complete") {
-    return <Login setupMode="configured" />;
+    return <Landing setupMode="configured" />;
   }
 
   return (

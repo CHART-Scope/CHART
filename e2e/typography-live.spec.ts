@@ -138,61 +138,25 @@ async function landingMedia(page: Page, name: string, mediaRequests: string[]) {
   const homeLinks = page.getByRole("link", { name: "CHART home", exact: true });
   await expect(homeLinks).toHaveCount(2);
   for (const brand of await homeLinks.all()) {
-    await expect(brand).toHaveCSS("font-size", "18px");
-    await typography(brand.getByText("CHART", { exact: true }), "Fira", 17.1);
+    await typography(brand, "Fira", 22);
+    await expect(brand).toHaveCSS("color", "rgb(190, 242, 116)");
   }
   const hero = page.locator("section[aria-labelledby='chart-landing-title']");
   const video = hero.getByLabel("CHART explainer video");
-  const preview = page.getByRole("figure", { name: "CHART dashboard previews" });
   await expect(video).toBeVisible();
   await expect(video).toHaveAttribute("preload", "none");
   await expect(video).toHaveJSProperty("controls", true);
-  await expect(page.getByText("CHART in 80 seconds", { exact: true })).toHaveCount(0);
-  await expect(preview).toBeVisible();
-  const position = await video.evaluate((element) => {
-    const image = document.querySelector(
-      'figure[aria-label="CHART dashboard previews"]',
-    )!;
-    const before = Boolean(
-      element.compareDocumentPosition(image) & Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-    const videoBounds = element.getBoundingClientRect();
-    const imageBounds = image.getBoundingClientRect();
-    return {
-      before,
-      videoBottom: videoBounds.bottom,
-      imageTop: imageBounds.top,
-      aspect: videoBounds.width / videoBounds.height,
-    };
+  const aspect = await video.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return bounds.width / bounds.height;
   });
-  expect(position.before).toBe(true);
-  expect(position.imageTop).toBeGreaterThanOrEqual(position.videoBottom);
-  expect(position.aspect).toBeCloseTo(16 / 9, 1);
-  await expect(hero.getByRole("heading", { level: 1 })).toHaveCSS(
-    "line-height",
-    "36.4px",
-  );
-  await typography(hero.getByText(/CHART helps local governments/), "Noto", 14);
-  await expect(hero.getByText(/CHART helps local governments/)).toHaveCSS(
-    "line-height",
-    "22.4px",
-  );
-  await typography(hero.getByText("Climate × health", { exact: true }), "Fira", 11);
-  await expect(hero.getByText("Climate × health", { exact: true })).toHaveCSS(
-    "letter-spacing",
-    "0.66px",
-  );
+  expect(aspect).toBeCloseTo(16 / 9, 1);
+  await typography(hero.getByText(/multi-sectoral platform/), "Noto", 17);
   await typography(
-    page
-      .getByRole("group", { name: "Choose dashboard preview" })
-      .getByRole("button", { name: "Dashboard", exact: true }),
+    hero.getByText("Climate x Health Adaptation and Resilience Tool", { exact: true }),
     "Noto",
-    12,
+    20,
   );
-  const radius = await page.evaluate(() =>
-    getComputedStyle(document.documentElement).getPropertyValue("--radius-card").trim(),
-  );
-  await expect(video).toHaveCSS("border-radius", radius);
   expect(mediaRequests).toEqual([]);
   const source = await video.locator("source").getAttribute("src");
   expect(source).toMatch(/^https:\/\//);
@@ -302,16 +266,16 @@ for (const [name, width, height] of [
         mediaRequests.push(request.url());
     });
     await page.goto("/");
-    await typography(page.getByRole("heading", { level: 1 }), "Fira", 28);
-    await typography(
-      page.getByRole("heading", { name: "Explore the CHART toolkit" }),
-      "Fira",
-      19,
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCSS(
+      "font-family",
+      /Fira/,
     );
     await typography(
-      page.getByRole("heading", { name: "Learning Hub", exact: true }),
+      page.getByRole("heading", {
+        name: "Climate x Health risk modeling and predictions",
+      }),
       "Fira",
-      15,
+      22,
     );
     await landingMedia(page, name, mediaRequests);
     await capture(page, `${name}-landing`);

@@ -1,0 +1,260 @@
+/* Frame 09b · Recommended actions · Gantt chart. */
+
+.wrap {
+  animation: enter 0.3s var(--ease-out-soft) both;
+}
+
+.scroller {
+  overflow-x: auto;
+  border: 1px solid #dddbd7;
+  border-radius: 16px;
+  background: var(--color-white);
+}
+
+.chart {
+  position: relative;
+  min-width: 1000px;
+  padding-top: 34px;
+}
+
+.grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.season {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: #f9eaee;
+}
+
+.today {
+  position: absolute;
+  top: 28px;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-nexus);
+  z-index: 1;
+}
+
+.today::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-nexus);
+}
+
+.today span {
+  position: absolute;
+  top: -26px;
+  left: 10px;
+  color: var(--color-nexus);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.months {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  list-style: none;
+}
+
+.months li {
+  padding: 10px 10px 12px;
+  border-left: 1px solid #e4e2de;
+  color: #5a5853;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.phase {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 3px 10px 6px;
+  background-size: 100% 28px;
+  background-repeat: no-repeat;
+}
+
+.phase.before {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #4a6133 0 2px,
+    transparent 2px 9px
+  );
+}
+
+.phase.during {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #e2738b 0 2px,
+    transparent 2px 9px
+  );
+}
+
+.phase.after {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #b5b3ae 0 2px,
+    transparent 2px 9px
+  );
+}
+
+.phaseName {
+  align-self: flex-start;
+  padding: 3px 8px;
+  border: 1px solid #dddbd7;
+  border-radius: 3px;
+  background: var(--color-white);
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.phasePill {
+  align-self: flex-start;
+  margin-left: 2px;
+  padding: 5px 14px;
+  border-radius: var(--radius-pill);
+  color: var(--color-white);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.phasePill.before {
+  background: #4a6133;
+}
+
+.phasePill.during {
+  background: #cc3d5c;
+}
+
+.phasePill.after {
+  background: #7a7873;
+}
+
+.rows {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px 0 30px;
+  list-style: none;
+}
+
+.card {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 10px;
+  padding: 16px 18px;
+  border: 1px solid #dddbd7;
+  border-bottom: 4px solid #c9c7c2;
+  border-radius: 10px;
+  background: var(--color-white);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    box-shadow 0.2s var(--ease-out-soft),
+    transform 0.2s var(--ease-out-soft),
+    border-color 0.2s var(--ease-out-soft);
+}
+
+.card:hover {
+  box-shadow: 0 8px 20px rgb(0 0 0 / 12%);
+  transform: translateY(-2px);
+}
+
+.card[data-selected] {
+  border-color: var(--color-nexus);
+}
+
+.card.in-progress {
+  border-bottom-color: #d2672b;
+}
+
+.card.completed {
+  border-bottom-color: var(--color-success);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag,
+.status {
+  padding: 4px 13px;
+  border-radius: var(--radius-pill);
+  background: #eceae7;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.status.not-started {
+  color: #8a877f;
+}
+
+.status.in-progress {
+  background: #fcebdd;
+  color: #b4521c;
+}
+
+.status.completed {
+  background: var(--color-success-tint);
+  color: #2b7a39;
+}
+
+.note {
+  margin-top: 16px;
+  color: #5a5853;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.edit {
+  color: var(--color-nexus);
+  font-weight: 500;
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wrap {
+    animation: none;
+  }
+  .card {
+    transition: none;
+  }
+}

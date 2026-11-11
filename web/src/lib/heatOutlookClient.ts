@@ -339,11 +339,16 @@ export type ForecastMap = MapResponse & {
 export async function fetchForecast(
   geographyId: string,
   outcome: string,
+  /** Signed-in reads pass their token; Explore's public reads do not. */
+  access?: { accessToken: string | null | undefined; signal?: AbortSignal },
 ): Promise<PlaceForecast> {
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/forecast?outcome=${outcome}`,
-    { auth: false, cache: "default" },
+    access
+      ? { accessToken: access.accessToken, signal: access.signal, cache: "default" }
+      : { auth: false, cache: "default" },
   );
+  if (response.status === 404) throw new OutlookNotPublished(geographyId);
   if (!response.ok) throw new Error("The forecast could not load.");
   return (await response.json()) as PlaceForecast;
 }
@@ -353,12 +358,15 @@ export async function fetchForecastMap(
   geographyId: string,
   outcome: string,
   month?: string | null,
+  accessToken?: string | null,
 ): Promise<ForecastMap> {
   const params = new URLSearchParams({ outcome });
   if (month) params.set("month", month);
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/forecast/map?${params}`,
-    { auth: false, cache: "default" },
+    accessToken === undefined
+      ? { auth: false, cache: "default" }
+      : { accessToken, cache: "default" },
   );
   if (!response.ok) throw new Error("The forecast map could not load.");
   return (await response.json()) as ForecastMap;

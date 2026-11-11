@@ -4,6 +4,7 @@ export type DashboardSearch = {
   admin_unit?: string;
   outcome?: string;
   month?: string;
+  forecast_month?: string;
   view?: string;
   scenario?: string;
   period?: string;
@@ -16,10 +17,13 @@ export type DashboardSearch = {
 export function readOutlookChoices(search: DashboardSearch): OutlookChoices {
   return {
     view:
-      search.view === "observed" || search.view === "projection"
+      search.view === "observed" ||
+      search.view === "forecast" ||
+      search.view === "projection"
         ? search.view
         : undefined,
     month: search.month,
+    forecastMonth: search.forecast_month,
     scenario: search.scenario,
     period: search.period,
     selector: search.selector,
@@ -48,6 +52,7 @@ export function dashboardHref({
   for (const [key, value] of Object.entries({
     view: choices.view,
     month: choices.month,
+    forecast_month: choices.forecastMonth,
     scenario: choices.scenario,
     period: choices.period,
     selector: choices.selector,

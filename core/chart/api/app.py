@@ -34,6 +34,7 @@ from chart.model_registry.routes import (
     router as model_catalog_router,
 )
 from chart.learning.routes import router as learning_router
+from chart.heat_seasons.routes import router as heat_seasons_router
 from chart.model_settings.routes import router as model_settings_router
 from chart.risk.routes import router as risk_router
 from chart.recommendations.routes import router as recommendations_router
@@ -136,6 +137,7 @@ app.include_router(heat_outlook_router)
 app.add_middleware(ReadCacheMiddleware)
 app.include_router(vra_router)
 app.include_router(model_settings_router)
+app.include_router(heat_seasons_router)
 app.include_router(saved_plans_router)
 app.include_router(recommendations_router)
 app.include_router(learning_router)

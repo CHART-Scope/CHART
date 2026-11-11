@@ -1631,3 +1631,34 @@ class RecommendationSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class HeatSeasonSetting(Base):
+    """A place's heat-season calendar: before, during and after months.
+
+    ``months`` holds one letter per calendar month, January first: ``b``
+    before (preparation), ``d`` during (response), ``a`` after (review) or
+    ``o`` outside the cycle. A place without a row inherits its nearest
+    ancestor's; a country without one uses its official season
+    (``chart.heat_seasons``).
+    """
+
+    __tablename__ = "heat_season_setting"
+
+    geography_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("geographies.id", ondelete="CASCADE"), primary_key=True
+    )
+    months: Mapped[str] = mapped_column(String(12), nullable=False)
+    source: Mapped[str | None] = mapped_column(String(200))
+    updated_by_user_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        # Portable for the SQLite test stores; migration 033 checks the
+        # letters too on PostgreSQL, and the service validates the cycle.
+        CheckConstraint("length(months) = 12", name="ck_heat_season_months"),
+    )

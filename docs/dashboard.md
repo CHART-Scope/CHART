@@ -8,9 +8,14 @@ It is composed of three cards, all reading the same selection.
 ## The selection
 
 The URL records the geography, optional `admin_unit`, `outcome`, `month`, and
-`view` (`observed` or `projection`). Projected choices also retain `scenario`,
-`period`, `selector`, and `reference`; the observed group uses
-`observed_selector`.
+`view` (`observed`, `forecast` or `projection`). The forecast keeps its own
+month in `forecast_month`. Projected choices also retain `scenario`, `period`,
+`selector`, and `reference`; the observed group uses `observed_selector`.
+
+The filter bar labels every dropdown (place levels, **Climate hazard**,
+**Health domain**, **Health outcome**) and ends with **Configure plan**, which
+opens the recommended actions for the same place and outcome. Domains no model
+covers yet are listed as "coming soon" and cannot be picked.
 
 ```
 /dashboard/geo-in-madhya-pradesh?admin_unit=geo-in-madhya-pradesh-division-bhopal&outcome=lbw&month=2026-08
@@ -46,6 +51,32 @@ reload and browser history. Both view tabs remain selectable at finer levels.
 Where an observed model is unavailable, the dashboard explains this and keeps
 the geographic outlines visible with no health values; going back restores the
 parent's available observed view.
+
+## The risk overview tabs
+
+The climate-attributable risk card has three tabs that share one layout:
+switching changes the month or period controls, the figures, the icon array
+and the map's shading, not the place, question or columns.
+
+- **Observed** — a year and a month with observed data (ERA5); months
+  without data stay in the grid, greyed.
+- **Forecasted** — the C3S multi-system seasonal forecast, the same one
+  Explore shows: up to six months ahead. Months outside the forecast window
+  are greyed. It is loaded only when the tab opens, and a place without a
+  saved forecast says so. Forecasts cannot be saved to a plan yet, so
+  **Save plan** is disabled on this tab.
+- **Projected** — time horizon (period length and period), **Emission
+  scenario** (cards with the plain-language name over the SSP code) and
+  reference period (annual average or highest-risk months).
+
+The sentence under the icon array reads "At a [forecasted / projected
+average annual] maximum temperature of X °C in <when>, N% of <outcome> cases
+in <place> may be attributable to heat exposure." The temperature is the
+month's ERA5 mean daily maximum (observed), the central forecast (forecasted)
+or the mean of the period's typical months (projected); without one the
+sentence starts at "In <when>". Beneath it: the share's 95% CI (or the
+forecast-system / climate-model range), the odds or risk ratio with its 95% CI
+and the precision badge (High, Moderate or Low, from the ratio's interval).
 
 ## The cards
 

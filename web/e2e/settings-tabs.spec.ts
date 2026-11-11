@@ -17,6 +17,7 @@ const tabs = [
   "Workspace",
   "Data",
   "Models",
+  "Heat seasons",
   "Recommendations",
   "Users",
   "Jobs",
@@ -110,6 +111,24 @@ function fakeClimate(api: KenyaApi) {
 
 async function installAdmin(page: Page) {
   const api = await installKenya(page, true, ["/kenya", "/india"], admin);
+  api.on(/^\/api\/chart\/heat-seasons$/, (route) =>
+    json(route, {
+      items: [
+        {
+          geography_id: "geo-ke",
+          name: "Kenya",
+          level_label: "Country",
+          parent_id: null,
+          depth: 0,
+          own: null,
+          months: "dddaaaabbbbd",
+          state: "official",
+          inherited_from: null,
+          source: "Kenya Meteorological Department",
+        },
+      ],
+    }),
+  );
   api.on(/^\/api\/admin\/users$/, (route) =>
     json(route, [
       {
@@ -384,9 +403,8 @@ test("every tab fits a phone and a desktop without sideways scrolling", async ({
   ] as const) {
     await page.setViewportSize(viewport);
     for (const name of tabs) {
-      await page.goto(
-        name === "Workspace" ? "/settings" : `/settings?tab=${name.toLowerCase()}`,
-      );
+      const key = name === "Heat seasons" ? "seasons" : name.toLowerCase();
+      await page.goto(name === "Workspace" ? "/settings" : `/settings?tab=${key}`);
       await expect(tab(page, new RegExp(`^${name}`))).toHaveAttribute(
         "aria-selected",
         "true",

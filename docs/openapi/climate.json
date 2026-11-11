@@ -3202,6 +3202,183 @@
         "description": "Stores which pregnancy windows or age groups, scenarios and data modes a country offers for an outcome. Settings may only narrow what the tables and releases support: unknown codes are refused (MODEL_SETTINGS_OPTION_UNKNOWN), every view keeps at least one option (MODEL_SETTINGS_OPTION_REQUIRED) and each default must be switched on (MODEL_SETTINGS_DEFAULT_NOT_ENABLED). Requires access to the country path; any signed-in role may write for now. Every change records a model_settings_changed audit event with the values before and after."
       }
     },
+    "/heat-seasons": {
+      "get": {
+        "tags": [
+          "heat-seasons"
+        ],
+        "summary": "List heat-season calendars",
+        "operationId": "list_heat_seasons_heat_seasons_get",
+        "responses": {
+          "200": {
+            "description": "Each readable place with its calendar in effect, its own months and where they come from.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeatSeasonList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Every place the caller can read, parents before children, with the heat-season calendar in effect: twelve letters from January (b before, d during, a after, o outside the cycle). state says whether the place has its own calendar (custom), inherits an ancestor's (inherited, with inherited_from), uses the country's official season (official) or has none (unset). Requires a dashboard reader role."
+      }
+    },
+    "/heat-seasons/{geography_id}": {
+      "get": {
+        "tags": [
+          "heat-seasons"
+        ],
+        "summary": "Read the heat-season calendar in effect for a place",
+        "operationId": "read_heat_season_heat_seasons__geography_id__get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The twelve-month calendar in effect for the place and the place or season it comes from.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeatSeasonCalendar"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "The place's own calendar, else its nearest ancestor's, else the country's official season with the four months before it as preparation. Lays out the recommended-actions Gantt chart. Requires read access to the place (GEOGRAPHY_NOT_ALLOWED, HEAT_SEASON_GEOGRAPHY_NOT_FOUND)."
+      },
+      "put": {
+        "tags": [
+          "heat-seasons"
+        ],
+        "summary": "Save a place's own heat-season calendar",
+        "operationId": "save_heat_season_heat_seasons__geography_id__put",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeatSeasonUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The saved calendar as it now applies to the place, with its source and state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeatSeasonCalendar"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Stores twelve months for the place; its children inherit them unless they have their own. Read from the first preparation month the months must run before, during, after, then off, with at least one during month (HEAT_SEASON_INVALID). Administrators only (ROLE_NOT_ALLOWED). Records a heat_season_changed audit event."
+      },
+      "delete": {
+        "tags": [
+          "heat-seasons"
+        ],
+        "summary": "Drop a place's own calendar so it inherits again",
+        "operationId": "reset_heat_season_heat_seasons__geography_id__delete",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The calendar that now applies: the parent's or the official season, with its origin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeatSeasonCalendar"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Removes the place's own calendar; it then inherits its parent's or the official season. Administrators only. Records a heat_season_changed audit event when a calendar was removed."
+      }
+    },
     "/saved-plans": {
       "get": {
         "tags": [
@@ -7389,6 +7566,119 @@
         ],
         "title": "HeatOutlookResponse"
       },
+      "HeatSeasonCalendar": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "level_label": {
+            "type": "string",
+            "title": "Level Label"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "own": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[bdao]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own"
+          },
+          "months": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[bdao]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Months"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "custom",
+              "inherited",
+              "official",
+              "unset"
+            ],
+            "title": "State"
+          },
+          "inherited_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inherited From"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "name",
+          "level_label",
+          "parent_id",
+          "depth",
+          "state"
+        ],
+        "title": "HeatSeasonCalendar"
+      },
+      "HeatSeasonList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HeatSeasonCalendar"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "HeatSeasonList"
+      },
       "HeatSeasonOptionResponse": {
         "properties": {
           "label": {
@@ -7454,6 +7744,32 @@
           "source_uri"
         ],
         "title": "HeatSeasonOptionResponse"
+      },
+      "HeatSeasonUpdate": {
+        "properties": {
+          "months": {
+            "type": "string",
+            "pattern": "^[bdao]{12}$",
+            "title": "Months"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "months"
+        ],
+        "title": "HeatSeasonUpdate"
       },
       "HorizonCard": {
         "properties": {

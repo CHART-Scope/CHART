@@ -59,9 +59,12 @@ test("a planner saves a dashboard view, reads its recommendations and removes it
   await expect(panel.getByTestId("plan-figure")).toContainText("2027");
   const ranked = panel.getByRole("list", { name: "Recommended actions for this plan" });
   await expect(ranked.locator(":scope > li")).toHaveCount(3);
+  // The plan opens the repository on its own season.
   await expect(
-    page.getByRole("tab", { name: /Before heat season/, selected: true }),
-  ).toBeVisible();
+    page
+      .getByRole("group", { name: "Filter actions" })
+      .getByRole("combobox", { name: "Timeframe" }),
+  ).toContainText("Before heat season");
   const insight = panel.getByRole("complementary", { name: "AI insight" });
   await expect(insight).toContainText("Placeholder");
   await expect(insight).toContainText("not by an AI model");

@@ -14,16 +14,26 @@
   text-decoration: underline;
 }
 .intro {
-  max-width: 720px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #dddbd7;
+}
+.intro > div:first-child {
+  max-width: 600px;
 }
 .title {
-  margin: 0 0 6px;
+  margin: 0 0 14px;
   font-family: var(--font-display);
-  font-size: var(--fs-h1);
+  font-size: 28px;
+  font-weight: 600;
 }
 .lede {
   margin: 0;
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-  color: var(--color-text-muted);
+  font-size: 16px;
+  line-height: 1.8;
+  color: #5a5853;
 }

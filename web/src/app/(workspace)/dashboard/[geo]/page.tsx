@@ -447,6 +447,7 @@ function Dashboard({
         adminUnit={adminUnit ?? null}
         outcome={outcome}
         catalog={catalog}
+        configureHref={actionsHref(geographyId, displayedAdminUnit, outcome)}
         onNavigate={({
           geographyId: nextGeo,
           adminUnit: nextAdmin,
@@ -513,7 +514,7 @@ function Dashboard({
               figure={iconArrayFigure(outcome)}
               onSelectArea={selectMapArea}
               onSavePlan={(resolved) => {
-                const view = resolved.view ?? "projection";
+                const view = resolved.view === "observed" ? "observed" : "projection";
                 setPlanDraft({
                   name: [
                     outcomeLabel,
@@ -563,6 +564,13 @@ function Dashboard({
       <SavePlanDialog draft={planDraft} onClose={() => setPlanDraft(null)} />
     </main>
   );
+}
+
+/** The recommended actions page (09a) for the place and outcome shown. */
+function actionsHref(geographyId: string, adminUnit: string | null, outcome: string) {
+  const query = new URLSearchParams({ outcome });
+  if (adminUnit) query.set("admin_unit", adminUnit);
+  return `/dashboard/${encodeURIComponent(geographyId)}/actions?${query}`;
 }
 
 function humanizeCode(value: string): string {

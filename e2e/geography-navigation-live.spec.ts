@@ -123,8 +123,8 @@ for (const place of cases) {
       );
       await expect(
         panel
-          .getByRole("group", { name: "Scenario", exact: true })
-          .getByRole("button", { name: "SSP1-2.6 (low emissions)", exact: true }),
+          .getByRole("group", { name: "Emission scenario", exact: true })
+          .getByRole("button", { name: "Low emissions SSP1-2.6", exact: true }),
       ).toHaveAttribute("aria-pressed", "true");
       const selector = panel.getByRole("combobox", {
         name: outcome === "lbw" ? "Pregnancy window" : "Age group",
