@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import type { ReactNode } from "react";
 
 import styles from "./DashboardHeader.module.css";
@@ -16,6 +18,8 @@ type Props = {
    * happen however the caller composes it.
    */
   trail: string[];
+  /** Makes the step before the last a link (the place, back to its dashboard). */
+  placeHref?: string;
   hazardLabel: string;
   healthDomainLabel: string;
   /** Optional inline element rendered in place of the country name — the
@@ -37,6 +41,7 @@ export function DashboardHeader({
   hazardLabel,
   healthDomainLabel,
   countrySlot,
+  placeHref,
 }: Props) {
   const pill = `${hazardLabel} + ${healthDomainLabel}`;
   const steps = trail.filter((step, index) => step && step !== trail[index - 1]);
@@ -56,6 +61,10 @@ export function DashboardHeader({
                 countrySlot
               ) : last ? (
                 <strong>{step}</strong>
+              ) : placeHref && index === steps.length - 2 ? (
+                <Link href={placeHref} className={styles.placeLink}>
+                  {step}
+                </Link>
               ) : (
                 <span>{step}</span>
               )}

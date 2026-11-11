@@ -63,13 +63,23 @@ and the map's shading, not the place, question or columns.
 - **Observed** — a year and a month with observed data (ERA5); months
   without data stay in the grid, greyed.
 - **Forecasted** — the C3S multi-system seasonal forecast, the same one
-  Explore shows: up to six months ahead. Months outside the forecast window
-  are greyed. It is loaded only when the tab opens, and a place without a
+  Explore shows: up to six months ahead, shown as one row of month chips
+  with the year written on the first month and on January (no year
+  dropdown). It is loaded only when the tab opens, and a place without a
   saved forecast says so. Forecasts cannot be saved to a plan yet, so
   **Save plan** is disabled on this tab.
-- **Projected** — time horizon (period length and period), **Emission
-  scenario** (cards with the plain-language name over the SSP code) and
-  reference period (annual average or highest-risk months).
+- **Projected** — three rows: **Time horizon** (the window lengths, e.g.
+  10 or 20 years, when the release publishes several — picking one opens its
+  first future period, named in the sentence; otherwise the periods
+  themselves), **Emission scenario** (cards with the plain-language name over
+  the SSP code) and **Reference period** (annual average or highest-risk
+  months).
+
+Switching place, tab, month or scenario never blanks the card. Each place's
+capabilities and actions are cached for the session; while a new place's
+figures load, the previous ones stay on screen dimmed and still named after
+their place, and are replaced (or cleared, if the new place has none) when the
+answer arrives. The map keeps its last shading until the next one loads.
 
 The sentence under the icon array reads "At a [forecasted / projected
 average annual] maximum temperature of X °C in <when>, N% of <outcome> cases

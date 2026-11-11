@@ -245,8 +245,9 @@ post-neonatal by default, as agreed with the modeller on 2026-10-08).
 
 **Observed** adds a **month** grid with a year picker. Only months that can be
 scored are enabled, and each is tinted by its share, so the riskiest months
-stand out. The figures are described in [Observed months](#observed-months);
-"Temperatures behind this estimate" lists the inputs on both scales.
+stand out. The figures are described in [Observed months](#observed-months).
+The card shows no source line or input table; the release behind the figures
+is in the panel's `data-release` attribute and under Settings → Models.
 
 **Projected** adds:
 

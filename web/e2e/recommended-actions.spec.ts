@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-import { installFakeApi, json } from "./support/fakeApi";
+import { installFakeApi, json, mapFor } from "./support/fakeApi";
 import { actionList } from "./support/actions";
 
 const actionsUrl =
@@ -348,4 +348,77 @@ test("the dashboard groups recommended actions by heat season", async ({ page })
   await panel.screenshot({
     path: "../outputs/e2e/web/dashboard-actions-by-season.png",
   });
+});
+
+test("each action names the place's areas at elevated risk, highest first", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-11-09T10:00:00"));
+  const api = await installFakeApi(page);
+  api.on(seasonRoute, (route) => json(route, heatSeason("bbddddaaaabb")));
+  // The state's divisions as the dashboard map shows them: no outlook map,
+  // so the observed risk map is read.
+  api.on(/^\/api\/chart\/risk\/geo-in-mp\/map$/, (route, url) => {
+    const base = mapFor(url);
+    const values: [string, number | null][] = [
+      ["sagar", 9],
+      ["rewa", 18],
+      ["bhopal", 12],
+      ["indore", 3],
+      ["ujjain", 6],
+      ["gwalior", null],
+    ];
+    return json(route, {
+      ...base,
+      areas: values.map(([code, value], index) => ({
+        ...base.areas[0],
+        geography_id: `geo-in-mp-${code}`,
+        admin_unit_id: index + 1,
+        code,
+        name: `${code[0].toUpperCase()}${code.slice(1)} Division`,
+        value_percent: value,
+        missing_reason: value === null ? "no_prediction" : null,
+      })),
+    });
+  });
+  await page.goto(actionsUrl);
+
+  // List (09a): dots by risk band, two names, the rest counted; 3% and the
+  // division without a result are left out.
+  const first = cards(page).first();
+  await expect(first).toContainText("Rewa, Bhopal +2 more divisions at elevated risk");
+  const dots = first.locator("[title]");
+  await expect(dots).toHaveCount(4);
+  await expect(dots.first()).toHaveAttribute("title", "Rewa: 18.0%");
+  await expect(dots.first()).toHaveCSS("background-color", "rgb(163, 21, 79)");
+  // The breadcrumb's place leads back to its dashboard, as in the design.
+  await expect(
+    page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", {
+      name: "Bhopal Division",
+    }),
+  ).toHaveAttribute(
+    "href",
+    "/dashboard/geo-in-mp?outcome=lbw&admin_unit=geo-in-mp-bhopal",
+  );
+  await expect(page.getByRole("link", { name: /Back to dashboard/ })).toHaveCount(0);
+  await expect(cards(page)).toHaveCount(4);
+  for (const card of await cards(page).all())
+    await expect(card).toContainText("Rewa, Bhopal +2 more");
+
+  // Gantt (09b): the same places under a "Priority divisions" heading.
+  await page.getByRole("button", { name: "Gantt chart", exact: true }).click();
+  const gantt = page
+    .getByRole("list", { name: "Actions on the planning cycle" })
+    .getByRole("button")
+    .first();
+  await expect(gantt).toContainText("Priority divisions");
+  await expect(gantt).toContainText("Rewa, Bhopal +2 more");
+  await page.screenshot({
+    path: "../outputs/e2e/web/actions-gantt-priority.png",
+    fullPage: true,
+  });
+  expect(
+    api.requests.some((request) => request.includes("/heat-outlook/geo-in-mp/map")),
+  ).toBe(true);
+  expect(api.unhandled).toEqual([]);
 });

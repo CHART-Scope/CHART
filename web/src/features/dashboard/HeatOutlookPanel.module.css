@@ -358,3 +358,11 @@
     transition: none;
   }
 }
+
+/* A small way out to the methodology, at the foot of the details. */
+.methodology {
+  align-self: flex-start;
+  color: var(--color-nexus);
+  font-size: var(--fs-caption);
+  font-weight: 500;
+}

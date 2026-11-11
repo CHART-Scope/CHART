@@ -136,7 +136,7 @@ for (const place of cases) {
       else await expect(selector).toContainText("Neonatal (0-27 days)");
       await expect(
         panel
-          .getByRole("group", { name: "Period length", exact: true })
+          .getByRole("group", { name: "Time horizon", exact: true })
           .getByRole("button", { name: "10 years", exact: true }),
       ).toHaveAttribute("aria-pressed", "true");
       await page.reload();
@@ -189,7 +189,7 @@ for (const place of cases) {
       if (place.country === "IN") {
         await expect(parentResult).toContainText(outcome === "lbw" ? "20%" : "9%");
       }
-      const parentSource = await panel.getByTestId("outlook-source").innerText();
+      const parentSource = (await panel.getAttribute("data-release")) ?? "";
       const childPolygon = mapArea(page, place.childName);
       await expect(childPolygon).not.toHaveAttribute(
         "aria-label",
@@ -220,7 +220,7 @@ for (const place of cases) {
       await expect(parentResult).toContainText(
         place.country === "IN" ? "September 2026" : "Sep 2026",
       );
-      await expect(panel.getByTestId("outlook-source")).toHaveText(parentSource);
+      await expect(panel).toHaveAttribute("data-release", parentSource);
       await childPolygon.click();
       await expectRoute(page, place.parent, observedFilters, place.child);
       await choosePlace(
@@ -238,7 +238,7 @@ for (const place of cases) {
       await expect(parentResult).toContainText(
         place.country === "IN" ? "September 2026" : "Sep 2026",
       );
-      await expect(panel.getByTestId("outlook-source")).toHaveText(parentSource);
+      await expect(panel).toHaveAttribute("data-release", parentSource);
       await choosePlace(page, place.level, place.childName);
       await expectRoute(page, place.parent, observedFilters, place.child);
       await goUp(page, place.parentName);
@@ -246,7 +246,7 @@ for (const place of cases) {
       await expect(parentResult).toContainText(
         place.country === "IN" ? "September 2026" : "Sep 2026",
       );
-      await expect(panel.getByTestId("outlook-source")).toHaveText(parentSource);
+      await expect(panel).toHaveAttribute("data-release", parentSource);
       await projected.click();
       await expectRoute(page, place.parent, filters);
       // LBW has only the whole pregnancy on by default, so no dropdown;
