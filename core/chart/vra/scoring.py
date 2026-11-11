@@ -3,7 +3,7 @@
 No FastAPI, Dagster or database imports: the service gathers the latest value
 per indicator and area, calls :func:`score`, and stores what comes back.
 
-Recipe (docs/vra-integration-plan.md section 2):
+Recipe (also in core/chart/vra/README.md):
 
 1. For each indicator with at least ``MIN_AREAS`` areas present, take the 5th
    and 95th percentiles across the areas (linear interpolation), clip, and

@@ -3,8 +3,7 @@
 The vulnerability and resilience assessment scores the child areas of a frame
 geography (a state's divisions, a country's counties) on hazard, exposure,
 sensitivity and adaptive capacity, and combines them into a risk score with a
-class, a rank and the indicators that drive it. Design, sources and open
-questions: [docs/vra-integration-plan.md](../../../docs/vra-integration-plan.md).
+class, a rank and the indicators that drive it.
 
 | File                      | Role                                                                                                                                                                                                                                                                    |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -58,7 +57,7 @@ days, 2015-2024 against 1982-2011 (daily ERA5, `hot_days.py`).
   rows records a failed ingestion and writes no indicator values. Uploading
   does not refresh the saved assessment: run the assessment after reviewing
   the import result.
-- Settings → Data provides one **Upload CSV** dialog: select all indicators or
+- Settings → VRA provides one **Upload CSV** dialog: select all indicators or
   one indicator, preview its fields and value rules, optionally download the
   template, then choose a file and explicitly **Validate and upload**. File
   selection alone sends nothing. Results and corrections stay in the dialog.
