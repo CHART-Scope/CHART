@@ -89,7 +89,13 @@ for (const [country, username, level] of [
     await expect(
       page.getByRole("combobox", { name: level, exact: true }),
     ).toBeVisible();
-    const periods = outlook.getByRole("group", { name: "Period length", exact: true });
+    // One "Time horizon" row of period lengths; no second row of periods.
+    const periods = outlook.getByRole("group", { name: "Time horizon", exact: true });
+    await expect(periods.getByRole("button")).toHaveText([
+      "5 years",
+      "10 years",
+      "20 years",
+    ]);
     for (const years of [5, 10, 20]) {
       const selected = periods.getByRole("button", {
         name: `${years} years`,
@@ -98,11 +104,7 @@ for (const [country, username, level] of [
       await selected.click();
       await expect(selected).toHaveAttribute("aria-pressed", "true");
       await expect(page.getByTestId("outlook-estimate")).toBeVisible();
-      await expect(
-        outlook
-          .getByRole("group", { name: "Time horizon", exact: true })
-          .or(outlook.getByRole("combobox", { name: "Time horizon", exact: true })),
-      ).toBeVisible();
+      await expect(outlook.getByRole("group", { name: "Time horizon" })).toHaveCount(1);
     }
     await expect(outlook.getByTestId("outlook-estimate")).toBeVisible();
     await expect(

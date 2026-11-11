@@ -43,8 +43,6 @@ export type MonthYearPickerProps = {
   intensity?: Readonly<Record<string, number>>;
   yearsBack?: number;
   idPrefix?: string;
-  /** Tooltip on a month with no data (a forecast says why it is off). */
-  unavailableTitle?: string;
   /** Lays the year and the months out as two labelled rows of the caller's
    * control box instead of side by side. */
   renderRow?: (label: string, content: ReactNode) => ReactNode;
@@ -69,7 +67,6 @@ export function MonthYearPicker({
   intensity = {},
   yearsBack = DEFAULT_YEARS_BACK,
   idPrefix = "month-year",
-  unavailableTitle = "No data for this month",
   renderRow,
 }: MonthYearPickerProps) {
   const years = useMemo(() => {
@@ -143,7 +140,7 @@ export function MonthYearPicker({
             // information, and a grid that changes shape is hard to scan.
             title={
               !isAvailable
-                ? unavailableTitle
+                ? "No data for this month"
                 : intensity[key] !== undefined
                   ? `${intensity[key].toFixed(1)}% attributable`
                   : undefined

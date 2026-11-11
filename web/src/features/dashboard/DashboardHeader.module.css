@@ -48,3 +48,14 @@
   max-width: 100%;
   min-width: 0;
 }
+
+/* The place in the actions breadcrumb links back to its dashboard (09a). */
+.placeLink {
+  color: var(--color-nexus);
+  text-decoration: none;
+}
+
+.placeLink:hover,
+.placeLink:focus-visible {
+  text-decoration: underline;
+}

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useMemo, useState } from "react";
 
@@ -16,6 +15,7 @@ import {
   useHeatActions,
 } from "@/features/actions";
 import { type HeatSeasonLayout } from "@/features/actions/ActionGantt";
+import { usePriorityAreas } from "@/features/actions/PriorityAreas";
 import { DashboardHeader } from "@/features/dashboard";
 import { getHeatSeason } from "@/lib/heatSeasonsClient";
 import { getSavedPlan, type SavedPlan } from "@/lib/savedPlansClient";
@@ -70,6 +70,8 @@ export default function RecommendedActionsPage(props: PageProps) {
   const view: ActionView = query.view === "gantt" ? "gantt" : "list";
   const selectedId = query.action ?? null;
   const heatSeason = useHeatSeasonLayout(placeId);
+  // The areas at elevated risk on the dashboard's map of this place.
+  const priority = usePriorityAreas(geographyId, outcome);
 
   const { geographies } = useGeographies();
   const { catalog } = useModelCatalog(geographyId);
@@ -117,11 +119,9 @@ export default function RecommendedActionsPage(props: PageProps) {
 
   return (
     <main className={styles.page}>
-      <Link href={dashboardHref} className={styles.back}>
-        ← Back to dashboard
-      </Link>
       <DashboardHeader
         trail={[...trail, "Recommended actions"]}
+        placeHref={dashboardHref}
         hazardLabel={hazardLabel}
         healthDomainLabel={domainLabel}
       />
@@ -175,6 +175,7 @@ export default function RecommendedActionsPage(props: PageProps) {
         season={season}
         onSeasonChange={(next) => setQuery({ season: next, action: null })}
         heatSeason={heatSeason}
+        priority={priority}
         selectedId={selectedId}
         onSelect={(action) => setQuery({ action })}
         contextLabel={`${hazardLabel} · ${domainLabel} · ${trail.at(-1)}`}

@@ -74,6 +74,13 @@ test("the three tabs swap figures and map in place; the forecast follows its mon
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
 
   const outlook = panel(page);
+  // The left card explains the risk in the design's words.
+  await expect(
+    page.getByText(
+      "Exposure to extreme heat directly increases the risk of low birth weight (LBW) for pregnant women, while maintaining a cooler environment significantly reduces this risk.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByText(/does not by itself establish causality/)).toHaveCount(0);
   const tabs = outlook.getByRole("tab");
   await expect(tabs).toHaveText(["Observed", "Forecasted", "Projected"]);
   await expect(outlook.getByRole("tab", { name: "Observed" })).toHaveAttribute(
@@ -99,19 +106,27 @@ test("the three tabs swap figures and map in place; the forecast follows its mon
   );
   await expect(estimate).toContainText("Forecast-system range 10.0 to 14.0%");
   await expect(estimate.getByRole("button", { name: /High/ })).toBeVisible();
-  await expect(outlook.getByTestId("outlook-source")).toContainText(
-    "Copernicus C3S multi-system seasonal forecast, issued Nov 2026",
-  );
+  // No source line on any tab; the forecast issue is kept out of sight.
+  await expect(outlook.getByText(/Forecasted · /)).toHaveCount(0);
+  await expect(outlook).toHaveAttribute("data-release", "2026-11");
   await expect(
     outlook.getByText(
       "Forecasts are available for the next 6 months (Nov 2026 – Apr 2027).",
     ),
   ).toBeVisible();
-  await expect(outlook.getByText("Outside forecast window")).toBeVisible();
-  // A month outside the six is shown but cannot be picked.
-  const october = outlook.locator("#forecast-month-2026-10");
-  await expect(october).toBeDisabled();
-  await expect(october).toHaveAttribute("title", "Outside the forecast window");
+  // Only the six forecast months, the year as text on the first and on
+  // January; no year dropdown and no greyed months.
+  const forecastMonths = outlook.getByRole("group", { name: "Forecast month" });
+  await expect(forecastMonths.getByRole("button")).toHaveText([
+    "Nov 2026",
+    "Dec",
+    "Jan 2027",
+    "Feb",
+    "Mar",
+    "Apr",
+  ]);
+  await expect(outlook.getByRole("combobox", { name: "Year" })).toHaveCount(0);
+  await expect(outlook.getByText("Outside forecast window")).toHaveCount(0);
   // Saved plans hold observed or projected views only.
   await expect(outlook.getByRole("button", { name: "Save plan" })).toBeDisabled();
   // Same panel, same columns: the map is not remounted or moved sideways.
@@ -125,7 +140,7 @@ test("the three tabs swap figures and map in place; the forecast follows its mon
     .boundingBox();
   expect(Math.abs(forecastFigures!.x - observedFigures!.x)).toBeLessThan(1);
 
-  await outlook.locator("#forecast-month-2026-12").click();
+  await forecastMonths.getByRole("button", { name: "Dec", exact: true }).click();
   await expect(page).toHaveURL(/forecast_month=2026-12/);
   await expect(estimate).toContainText("in Dec 2026, 13.0% of low birth weight cases");
   await expect(estimate.getByRole("button", { name: /Moderate/ })).toBeVisible();
@@ -177,7 +192,9 @@ test("projected: time horizon, emission scenario cards and reference period", as
   await expect(outlook.getByRole("combobox", { name: "Pregnancy window" })).toHaveCount(
     0,
   );
-  await expect(labels).toContainText([
+  // Exactly the three rows of the user flow: one time horizon (no separate
+  // period length), the emission scenario and the reference period.
+  await expect(labels).toHaveText([
     "Time horizon",
     "Emission scenario",
     "Reference period",
@@ -268,5 +285,58 @@ test("filter bar: labelled dropdowns, health domain, and Configure plan opens th
     path: "../outputs/e2e/web/risk-overview-actions-gantt.png",
     fullPage: true,
   });
+  expect(api.unhandled).toEqual([]);
+});
+
+test("switching county keeps the card, the figures and the actions on screen", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const api = await installKenya(page);
+  // Slow Garissa's answers so the switch can be watched.
+  for (const pattern of [
+    /^\/api\/chart\/heat-outlook\/geo-ke-garissa\/observed$/,
+    /^\/api\/chart\/heat-outlook\/geo-ke-garissa\/capabilities$/,
+  ])
+    api.on(pattern, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      await route.fallback();
+    });
+  await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
+  const outlook = panel(page);
+  const estimate = outlook.getByTestId("outlook-estimate");
+  await expect(estimate).toContainText("Kajiado");
+  const actions = page.getByRole("region", { name: "Before heat season" });
+  await expect(actions.getByRole("button").first()).toBeVisible();
+
+  // Watch the page: the card must not be replaced, and the figures and the
+  // actions must never disappear while Garissa loads.
+  await page.evaluate(() => {
+    const w = window as unknown as Record<string, unknown>;
+    const card = document.querySelector('[data-testid="heat-outlook"]');
+    w.__card = card;
+    w.__blanked = [];
+    const observer = new MutationObserver(() => {
+      const blanked = w.__blanked as string[];
+      if (document.querySelector('[data-testid="heat-outlook"]') !== card)
+        blanked.push("card replaced");
+      if (!document.querySelector('[data-testid="outlook-estimate"]'))
+        blanked.push("figures blank");
+      const before = [...document.querySelectorAll("section")].find(
+        (section) => section.getAttribute("aria-label") === "Before heat season",
+      );
+      if (!before || before.querySelectorAll("button").length === 0)
+        blanked.push("actions empty");
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
+
+  await outlook.getByRole("button", { name: /^Garissa: / }).click();
+  await page.waitForURL(/admin_unit=geo-ke-garissa/);
+  await expect(estimate).toContainText("Garissa");
+  const blanked = await page.evaluate(() => [
+    ...new Set((window as unknown as { __blanked: string[] }).__blanked),
+  ]);
+  expect(blanked).toEqual([]);
   expect(api.unhandled).toEqual([]);
 });

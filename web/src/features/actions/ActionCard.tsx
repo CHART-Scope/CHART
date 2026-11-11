@@ -2,16 +2,18 @@ import { Icon } from "@/components/Icon";
 
 import { actionTypeIcon, type Action } from "./actionCatalog";
 import styles from "./ActionCard.module.css";
+import { PriorityAreasLine, type PriorityAreas } from "./PriorityAreas";
 import { statusLabels, type ActionStatus } from "./useActionProgress";
 
 type Props = {
   action: Action;
   status: ActionStatus;
+  priority: PriorityAreas | null;
   selected: boolean;
   onOpen: () => void;
 };
 
-export function ActionCard({ action, status, selected, onOpen }: Props) {
+export function ActionCard({ action, status, priority, selected, onOpen }: Props) {
   return (
     <button
       type="button"
@@ -37,9 +39,7 @@ export function ActionCard({ action, status, selected, onOpen }: Props) {
             {statusLabels[status]}
           </span>
         </span>
-        {action.summary ? (
-          <span className={styles.summary}>{action.summary}</span>
-        ) : null}
+        <PriorityAreasLine priority={priority} variant="list" />
       </span>
     </button>
   );

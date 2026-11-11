@@ -6,6 +6,7 @@ import type { CSSProperties } from "react";
 import { seasons, type Action } from "./actionCatalog";
 import { actionSpan, planningCycle } from "./actionCycle";
 import styles from "./ActionGantt.module.css";
+import { PriorityAreasLine, type PriorityAreas } from "./PriorityAreas";
 import { timingSeason } from "./planLabels";
 import { statusLabels, type ActionStatus } from "./useActionProgress";
 
@@ -20,6 +21,7 @@ type Props = {
   actions: Action[];
   statusOf: (actionId: string) => ActionStatus;
   heatSeason: HeatSeasonLayout;
+  priority: PriorityAreas | null;
   selectedId: string | null;
   onOpen: (actionId: string) => void;
 };
@@ -55,6 +57,7 @@ export function ActionGantt({
   actions,
   statusOf,
   heatSeason,
+  priority,
   selectedId,
   onOpen,
 }: Props) {
@@ -147,6 +150,7 @@ export function ActionGantt({
                         <span className={styles.tag}>{action.departments[0]}</span>
                       ) : null}
                     </span>
+                    <PriorityAreasLine priority={priority} variant="gantt" />
                   </button>
                 </li>
               );

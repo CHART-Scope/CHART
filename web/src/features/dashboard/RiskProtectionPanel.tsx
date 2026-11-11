@@ -38,15 +38,11 @@ export function RiskProtectionPanel({
   contextFigure?: IconName;
   description?: string | null;
 }) {
+  const isLbw = outcomeLabel.toLowerCase() === "low birth weight";
+  const shortLabel = isLbw ? "LBW" : outcomeLabel.toLowerCase();
   const columns: readonly RenderedColumn[] = [
-    {
-      ...COLUMNS[0],
-      caption: `Elevated ${outcomeLabel.toLowerCase() === "low birth weight" ? "LBW" : outcomeLabel.toLowerCase()} risk`,
-    },
-    {
-      ...COLUMNS[1],
-      caption: `Reduced ${outcomeLabel.toLowerCase() === "low birth weight" ? "LBW" : outcomeLabel.toLowerCase()} risk`,
-    },
+    { ...COLUMNS[0], caption: `Elevated ${shortLabel} risk` },
+    { ...COLUMNS[1], caption: `Reduced ${shortLabel} risk` },
   ];
   return (
     <section className={styles.panel} aria-labelledby="risk-protection-heading">
@@ -82,7 +78,9 @@ export function RiskProtectionPanel({
       </div>
       <p className={styles.body}>
         {description ??
-          `The fitted model estimates how climate exposure is associated with ${outcomeLabel.toLowerCase()}. It does not by itself establish causality.`}
+          (isLbw
+            ? "Exposure to extreme heat directly increases the risk of low birth weight (LBW) for pregnant women, while maintaining a cooler environment significantly reduces this risk."
+            : `The fitted model estimates how climate exposure is associated with ${outcomeLabel.toLowerCase()}. It does not by itself establish causality.`)}
       </p>
     </section>
   );

@@ -8,6 +8,7 @@ import { seasons, type Action, type Season } from "./actionCatalog";
 import { ActionCard } from "./ActionCard";
 import { ActionGantt, type HeatSeasonLayout } from "./ActionGantt";
 import { ActionPanel } from "./ActionPanel";
+import type { PriorityAreas } from "./PriorityAreas";
 import styles from "./ActionRepository.module.css";
 import { timingSeason } from "./planLabels";
 import { actionStatuses, statusLabels, type ActionProgress } from "./useActionProgress";
@@ -26,6 +27,8 @@ type Props = {
   onSeasonChange: (season: Season | null) => void;
   /** The place's heat-season calendar and the place it was set for. */
   heatSeason: HeatSeasonLayout;
+  /** The place's areas at elevated risk, shown on every card. */
+  priority: PriorityAreas | null;
   selectedId: string | null;
   onSelect: (actionId: string | null) => void;
   contextLabel: string;
@@ -44,6 +47,7 @@ export function ActionRepository({
   season,
   onSeasonChange,
   heatSeason,
+  priority,
   selectedId,
   onSelect,
   contextLabel,
@@ -154,6 +158,7 @@ export function ActionRepository({
           actions={visible}
           statusOf={progress.statusOf}
           heatSeason={heatSeason}
+          priority={priority}
           selectedId={selectedId}
           onOpen={onSelect}
         />
@@ -167,6 +172,7 @@ export function ActionRepository({
               <ActionCard
                 action={action}
                 status={progress.statusOf(action.id)}
+                priority={priority}
                 selected={action.id === selectedId}
                 onOpen={() => onSelect(action.id)}
               />

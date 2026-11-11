@@ -93,6 +93,9 @@ export async function installFakeApi(
     if (path === "/api/chart/audit/events" || path.startsWith("/api/chart/audit")) {
       return json(route, {}, 202);
     }
+    // No published outlook map unless a spec installs one (Kenya does).
+    if (/^\/api\/chart\/heat-outlook\/[^/]+\/map$/.test(path))
+      return json(route, { error: "OUTLOOK_NOT_PUBLISHED" }, 404);
     if (/^\/api\/chart\/heat-outlook\/[^/]+\/capabilities$/.test(path))
       return json(route, { published: false, data_modes: [] });
     if (path === "/api/chart/geographies") return json(route, geographies);

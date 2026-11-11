@@ -85,12 +85,14 @@ test("Kenya LBW opens on the newest observed month, scored from ERA5", async ({
     }),
   ).toHaveAttribute("aria-pressed", "true");
 
-  // The temperatures behind it: nine months on both scales.
-  await outlook.getByText("Temperatures behind this estimate").click();
-  const inputs = outlook.getByRole("table", { name: "Temperatures used" });
-  await expect(inputs.getByRole("row")).toHaveCount(1 + latest.inputs.length);
-  await expect(inputs).toContainText(latest.inputs[0].label);
-  await expect(outlook.getByText(latest.calibration_note)).toBeVisible();
+  // No source line or "Temperatures behind this estimate" details on the
+  // card; the release is kept out of sight for checks.
+  await expect(outlook.getByText("Temperatures behind this estimate")).toHaveCount(0);
+  await expect(outlook.getByText(/Observed · ERA5/)).toHaveCount(0);
+  await expect(outlook).toHaveAttribute(
+    "data-release",
+    String((latest as Record<string, unknown>).release),
+  );
 
   // The map shades the same month.
   expect(
@@ -247,11 +249,16 @@ test("the projected highest-risk months rank by share, not temperature", async (
   const reference = outlook.getByRole("group", { name: "Reference period" });
   // "Peak heat season" was read as the weather season; it is not one.
   await expect(outlook.getByText(/Peak heat season/)).toHaveCount(0);
+  // The details end with a small link to the published methodology.
+  await outlook.getByText("Seasonal pattern and all periods").click();
   await expect(
-    outlook.getByText(
-      /Hot season \(Kenya Meteorological Department\): Dec–Mar, peaking in Feb\./,
-    ),
-  ).toBeVisible();
+    outlook.getByRole("link", { name: "How these estimates are made" }),
+  ).toHaveAttribute("href", "https://chart-scope.github.io/CHART/docs/methodology/");
+  // The season and averaging note under the controls is gone.
+  await expect(outlook.getByText(/Meteorological Department\)/)).toHaveCount(0);
+  await expect(outlook.getByText(/Projections average the selected years/)).toHaveCount(
+    0,
+  );
   await reference
     .getByRole("button", { name: /Highest-risk months \(Jul–Sep\)/ })
     .click();
