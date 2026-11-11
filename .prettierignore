@@ -22,6 +22,7 @@ orchestration/storage/
 
 data/
 docs/
+docs-internal/
 pipelines/era5_heat/README.md
 pipelines/LBW_demo/README.md
 pipelines/models/lbw/web/index.html

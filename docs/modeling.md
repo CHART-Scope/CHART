@@ -247,7 +247,7 @@ not stored in this repository. The division fitting script and supplied
 MP-wide fit belong to the upstream modeling project. CHART stores only code
 that packages or scores approved fitted artifacts.
 
-See the [health input contract](health-input-contract.md) for the proposed
+See the health input contract (`docs-internal/archive/health-input-contract.md`) for the proposed
 source fields, data rights, and unresolved extraction decisions.
 
 ## Model-release manifest structure

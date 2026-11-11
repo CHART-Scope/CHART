@@ -4,7 +4,7 @@ The vulnerability and resilience assessment scores the child areas of a frame
 geography (a state's divisions, a country's counties) on hazard, exposure,
 sensitivity and adaptive capacity, and combines them into a risk score with a
 class, a rank and the indicators that drive it. Design, sources and open
-questions: [docs/vra-integration-plan.md](../../../docs/vra-integration-plan.md).
+questions: [docs/vra.md](../../../docs/vra.md) (history: `docs-internal/archive/vra-integration-plan.md`).
 
 | File                      | Role                                                                                                                                                                                                                                                                    |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

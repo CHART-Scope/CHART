@@ -67,7 +67,6 @@ nav:
   - Installation setup: installation-setup.md
   - Sign-in and email: sign-in.md
   - Architecture:
-      - System requirements and capacity: system-architecture-and-requirements.md
       - Observed climate data: observed-climate.md
   - Infrastructure:
       - AWS sandbox deployment: aws-sandbox.md
@@ -79,13 +78,11 @@ nav:
   - Modeling:
       - Overview: modeling.md
       - Model releases: model-updates.md
-      - Health input contract: health-input-contract.md
-      - Survey exploration guide: health-survey-exploration-guide.md
   - Model integration:
       - From R output to the dashboard: model-integration.md
   - Data pipeline: data-pipeline.md
   - Data loading and storage: data-loading.md
-  - VRA data and integration plan: vra-integration-plan.md
+  - Vulnerability assessment (VRA): vra.md
   - Explore (public map): explore.md
   - Dashboard: dashboard.md
   - Action repository: actions.md

@@ -1,6 +1,6 @@
 {
   "version": "vra-catalogue-2026-11-03",
-  "source": "CEEW draft indicator list for the VRA (all sheets), with direction and placement fixes from docs/vra-integration-plan.md",
+  "source": "CEEW draft indicator list for the VRA (all sheets), with direction and placement fixes from docs-internal/archive/vra-integration-plan.md (section 4)",
   "indicators": [
     {
       "code": "haz.heatwave_days_12m",
