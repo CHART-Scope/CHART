@@ -5,7 +5,7 @@ load, check and rebuild it. Sizes are measured on the AWS sandbox unless marked
 ≈ (an estimate until pulled). Method details live with each dataset:
 [observed climate](observed-climate.md), [data pipeline](data-pipeline.md),
 [Explore](explore.md) (forecasts, population) and the
-[VRA plan](vra-integration-plan.md).
+[VRA module](https://github.com/CHART-Scope/CHART/blob/dev/core/chart/vra/README.md).
 
 ## Where data is kept
 
@@ -37,7 +37,7 @@ Climate Change Service information".
 | C3S multi-system seasonal forecast (Tmax anomalies, nine centres) | Explore next six months | recurring, monthly (Dagster `seasonal_forecast_sensor` checks daily) | 0.5 MB per issue | downloads; scored result as JSON under `MODEL_CACHE_DIR/forecasts` | `python -m chart.climate.seasonal_forecast build --country KE` | rerun `build`: 2 min (India), about 12 min (Kenya) |
 | ISIMIP3b Tmax projections (SSP1-2.6, 3-7.0, 5-8.5) | Explore projections | one-off per release | held | outlook files | model release process ([model integration](model-integration.md)) | from the release files |
 | WorldPop 2025, 1 km | population layer, exposure | one-off per release | done | `core/chart/population/worldpop_2025.json` | `core/scripts/worldpop_population.py` | rerun the script |
-| NFHS-5, Census 2011, NITI MPI (MP districts and divisions) | 25 VRA indicators | one-off per survey round | under 1 MB | VRA indicator values | VRA upload with `?level=district` ([VRA plan](vra-integration-plan.md)) | re-upload the committed CSV |
+| NFHS-5, Census 2011, NITI MPI (MP districts and divisions) | 25 VRA indicators | one-off per survey round | under 1 MB | VRA indicator values | VRA upload with `?level=district` ([VRA module](https://github.com/CHART-Scope/CHART/blob/dev/core/chart/vra/README.md)) | re-upload the committed CSV |
 
 Planned, in the order they are likely to be pulled:
 
