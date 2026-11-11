@@ -69,5 +69,4 @@ flowchart LR
 | [Data pipeline](data-pipeline.md) | Run Dagster assets and materialisation |
 | [Add a geography and model](add-geography-and-model.md) | Extend the supported analytical areas |
 | [Where model updates happen](model-updates.md) | Register, version, or replace a health model — for CHART devs and external adopters |
-| [Vulnerability assessment (VRA)](vra.md) | How the VRA scores areas, its data and what it shows |
 | [Digital public good and licensing](licensing.md) | Understand CHART's AGPL licence, source availability, and third-party boundaries |
