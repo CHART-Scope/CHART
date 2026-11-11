@@ -33,8 +33,10 @@ place selectors. Routing-only roots such as India do not offer an aggregate
 option when they lead directly to their supported state.
 
 Which pregnancy windows or age groups, scenarios and data views the cards
-offer is set per country and outcome under Settings → Workspace → Model
-options. The API
+offer is set per country and outcome under Settings → Models → Model
+options. A pregnancy window or age group dropdown appears only when more
+than one option is switched on; with just the default, the cards use it
+without asking. The API
 applies those settings, so the dashboard only lists what it is given. See
 [Model settings](model-integration.md#model-settings).
 

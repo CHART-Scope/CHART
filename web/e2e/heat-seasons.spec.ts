@@ -12,7 +12,15 @@ const places: Place[] = [
   { id: "geo-ke", name: "Kenya", level: "Country", parent: null },
   { id: "geo-ke-kajiado", name: "Kajiado", level: "County", parent: "geo-ke" },
   { id: "geo-ke-garissa", name: "Garissa", level: "County", parent: "geo-ke" },
+  {
+    id: "geo-ke-kajiado-central",
+    name: "Kajiado Central",
+    level: "Constituency",
+    parent: "geo-ke-kajiado",
+  },
 ];
+const depthOf = (place: Place): number =>
+  place.parent ? 1 + depthOf(places.find((item) => item.id === place.parent)!) : 0;
 const OFFICIAL = "dddaaaabbbbd";
 
 function serveSeasons(api: KenyaApi, fail?: string) {
@@ -29,7 +37,7 @@ function serveSeasons(api: KenyaApi, fail?: string) {
       name: place.name,
       level_label: place.level,
       parent_id: place.parent,
-      depth: place.parent ? 1 : 0,
+      depth: depthOf(place),
       own: own.get(place.id) ?? null,
       months: origin ? own.get(origin.id)! : OFFICIAL,
       state: own.has(place.id) ? "custom" : origin ? "inherited" : "official",
@@ -58,6 +66,12 @@ function serveSeasons(api: KenyaApi, fail?: string) {
   return writes;
 }
 
+/** A place's row button: its name, then its level (not the fold button). */
+const place = (page: Page, name: string) =>
+  page.getByRole("list", { name: "Places" }).getByRole("button", {
+    name: new RegExp(`^${name}\\s*(Country|County|Constituency)`),
+  });
+
 const months = (page: Page) =>
   page.getByRole("group", { name: "Months" }).getByRole("button");
 
@@ -77,13 +91,12 @@ test("an administrator paints a county's months, saves them and can return to in
     page.getByRole("heading", { name: "Heat season calendar" }),
   ).toBeVisible();
   const list = page.getByRole("list", { name: "Places" });
-  await expect(list.getByRole("button")).toHaveCount(3);
-  await expect(list.getByRole("button").first()).toContainText("Official season");
+  // Countries open on their counties; constituencies stay folded away.
+  await expect(list.getByRole("listitem")).toHaveCount(3);
+  await expect(list.getByRole("listitem").first()).toContainText("Official season");
 
-  await list.getByRole("button", { name: /Kajiado/ }).click();
-  await expect(list.getByRole("button", { name: /Kajiado/ })).toContainText(
-    "Inherits the official season",
-  );
+  await place(page, "Kajiado").click();
+  await expect(place(page, "Kajiado")).toContainText("Inherits the official season");
   // Kenya's December–March season, read January first.
   await expect(months(page).first()).toHaveAccessibleName("Jan: During");
   await expect(months(page).nth(4)).toHaveAccessibleName("May: After");
@@ -109,15 +122,13 @@ test("an administrator paints a county's months, saves them and can return to in
   expect(writes).toEqual([
     { method: "PUT", id: "geo-ke-kajiado", months: "ddddaaabbbbd" },
   ]);
-  await expect(list.getByRole("button", { name: /Kajiado/ })).toContainText("Custom");
+  await expect(place(page, "Kajiado")).toContainText("Custom");
   // Garissa keeps the official season: only Kajiado changed.
-  await expect(list.getByRole("button", { name: /Garissa/ })).toContainText(
-    "Inherits the official season",
-  );
+  await expect(place(page, "Garissa")).toContainText("Inherits the official season");
 
   // Saved calendars survive a reload.
   await page.reload();
-  await list.getByRole("button", { name: /Kajiado/ }).click();
+  await place(page, "Kajiado").click();
   await expect(months(page).nth(3)).toHaveAccessibleName("Apr: During");
 
   await page.getByRole("button", { name: "Use Kenya" }).click();
@@ -126,6 +137,49 @@ test("an administrator paints a county's months, saves them and can return to in
   );
   await expect(months(page).nth(3)).toHaveAccessibleName("Apr: After");
   expect(writes.at(-1)).toEqual({ method: "DELETE", id: "geo-ke-kajiado" });
+  expect(api.unhandled).toEqual([]);
+});
+
+test("places fold under their parents, expand all at once and can be searched", async ({
+  page,
+}) => {
+  const api = await installKenya(page, true, ["/kenya"], { roles: ["chart_admin"] });
+  serveSeasons(api);
+  await page.goto("/settings?tab=seasons");
+  const list = page.getByRole("list", { name: "Places" });
+  await expect(list.getByRole("listitem")).toHaveCount(3);
+  await expect(place(page, "Kajiado Central")).toHaveCount(0);
+
+  // One parent opens on its own.
+  const kajiado = list.getByRole("button", { name: "Expand Kajiado" });
+  await expect(kajiado).toHaveAttribute("aria-expanded", "false");
+  await kajiado.click();
+  await expect(place(page, "Kajiado Central")).toBeVisible();
+  await list.getByRole("button", { name: "Collapse Kajiado" }).click();
+  await expect(place(page, "Kajiado Central")).toHaveCount(0);
+
+  // Collapsing the country hides everything beneath it.
+  await list.getByRole("button", { name: "Collapse Kenya" }).click();
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+
+  // One button opens and closes the whole tree.
+  await page.getByRole("button", { name: "Expand all" }).click();
+  await expect(list.getByRole("listitem")).toHaveCount(4);
+  await page.getByRole("button", { name: "Collapse all" }).click();
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+
+  // Search shows matches with the parents they sit under, folded or not.
+  const search = page.getByRole("searchbox", { name: "Search places" });
+  await search.fill("central");
+  await expect(list.getByRole("listitem")).toHaveCount(3);
+  await expect(place(page, "Kajiado Central")).toBeVisible();
+  await expect(place(page, "Garissa")).toHaveCount(0);
+  await place(page, "Kajiado Central").click();
+  await expect(page.getByRole("heading", { name: "Kajiado Central" })).toBeVisible();
+  await search.fill("nairobi");
+  await expect(page.getByRole("status")).toHaveText("No place matches “nairobi”.");
+  await search.fill("");
+  await expect(list.getByRole("listitem")).toHaveCount(1);
   expect(api.unhandled).toEqual([]);
 });
 

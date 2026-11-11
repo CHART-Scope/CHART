@@ -286,7 +286,7 @@ reused: it has no component, direction or vintage.
   value with unit, normalised score and contribution, badges for vintage
   ("Census 2011"), "apportioned", "state-level" and coverage, and a caption
   that classes are relative within the state.
-- **Settings → Data → Indicators**: a coverage matrix (indicator × vintage,
+- **Settings → VRA → Indicators**: a coverage matrix (indicator × vintage,
   % of districts present), template download and upload per source, manual
   entry for officials' data, and a "Run assessment" action. Pulls and runs
   appear in Settings → Jobs.
@@ -357,7 +357,7 @@ districts. Details: `core/chart/vra/README.md`.
 The current app keeps the existing `vra-v1` calculation and configurable
 geography hierarchy. It now exposes a value schema for every indicator:
 unit, numeric type, inclusive bounds, an illustrative value and whether it
-can be uploaded. Settings → Data has one Upload CSV dialog: choose a template
+can be uploaded. Settings → VRA has one Upload CSV dialog: choose a template
 for all uploadable indicators or one selected indicator, preview the fields
 and rules, download it if needed, and select a CSV. **Validate and upload**
 explicitly validates and saves accepted rows; selecting a file alone does

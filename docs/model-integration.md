@@ -368,7 +368,7 @@ The display rules below apply to observed months as to projected ones.
 
 ## Model settings
 
-Settings → Workspace → **Model options** chooses, per country and outcome
+Settings → **Models** → **Model options** chooses, per country and outcome
 (for example Kenya + LBW, Kenya + under-five, India + LBW), which options CHART
 offers. One country is shown at a time: a picker in the card's header (opening
 on the planning location's country) chooses it, and each outcome below it has

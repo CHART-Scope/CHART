@@ -15,11 +15,11 @@ const evidence = "../outputs/e2e/web/settings";
 const admin = { roles: ["chart_admin", "health_planning_lead"] };
 const tabs = [
   "Workspace",
-  "Data",
   "Models",
   "Heat seasons",
+  "Data",
+  "VRA",
   "Recommendations",
-  "Users",
   "Jobs",
 ] as const;
 
@@ -203,7 +203,13 @@ test("tabs are kept in the URL, survive a reload and work from the keyboard", as
   await page.goto("/settings");
   await expect(tabList(page).getByRole("tab")).toHaveText([...tabs]);
   await expect(tab(page, "Workspace")).toHaveAttribute("aria-selected", "true");
+  // Workspace is about where and with whom: the location and, for an admin,
+  // who has access. Model options moved to Models.
   await expect(page.getByText("Planning location")).toBeVisible();
+  await expect(page.getByText("Amina Planner")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "What the dashboard offers" }),
+  ).toHaveCount(0);
 
   await tab(page, "Data").click();
   await expect(page).toHaveURL(/\/settings\?tab=data$/);
@@ -218,12 +224,22 @@ test("tabs are kept in the URL, survive a reload and work from the keyboard", as
     page.getByRole("heading", { name: "Observations held per country" }),
   ).toBeVisible();
 
+  // The vulnerability indicators have their own tab now, not Data.
+  await expect(page.getByRole("heading", { name: /Indicator/ })).toHaveCount(0);
+
   // Arrow keys move between tabs; Enter opens the focused one.
   await tab(page, "Data").focus();
   await page.keyboard.press("ArrowRight");
-  await expect(tab(page, "Models")).toBeFocused();
+  await expect(tab(page, "VRA")).toBeFocused();
   await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\?tab=vra$/);
+
+  // Models holds every model setting: the options and the releases.
+  await tab(page, "Models").click();
   await expect(page).toHaveURL(/\?tab=models$/);
+  await expect(
+    page.getByRole("heading", { name: "What the dashboard offers" }),
+  ).toBeVisible();
   await expect(page.getByText("ke-lbw", { exact: true })).toBeVisible();
   await expect(page.getByText("1 active of 1 installed.")).toBeVisible();
 
@@ -232,8 +248,8 @@ test("tabs are kept in the URL, survive a reload and work from the keyboard", as
   await expect(page).toHaveURL(/\/settings\?tab=models$/);
   await expect(tab(page, "Models")).toHaveAttribute("aria-selected", "true");
 
-  // The reset is folded away at the foot of Users, never on show.
-  await tab(page, "Users").click();
+  // The reset is folded away at the foot of Workspace, never on show.
+  await tab(page, "Workspace").click();
   await expect(page.getByText("Amina Planner")).toBeVisible();
   const reset = page.getByRole("button", { name: "Reset installation" });
   await expect(reset).toBeHidden();
@@ -245,7 +261,7 @@ test("tabs are kept in the URL, survive a reload and work from the keyboard", as
   await expect(page).toHaveURL(/\/settings$/);
 });
 
-test("a planner sees only Workspace and cannot open an admin tab by URL", async ({
+test("a planner sees Workspace and Models only and cannot open an admin tab by URL", async ({
   page,
 }) => {
   const api = await installKenya(page, true, ["/kenya"], {
@@ -254,8 +270,11 @@ test("a planner sees only Workspace and cannot open an admin tab by URL", async 
   await page.goto("/settings?tab=jobs");
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByText("Planning location")).toBeVisible();
+  await expect(tabList(page).getByRole("tab")).toHaveText(["Workspace", "Models"]);
+  // Managing people stays with administrators.
+  await expect(page.getByText("Amina Planner")).toHaveCount(0);
+  await tab(page, "Models").click();
   await expect(page.getByRole("group", { name: "Low birth weight" })).toBeVisible();
-  await expect(page.getByRole("tablist")).toHaveCount(0);
   for (const hidden of ["Running and recent work", "Observations held per country"])
     await expect(page.getByRole("heading", { name: hidden })).toHaveCount(0);
 
@@ -277,7 +296,7 @@ test("each country appears once: one Data row, one model-options picker", async 
   page,
 }) => {
   await installAdmin(page);
-  await page.goto("/settings");
+  await page.goto("/settings?tab=models");
   // Model options name the country once, in the header, not on every block.
   const options = page.getByRole("region", { name: "What the dashboard offers" });
   await expect(options.getByText("Kenya", { exact: true })).toHaveCount(1);

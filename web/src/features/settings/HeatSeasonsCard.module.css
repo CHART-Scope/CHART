@@ -28,6 +28,68 @@
   align-items: start;
 }
 
+.placesPane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.placesTools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.search {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--color-white);
+  color: var(--color-text-muted);
+}
+
+.search:focus-within {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--color-charcoal);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.toggleAll {
+  flex: 0 0 auto;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--color-white);
+  color: var(--color-nexus);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.toggleAll:disabled {
+  color: var(--color-text-faint);
+  cursor: default;
+}
+
 .places {
   max-height: 560px;
   margin: 0;
@@ -38,32 +100,82 @@
   list-style: none;
 }
 
-.place {
+.placeRow {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 12px 14px;
-  border: none;
   border-bottom: 1px solid #f0eeeb;
   border-left: 3px solid transparent;
   background: var(--color-white);
+}
+
+.placeRow[aria-current="true"] {
+  border-left-color: var(--color-nexus);
+  background: #f3f3fd;
+}
+
+.fold,
+.foldSpace {
+  flex: 0 0 28px;
+  height: 28px;
+}
+
+.fold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.fold svg {
+  transition: transform 0.15s var(--ease-out-soft);
+}
+
+.fold[aria-expanded="false"] svg {
+  transform: rotate(-90deg);
+}
+
+.fold:hover:not(:disabled) {
+  background: var(--color-grey-light);
+}
+
+.fold:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.place {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px 12px 4px;
+  border: none;
+  background: transparent;
   color: var(--color-charcoal);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.place[aria-current="true"] {
-  border-left-color: var(--color-nexus);
-  background: #f3f3fd;
-}
-
 .place:focus-visible,
+.fold:focus-visible,
+.toggleAll:focus-visible,
 .brushes button:focus-visible,
 .calendar button:focus-visible {
   outline: var(--focus-ring);
   outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fold svg {
+    transition: none;
+  }
 }
 
 .placeText {

@@ -128,7 +128,7 @@ the code arrives within a minute and is not in spam.
 
 ## Inviting people
 
-An administrator invites people in **Settings → Users**: full name, email
+An administrator invites people in **Settings → Workspace**: full name, email
 address, role and planning area (a country or its first level, such as a
 state or county; an area covers everything inside it).
 

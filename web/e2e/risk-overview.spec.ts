@@ -115,7 +115,6 @@ test("the three tabs swap figures and map in place; the forecast follows its mon
   // Saved plans hold observed or projected views only.
   await expect(outlook.getByRole("button", { name: "Save plan" })).toBeDisabled();
   // Same panel, same columns: the map is not remounted or moved sideways.
-  // (It sits one row higher: the forecast has no pregnancy-window row.)
   await expect(outlook.locator("#heat-outlook-title")).toContainText("Kajiado County");
   await expect(map).toHaveCount(1);
   const forecastMap = await map.boundingBox();
@@ -174,8 +173,11 @@ test("projected: time horizon, emission scenario cards and reference period", as
 
   const outlook = panel(page);
   const labels = outlook.locator("[class*='controlLabel']");
+  // Only the whole pregnancy is on in Settings, so it has no row.
+  await expect(outlook.getByRole("combobox", { name: "Pregnancy window" })).toHaveCount(
+    0,
+  );
   await expect(labels).toContainText([
-    "Pregnancy window",
     "Time horizon",
     "Emission scenario",
     "Reference period",

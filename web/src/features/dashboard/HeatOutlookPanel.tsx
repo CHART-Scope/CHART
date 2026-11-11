@@ -385,9 +385,11 @@ export function HeatOutlookPanel({
             </p>
           )}
 
-          {(selectors.length > 0 || (view === "forecast" && forecastData)) && (
+          {viewData && (
             <div className={styles.controlBox} data-busy={busy || undefined}>
-              {selectors.length > 0 && (
+              {/* The API lists only the windows or age groups Settings leaves
+              on; with just the default there is nothing to choose. */}
+              {selectors.length > 1 && (
                 <ControlRow
                   label={outcome === "lbw" ? "Pregnancy window" : "Age group"}
                 >

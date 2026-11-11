@@ -13,6 +13,7 @@ import {
   type SeasonPhase,
 } from "@/lib/heatSeasonsClient";
 
+import { HeatSeasonPlaces } from "./HeatSeasonPlaces";
 import styles from "./HeatSeasonsCard.module.css";
 
 const MONTHS = [
@@ -125,35 +126,12 @@ export function HeatSeasonsCard({ canEdit }: { canEdit: boolean }) {
       ) : null}
       {items && selected ? (
         <div className={styles.layout}>
-          <ul className={styles.places} aria-label="Places">
-            {items.map((item) => (
-              <li key={item.geography_id}>
-                <button
-                  type="button"
-                  className={styles.place}
-                  aria-current={item.geography_id === selectedId || undefined}
-                  style={{ paddingLeft: `${14 + item.depth * 18}px` }}
-                  onClick={() => select(item.geography_id)}
-                >
-                  <span className={styles.placeText}>
-                    <span
-                      className={styles.placeName}
-                      data-root={item.depth === 0 || undefined}
-                    >
-                      {item.name}
-                      <span className={styles.level}>{item.level_label}</span>
-                    </span>
-                    <span className={styles.placeNote}>{stateText(item)}</span>
-                  </span>
-                  <span className={styles.mini} aria-hidden="true">
-                    {[...(item.months ?? "oooooooooooo")].map((key, index) => (
-                      <span key={index} data-phase={key} />
-                    ))}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <HeatSeasonPlaces
+            items={items}
+            selectedId={selectedId}
+            onSelect={select}
+            stateText={stateText}
+          />
 
           <div className={styles.editor}>
             <div className={styles.title}>
