@@ -32,9 +32,9 @@
   border-radius: 999px;
   font-size: var(--fs-eyebrow);
   font-weight: 500;
-  background: #fbeedd;
-  color: #8a5a1a;
-  border: 1px solid #eeddc0;
+  background: var(--color-amber-tint);
+  color: var(--color-amber-text);
+  border: 1px solid transparent;
   white-space: nowrap;
 }
 
@@ -126,25 +126,25 @@
 }
 
 .tBehaviour {
-  background: #eaf0fa;
-  color: #2f5db3;
-  border-color: #d4dff2;
+  background: var(--color-nexus-tint);
+  color: var(--color-nexus);
+  border-color: transparent;
 }
 
 .tEnvironment {
-  background: #e6f2ea;
-  color: #2f7a4a;
-  border-color: #cfe4d6;
+  background: var(--color-env-tint);
+  color: var(--color-env);
+  border-color: transparent;
 }
 
 .tPolicy {
-  background: #fbeedd;
-  color: #8a5a1a;
-  border-color: #eeddc0;
+  background: var(--color-amber-tint);
+  color: var(--color-amber-text);
+  border-color: transparent;
 }
 
 .tNeutral {
-  background: #f0efe9;
+  background: var(--color-grey-light);
   color: var(--color-text-muted);
   border-color: var(--border-subtle);
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { buttonClassName } from "@/components/Button";
 import { ExplainerVideo } from "@/components/ExplainerVideo";
 import { startKeycloakSignIn, takeSignedOutReason } from "@/lib/authClient";
 import { getSetupStatus } from "@/lib/setupClient";
@@ -151,14 +152,14 @@ export function Landing({
           <div className={styles.navActions}>
             <button
               type="button"
-              className={styles.outline}
+              className={buttonClassName({ variant: "secondary" })}
               onClick={() => setContact("other")}
             >
               Contact us
             </button>
             <button
               type="button"
-              className={styles.primary}
+              className={buttonClassName()}
               onClick={logIn}
               disabled={mode === "checking"}
             >
@@ -200,12 +201,12 @@ export function Landing({
               decisions and plans for climate x health action.
             </p>
             <div className={styles.ctaRow}>
-              <a className={`${styles.primary} ${styles.large}`} href="#toolkit">
+              <a className={buttonClassName({ size: "lg" })} href="#toolkit">
                 Explore the toolkit <ArrowIcon size={14} />
               </a>
               <button
                 type="button"
-                className={`${styles.outline} ${styles.large}`}
+                className={buttonClassName({ variant: "secondary", size: "lg" })}
                 onClick={() => setContact("demo")}
               >
                 Request a demo
@@ -297,7 +298,7 @@ export function Landing({
               </p>
               <button
                 type="button"
-                className={`${styles.outline} ${styles.large}`}
+                className={buttonClassName({ variant: "secondary", size: "lg" })}
                 onClick={() => setContact("demo")}
               >
                 Request a demo
@@ -335,7 +336,7 @@ export function Landing({
               </p>
               <button
                 type="button"
-                className={`${styles.outline} ${styles.large}`}
+                className={buttonClassName({ variant: "secondary", size: "lg" })}
                 onClick={() => setContact("partner")}
               >
                 Contact us

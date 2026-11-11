@@ -82,6 +82,7 @@ nav:
       - From R output to the dashboard: model-integration.md
   - Data pipeline: data-pipeline.md
   - Data loading and storage: data-loading.md
+  - Design system: design-system.md
   - Explore (public map): explore.md
   - Dashboard: dashboard.md
   - Action repository: actions.md

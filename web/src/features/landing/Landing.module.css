@@ -6,10 +6,10 @@
   /* Side gutter: 24px on phones, growing with the window to 120px, so
      content never runs to the edge on a laptop. Content stays at most
      1592px wide, as in the design. */
-  --gutter: clamp(24px, 6vw, 120px);
-  --content: calc(1592px + 2 * var(--gutter));
+  --gutter: var(--page-gutter);
+  --content: calc(var(--content-max) + 2 * var(--gutter));
   min-height: 100dvh;
-  background: #f6f5f3;
+  background: var(--surface-page-alt);
   color: var(--color-charcoal);
   font-family: var(--font-body);
 }
@@ -71,64 +71,6 @@
   gap: 12px;
 }
 
-/* ---- Buttons ---- */
-
-.primary,
-.outline {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 9px 20px;
-  border: 1.5px solid var(--color-nexus);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-  transition:
-    background-color 0.2s var(--ease-out-soft),
-    color 0.2s var(--ease-out-soft),
-    border-color 0.2s var(--ease-out-soft),
-    transform 0.2s var(--ease-out-soft);
-}
-
-.primary {
-  background: var(--color-nexus);
-  color: var(--color-white);
-}
-
-.primary:hover {
-  background: var(--color-nexus-hover);
-  border-color: var(--color-nexus-hover);
-  color: var(--color-white);
-}
-
-.outline {
-  background: var(--color-white);
-  color: var(--color-nexus);
-}
-
-.outline:hover {
-  background: #eeeffd;
-}
-
-.primary:active,
-.outline:active {
-  transform: translateY(1px);
-}
-
-.primary:disabled {
-  opacity: 0.6;
-  cursor: progress;
-}
-
-.large {
-  padding: 14px 24px;
-  font-size: 16px;
-}
-
 /* ---- Page body ---- */
 
 .main {
@@ -142,7 +84,7 @@
   padding: 12px 24px;
   border-radius: var(--radius-md);
   background: var(--color-white);
-  font-size: 14px;
+  font-size: var(--fs-body-lg);
 }
 
 .hero {
@@ -163,7 +105,7 @@
 .hero h1 {
   margin: 0 0 22px;
   font-family: var(--font-display);
-  font-size: clamp(44px, 6vw, 64px);
+  font-size: clamp(44px, 6vw, var(--fs-display-1));
   font-weight: 600;
   line-height: 1;
 }
@@ -177,8 +119,8 @@
 .lede {
   max-width: 480px;
   margin: 0 0 36px;
-  font-size: 17px;
-  line-height: 1.85;
+  font-size: var(--fs-lede);
+  line-height: var(--lh-lede);
 }
 
 .ctaRow {
@@ -209,7 +151,7 @@
   height: 14px;
   margin: 0 -20px;
   border-radius: 0 0 14px 14px;
-  background: #dddcd9;
+  background: var(--color-tile-muted);
   box-shadow: 0 10px 20px rgb(0 0 0 / 8%);
 }
 
@@ -232,13 +174,13 @@
 .inner {
   max-width: var(--content);
   margin: 0 auto;
-  padding: 88px var(--gutter);
+  padding: var(--space-22) var(--gutter);
 }
 
 .section h2 {
   margin: 0 0 22px;
   font-family: var(--font-display);
-  font-size: clamp(26px, 3vw, 34px);
+  font-size: clamp(26px, 3vw, var(--fs-display-2));
   font-weight: 600;
   line-height: 1.2;
 }
@@ -246,8 +188,8 @@
 .wide,
 .intro {
   margin: 0 0 44px;
-  font-size: 17px;
-  line-height: 1.85;
+  font-size: var(--fs-lede);
+  line-height: var(--lh-lede);
 }
 
 .wide {
@@ -256,9 +198,9 @@
 
 .eyebrow {
   margin: 0 0 18px;
-  color: #5e5c57;
+  color: var(--color-text-eyebrow);
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: var(--fs-caption);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -275,12 +217,12 @@
 .card h3 {
   margin: 0 0 10px;
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: var(--fs-subhead);
   font-weight: 600;
 }
 
 .steps p {
-  color: #5e5c57;
+  color: var(--color-text-eyebrow);
   font-size: 15px;
   line-height: 1.7;
 }
@@ -298,7 +240,7 @@
 }
 
 .tileMuted {
-  background: #dddcd9;
+  background: var(--color-tile-muted);
   color: var(--color-charcoal);
 }
 
@@ -315,7 +257,7 @@
   padding: 26px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
-  background: #f6f5f3;
+  background: var(--surface-page-alt);
 }
 
 .card .tile {
@@ -324,15 +266,15 @@
 
 .card h3 {
   margin-bottom: 12px;
-  font-size: 22px;
+  font-size: var(--fs-title-card);
   line-height: 1.3;
 }
 
 .card p {
   flex: 1;
   margin: 0 0 24px;
-  color: #5e5c57;
-  font-size: 14px;
+  color: var(--color-text-eyebrow);
+  font-size: var(--fs-body-lg);
   line-height: 1.7;
 }
 
@@ -355,10 +297,10 @@
   right: 16px;
   padding: 4px 11px;
   border-radius: var(--radius-pill);
-  background: #4a2fc2;
+  background: var(--color-coming-soon);
   color: var(--color-white);
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: var(--fs-caption);
   font-weight: 600;
 }
 
@@ -401,7 +343,7 @@
 
 .strip p {
   max-width: 640px;
-  font-size: 17px;
+  font-size: var(--fs-lede);
   line-height: 1.6;
 }
 
@@ -431,8 +373,8 @@
 .quotes figcaption {
   display: flex;
   flex-direction: column;
-  font-size: 14px;
-  color: #5e5c57;
+  font-size: var(--fs-body-lg);
+  color: var(--color-text-eyebrow);
 }
 
 .quotes figcaption strong {
@@ -479,7 +421,7 @@
 
 .footer {
   background: var(--surface-inverse);
-  color: #d9d7d2;
+  color: var(--color-on-dark-muted);
 }
 
 .footerTop {
@@ -495,7 +437,7 @@
 .footerTop p {
   max-width: 300px;
   margin-top: 14px;
-  font-size: 14px;
+  font-size: var(--fs-body-lg);
   line-height: 1.6;
 }
 
@@ -504,7 +446,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  font-size: 14px;
+  font-size: var(--fs-body-lg);
 }
 
 .resources h2 {
@@ -518,7 +460,7 @@
   display: flex;
   justify-content: space-between;
   gap: 24px;
-  color: #d9d7d2;
+  color: var(--color-on-dark-muted);
 }
 
 .resources a:hover {
@@ -532,7 +474,7 @@
   padding: 22px 0 32px;
   border-top: 1px solid #44464b;
   color: var(--color-text-light);
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 
 /* ---- Contact dialog ---- */
@@ -548,7 +490,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   font-weight: 600;
 }
 
@@ -558,7 +500,7 @@
   padding: 10px 12px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: var(--fs-body-lg);
   font-weight: 400;
 }
 
@@ -575,7 +517,7 @@
 
 .form legend {
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   font-weight: 600;
 }
 
@@ -586,7 +528,7 @@
   padding: 9px 12px;
   border: 1.5px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: var(--fs-body);
   cursor: pointer;
   transition:
     border-color 0.15s var(--ease-out-soft),
@@ -634,27 +576,9 @@
   .publicContent {
     animation: none;
   }
-  .primary,
-  .outline,
   .cardLive,
   .logos a,
   .textLink svg {
     transition: none;
   }
-}
-
-.signIn {
-  padding: 10px 18px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: var(--color-lime);
-  color: var(--color-charcoal);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: filter 0.2s var(--ease-out-soft);
-}
-
-.signIn:hover {
-  filter: brightness(0.95);
 }
