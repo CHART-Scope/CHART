@@ -12,6 +12,7 @@ import {
   takeReturnPath,
 } from "@/lib/authClient";
 import { BrandMark, ChartLoader } from "@/components/BrandMark";
+import { dashboardPath } from "./dashboardPath";
 import styles from "./AuthState.module.css";
 
 // An authorization code is single-use and a successful exchange clears the
@@ -67,11 +68,15 @@ export function AuthCallbackPage() {
     if (code && !pending) pendingExchanges.set(code, signIn);
 
     signIn
-      .then((session) => {
-        // Back to the page that asked for sign-in, when the user may use it.
+      .then(async (session) => {
+        // Back to the page that asked for sign-in, when the user may use it;
+        // otherwise straight to the dashboard of their own area.
+        // An administrator without an area yet may still go back (to setup).
         const home = signedInHomePath(session.user);
         const back = takeReturnPath();
-        router.replace(home === "/plan" && back ? back : home);
+        if (back && home !== "/explore") return router.replace(back);
+        if (home !== "/plan") return router.replace(home);
+        router.replace(await dashboardPath(session.user).catch(() => home));
       })
       .catch(() => setError("The sign-in response could not be completed."));
   }, [router]);

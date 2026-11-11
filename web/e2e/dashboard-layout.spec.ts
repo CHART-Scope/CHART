@@ -108,19 +108,24 @@ const pillStyle = (trigger: Locator) =>
     };
   });
 
-test("every dashboard picker is the plan page's select pill", async ({ page }) => {
+// Design system: the Planning center's sentence pill is 40 high; the
+// dashboard's context pickers are one filter-select style, all alike.
+test("dashboard pickers share one select style and the plan pill is 40 high", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await installFakeApi(page);
 
   await page.goto("/plan");
-  const planPill = page.getByRole("combobox", { name: "Choose the climate hazard" });
-  await expect(planPill).toHaveText(/Heat/);
-  const reference = await pillStyle(planPill);
+  const planPill = page.getByRole("combobox", { name: "Choose a climate hazard" });
+  await expect(planPill).toHaveCSS("height", "40px");
+  await expect(planPill).toHaveCSS("font-size", "17px");
 
   await page.goto("/dashboard/geo-in-mp?outcome=lbw");
   const outcome = page.getByRole("combobox", { name: "Health outcome", exact: true });
   await expect(outcome).toHaveText(/Low birth weight/);
-  for (const name of ["State", "Division", "Climate hazard", "Health outcome"]) {
+  const reference = await pillStyle(outcome);
+  for (const name of ["State", "Division", "Climate hazard"]) {
     const trigger = page.getByRole("combobox", { name, exact: true });
     expect(await pillStyle(trigger), name).toEqual(reference);
   }

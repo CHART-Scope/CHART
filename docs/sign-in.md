@@ -1,7 +1,10 @@
 # Sign-in and email
 
-CHART has no passwords. A person types their email address, Keycloak emails
-them a six-character code, and the code signs them in. Anyone can use
+People sign in without passwords: they type their email address, Keycloak
+emails them a six-character code, and the code signs them in. The one
+exception is the default administrator, `admin`, which has a password and
+must change it at its first sign-in
+([installation setup](installation-setup.md)). Anyone can use
 [Explore](explore.md) without an account; signing in is for people an
 administrator has added (the first administrator is created by the
 [installation wizard](installation-setup.md)).
@@ -18,15 +21,39 @@ deploy) sets the `chart` realm up:
   15 minutes, so nobody can flood an inbox;
 - self-registration and password reset are off. An unknown or disabled
   address gets an error and no email;
-- Keycloak sends the email itself through the SMTP server below.
+- Keycloak sends the email itself through the SMTP server below;
+- after the code, CHART opens the dashboard of the person's own area (the
+  area the Planning center would pick; for Kenya, Kajiado), or the page that
+  asked them to sign in.
+
+The two screens, **CHART login** (email) and **Check your email** (code),
+use CHART's fonts and colours. On screens 960px and wider they follow the
+design's sign-in frame: a charcoal panel on the left with the wordmark,
+"Plan for climate-health risk, together." and the three steps, and the form
+on its right. Narrower screens keep the bar and a full-width form. The email
+step also offers **Explore the map without an account** and says that an
+administrator adds accounts. They are the `chart` login theme:
+`infra/keycloak/themes/chart/login/` holds their templates
+(`login-username.ftl`, `login-email-otp.ftl`, and `footer.ftl` for the brand
+panel), wording (`messages/messages_en.properties`) and styles
+(`resources/css/chart.css`).
+
+Keycloak serves theme files under a path that changes only with the
+Keycloak version, and browsers keep them for 30 days. So `theme.properties`
+names the stylesheet as `css/chart.css?v=<date>`. **Change that date
+whenever `chart.css` changes**; otherwise people who have signed in before
+keep the old styles next to the new templates.
 
 The code step is the
 [for-keycloak email OTP authenticator](https://github.com/for-keycloak/email-otp-authenticator)
 (Unlicense), committed as
 `infra/keycloak/providers/email-otp-authenticator-v1.8.1-kc-26.6.4.jar`
 (SHA-256 `8013758fe4f24dfb561d57f83c0853387fb18c9b35925c77fb60ccd9af7cedea`).
-It is built for Keycloak 26.6.4; when Keycloak is upgraded, replace the jar
-with the release built for the new version.
+`infra/keycloak/Dockerfile` builds it, the theme and the realm seed into the
+`chart-keycloak` image that deployments run (pre-built, so Keycloak starts in
+seconds), and the sync script into `chart-keycloak-config`. To upgrade
+Keycloak, change `KEYCLOAK_VERSION` there and replace the jar with the
+release built for that version.
 
 ## Email settings
 
@@ -99,11 +126,33 @@ goes to the signed-in Keycloak administrator's email address, so give that
 account an address first. Then sign in to CHART with a real account and check
 the code arrives within a minute and is not in spam.
 
+## Inviting people
+
+An administrator invites people in **Settings → Users**: full name, email
+address, role and planning area (a country or its first level, such as a
+state or county; an area covers everything inside it).
+
+1. CHART creates the account, with no password (`POST /users`).
+2. Keycloak emails **You are invited to CHART** through the email settings
+   above. The link works for 7 days.
+3. The link opens **Accept your CHART invitation**; accepting confirms the
+   address and offers **Go to CHART login**.
+4. They sign in with their email address and a code, and land on their
+   area's dashboard.
+
+If the email could not be sent, the account still exists and Settings says
+so. **Send invitation again** beside a person emails a fresh link
+(`POST /users/{id}/invitation`). An address that already has an account is
+refused. The emails use CHART's layout and wording: the `chart` email theme
+in `infra/keycloak/themes/chart/email/`.
+
 ## Administrators
 
-- Adding a person (`POST /users`) creates their Keycloak account with a role
-  and planning area and no password; they sign in with their email address.
 - Disabling a person (`POST /users/{id}/disable`) stops their codes.
+- The Keycloak administration console (`/identity/admin`) is for operators,
+  not everyday work. Its sign-in, headed **CHART admin**, also uses CHART's look; the user is `admin`
+  and the password is `KEYCLOAK_ADMIN_PASSWORD` from `.env.prod`. That is
+  Keycloak's own administrator, a different account from CHART's `admin`.
 - If the only administrator is locked out, re-enable them from an operator
   shell; they then sign in with a code as usual:
 

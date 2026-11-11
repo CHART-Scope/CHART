@@ -226,15 +226,49 @@ async function breadcrumbBounds(page: Page) {
   }).toPass({ timeout: 10_000 });
 }
 
+/** The sign-in heading: 26px beside the brand panel (960px and wider, the
+ * design's frame 04), the shared 20px h1 on narrower screens. */
+function signInTitleSize(page: Page) {
+  return page.viewportSize()!.width >= 960 ? 26 : 20;
+}
+
 async function signIn(page: Page, username = "india-planner") {
   await page.goto("/auth/signin");
-  await typography(page.locator("#kc-page-title"), "Fira", 20);
+  // A versioned stylesheet URL, so browsers holding a cached older copy
+  // fetch the new one (theme.properties).
+  await expect(page.locator('link[href*="/css/chart.css"]')).toHaveAttribute(
+    "href",
+    /\/css\/chart\.css\?v=\d{4}-\d{2}-\d{2}$/,
+  );
+  await typography(page.locator("#kc-page-title"), "Fira", signInTitleSize(page));
+  const panel = page.getByRole("complementary", {
+    name: "Plan for climate-health risk, together.",
+  });
+  if (page.viewportSize()!.width >= 960) {
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole("listitem")).toHaveCount(3);
+  } else {
+    await expect(panel).toBeHidden();
+  }
+  await expect(
+    page.getByRole("link", {
+      name: "Just looking? Explore the map without an account",
+    }),
+  ).toHaveAttribute("href", /\/explore$/);
   await typography(
     page.locator('label[for="username"] .pf-v5-c-form__label-text'),
     "Fira",
     11,
   );
-  await typography(page.getByLabel("Email address"), "Noto", 13);
+  // Phones get 16px so iOS does not zoom into the field.
+  const phone = page.viewportSize()!.width <= 480;
+  // 14px beside the brand panel (960px and wider), 13px between.
+  const wide = page.viewportSize()!.width >= 960;
+  await typography(
+    page.getByLabel("Email address"),
+    "Noto",
+    phone ? 16 : wide ? 14 : 13,
+  );
   await capture(page, `signin-${username}-${page.viewportSize()!.width}`);
   await signInWithEmailCode(page, username);
 }
@@ -243,11 +277,17 @@ test("sign-in failure keeps the themed form readable and retryable", async ({
   page,
 }) => {
   await page.goto("/auth/signin");
-  await page.getByLabel("Email address").fill("missing-typography-account");
+  await page
+    .getByLabel("Email address")
+    .fill("missing-typography-account@example.invalid");
   await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByText("Invalid username or email.")).toBeVisible();
+  await expect(
+    page.getByText(
+      "No CHART account uses that email address. Ask your CHART administrator to add you.",
+    ),
+  ).toBeVisible();
   await page.getByLabel("Email address").fill("");
-  await typography(page.locator("#kc-page-title"), "Fira", 20);
+  await typography(page.locator("#kc-page-title"), "Fira", signInTitleSize(page));
   await capture(page, "signin-error");
 });
 

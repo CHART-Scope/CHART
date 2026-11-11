@@ -24,6 +24,59 @@
   line-height: 1.5;
 }
 
+.intro {
+  max-width: 68ch;
+  margin: 0 0 16px;
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+  line-height: 1.6;
+}
+
+.inviteForm {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  align-items: end;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+}
+
+.inviteForm > .error,
+.inviteForm > button {
+  grid-column: 1 / -1;
+}
+
+.inviteForm > button {
+  justify-self: start;
+}
+
+.success {
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  color: var(--color-charcoal);
+  background: var(--color-nexus-tint);
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .inviteForm {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .user {
+    grid-template-columns: 38px 1fr;
+  }
+
+  .user > button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
 .empty {
   color: var(--color-text-muted);
   font-size: var(--fs-caption);
@@ -55,7 +108,8 @@
 
 .user {
   display: grid;
-  grid-template-columns: 38px 1fr;
+  grid-template-columns: 38px 1fr auto;
+  align-items: center;
   gap: 12px;
   padding: 8px 0;
   background: var(--surface-card);

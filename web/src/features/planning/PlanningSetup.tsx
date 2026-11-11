@@ -5,7 +5,6 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { Button } from "@/components/Button";
 import { InlineSelect } from "@/components/InlineSelect";
 import { Icon } from "@/components/Icon";
-import { PageHeader } from "@/components/PageHeader";
 import type { GeographyRecord, ModelCatalogEntry } from "@/lib/planningClient";
 
 import type { PlanningSelection } from "./planningWireframe";
@@ -47,6 +46,8 @@ export function PlanningSetup({
     [areas, selection.area],
   );
 
+  // What the deployed models cover, from the area's catalog. Nothing is
+  // preselected: the planner builds the sentence.
   const hazards = useMemo(
     () =>
       dedupeBy(
@@ -58,160 +59,88 @@ export function PlanningSetup({
       ),
     [catalog],
   );
-  const selectedHazard = selection.hazard || hazards[0]?.code || "";
   const domains = useMemo(
     () =>
       dedupeBy(
         catalog
-          .filter((entry) => entry.climate_hazard === selectedHazard)
+          .filter(
+            (entry) => !selection.hazard || entry.climate_hazard === selection.hazard,
+          )
           .map((entry) => ({
             code: entry.health_domain,
             label: entry.health_domain_label,
           })),
         (item) => item.code,
       ),
-    [catalog, selectedHazard],
+    [catalog, selection.hazard],
   );
-  const selectedDomain = selection.healthDomain || domains[0]?.code || "";
-  const outcomes = useMemo(
-    () =>
-      dedupeBy(
-        catalog
-          .filter(
-            (entry) =>
-              entry.climate_hazard === selectedHazard &&
-              entry.health_domain === selectedDomain,
-          )
-          .map((entry) => ({ code: entry.outcome, label: entry.outcome_label })),
-        (item) => item.code,
-      ),
-    [catalog, selectedDomain, selectedHazard],
-  );
-  const selectedOutcome = selection.outcome || outcomes[0]?.code || "";
-  const selectedAreaSupportsOutcome = Boolean(
-    activeArea && supportsOutcome(activeArea, selectedOutcome),
-  );
-  const descendantModelAreas = useMemo(
-    () =>
-      activeArea
-        ? areas.filter(
-            (area) =>
-              area.path.startsWith(`${activeArea.path.replace(/\/+$/, "")}/`) &&
-              supportsOutcome(area, selectedOutcome),
-          )
-        : [],
-    [activeArea, areas, selectedOutcome],
-  );
-  const selectedScopeSupportsOutcome =
-    selectedAreaSupportsOutcome || descendantModelAreas.length > 0;
+  // The dashboard opens on the first outcome the models estimate for the
+  // chosen hazard and domain (low birth weight before under-five
+  // mortality); it has its own outcome picker.
+  const outcome =
+    catalog.find(
+      (entry) =>
+        entry.climate_hazard === selection.hazard &&
+        entry.health_domain === selection.healthDomain,
+    )?.outcome ?? "";
   useEffect(() => {
-    if (
-      selectedHazard &&
-      selectedDomain &&
-      selectedOutcome &&
-      (selection.hazard !== selectedHazard ||
-        selection.healthDomain !== selectedDomain ||
-        selection.outcome !== selectedOutcome)
-    ) {
-      onChange({
-        ...selection,
-        hazard: selectedHazard,
-        healthDomain: selectedDomain,
-        outcome: selectedOutcome,
-      });
-    }
-  }, [onChange, selectedDomain, selectedHazard, selectedOutcome, selection]);
-  const hazardLabel =
-    hazards.find((item) => item.code === selectedHazard)?.label ?? "…";
-  const domainLabel =
-    domains.find((item) => item.code === selectedDomain)?.label ?? "…";
-  const outcomeLabel =
-    outcomes.find((item) => item.code === selectedOutcome)?.label ?? "…";
+    if (selection.outcome !== outcome) onChange({ ...selection, outcome });
+  }, [onChange, outcome, selection]);
 
-  const canStart =
-    Boolean(activeArea && selectedOutcome && selectedScopeSupportsOutcome) &&
-    !isLoading &&
-    !isSubmitting;
+  const chosen = Boolean(selection.hazard && selection.healthDomain);
+  const canStart = Boolean(activeArea && outcome) && !isLoading && !isSubmitting;
   const modelUnavailable = Boolean(activeArea) && !isLoading && catalog.length === 0;
   const areaName = activeArea?.name ?? "your area";
 
   return (
     <div className={styles.wrap}>
-      <PageHeader
-        kicker="Start planning"
-        title="What would you like to plan for, together?"
-        lede="Build a sentence below. CHART will generate the shared risk picture, recommended actions, and planning tools your departments can act on together."
-        aside={contextSwitcher}
-      />
+      <header className={styles.header}>
+        {contextSwitcher}
+        <h1 className={styles.title}>What would you like to plan for, together?</h1>
+        <p className={styles.lede}>
+          Build a sentence below. CHART will generate the shared risk picture,
+          recommended actions, and planning tools your departments can act on together.
+        </p>
+      </header>
 
       <form
-        className={styles.card}
+        className={styles.form}
         onSubmit={(event) => {
           event.preventDefault();
           if (canStart) onStart();
         }}
       >
         <p className={styles.sentence}>
-          <span>We&apos;re planning together for the impacts of </span>
-          <PillSelect
-            label={hazardLabel}
-            value={selectedHazard}
-            options={hazards}
-            onChange={(hazard) =>
-              onChange({
-                ...selection,
-                hazard,
-                healthDomain: "",
-                outcome: "",
-              })
-            }
-            ariaLabel="Choose the climate hazard"
-            hint="Hazard covered by the deployed model."
-          />
-          <span> on </span>
-          <PillSelect
-            label={domainLabel}
-            value={selectedDomain}
-            options={domains}
-            onChange={(healthDomain) =>
-              onChange({ ...selection, healthDomain, outcome: "" })
-            }
-            ariaLabel="Choose the health domain"
-            hint="Health domain the deployed model estimates."
-          />
-          <span>, focusing on </span>
-          <PillSelect
-            label={outcomeLabel}
-            value={selectedOutcome}
-            options={outcomes}
-            onChange={(outcome) => onChange({ ...selection, outcome })}
-            ariaLabel="Choose the health outcome"
-            hint="Specific outcome estimated by the deployed model."
-          />
-          <span> in {areaName}.</span>
+          We&apos;re planning together for the impacts of{" "}
+          <InlineSelect
+            className={styles.pill}
+            aria-label="Choose a climate hazard"
+            value={selection.hazard}
+            onChange={(hazard) => onChange({ ...selection, hazard, healthDomain: "" })}
+            options={withComingSoon(
+              "choose a climate hazard",
+              hazards,
+              COMING_SOON_HAZARDS,
+            )}
+          />{" "}
+          on{" "}
+          <InlineSelect
+            className={styles.pill}
+            aria-label="Choose a health domain"
+            value={selection.healthDomain}
+            onChange={(healthDomain) => onChange({ ...selection, healthDomain })}
+            options={withComingSoon(
+              "choose a health domain",
+              domains,
+              COMING_SOON_DOMAINS,
+            )}
+          />{" "}
+          in {areaName}.
         </p>
 
         {error ? (
           <div className={styles.error} role="alert">
             {error}
-          </div>
-        ) : null}
-        {activeArea &&
-        selectedOutcome &&
-        !selectedAreaSupportsOutcome &&
-        descendantModelAreas.length > 0 ? (
-          <div className={styles.notice} role="status">
-            {outcomeLabel} is available for {descendantModelAreas.length}{" "}
-            {pluralizeLevel(
-              descendantModelAreas[0]?.levelLabel,
-              descendantModelAreas.length,
-            )}{" "}
-            within {areaName}. Choose one on the dashboard to see its estimate.
-          </div>
-        ) : null}
-        {activeArea && selectedOutcome && !selectedScopeSupportsOutcome ? (
-          <div className={styles.error} role="status">
-            {outcomeLabel} is not fitted for {areaName} or any available area below it.
           </div>
         ) : null}
         {modelUnavailable ? (
@@ -222,10 +151,14 @@ export function PlanningSetup({
         ) : null}
 
         <div className={styles.ctaRow}>
-          <p className={styles.ctaHint}>Ready to build your shared risk picture</p>
+          <p className={styles.ctaHint} role="status">
+            {chosen
+              ? "Ready — CHART will build the shared risk picture for this scenario."
+              : "Choose a climate hazard and health domain to continue"}
+          </p>
           <Button
             type="submit"
-            size="md"
+            size="lg"
             disabled={!canStart}
             trailingIcon={<Icon name="arrow-right" size={14} />}
           >
@@ -239,46 +172,32 @@ export function PlanningSetup({
   );
 }
 
-function supportsOutcome(area: GeographyRecord, outcome: string) {
-  return Boolean(outcome && area.models?.some((model) => model.outcome === outcome));
-}
+/** Hazards and domains on CHART's roadmap: listed so planners see what is
+ * coming, but not selectable until a model covers them. */
+const COMING_SOON_HAZARDS = ["Flooding", "Air pollution"];
+const COMING_SOON_DOMAINS = [
+  "Vector-borne diseases",
+  "Heat-related illnesses",
+  "Non-communicable diseases",
+];
 
-function pluralizeLevel(levelLabel: string | undefined, count: number) {
-  const label = levelLabel?.toLowerCase() || "sub-area";
-  return count === 1 ? label : `${label}s`;
-}
-
-function PillSelect({
-  label,
-  value,
-  options,
-  onChange,
-  ariaLabel,
-  hint,
-}: {
-  label: string;
-  value: string;
-  options: { code: string; label: string }[];
-  onChange: (value: string) => void;
-  ariaLabel: string;
-  hint: string;
-}) {
-  const disabled = options.length === 0;
-  return (
-    <span title={hint}>
-      <InlineSelect
-        value={value}
-        onChange={onChange}
-        aria-label={ariaLabel}
-        disabled={disabled}
-        options={
-          options.length
-            ? options.map((option) => ({ value: option.code, label: option.label }))
-            : [{ value: "", label }]
-        }
-      />
-    </span>
-  );
+function withComingSoon(
+  placeholder: string,
+  available: { code: string; label: string }[],
+  comingSoon: string[],
+) {
+  const known = new Set(available.map((item) => item.label.toLowerCase()));
+  return [
+    { value: "", label: placeholder, disabled: true },
+    ...available.map((item) => ({ value: item.code, label: item.label })),
+    ...comingSoon
+      .filter((label) => !known.has(label.toLowerCase()))
+      .map((label) => ({
+        value: `soon:${label}`,
+        label: `${label} (coming soon)`,
+        disabled: true,
+      })),
+  ];
 }
 
 function dedupeBy<T>(items: T[], key: (item: T) => string) {

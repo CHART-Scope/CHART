@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { buttonClassName } from "@/components/Button";
 import { ExplainerVideo } from "@/components/ExplainerVideo";
 import { startKeycloakSignIn, takeSignedOutReason } from "@/lib/authClient";
 import { getSetupStatus } from "@/lib/setupClient";
@@ -151,14 +152,14 @@ export function Landing({
           <div className={styles.navActions}>
             <button
               type="button"
-              className={styles.outline}
+              className={buttonClassName({ variant: "secondary" })}
               onClick={() => setContact("other")}
             >
               Contact us
             </button>
             <button
               type="button"
-              className={styles.primary}
+              className={buttonClassName()}
               onClick={logIn}
               disabled={mode === "checking"}
             >
@@ -178,6 +179,16 @@ export function Landing({
             {signedOutNotice}
           </p>
         ) : null}
+        {needsSetup ? (
+          // A new installation: whoever deployed it signs in first.
+          <p className={styles.notice} role="note" aria-label="First sign-in">
+            <strong>New installation.</strong> Choose <strong>Set up CHART</strong> and
+            sign in as <code>admin</code> with the first password from the deployment
+            settings (<code>CHART_ADMIN_INITIAL_PASSWORD</code>, or <code>admin</code>{" "}
+            if it was not set). You will then choose your own password, set CHART up and
+            invite everyone else.
+          </p>
+        ) : null}
 
         <section className={styles.hero} aria-labelledby="chart-landing-title">
           <div className={styles.heroText}>
@@ -190,12 +201,12 @@ export function Landing({
               decisions and plans for climate x health action.
             </p>
             <div className={styles.ctaRow}>
-              <a className={`${styles.primary} ${styles.large}`} href="#toolkit">
+              <a className={buttonClassName({ size: "lg" })} href="#toolkit">
                 Explore the toolkit <ArrowIcon size={14} />
               </a>
               <button
                 type="button"
-                className={`${styles.outline} ${styles.large}`}
+                className={buttonClassName({ variant: "secondary", size: "lg" })}
                 onClick={() => setContact("demo")}
               >
                 Request a demo
@@ -287,7 +298,7 @@ export function Landing({
               </p>
               <button
                 type="button"
-                className={`${styles.outline} ${styles.large}`}
+                className={buttonClassName({ variant: "secondary", size: "lg" })}
                 onClick={() => setContact("demo")}
               >
                 Request a demo
@@ -325,7 +336,7 @@ export function Landing({
               </p>
               <button
                 type="button"
-                className={`${styles.outline} ${styles.large}`}
+                className={buttonClassName({ variant: "secondary", size: "lg" })}
                 onClick={() => setContact("partner")}
               >
                 Contact us

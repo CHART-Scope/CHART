@@ -2,15 +2,29 @@
 
 GitHub Actions builds CHART once and publishes commit-tagged images to GitHub
 Container Registry. The EC2 host does not clone the repository or build images.
-It receives this small deployment bundle, pulls the requested image tag, and
-runs Docker Compose.
+It pulls the requested image tag and runs Docker Compose. The host holds only
+what Compose reads:
+
+```txt
+~/chart-deploy/aws/
+  docker-compose.yml   copied by each deploy
+  Caddyfile            copied by each deploy
+  .env.prod            your settings and secrets (never in an image)
+  backups/             database dumps taken before migrations (14 days)
+```
+
+Each deploy deletes anything else there, including the `~/chart-deploy/keycloak`
+folder earlier releases copied. Keycloak's theme, email-code plugin and realm
+seed are built into the `chart-keycloak` image (`infra/keycloak/Dockerfile`).
 
 ## Release flow
 
-1. Pull requests run tests and validate all three deploy images.
-2. A push to `dev` runs the same validation, builds the Python, web, and LBW
-   images, and pushes both the commit SHA and `dev` tags to GHCR.
-3. CI copies `infra/aws` and `infra/keycloak` to `~/chart-deploy` on EC2.
+1. Pull requests run tests and validate every deploy image.
+2. A push to `dev` runs the same validation, builds the Python, web, LBW,
+   Keycloak and Keycloak realm sync images, and pushes both the commit SHA and
+   `dev` tags to GHCR.
+3. CI copies `docker-compose.yml` and `Caddyfile` to `~/chart-deploy/aws` on
+   EC2 and removes files earlier releases left there.
 4. EC2 logs in to GHCR and runs `docker compose pull` followed by
    `docker compose up -d --remove-orphans` using the host's single runtime file,
    `~/chart-deploy/aws/.env.prod`.
@@ -76,7 +90,12 @@ SMTP_HOST=email-smtp.eu-north-1.amazonaws.com
 SMTP_USERNAME=your-ses-smtp-username
 SMTP_PASSWORD=your-ses-smtp-password
 SMTP_FROM=no-reply@your-domain
+CHART_ADMIN_INITIAL_PASSWORD=a-long-random-first-password
 ```
+
+`CHART_ADMIN_INITIAL_PASSWORD` is the first password of the default `admin`
+account, changed at its first sign-in. Without it the account starts on
+`admin`, which a public server should never do.
 
 Save it, then copy that same file to the sandbox:
 

@@ -8,6 +8,7 @@ import { IconSprite } from "@/components/Icon";
 import { IdleWarning } from "@/features/auth/IdleWarning";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { WorkspaceSessionProvider } from "@/features/auth/WorkspaceSession";
+import { buttonClassName } from "@/components/Button";
 import publicStyles from "@/features/landing/Landing.module.css";
 import {
   getStoredAuthSession,
@@ -179,7 +180,7 @@ function PublicFrame({ children }: { children: ReactNode }) {
           </div>
           <button
             type="button"
-            className={publicStyles.signIn}
+            className={buttonClassName({ variant: "inverse" })}
             onClick={startKeycloakSignIn}
           >
             Sign in

@@ -16,11 +16,8 @@ import {
   type SavedPlan,
 } from "@/lib/savedPlansClient";
 import { isInScope } from "@/lib/geographyScope";
-import {
-  computeFamilies,
-  defaultAreaForFamily,
-  familyContains,
-} from "./contextFamilies";
+import { dashboardHref } from "@/features/dashboard/dashboardNavigation";
+import { dashboardTarget, defaultPlanningArea } from "./contextFamilies";
 import { InlineContextSwitcher } from "./InlineContextSwitcher";
 import { PlanningSetup } from "./PlanningSetup";
 import { SavedPlansList } from "./SavedPlansList";
@@ -37,6 +34,7 @@ export function PlanningApp({ geographyScopes, activeGeographyId }: Props) {
     defaultPlanningSelection,
   );
   const [areas, setAreas] = useState<GeographyRecord[]>([]);
+  const [allGeographies, setAllGeographies] = useState<GeographyRecord[]>([]);
   const [catalog, setCatalog] = useState<ModelCatalogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -74,14 +72,9 @@ export function PlanningApp({ geographyScopes, activeGeographyId }: Props) {
         const inScope = records.filter((area) => isInScope(area, geographyScopes));
         // Plan from the family the user last chose, at its broadest useful
         // level (Kenya, Madhya Pradesh), not from the first county or division.
-        const families = computeFamilies(records, geographyScopes);
-        const family =
-          families.find(
-            (item) =>
-              activeGeographyId && familyContains(item, activeGeographyId, records),
-          ) ?? families[0];
-        const active = family ? defaultAreaForFamily(family, records) : null;
+        const active = defaultPlanningArea(records, geographyScopes, activeGeographyId);
         setAreas(inScope);
+        setAllGeographies(records);
         setSelection((current) => ({ ...current, area: active?.id ?? "" }));
         if (!active) {
           setError(
@@ -122,13 +115,17 @@ export function PlanningApp({ geographyScopes, activeGeographyId }: Props) {
   }, [selection.area]);
 
   const openDashboard = useCallback(() => {
-    if (!selection.area) return;
+    const area = allGeographies.find((geo) => geo.id === selection.area);
+    if (!area) return;
     setIsSubmitting(true);
-    const query = selection.outcome
-      ? `?outcome=${encodeURIComponent(selection.outcome)}`
-      : "";
-    router.push(`/dashboard/${encodeURIComponent(selection.area)}${query}`);
-  }, [router, selection.area]);
+    router.push(
+      dashboardHref({
+        ...dashboardTarget(area, allGeographies, geographyScopes),
+        outcome: selection.outcome,
+        choices: {},
+      }),
+    );
+  }, [allGeographies, geographyScopes, router, selection.area, selection.outcome]);
 
   function changeSelection(next: PlanningSelection) {
     if (next.area !== selection.area) {

@@ -86,6 +86,7 @@ nav:
   - Data pipeline: data-pipeline.md
   - Data loading and storage: data-loading.md
   - VRA data and integration plan: vra-integration-plan.md
+  - Design system: design-system.md
   - Explore (public map): explore.md
   - Dashboard: dashboard.md
   - Action repository: actions.md

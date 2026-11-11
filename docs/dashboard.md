@@ -123,6 +123,11 @@ never a blank. Up to 60 maps are kept for the session (cleared on sign-out).
 Custom maps with their own loader (outlook, vulnerability) keep the last-map
 behaviour but are not fetched ahead.
 
+A click never empties the risk card either. Which views a place and outcome
+publish (its capabilities) are kept for the session, and while the next
+place's arrive the current card stays drawn; only the first load of the
+dashboard shows its placeholder.
+
 For what the map queues by itself and what its four states mean, see
 [Data pipeline](data-pipeline.md#what-the-dashboard-queues-on-its-own).
 
@@ -151,7 +156,7 @@ the reason recorded. Plans are private to their owner, at most 100 per user,
 and hidden once their place leaves the user's geography scope
 (`/saved-plans`, see the API reference).
 
-Saved plans are listed on **Start planning**, where each reopens its dashboard
+Saved plans are listed on the **Planning center**, where each reopens its dashboard
 view or its recommendations. The [action repository](actions.md) page opened
 with `?plan=<id>` ranks the repository's actions for the plan:
 
@@ -168,3 +173,19 @@ with `?plan=<id>` ranks the repository's actions for the plan:
 The insight beside them is a template unless an administrator chose a
 language model; see [Recommendations and AI](recommendations.md). The figure
 and the ranking never depend on it.
+
+## Planning center
+
+The **Planning center** (`/plan`, "Planning center" in the sidebar) builds one
+sentence: "We're planning together for the impacts of [climate hazard] on
+[health domain] in [place]." Both choices start empty, and **Start planning
+together** stays disabled until both are made. The enabled options are the
+hazards and domains the place's models cover; the roadmap's others (Flooding,
+Air pollution; Vector-borne diseases, Heat-related illnesses, Non-communicable
+diseases) are listed as "(coming soon)" and cannot be chosen. The outcome is
+picked on the dashboard, which opens on the first one the models estimate.
+
+Planning starts in Madhya Pradesh for India and in Kajiado, its co-design
+county, for Kenya (`PREFERRED_START_AREAS` in
+`web/src/features/planning/contextFamilies.ts`). Switching country on the
+dashboard still opens the country or state as a whole.

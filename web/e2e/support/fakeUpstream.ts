@@ -6,7 +6,7 @@ import http from "node:http";
  * endpoint, as the server-side route handlers reach them.
  *
  * Browser requests are faked with page.route (fakeApi.ts), but a route handler
- * such as /api/setup/bootstrap or /api/auth/keycloak-exchange calls onward
+ * such as /api/setup/complete or /api/auth/keycloak-exchange calls onward
  * from the Next process, where page.route cannot see. playwright.config.ts
  * points CHART_PYTHON_API_INTERNAL_URL and KEYCLOAK_SERVER_URL here so a spec
  * can assert exactly what the web server forwarded.

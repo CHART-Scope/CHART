@@ -254,7 +254,7 @@ test("signed-in Learning Hub keeps workspace navigation", async ({ page }) => {
   );
   await page.goto("/learning");
   await expect(
-    page.getByRole("link", { name: "Start planning", exact: true }),
+    page.getByRole("link", { name: "Planning center", exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("searchbox")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in", exact: true })).toHaveCount(
@@ -280,5 +280,57 @@ for (const requiresOnboarding of [false, true]) {
       })
       .click();
     await expect(page).toHaveURL(new RegExp(`${destination}$`));
+  });
+}
+
+// Regression: a fixed 24px gutter ran the content to the window's edge on a
+// laptop. The gutter grows with the window (6vw, 24–120px) and every block
+// (header, hero, sections, footer) starts on the same line.
+for (const [width, gutter] of [
+  [390, 24],
+  [1440, 86.4],
+  [2560, 120],
+] as const) {
+  test(`landing content keeps the design's side gutter at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const api = await installFakeApi(page);
+    api.on(/^\/api\/setup$/, (route) => json(route, { requiresOnboarding: false }));
+    await page.goto("/");
+    const left = (locator: ReturnType<typeof page.locator>) =>
+      locator.evaluate((element) => element.getBoundingClientRect().left);
+    const brand = page.locator("header").getByRole("link", { name: "CHART home" });
+    const start = await left(brand);
+    // Content is centred within 1592px once the window is wide enough.
+    const expected = Math.max(gutter, (width - 1592) / 2);
+    expect(start).toBeCloseTo(expected, 0);
+    for (const block of [
+      page.getByRole("heading", { level: 1 }),
+      page.getByRole("heading", {
+        level: 2,
+        name: "Plan for climate-health risk, together",
+      }),
+      page.getByRole("heading", { level: 2, name: "Explore CHART toolkit" }),
+      page.getByRole("heading", {
+        level: 2,
+        name: "A Digital Public Good, stewarded together",
+      }),
+      page.locator("footer").getByRole("link", { name: "CHART home" }),
+    ]) {
+      expect(await left(block)).toBeCloseTo(start, 0);
+    }
+    const strip = page.getByText("Interested in seeing how it all comes together");
+    const right = await strip
+      .locator("xpath=..")
+      .evaluate((element) => innerWidth - element.getBoundingClientRect().right);
+    expect(right).toBeCloseTo(expected, 0);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    ).toBe(true);
+    await page.screenshot({
+      path: `../outputs/e2e/web/landing-gutter-${width}.png`,
+      fullPage: true,
+    });
   });
 }

@@ -2,8 +2,9 @@
 
 The `App Deploy` workflow validates CHART, publishes commit-tagged images to
 GitHub Container Registry, and deploys those images to one EC2 host with Docker
-Compose. EC2 receives the small `infra/aws` and `infra/keycloak` deployment
-bundle; it does not clone or build the repository.
+Compose. EC2 receives only `docker-compose.yml` and `Caddyfile`, beside its
+own `.env.prod` and database backups; it does not clone or build the
+repository. Keycloak, its theme and the email-code plugin ship as images too.
 
 The operational setup is documented in
 [`infra/aws/README.md`](https://github.com/CHART-Scope/CHART/blob/dev/infra/aws/README.md).
@@ -17,6 +18,14 @@ Create a GitHub environment named `dev` with these connection secrets:
 | `AWS_APP_HOST` | EC2 hostname or IP used by SSH. |
 | `AWS_APP_USER` | EC2 deployment user. |
 | `AWS_APP_SSH_KEY` | Private SSH key for that user. |
+
+To post merges to Slack, add a repository secret `SLACK_WEBHOOK_URL`: an
+incoming webhook from the Chart-MVP Slack app (api.slack.com/apps →
+Incoming Webhooks → Add New Webhook, then pick the channel). The
+`Merge notify` workflow then posts each pull request merged into `dev` or
+`main`: its title, a details line, the **Summary** section of the pull
+request template (or the description's first paragraph) and links to the
+pull request and deploys. Without the secret it skips the message.
 
 Application settings are written once in the gitignored
 `infra/aws/.env.prod`, then copied unchanged to

@@ -59,12 +59,9 @@ test("a planner saves a dashboard view, reads its recommendations and removes it
   await expect(panel.getByTestId("plan-figure")).toContainText("2027");
   const ranked = panel.getByRole("list", { name: "Recommended actions for this plan" });
   await expect(ranked.locator(":scope > li")).toHaveCount(3);
-  // The plan opens the repository on its own season.
   await expect(
-    page
-      .getByRole("group", { name: "Filter actions" })
-      .getByRole("combobox", { name: "Timeframe" }),
-  ).toContainText("Before heat season");
+    page.getByRole("tab", { name: /Before heat season/, selected: true }),
+  ).toBeVisible();
   const insight = panel.getByRole("complementary", { name: "AI insight" });
   await expect(insight).toContainText("Placeholder");
   await expect(insight).toContainText("not by an AI model");
@@ -144,10 +141,10 @@ test("an administrator chooses the insight model from the provider's list", asyn
 }) => {
   test.setTimeout(120_000);
   await signIn(page, "typography-admin");
-  // Learning hub sits directly below Start planning.
+  // About CHART first, then Learning hub above the Planning center.
   await expect(
     page.getByRole("navigation", { name: "Main" }).getByRole("link"),
-  ).toHaveText(["Start planning", "Learning hub", "Vulnerability", "Settings"]);
+  ).toHaveText(["About CHART", "Learning hub", "Planning center", "Settings"]);
   await page.goto("/settings?tab=recommendations");
   const card = page.getByRole("region", {
     name: "How actions are ranked and explained",

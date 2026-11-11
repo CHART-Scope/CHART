@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/Button";
-import { Landing } from "@/features/landing";
+import { dashboardPath } from "@/features/auth/dashboardPath";
+import { RequireAuth } from "@/features/auth/RequireAuth";
 import {
   exampleSetupSectors,
   OnboardingWizard,
@@ -12,8 +13,9 @@ import {
   type SetupSector,
   useOnboardingStore,
 } from "@/features/onboarding";
+import { restoreAuthSession, type AuthSession } from "@/lib/authClient";
 import {
-  bootstrapChartSetup,
+  completeChartSetup,
   getSetupOptions,
   getSetupStatus,
   loadActionRepository,
@@ -32,10 +34,15 @@ type PageState =
       geographies: SetupCountryOption[];
       repository: ActionRepositoryStatus;
     }
-  | { phase: "complete"; repository: ActionRepositoryStatus }
   | { phase: "error"; message: string };
 
+/** Setup is run by a signed-in administrator: on a new installation, the
+ * default `admin` after changing its first password (docs/installation-setup.md). */
 export default function OnboardingPage() {
+  return <RequireAuth>{(session) => <Onboarding session={session} />}</RequireAuth>;
+}
+
+function Onboarding({ session }: { session: AuthSession }) {
   const router = useRouter();
   const [pageState, setPageState] = useState<PageState>({
     phase: "loading",
@@ -45,6 +52,13 @@ export default function OnboardingPage() {
   const loadSetup = useCallback(async () => {
     setPageState({ phase: "loading", stage: "setup" });
     try {
+      if (!session.user.roles.includes("chart_admin")) {
+        setPageState({
+          phase: "error",
+          message: "Only a CHART administrator can set up CHART. Sign in as admin.",
+        });
+        return;
+      }
       const status = await getSetupStatus();
       if (!status.requiresOnboarding) {
         router.replace("/");
@@ -69,7 +83,7 @@ export default function OnboardingPage() {
             : "CHART installation setup is unavailable.",
       });
     }
-  }, [router]);
+  }, [router, session.user.roles]);
 
   useEffect(() => {
     void loadSetup();
@@ -78,9 +92,11 @@ export default function OnboardingPage() {
   async function launch(state: OnboardingState) {
     if (pageState.phase !== "setup") return;
 
-    await bootstrapChartSetup(state, pageState.geographies);
+    await completeChartSetup(state, pageState.geographies, session.accessToken);
     useOnboardingStore.getState().reset();
-    setPageState({ phase: "complete", repository: pageState.repository });
+    // A fresh token carries the installed country this setup gave the account.
+    const fresh = await restoreAuthSession();
+    router.replace(await dashboardPath(fresh.user).catch(() => "/plan"));
   }
 
   if (pageState.phase === "setup") {
@@ -92,10 +108,6 @@ export default function OnboardingPage() {
         onLaunch={(state) => launch(state)}
       />
     );
-  }
-
-  if (pageState.phase === "complete") {
-    return <Landing setupMode="configured" />;
   }
 
   return (

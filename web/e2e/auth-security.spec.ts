@@ -5,7 +5,7 @@ import { type FakeUpstream, startFakeUpstream } from "./support/fakeUpstream";
 
 // Failure modes: sign-out reachable by a plain GET, two tabs' sign-ins
 // overwriting one PKCE cookie, a failed callback with no way back to sign-in,
-// the web server adding the bootstrap token for any caller, and model-release
+// setup run by anyone but a signed-in administrator, and model-release
 // calls reaching the API without the user's token.
 
 let upstream: FakeUpstream;
@@ -140,7 +140,7 @@ test("two tabs signing in at once each finish with their own PKCE verifier", asy
     const api = await installFakeApi(tab);
     api.on(/^\/api\/auth\/keycloak-exchange$/, (route) => route.continue());
     await tab.goto(`/auth/callback?code=${code}&state=${attempts[index].state}`);
-    await tab.waitForURL("**/plan**");
+    await tab.waitForURL("**/dashboard/geo-in-mp");
   }
 
   const exchanges = upstream.requests.filter((request) =>
@@ -183,30 +183,6 @@ test("a failed callback offers a fresh sign-in", async ({ context, page }) => {
   ]);
 });
 
-test("the bootstrap proxy forwards only the token the caller supplied", async ({
-  page,
-}) => {
-  upstream.on("POST", "/setup/bootstrap", () => ({
-    status: 403,
-    body: { error: "SETUP_BOOTSTRAP_FORBIDDEN" },
-  }));
-
-  const anonymous = await page.request.post("/api/setup/bootstrap", { data: {} });
-  expect(anonymous.status()).toBe(403);
-  const supplied = await page.request.post("/api/setup/bootstrap", {
-    data: {},
-    headers: { "x-chart-bootstrap-token": "caller-token" },
-  });
-  expect(supplied.status()).toBe(403);
-
-  const sent = upstream.requests.map(
-    (request) => request.headers["x-chart-bootstrap-token"] ?? null,
-  );
-  // The server's own CHART_BOOTSTRAP_TOKEN (see playwright.config.ts) never
-  // leaves it.
-  expect(sent).toEqual([null, "caller-token"]);
-});
-
 const setupStatus = {
   completed: false,
   requiresOnboarding: true,
@@ -235,7 +211,7 @@ const testland = {
   ],
 };
 
-test("the setup wizard sends the setup token the administrator enters", async ({
+test("the signed-in administrator completes setup with their own token, then lands on a dashboard", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -250,14 +226,22 @@ test("the setup wizard sends the setup token the administrator enters", async ({
           subgeo: null,
           primarySectorId: "health",
           collaboratingSectorIds: [],
-          adminName: "",
-          adminEmail: "",
           currentStep: 3,
         },
       }),
     );
   });
+  // The default `admin` has no planning area until setup gives it the country.
+  let completed = false;
   const api = await installFakeApi(page);
+  api.on(/^\/api\/chart\/auth\/me$/, (route) =>
+    json(route, {
+      userId: "admin-1",
+      username: "admin",
+      roles: ["chart_admin", "content_editor"],
+      geographyScopes: completed ? ["/india"] : [],
+    }),
+  );
   api.on(/^\/api\/setup$/, (route) => json(route, setupStatus));
   api.on(/^\/api\/setup\/options$/, (route) =>
     json(route, {
@@ -265,51 +249,62 @@ test("the setup wizard sends the setup token the administrator enters", async ({
       geographies: [testland],
     }),
   );
-  api.on(/^\/api\/setup\/bootstrap$/, (route) => route.continue());
-  upstream.on("POST", "/setup/bootstrap", (request) =>
-    request.headers["x-chart-bootstrap-token"] === "the-real-setup-token"
-      ? {
-          status: 200,
-          body: {
-            setup: { ...setupStatus, completed: true, requiresOnboarding: false },
-            admin: { userId: "admin-1", username: "admin@example.org", email: "" },
-          },
-        }
-      : { status: 403, body: { error: "SETUP_BOOTSTRAP_FORBIDDEN" } },
-  );
+  api.on(/^\/api\/setup\/complete$/, (route) => route.continue());
+  let attempts = 0;
+  upstream.on("POST", "/setup/complete", (request) => {
+    if (!request.headers.authorization?.startsWith("Bearer ")) {
+      return { status: 401, body: { error: "AUTH_TOKEN_REQUIRED" } };
+    }
+    attempts += 1;
+    if (attempts === 1)
+      return { status: 502, body: { error: "SETUP_IDENTITY_GROUP_FAILED" } };
+    completed = true;
+    return {
+      status: 200,
+      body: { ...setupStatus, completed: true, requiresOnboarding: false },
+    };
+  });
 
   await page.goto("/onboarding");
+  // No "create an administrator" step and no setup token any more.
+  await expect(page.locator('input[type="password"]')).toHaveCount(0);
   await page.getByRole("button", { name: "Launch CHART" }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Full name").fill("CHART Administrator");
-  await dialog.getByLabel("Email address").fill("admin@example.org");
-  // The administrator signs in with emailed codes, so setup asks for no password.
-  await expect(dialog.locator('input[type="password"]')).toHaveCount(1);
-  const create = dialog.getByRole("button", { name: "Create account & launch" });
-  await expect(create).toBeDisabled();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "installed country" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Launch CHART" }).click();
+  await page.waitForURL("**/dashboard/geo-in-mp");
 
-  await dialog.getByLabel("Setup token").fill("a-wrong-token");
-  await create.click();
-  await expect(dialog.getByRole("alert")).toContainText("setup token is not correct");
-
-  await dialog.getByLabel("Setup token").fill("the-real-setup-token");
-  await create.click();
-  await expect(dialog).toBeHidden();
-
-  expect(
-    upstream.requests.map((request) => request.headers["x-chart-bootstrap-token"]),
-  ).toEqual(["a-wrong-token", "the-real-setup-token"]);
-  expect(JSON.parse(upstream.requests[1].body).admin).toEqual({
-    name: "CHART Administrator",
-    email: "admin@example.org",
-    username: "admin@example.org",
-  });
-  const persisted = await page.evaluate(() =>
-    window.localStorage.getItem("chart:onboarding"),
+  const sent = upstream.requests.filter(
+    (request) => request.path === "/setup/complete",
   );
-  // The token stays in memory only.
-  expect(persisted ?? "").not.toContain("setup-token");
-  expect(persisted ?? "").not.toContain("setupToken");
+  expect(
+    sent.map((request) => request.headers.authorization?.startsWith("Bearer ")),
+  ).toEqual([true, true]);
+  const body = JSON.parse(sent[1].body);
+  expect(body).toMatchObject({ countryCode: "TL", primarySectorId: "health" });
+  expect(body).not.toHaveProperty("admin");
+});
+
+test("only an administrator may run setup", async ({ page }) => {
+  const api = await installFakeApi(page);
+  api.on(/^\/api\/chart\/auth\/me$/, (route) =>
+    json(route, {
+      userId: "planner-1",
+      username: "planner",
+      roles: ["health_planning_lead"],
+      geographyScopes: ["/india"],
+    }),
+  );
+  api.on(/^\/api\/setup$/, (route) => json(route, setupStatus));
+  await page.goto("/onboarding");
+  await expect(
+    page.getByText("Only a CHART administrator can set up CHART. Sign in as admin."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Launch CHART" })).toHaveCount(0);
+  expect(
+    upstream.requests.filter((request) => request.path === "/setup/complete"),
+  ).toEqual([]);
 });
 
 test("the Models page sends the signed-in admin's token for list and reload", async ({

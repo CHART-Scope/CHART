@@ -112,14 +112,15 @@ test("sidebar navigation keeps one shell mounted across workspace pages", async 
   await page.goto("/dashboard/geo-in-mp?admin_unit=geo-in-mp-bhopal&outcome=lbw");
   const nav = page.getByRole("navigation", { name: "Main" });
   const entry = (name: string) => nav.getByRole("link", { name, exact: true });
-  await expect(entry("Start planning")).toHaveAttribute("aria-current", "page");
-  // Learning hub sits directly below Start planning.
+  await expect(entry("Planning center")).toHaveAttribute("aria-current", "page");
+  // About CHART first, then Learning hub above the Planning center.
   await expect(nav.getByRole("link")).toHaveText([
-    "Start planning",
+    "About CHART",
     "Learning hub",
-    "Vulnerability",
+    "Planning center",
     "Settings",
   ]);
+  await expect(entry("About CHART")).toHaveAttribute("href", "/");
   await expect(
     page.getByRole("combobox", { name: "State", exact: true }),
   ).toBeVisible();
@@ -144,7 +145,7 @@ test("sidebar navigation keeps one shell mounted across workspace pages", async 
   await expect(page.getByRole("searchbox", { name: "Search videos" })).toBeVisible();
   await page.screenshot({ path: "../outputs/e2e/web/navigation-shell-3-learning.png" });
 
-  await entry("Start planning").click();
+  await entry("Planning center").click();
   await expect(page).toHaveURL(/\/plan$/);
   await expect(page.getByText("in Madhya Pradesh.")).toBeVisible();
   await settle(page);

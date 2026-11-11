@@ -40,10 +40,9 @@ export default defineConfig({
     // tracked copy is put back before the server starts.
     command: `cp next-env.d.ts .next-env.d.ts.bak && NEXT_DIST_DIR=.next-e2e npx next build --webpack; status=$?; mv .next-env.d.ts.bak next-env.d.ts; [ $status -eq 0 ] && NEXT_DIST_DIR=.next-e2e npx next start --hostname 127.0.0.1 --port ${port}`,
     // Server-side calls go to the specs' fake upstream (e2e/support/fakeUpstream.ts).
-    // The bootstrap token is set only so a spec can prove the server never sends it.
     env: {
       CHART_WEB_ORIGIN: `http://127.0.0.1:${port}`,
-      // Server-side proxies (setup bootstrap, models sync, Keycloak token
+      // Server-side proxies (setup, models sync, Keycloak token
       // exchange) reach a stand-in a spec starts on this port when it needs to
       // see what was forwarded; nothing listens otherwise.
       CHART_PYTHON_API_INTERNAL_URL: `http://127.0.0.1:${upstreamPort}`,
@@ -52,7 +51,6 @@ export default defineConfig({
       // server itself, so a spec never depends on a real Keycloak or the
       // remote-dev tunnel on :8080. Specs stub these pages where they matter.
       KEYCLOAK_BROWSER_URL: `http://127.0.0.1:${port}/__e2e-keycloak`,
-      CHART_BOOTSTRAP_TOKEN: "e2e-server-side-bootstrap-token",
     },
     url: `http://127.0.0.1:${port}/`,
     reuseExistingServer: false,

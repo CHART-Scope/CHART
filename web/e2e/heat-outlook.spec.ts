@@ -138,17 +138,11 @@ test("a place without published tables says so, and other countries keep the liv
   await expect(panel(page)).toHaveCount(0);
 });
 
-test("planning for Kenya starts on Kenya, not on its first county", async ({
-  page,
-}) => {
+// The Planning center opens Kenya on Kajiado (start-planning.spec.ts); the
+// national dashboard still averages the estimate over Kenya's counties.
+test("the Kenya dashboard estimates for Kenya as a whole", async ({ page }) => {
   const api = await installKenya(page);
-  await page.goto("/plan");
-
-  await expect(page.getByText("in Kenya.", { exact: false }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Start planning together" }).click();
-  await page.waitForURL(/\/dashboard\/geo-ke(\?|$)/);
-  expect(page.url()).not.toContain("geo-ke-baringo");
-  expect(page.url()).not.toContain("admin_unit");
+  await page.goto("/dashboard/geo-ke?outcome=lbw");
   await expect(panel(page).getByTestId("outlook-estimate")).toContainText(
     /averaged over \d+ counties, [\d.]+% of .* in Kenya/,
   );

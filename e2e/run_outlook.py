@@ -67,7 +67,7 @@ def main() -> int:
         "working_tree": subprocess.check_output(
             ["git", "status", "--short"], cwd=ROOT, text=True
         ),
-        "fixtures": "Supplied handovers imported twice into disposable PostGIS; isolated real Keycloak realm with India/Kenya planners and denied-role user, given email-code sign-in by infra/keycloak/sync-realm.js; Mailpit receives the codes; e2e/fixtures/airtable_actions.json published to a local action feed by chart.actions.publish",
+        "fixtures": "Supplied handovers imported twice into disposable PostGIS; isolated real Keycloak realm with India/Kenya planners and denied-role user, run in the deployment's chart-keycloak image and given email-code sign-in by its chart-keycloak-config image; Mailpit receives the codes; e2e/fixtures/airtable_actions.json published to a local action feed by chart.actions.publish",
         "source": str(source),
         "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
@@ -85,7 +85,8 @@ def main() -> int:
             free_port() for _ in range(6)
         ]
         ai_stub = f"http://127.0.0.1:{ai_port}"
-        identity = f"http://127.0.0.1:{identity_port}"
+        # CHART's Keycloak image serves under /identity, as in production.
+        identity = f"http://127.0.0.1:{identity_port}/identity"
         origin = f"http://127.0.0.1:{web_port}"
         # Disposable credentials are generated, never included in saved evidence.
         password = uuid.uuid4().hex
@@ -103,7 +104,13 @@ def main() -> int:
                     {"name": "content_editor"},
                     {"name": "chart_admin"},
                 ],
-                "client": {"chart-core": [{"name": "health_planning_lead"}]},
+                "client": {
+                    "chart-core": [
+                        {"name": "health_planning_lead"},
+                        {"name": "chart_admin"},
+                        {"name": "content_editor"},
+                    ]
+                },
             },
             "groups": [
                 nested_group(
@@ -221,6 +228,20 @@ def main() -> int:
             "CHART_INSIGHT_MODELS": "",
         }
         try:
+            # The images the deployment runs (infra/keycloak/Dockerfile).
+            with (evidence / "keycloak-images.log").open("w") as log:
+                for target, tag in [
+                    ("final", "chart-keycloak:e2e"),
+                    ("config", "chart-keycloak-config:e2e"),
+                ]:
+                    target_args = [] if target == "final" else ["--target", target]
+                    subprocess.run(
+                        ["docker", "build", *target_args, "-t", tag, "infra/keycloak"],
+                        cwd=ROOT,
+                        check=True,
+                        stdout=log,
+                        stderr=subprocess.STDOUT,
+                    )
             subprocess.run(
                 ["docker", "network", "create", network],
                 check=True,
@@ -247,26 +268,6 @@ def main() -> int:
                         "-p",
                         f"127.0.0.1:{mail_port}:8025",
                         "axllent/mailpit:v1.30.0",
-                    ],
-                ),
-                (
-                    "identity",
-                    [
-                        "-e",
-                        "KC_BOOTSTRAP_ADMIN_USERNAME=admin",
-                        "-e",
-                        f"KC_BOOTSTRAP_ADMIN_PASSWORD={password}",
-                        "-p",
-                        f"127.0.0.1:{identity_port}:8080",
-                        "-v",
-                        f"{realm_path}:/opt/keycloak/data/import/realm.json:ro",
-                        "-v",
-                        f"{ROOT / 'infra/keycloak/themes/chart'}:/opt/keycloak/themes/chart:ro",
-                        "-v",
-                        f"{ROOT / 'infra/keycloak/providers'}:/opt/keycloak/providers:ro",
-                        "quay.io/keycloak/keycloak:26.6.4",
-                        "start-dev",
-                        "--import-realm",
                     ],
                 ),
             ]:
@@ -298,6 +299,69 @@ def main() -> int:
                 ):
                     break
                 time.sleep(1)
+            # Keycloak keeps its own database beside CHART's, as on EC2. Retried:
+            # pg_isready already answers during the image's init restart.
+            for attempt in range(60):
+                created = subprocess.run(
+                    [
+                        "docker",
+                        "exec",
+                        containers[0],
+                        "psql",
+                        "-U",
+                        "chart",
+                        "-d",
+                        "chart",
+                        "-c",
+                        "CREATE DATABASE chart_keycloak",
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                if created.returncode == 0:
+                    break
+                if attempt == 59:
+                    raise RuntimeError("Could not create the Keycloak database")
+                time.sleep(1)
+            identity_container = "chart-e2e-" + run_id + "-identity"
+            subprocess.run(
+                [
+                    "docker",
+                    "run",
+                    "--rm",
+                    "-d",
+                    "--network",
+                    network,
+                    "--name",
+                    identity_container,
+                    "-e",
+                    "KC_BOOTSTRAP_ADMIN_USERNAME=admin",
+                    "-e",
+                    f"KC_BOOTSTRAP_ADMIN_PASSWORD={password}",
+                    "-e",
+                    f"KC_DB_URL=jdbc:postgresql://{containers[0]}:5432/chart_keycloak",
+                    "-e",
+                    "KC_DB_USERNAME=chart",
+                    "-e",
+                    f"KC_DB_PASSWORD={password}",
+                    "-e",
+                    "KC_HTTP_ENABLED=true",
+                    "-e",
+                    f"KC_HOSTNAME={identity}",
+                    "-p",
+                    f"127.0.0.1:{identity_port}:8080",
+                    # The disposable realm replaces the image's realm seed.
+                    "-v",
+                    f"{realm_path}:/opt/keycloak/data/import/chart-realm.json:ro",
+                    "chart-keycloak:e2e",
+                    "start",
+                    "--optimized",
+                    "--import-realm",
+                ],
+                check=True,
+                stdout=subprocess.DEVNULL,
+            )
+            containers.append(identity_container)
             with (evidence / "migration.log").open("w") as log:
                 subprocess.run(
                     ["bash", "core/scripts/migrate.sh"],
@@ -309,21 +373,35 @@ def main() -> int:
                 )
             wait_http(identity + "/realms/chart/.well-known/openid-configuration")
             # The deploy's own realm sync turns on email-code sign-in.
+            sync_env = {
+                "KEYCLOAK_ADMIN_URL": f"http://{identity_container}:8080/identity",
+                "KEYCLOAK_ADMIN_USERNAME": "admin",
+                "KEYCLOAK_ADMIN_PASSWORD": password,
+                "KEYCLOAK_REALM": "chart",
+                "KEYCLOAK_REALM_FILE": "/realm.json",
+                "CHART_WEB_ORIGIN": origin,
+                "SMTP_HOST": mail_host,
+                "SMTP_PORT": "1025",
+                "SMTP_SECURITY": "none",
+                "SMTP_FROM": "no-reply@chart-e2e.invalid",
+                # Each browser sign-in emails a code; the suite signs the
+                # same accounts in many times within the window.
+                "SIGN_IN_CODE_LIMIT": "100",
+            }
             with (evidence / "identity-sync.log").open("w") as log:
                 subprocess.run(
-                    ["node", "infra/keycloak/sync-realm.js"],
-                    cwd=ROOT,
-                    env={
-                        **env,
-                        "KEYCLOAK_REALM_FILE": str(realm_path),
-                        "SMTP_HOST": mail_host,
-                        "SMTP_PORT": "1025",
-                        "SMTP_SECURITY": "none",
-                        "SMTP_FROM": "no-reply@chart-e2e.invalid",
-                        # Each browser sign-in emails a code; the suite signs
-                        # the same accounts in many times within the window.
-                        "SIGN_IN_CODE_LIMIT": "100",
-                    },
+                    [
+                        "docker",
+                        "run",
+                        "--rm",
+                        "--network",
+                        network,
+                        *[arg for key in sync_env for arg in ("-e", key)],
+                        "-v",
+                        f"{realm_path}:/realm.json:ro",
+                        "chart-keycloak-config:e2e",
+                    ],
+                    env={**os.environ, **sync_env},
                     check=True,
                     stdout=log,
                     stderr=subprocess.STDOUT,

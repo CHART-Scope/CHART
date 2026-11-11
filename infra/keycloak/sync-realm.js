@@ -15,10 +15,21 @@ const realmFile =
 
 // People sign in with their email address and a code sent to it
 // (docs/sign-in.md). The code step comes from the email-otp-form provider in
-// infra/keycloak/providers.
+// infra/keycloak/providers. An account with a password (the default `admin`)
+// is asked for that instead.
 const signInFlow = "chart email code";
 const signInFormsFlow = "chart email code forms";
+const signInProofFlow = "chart email code proof";
+const passwordBranch = "chart email code password";
+const codeBranch = "chart email code code";
+// Accounts that sign in with a password instead of a code: the default
+// `admin` only. A role, so the choice never depends on what credentials an
+// account happens to hold.
+const passwordSignInRole = "chart-password-sign-in";
+const defaultAdmin = "admin";
 const signInRealmSettings = {
+  // Invitations and sign-in codes use CHART's email layout and wording.
+  emailTheme: "chart",
   loginWithEmailAllowed: true,
   duplicateEmailsAllowed: false,
   registrationAllowed: false,
@@ -34,7 +45,8 @@ async function main() {
 
   await syncRealmSettings(token, realmSeed, process.env.CHART_WEB_ORIGIN, smtpServer);
   await ensureEmailCodeSignIn(token, codeSettings);
-  await makeLastNameOptional(token);
+  await skipProfileReview(token);
+  await brandAdminSignIn(token);
   await syncClientSettings(token, realmSeed.clients ?? []);
   await ensureClientRoles(token, realmSeed.roles?.client ?? {});
   await ensureClientProtocolMappers(token, realmSeed.clients ?? []);
@@ -46,6 +58,7 @@ async function main() {
   await ensureIdentityProvider(token, buildScopeGoogleIdentityProvider(process.env));
   await ensureGroups(token, realmSeed.groups ?? []);
   await importUsers(token, realmSeed.users ?? []);
+  await ensureDefaultAdmin(token, process.env);
 
   console.log(`Synced Keycloak realm '${targetRealm}' from ${realmFile}`);
 }
@@ -167,9 +180,20 @@ function buildEmailCodeSettings(env) {
 async function ensureEmailCodeSignIn(token, codeSettings) {
   const realmUrl = `${keycloakUrl}/admin/realms/${targetRealm}`;
   let executions = await findFlowExecutions(token, signInFlow);
-  const complete = ["auth-cookie", "auth-username-form", "email-otp-form"].every(
-    (provider) => executions?.some((execution) => execution.providerId === provider),
-  );
+  // The steps in order (depth first); any difference, including order,
+  // rebuilds the flow, so a change here reaches existing realms.
+  const steps = [
+    "auth-cookie",
+    "auth-username-form",
+    "conditional-user-role",
+    "auth-password-form",
+    "conditional-user-role",
+    "email-otp-form",
+  ];
+  const complete =
+    JSON.stringify(
+      executions?.map((execution) => execution.providerId).filter(Boolean),
+    ) === JSON.stringify(steps);
 
   if (!complete) {
     // A missing or half-created flow is rebuilt; the realm keeps Keycloak's
@@ -217,36 +241,57 @@ async function ensureEmailCodeSignIn(token, codeSettings) {
       { provider: "auth-username-form" },
       "REQUIRED",
     );
+    // After the address: a password for accounts with the password role,
+    // otherwise the emailed code.
     await addExecution(
       token,
       signInFormsFlow,
-      { provider: "email-otp-form" },
+      {
+        alias: signInProofFlow,
+        type: "basic-flow",
+        provider: "registration-page-form",
+      },
       "REQUIRED",
     );
+    for (const [branch, step] of [
+      [passwordBranch, "auth-password-form"],
+      [codeBranch, "email-otp-form"],
+    ]) {
+      await addExecution(
+        token,
+        signInProofFlow,
+        { alias: branch, type: "basic-flow", provider: "registration-page-form" },
+        "CONDITIONAL",
+      );
+      await addExecution(
+        token,
+        branch,
+        { provider: "conditional-user-role" },
+        "REQUIRED",
+      );
+      await addExecution(token, branch, { provider: step }, "REQUIRED");
+    }
     executions = await findFlowExecutions(token, signInFlow);
   }
 
-  // Code settings are re-applied on every sync so changes reach the realm.
-  const codeStep = executions.find(
-    (execution) => execution.providerId === "email-otp-form",
+  // Settings are re-applied on every sync so changes reach the realm.
+  const [passwordCondition, codeCondition] = executions.filter(
+    (execution) => execution.providerId === "conditional-user-role",
   );
-  const config = { alias: "chart email code settings", config: codeSettings };
-  if (codeStep.authenticationConfig) {
-    await fetchOk(
-      `${realmUrl}/authentication/config/${codeStep.authenticationConfig}`,
-      {
-        method: "PUT",
-        headers: jsonHeaders(token),
-        body: JSON.stringify({ ...config, id: codeStep.authenticationConfig }),
-      },
-    );
-  } else {
-    await fetchOk(`${realmUrl}/authentication/executions/${codeStep.id}/config`, {
-      method: "POST",
-      headers: jsonHeaders(token),
-      body: JSON.stringify(config),
-    });
-  }
+  await applyConfig(token, passwordCondition, "chart password sign-in", {
+    condUserRole: passwordSignInRole,
+    negate: "false",
+  });
+  await applyConfig(token, codeCondition, "chart code sign-in", {
+    condUserRole: passwordSignInRole,
+    negate: "true",
+  });
+  await applyConfig(
+    token,
+    executions.find((execution) => execution.providerId === "email-otp-form"),
+    "chart email code settings",
+    codeSettings,
+  );
 
   await fetchOk(realmUrl, {
     method: "PUT",
@@ -255,21 +300,124 @@ async function ensureEmailCodeSignIn(token, codeSettings) {
   });
 }
 
-// CHART keeps a person's whole name in firstName. A required last name would
-// stop every account an administrator or setup creates at a profile form on
-// its first sign-in.
-async function makeLastNameOptional(token) {
-  const profileUrl = `${keycloakUrl}/admin/realms/${targetRealm}/users/profile`;
-  const profile = await fetchJson(profileUrl, { headers: authHeaders(token) });
-  const lastName = profile.attributes?.find(
-    (attribute) => attribute.name === "lastName",
+// Every installation starts with one administrator, `admin`, whose first
+// password (CHART_ADMIN_INITIAL_PASSWORD, default "admin") must be changed at
+// the first sign-in. It runs setup and invites everyone else. Created once:
+// an existing `admin` is never touched, so its password stays its own.
+async function ensureDefaultAdmin(token, env) {
+  const realmUrl = `${keycloakUrl}/admin/realms/${targetRealm}`;
+  const usersUrl = `${realmUrl}/users`;
+  const find = () =>
+    fetchJson(`${usersUrl}?username=${defaultAdmin}&exact=true`, {
+      headers: authHeaders(token),
+    });
+  const roleUrl = `${realmUrl}/roles/${passwordSignInRole}`;
+  if ((await fetch(roleUrl, { headers: authHeaders(token) })).status === 404) {
+    await fetchOk(`${realmUrl}/roles`, {
+      method: "POST",
+      headers: jsonHeaders(token),
+      body: JSON.stringify({
+        name: passwordSignInRole,
+        description: "Signs in with a password instead of an emailed code",
+      }),
+    });
+  }
+  const givePasswordSignIn = async (userId) =>
+    fetchOk(`${usersUrl}/${userId}/role-mappings/realm`, {
+      method: "POST",
+      headers: jsonHeaders(token),
+      body: JSON.stringify([await fetchJson(roleUrl, { headers: authHeaders(token) })]),
+    });
+
+  const [existing] = await find();
+  if (existing) {
+    // Only the sign-in role is ensured; the password stays the admin's own.
+    await givePasswordSignIn(existing.id);
+    return;
+  }
+
+  await fetchOk(usersUrl, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({
+      username: defaultAdmin,
+      enabled: true,
+      firstName: "CHART administrator",
+      credentials: [
+        {
+          type: "password",
+          value: env.CHART_ADMIN_INITIAL_PASSWORD || "admin",
+          temporary: true,
+        },
+      ],
+    }),
+  });
+  const [user] = await find();
+  await givePasswordSignIn(user.id);
+  const client = await getClient(token, "chart-core");
+  const roles = await Promise.all(
+    ["chart_admin", "content_editor"].map((name) =>
+      fetchJson(
+        `${keycloakUrl}/admin/realms/${targetRealm}/clients/${client.id}/roles/${name}`,
+        { headers: authHeaders(token) },
+      ),
+    ),
   );
-  if (!lastName?.required) return;
-  delete lastName.required;
-  await fetchOk(profileUrl, {
+  await fetchOk(`${usersUrl}/${user.id}/role-mappings/clients/${client.id}`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify(roles),
+  });
+  console.log(`Created the default administrator '${defaultAdmin}'.`);
+}
+
+// The Keycloak administration console signs in through the master realm;
+// give that page CHART's look too. Its username-and-password form is
+// Keycloak's own, styled by the same theme.
+async function brandAdminSignIn(token) {
+  await fetchOk(`${keycloakUrl}/admin/realms/${adminRealm}`, {
     method: "PUT",
     headers: jsonHeaders(token),
-    body: JSON.stringify(profile),
+    body: JSON.stringify({
+      loginTheme: "chart",
+      displayName: "CHART",
+      displayNameHtml: "CHART",
+    }),
+  });
+}
+
+// CHART keeps people's names and email addresses itself. Keycloak's profile
+// review would stop accounts at an "Update Account Information" form on their
+// first sign-in: those without a last name, and the default `admin`, which
+// has no email address.
+async function skipProfileReview(token) {
+  const actionUrl = `${keycloakUrl}/admin/realms/${targetRealm}/authentication/required-actions/VERIFY_PROFILE`;
+  const action = await fetchJson(actionUrl, { headers: authHeaders(token) });
+  if (!action.enabled) return;
+  await fetchOk(actionUrl, {
+    method: "PUT",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ ...action, enabled: false }),
+  });
+}
+
+async function applyConfig(token, execution, alias, config) {
+  const realmUrl = `${keycloakUrl}/admin/realms/${targetRealm}`;
+  if (execution.authenticationConfig) {
+    await fetchOk(
+      `${realmUrl}/authentication/config/${execution.authenticationConfig}`,
+      {
+        method: "PUT",
+        headers: jsonHeaders(token),
+        body: JSON.stringify({ id: execution.authenticationConfig, alias, config }),
+      },
+    );
+    return;
+  }
+  await fetchOk(`${realmUrl}/authentication/executions/${execution.id}/config`, {
+    method: "POST",
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ alias, config }),
   });
 }
 
@@ -483,6 +631,8 @@ async function ensureWebClientSettings(token, clients, configuredOrigin) {
     body: JSON.stringify({
       ...existing,
       ...settings,
+      // The sign-in page's "Back to CHART" link.
+      baseUrl: publicOrigin,
       attributes: {
         ...(existing.attributes ?? {}),
         ...(settings.attributes ?? {}),
@@ -500,7 +650,11 @@ function buildWebClientSettings(configuredOrigin) {
   ]);
 
   return {
-    redirectUris: origins.map((origin) => `${origin}/auth/callback`),
+    // /auth/signin is where an invitation link lands after confirming the address.
+    redirectUris: origins.flatMap((origin) => [
+      `${origin}/auth/callback`,
+      `${origin}/auth/signin`,
+    ]),
     webOrigins: origins,
     attributes: {
       "post.logout.redirect.uris": origins

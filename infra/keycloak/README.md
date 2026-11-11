@@ -32,6 +32,24 @@ upgrades.
 
 Local codes land in Mailpit at `http://127.0.0.1:8025`.
 
+The `chart` login theme (`themes/chart/login/`) styles both screens and
+overrides two templates: `login-username.ftl` (the email step) and
+`login-email-otp.ftl` (the provider's code step).
+
+## Deployment images
+
+`Dockerfile` builds what deployments run, so the server holds no Keycloak
+files:
+
+```bash
+docker build -t chart-keycloak infra/keycloak                          # Keycloak + plugin, theme, realm seed
+docker build --target config -t chart-keycloak-config infra/keycloak   # sync-realm.js
+```
+
+`chart-keycloak` is pre-built for PostgreSQL under `/identity` and starts with
+`start --optimized --import-realm`. Local development keeps mounting these
+files into stock Keycloak, so theme edits show on reload.
+
 ## Upstream SSO
 
 Keycloak is CHART's identity broker and token issuer. Configure Google Workspace or
@@ -80,7 +98,12 @@ password for a `chart-web` token directly.
 
 ## Seed users
 
-None. The realm ships without any pre-seeded users. Create the first administrator by completing the CHART installation setup wizard at `/onboarding`.
+One: the default administrator `admin`, created by `sync-realm.js` when the
+realm has no `admin` (first password `CHART_ADMIN_INITIAL_PASSWORD`, default
+`admin`, which must be changed at the first sign-in). It has the
+`chart_admin` and `content_editor` roles, runs setup at `/onboarding` and
+invites everyone else. An existing `admin` is never modified. It signs in
+with a password; every other account signs in with an emailed code.
 
 ## Roles
 

@@ -28,20 +28,23 @@ export function computeFamilies(geos: GeographyRecord[], scopes: string[]): Fami
   );
 }
 
-/** Where planning for a family starts: the broadest place that still says
- * something, never a single county or division picked on the user's behalf.
- * From the family root it steps down only while there is exactly one branch
- * holding models, so India opens on Madhya Pradesh (its one modelled state)
- * and Kenya opens on Kenya; the dashboard then offers the areas beneath. */
-export function defaultAreaForFamily(
+/** Places planning opens on within their country (see defaultAreaForFamily). */
+const PREFERRED_START_AREAS: readonly string[] = ["geo-ke-kajiado"];
+
+const hasModel = (geo: GeographyRecord) => (geo.models?.length ?? 0) > 0;
+const within = (root: GeographyRecord, geo: GeographyRecord) => {
+  const rootPath = root.path.replace(/\/+$/, "");
+  return geo.path === root.path || geo.path.startsWith(`${rootPath}/`);
+};
+
+/** A family's dashboard frame: the broadest place that still says
+ * something. From the family root it steps down only while there is exactly
+ * one branch holding models, so India's frame is Madhya Pradesh (its one
+ * modelled state) and Kenya's is Kenya. */
+export function familyFrame(
   family: Family,
   geographies: readonly GeographyRecord[],
-): GeographyRecord | null {
-  const hasModel = (geo: GeographyRecord) => (geo.models?.length ?? 0) > 0;
-  const within = (root: GeographyRecord, geo: GeographyRecord) => {
-    const rootPath = root.path.replace(/\/+$/, "");
-    return geo.path === root.path || geo.path.startsWith(`${rootPath}/`);
-  };
+): GeographyRecord {
   let place = family.root;
   while (!hasModel(place)) {
     const branches = geographies.filter(
@@ -53,6 +56,37 @@ export function defaultAreaForFamily(
     place = branches[0];
   }
   return place;
+}
+
+/** Where planning for a family starts: the place a country names (Kenya:
+ * Kajiado, its co-design county) when it is inside the family, else the
+ * family's frame. A planner scoped elsewhere is unaffected. */
+export function defaultAreaForFamily(
+  family: Family,
+  geographies: readonly GeographyRecord[],
+): GeographyRecord | null {
+  return (
+    geographies.find(
+      (geo) => PREFERRED_START_AREAS.includes(geo.id) && within(family.root, geo),
+    ) ?? familyFrame(family, geographies)
+  );
+}
+
+/** Where a planner starts: the family they last chose (`activeGeographyId`),
+ * else their first, opened at `defaultAreaForFamily`. Start planning and
+ * sign-in both use it, so they never disagree about a person's area. */
+export function defaultPlanningArea(
+  geographies: GeographyRecord[],
+  scopes: string[],
+  activeGeographyId?: string | null,
+): GeographyRecord | null {
+  const families = computeFamilies(geographies, scopes);
+  const family =
+    families.find(
+      (item) =>
+        activeGeographyId && familyContains(item, activeGeographyId, geographies),
+    ) ?? families[0];
+  return family ? defaultAreaForFamily(family, geographies) : null;
 }
 
 /** Match a geography id or family path against a family's subtree so
@@ -129,4 +163,21 @@ function countryFromPath(path: string): string | null {
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+/**
+ * Where a place opens on the dashboard, framed the way the dashboard links
+ * its own places: under its family's frame (Kenya, Madhya Pradesh) with the
+ * place as the admin unit (Kajiado → geo-ke with admin unit geo-ke-kajiado).
+ */
+export function dashboardTarget(
+  area: GeographyRecord,
+  geographies: GeographyRecord[],
+  scopes: string[],
+): { geographyId: string; adminUnit: string | null } {
+  const family = computeFamilies(geographies, scopes).find((item) =>
+    familyContains(item, area.id, geographies),
+  );
+  const frame = family ? familyFrame(family, geographies) : area;
+  return { geographyId: frame.id, adminUnit: frame.id === area.id ? null : area.id };
 }

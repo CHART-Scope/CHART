@@ -130,6 +130,45 @@
   --ease-out-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
   --shadow-thumb: 0 1px 4px rgba(0, 0, 0, 0.28);
 
+  /* --- Design system v1 (canvas "00 · Design system") ---
+     Values the frames use that had no token: one source for the landing
+     page, the workspace and the sign-in theme's mirror. */
+  --color-text-secondary: #5a5853;
+  --color-text-hint: #8a877f;
+  --color-text-eyebrow: #5e5c57;
+  --color-nexus-pill: #e6e6f5;
+  --color-nexus-disabled: #b9b8f2;
+  --color-coming-soon: #4a2fc2;
+  /* Amber text readable on the amber tint (4.5:1). */
+  --color-amber-text: #9a4a1c;
+  --color-tile-muted: #dddcd9;
+  --color-on-dark-muted: #d9d7d2;
+  --surface-sentence: #ecebe8;
+  --surface-page-alt: #f6f5f3;
+
+  /* Display type: landing hero, landing sections, page titles, cards. */
+  --fs-display-1: 64px;
+  --fs-display-2: 34px;
+  --fs-title: 28px;
+  --fs-title-card: 22px;
+  --fs-subhead: 19px;
+  --fs-lede: 17px;
+  --lh-lede: 1.85;
+
+  /* Control heights: every control is a height plus side padding. */
+  --control-lg: 48px;
+  --control-md: 40px;
+  --control-sm: 32px;
+  --control-input: 44px;
+  --control-tag: 28px;
+
+  /* Wider steps and the page gutter (24px on phones to 120px). */
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-22: 88px;
+  --page-gutter: clamp(24px, 6vw, 120px);
+  --content-max: 1592px;
+
   /* --- Focus --- */
   --focus-ring: 2px solid var(--color-nexus);
 }

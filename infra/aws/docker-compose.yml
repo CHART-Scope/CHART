@@ -186,8 +186,9 @@ services:
       - /app/pipelines/models/lbw/model-release.mp.compact.review.json
       - --activate-model
 
+  # Plugin, theme and realm seed are built into the image (infra/keycloak/Dockerfile).
   chart-keycloak:
-    image: quay.io/keycloak/keycloak:26.6.4
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-keycloak:${IMAGE_TAG:-dev}
     container_name: chart-keycloak
     restart: unless-stopped
     depends_on:
@@ -196,30 +197,22 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-      KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://chart-postgres:5432/chart_keycloak
       KC_DB_USERNAME: chart_keycloak
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
       KC_HTTP_ENABLED: "true"
-      KC_HTTP_RELATIVE_PATH: /identity
       KC_HOSTNAME: ${PUBLIC_ORIGIN}/identity
       KC_HOSTNAME_STRICT: "true"
       KC_PROXY_HEADERS: xforwarded
-    volumes:
-      - ../keycloak/chart-realm.json:/opt/keycloak/data/import/chart-realm.json:ro
-      - ../keycloak/themes/chart:/opt/keycloak/themes/chart:ro
-      - ../keycloak/providers:/opt/keycloak/providers:ro
-    command: ["start", "--import-realm"]
+    command: ["start", "--optimized", "--import-realm"]
     healthcheck:
       test: ["CMD-SHELL", "timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
       interval: 5s
       timeout: 5s
       retries: 30
-      # The first start after a provider change rebuilds Keycloak (minutes).
-      start_period: 300s
 
   chart-keycloak-config:
-    image: node:22-alpine
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-keycloak-config:${IMAGE_TAG:-dev}
     restart: "no"
     labels:
       chart.release: ${IMAGE_TAG:-dev}
@@ -231,7 +224,6 @@ services:
       KEYCLOAK_ADMIN_USERNAME: admin
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KEYCLOAK_REALM: chart
-      KEYCLOAK_REALM_FILE: /keycloak/chart-realm.json
       CHART_WEB_ORIGIN: ${PUBLIC_ORIGIN}
       KEYCLOAK_GOOGLE_CLIENT_ID: ${KEYCLOAK_GOOGLE_CLIENT_ID:-}
       KEYCLOAK_GOOGLE_CLIENT_SECRET: ${KEYCLOAK_GOOGLE_CLIENT_SECRET:-}
@@ -247,9 +239,9 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-CHART}
       SMTP_REPLY_TO: ${SMTP_REPLY_TO:-}
       SIGN_IN_CODE_LIMIT: ${SIGN_IN_CODE_LIMIT:-5}
-    volumes:
-      - ../keycloak:/keycloak:ro
-    command: ["node", "/keycloak/sync-realm.js"]
+      # First password of the default `admin`, changed at first sign-in
+      # (docs/sign-in.md). Set it so a public server never starts on "admin".
+      CHART_ADMIN_INITIAL_PASSWORD: ${CHART_ADMIN_INITIAL_PASSWORD:-}
 
   chart-core:
     image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}

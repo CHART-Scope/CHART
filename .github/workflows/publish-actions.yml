@@ -4,6 +4,10 @@ name: Publish actions
 # feed on S3 (docs/actions.md). Runs hourly, on demand ("Run workflow"), and
 # when an Airtable automation sends a repository_dispatch "publish-actions".
 # Nothing is uploaded when the actions have not changed.
+#
+# GitHub only schedules workflows from the default branch (main), but the app
+# and the publisher are developed on dev, so every run publishes with dev's
+# code. Keep this file identical on main and dev.
 on:
   schedule:
     - cron: "17 * * * *"
@@ -24,6 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: dev
 
       - uses: actions/setup-python@v6
         with:

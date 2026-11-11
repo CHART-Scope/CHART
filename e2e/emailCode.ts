@@ -20,6 +20,18 @@ export async function inboxCount(page: Page, email: string) {
   return (await inbox(page, email)).length;
 }
 
+/** The newest email to `email` once it arrives: its subject and text. */
+export async function newestEmail(page: Page, email: string, after = 0) {
+  let message: { Subject: string; Text: string } | undefined;
+  await expect(async () => {
+    const messages = await inbox(page, email);
+    expect(messages.length).toBeGreaterThan(after);
+    const full = await page.request.get(`${mailpit}/api/v1/message/${messages[0].ID}`);
+    message = (await full.json()) as { Subject: string; Text: string };
+  }).toPass({ timeout: 20_000 });
+  return message!;
+}
+
 /** Codes sent to `email` since `since` (ms), newest first. */
 async function codesSince(page: Page, email: string, since: number) {
   const messages = await inbox(page, email);
@@ -28,7 +40,7 @@ async function codesSince(page: Page, email: string, since: number) {
     if (Date.parse(message.Created) < since - 1000) continue;
     const full = await page.request.get(`${mailpit}/api/v1/message/${message.ID}`);
     const { Text } = (await full.json()) as { Text: string };
-    const code = Text.match(/access code is:\s*([A-Z0-9]{6})/)?.[1];
+    const code = Text.match(/code is:\s*([A-Z0-9]{6})/)?.[1];
     if (code) codes.push(code);
   }
   return codes;
@@ -39,7 +51,8 @@ export async function requestSignInCode(page: Page, account: string) {
   const since = Date.now();
   await page.goto("/auth/signin");
   await expect(page.locator('input[type="password"]')).toHaveCount(0);
-  await page.getByLabel("Email address").fill(account);
+  // People sign in with their address; the field only takes an email.
+  await page.getByLabel("Email address").fill(inboxOf(account));
   await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByLabel("Your access code")).toBeVisible();
   let code: string | undefined;
