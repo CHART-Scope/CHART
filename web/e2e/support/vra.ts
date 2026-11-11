@@ -653,7 +653,7 @@ export async function installVra(
   api.on(/^\/api\/chart\/vra\/indicators$/, (route) =>
     json(route, { items: catalogue }),
   );
-  // Settings > Data also holds the climate card; nothing pulled here.
+  // The Jobs badge and climate reads elsewhere in Settings; nothing pulled here.
   api.on(/^\/api\/chart\/climate\/(coverage|ingestion-jobs)$/, (route) =>
     json(route, []),
   );

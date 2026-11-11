@@ -295,7 +295,7 @@ export function takeSignedOutReason(): SignOutReason | null {
  * public map. */
 export function signedInHomePath(user: CurrentUser) {
   if (user.roles.length > 0 && user.geographyScopes.length > 0) return "/plan";
-  return user.roles.includes("chart_admin") ? "/settings?tab=users" : "/explore";
+  return user.roles.includes("chart_admin") ? "/settings" : "/explore";
 }
 
 /** Milliseconds until the token should be renewed (30 s before it expires). */

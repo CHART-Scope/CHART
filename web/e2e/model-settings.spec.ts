@@ -22,21 +22,28 @@ async function optionsOf(page: Page, combobox: string): Promise<string[]> {
   return labels.map((label) => label.replace("✓", "").trim());
 }
 
+/** With only the default switched on there is nothing to choose, so the
+ * dashboard shows no dropdown for it. */
+async function expectNoChoice(page: Page, combobox: string) {
+  await expect(outlookPanel(page).getByTestId("outlook-estimate")).toBeVisible();
+  await expect(
+    outlookPanel(page).getByRole("combobox", { name: combobox }),
+  ).toHaveCount(0);
+}
+
 test("turning on a pregnancy window saves it and the dashboard offers it", async ({
   page,
 }) => {
   const api = await installKenya(page, true, ["/kenya"], admin);
 
-  // Before any setting: the outlook offers the whole pregnancy only.
+  // Before any setting: only the whole pregnancy is on, so no dropdown.
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
   await expect(outlookPanel(page).getByTestId("outlook-estimate")).toContainText(
     "Kajiado",
   );
-  expect(await optionsOf(page, "Pregnancy window")).toEqual([
-    "Whole pregnancy (lags 0-8)",
-  ]);
+  await expectNoChoice(page, "Pregnancy window");
 
-  await page.goto("/settings");
+  await page.goto("/settings?tab=models");
   const lbw = settingsFor(page, "Low birth weight");
   const windows = lbw.getByRole("group", { name: "Pregnancy windows" });
   await expect(
@@ -65,7 +72,7 @@ test("turning on a pregnancy window saves it and the dashboard offers it", async
     fullPage: true,
   });
 
-  // The dashboard now offers exactly the windows switched on.
+  // Two windows on: the dashboard offers exactly those in a dropdown.
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
   expect(await optionsOf(page, "Pregnancy window")).toEqual([
     "Whole pregnancy (lags 0-8)",
@@ -84,7 +91,7 @@ test("turning on a pregnancy window saves it and the dashboard offers it", async
 
 test("switching off an age group hides it from the dashboard", async ({ page }) => {
   const api = await installKenya(page, true, ["/kenya"], admin);
-  await page.goto("/settings");
+  await page.goto("/settings?tab=models");
 
   const u5 = settingsFor(page, "Under-five mortality");
   const groups = u5.getByRole("group", { name: "Age groups" });
@@ -113,14 +120,16 @@ test("switching off an age group hides it from the dashboard", async ({ page }) 
   await page.goto(
     "/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=under_5_mortality",
   );
-  expect(await optionsOf(page, "Age group")).toEqual(["Post-neonatal (1-11 months)"]);
+  // One age group left: the dashboard uses it without a dropdown.
+  await expectNoChoice(page, "Age group");
+  await expect(outlookPanel(page).getByTestId("outlook-estimate")).toBeVisible();
 });
 
 test("a refused save shows the reason and keeps the saved settings", async ({
   page,
 }) => {
   const api = await installKenya(page, true, ["/kenya"], admin);
-  await page.goto("/settings");
+  await page.goto("/settings?tab=models");
 
   const lbw = settingsFor(page, "Low birth weight");
   await lbw
@@ -137,16 +146,14 @@ test("a refused save shows the reason and keeps the saved settings", async ({
     fullPage: true,
   });
 
-  // Nothing was stored: the dashboard still offers the whole pregnancy.
+  // Nothing was stored: the dashboard still uses the whole pregnancy alone.
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
-  expect(await optionsOf(page, "Pregnancy window")).toEqual([
-    "Whole pregnancy (lags 0-8)",
-  ]);
+  await expectNoChoice(page, "Pregnancy window");
 });
 
 test("countries outside the user's scope are not listed", async ({ page }) => {
   await installKenya(page, true, ["/india"], admin);
-  await page.goto("/settings");
+  await page.goto("/settings?tab=models");
   await expect(
     page.getByText("No model is installed for the countries you can see."),
   ).toBeVisible();
@@ -157,13 +164,20 @@ test("any signed-in planner can change model settings, without the admin cards",
   page,
 }) => {
   await installKenya(page, true, ["/kenya"], { roles: ["health_planning_lead"] });
-  await page.goto("/settings");
+  await page.goto("/settings?tab=models");
 
   const lbw = settingsFor(page, "Low birth weight");
   await expect(lbw).toBeVisible();
-  // Installation administration stays with admins: no tabs, no admin cards.
-  await expect(page.getByRole("tablist")).toHaveCount(0);
+  // Installation administration stays with admins: only Workspace and
+  // Models, and no release management.
+  await expect(page.getByRole("tablist").getByRole("tab")).toHaveText([
+    "Workspace",
+    "Models",
+  ]);
   await expect(page.getByText("Climate data", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Installed model releases" }),
+  ).toHaveCount(0);
 
   const windows = lbw.getByRole("group", { name: "Pregnancy windows" });
   await windows.getByRole("checkbox", { name: /1st trimester/ }).check();

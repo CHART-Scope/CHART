@@ -10,6 +10,8 @@ import { PrecisionInfoModal } from "@/components/PrecisionInfoModal";
 import { Select } from "@/components/Select";
 import { Tabs } from "@/components/Tabs";
 import {
+  fetchForecast,
+  fetchForecastMap,
   fetchHeatOutlook,
   fetchHeatOutlookMap,
   fetchObservedRisk,
@@ -23,6 +25,7 @@ import {
   type OutlookRatio,
   type OutlookReference,
   type OutlookView,
+  type PlaceForecast,
 } from "@/lib/heatOutlookClient";
 
 import base from "./HeatLbwLinkPanel.module.css";
@@ -52,15 +55,21 @@ const SIDE_LABEL = {
 const RATIO_LABEL = { odds_ratio: "Odds ratio", risk_ratio: "Risk ratio" } as const;
 const VIEW_TABS = [
   { value: "observed", label: "Observed" },
+  { value: "forecast", label: "Forecasted" },
   { value: "projection", label: "Projected" },
 ] as const;
 
+/** The dashboard's tabs: the two published views plus the seasonal forecast. */
+export type DashboardView = OutlookView | "forecast";
+
 export type OutlookChoices = {
-  view?: OutlookView;
+  view?: DashboardView;
   /** Observed and projected releases can have different selector codes. */
   observedSelector?: string;
   selector?: string;
   month?: string;
+  /** A forecast month, kept apart from the observed month it never shares. */
+  forecastMonth?: string;
   scenario?: string;
   period?: string;
   reference?: OutlookReference;
@@ -124,7 +133,7 @@ export function HeatOutlookPanel({
   const [picked, setPicked] = useState<Choices & { outcome: string }>({ outcome });
   const choice: Choices = selection ?? (picked.outcome === outcome ? picked : {});
   const [precisionOpen, setPrecisionOpen] = useState(false);
-  const { selector, observedSelector, month, scenario, period } = choice;
+  const { selector, observedSelector, month, forecastMonth, scenario, period } = choice;
   const reference = choice.reference ?? "annual";
 
   const observedEnabled = dataModes.includes("observed");
@@ -176,7 +185,7 @@ export function HeatOutlookPanel({
       (projected.state === "ready" && projectedData !== null));
   // Observed is the default once it has a month to show; a place or setting
   // without it opens on the projection instead.
-  const view: OutlookView =
+  const view: DashboardView =
     choice.view ??
     (!observedEnabled
       ? "projection"
@@ -188,12 +197,27 @@ export function HeatOutlookPanel({
         : projectedOpen
           ? "projection"
           : "observed");
+  // The C3S seasonal forecast loads once its tab opens; a place without one
+  // shows the tab with a note rather than hiding it.
+  const forecastOpen = view === "forecast";
+  const forecast = useLoaded<PlaceForecast>(
+    (signal) =>
+      forecastOpen
+        ? fetchForecast(geographyId, outcome, { accessToken, signal })
+        : Promise.reject(new OutlookNotPublished(geographyId)),
+    [geographyId, accessToken, outcome, forecastOpen],
+  );
+  const forecastData =
+    forecast.data?.outcome === outcome && forecast.data.geography_id === geographyId
+      ? forecast.data
+      : null;
   const resolvedChoices: Choices = {
     ...choice,
     view,
     // Responses may still contain the previous selection while a new one
     // loads. Explicit URL choices must win when another control is changed.
     month: month ?? observedData?.month ?? undefined,
+    forecastMonth: forecastMonth ?? defaultForecastMonth(forecastData),
     observedSelector: observedSelector ?? observedData?.selector,
     scenario: scenario ?? projectedData?.scenario,
     period: period ?? projectedData?.period,
@@ -205,30 +229,45 @@ export function HeatOutlookPanel({
     setPicked({ ...merged, outcome });
     onSelectionChange?.(merged);
   };
-  const settled = view === "observed" ? observed : projected;
+  const settled =
+    view === "observed" ? observed : view === "forecast" ? forecast : projected;
   const showMonthlyObserved = view === "observed" && monthlyObserved && observedEnabled;
   const busy = !showMonthlyObserved && settled.state === "loading";
 
+  // One name on every tab, so switching changes only the figures (the
+  // forecast carries none, and the two releases may spell it differently).
   const place =
-    (view === "observed" ? observedData?.place : projectedData?.place) ??
-    placeLabel ??
-    "this place";
+    observedData?.place ?? projectedData?.place ?? placeLabel ?? "this place";
   const selectors =
-    (view === "observed" ? observedData?.selectors : projectedData?.selectors) ?? [];
+    (view === "observed"
+      ? observedData?.selectors
+      : view === "projection"
+        ? projectedData?.selectors
+        : undefined) ?? [];
   const resolvedSelector =
     view === "observed" ? observedData?.selector : projectedData?.selector;
+  const viewData =
+    view === "observed"
+      ? observedData
+      : view === "forecast"
+        ? forecastData
+        : projectedData;
 
   const shown =
     view === "observed"
       ? observedFigure(observedData)
-      : projectedFigure(projectedData, reference);
+      : view === "forecast"
+        ? forecastFigure(forecastData, resolvedChoices.forecastMonth)
+        : projectedFigure(projectedData, reference);
 
   const mapSource = useMapSource({
     view,
     outcome,
     mapGeographyId,
+    accessToken,
     observed: observedData,
     projected: projectedData,
+    forecastMonth: resolvedChoices.forecastMonth,
     choice: {
       ...choice,
       selector: view === "observed" ? observedSelector : selector,
@@ -257,12 +296,19 @@ export function HeatOutlookPanel({
     >
       <div className={styles.headRow}>
         <p className={base.eyebrow}>Climate attributable health risk</p>
+        {/* Saved plans hold observed or projected views only; the button
+        stays put on the forecast so the tabs do not shift the layout. */}
         {onSavePlan && (
           <Button
             variant="secondary"
             size="sm"
             leadingIcon={<Icon name="bookmark" size={14} />}
-            disabled={busy}
+            disabled={busy || view === "forecast"}
+            title={
+              view === "forecast"
+                ? "Forecasts cannot be saved to a plan yet"
+                : undefined
+            }
             onClick={() => onSavePlan(resolvedChoices)}
           >
             Save plan
@@ -300,7 +346,9 @@ export function HeatOutlookPanel({
         <p className={styles.note} data-testid="outlook-source">
           {view === "observed"
             ? `Observed · ERA5 with model release ${observedData?.release ?? observedCapability?.release ?? "not available"}`
-            : `Projected · Published model release ${projectedData?.release ?? projectionRelease ?? "loading"}`}
+            : view === "forecast"
+              ? `Forecasted · ${forecastData ? `${forecastData.source}, issued ${monthLabel(forecastData.issue)}` : "C3S seasonal forecast"}`
+              : `Projected · Published model release ${projectedData?.release ?? projectionRelease ?? "loading"}`}
         </p>
       )}
 
@@ -314,44 +362,65 @@ export function HeatOutlookPanel({
             </p>
           )}
           {settled.state === "missing" &&
-            (view === "observed" ? observedEnabled : projectionEnabled) && (
+            (view === "observed"
+              ? observedEnabled
+              : view === "projection"
+                ? projectionEnabled
+                : true) && (
               <p className={styles.note} role="status">
                 {view === "observed"
                   ? "Observed months are not available for this place."
-                  : "No projection has been published for this place and outcome yet."}
+                  : view === "forecast"
+                    ? "No seasonal forecast is available for this place yet."
+                    : "No projection has been published for this place and outcome yet."}
               </p>
             )}
           {settled.state === "error" && (
             <p className={styles.note} role="alert">
               {view === "observed"
                 ? "The observed estimate could not load."
-                : "The heat outlook could not load."}
+                : view === "forecast"
+                  ? "The seasonal forecast could not load."
+                  : "The heat outlook could not load."}
             </p>
           )}
 
-          {selectors.length > 0 && (
+          {viewData && (
             <div className={styles.controlBox} data-busy={busy || undefined}>
-              <ControlRow label={outcome === "lbw" ? "Pregnancy window" : "Age group"}>
-                <Select
-                  aria-label={outcome === "lbw" ? "Pregnancy window" : "Age group"}
-                  value={resolvedSelector}
-                  options={selectors.map((option) => ({
-                    value: option.code,
-                    label: option.label,
-                  }))}
-                  onChange={(next) =>
-                    choose(
-                      view === "observed"
-                        ? { observedSelector: next, month: undefined }
-                        : { selector: next },
-                    )
-                  }
-                />
-              </ControlRow>
+              {/* The API lists only the windows or age groups Settings leaves
+              on; with just the default there is nothing to choose. */}
+              {selectors.length > 1 && (
+                <ControlRow
+                  label={outcome === "lbw" ? "Pregnancy window" : "Age group"}
+                >
+                  <Select
+                    aria-label={outcome === "lbw" ? "Pregnancy window" : "Age group"}
+                    value={resolvedSelector}
+                    options={selectors.map((option) => ({
+                      value: option.code,
+                      label: option.label,
+                    }))}
+                    onChange={(next) =>
+                      choose(
+                        view === "observed"
+                          ? { observedSelector: next, month: undefined }
+                          : { selector: next },
+                      )
+                    }
+                  />
+                </ControlRow>
+              )}
               {view === "observed" && observedData && (
                 <ObservedControls
                   observed={observedData}
                   onMonth={(next) => choose({ month: next })}
+                />
+              )}
+              {view === "forecast" && forecastData && (
+                <ForecastControls
+                  forecast={forecastData}
+                  month={resolvedChoices.forecastMonth}
+                  onMonth={(next) => choose({ forecastMonth: next })}
                 />
               )}
               {view === "projection" && projectedData && (
@@ -362,6 +431,14 @@ export function HeatOutlookPanel({
                 />
               )}
             </div>
+          )}
+
+          {view !== "projection" && viewData && (
+            <MonthLegend
+              unavailable={
+                view === "forecast" ? "Outside forecast window" : "No data yet"
+              }
+            />
           )}
 
           {shown.note && (
@@ -384,22 +461,26 @@ export function HeatOutlookPanel({
                   <div className={base.emptyGrid} aria-hidden="true" />
                 )}
 
-                {(view === "observed" ? observedData : projectedData) && (
+                {viewData && (
                   <div className={base.summary} data-testid="outlook-estimate">
                     <p className={base.eyebrow}>{place}</p>
                     <p className={base.stat}>
                       {shown.percent !== null ? (
                         <>
-                          <strong>{shown.percent.toFixed(1)}%</strong> of{" "}
-                          {outcomeLabel.toLowerCase()} cases in {place} may be
-                          attributed to heat {shown.when}
-                          {shown.range}.
+                          {shown.lead},{" "}
+                          <strong className={styles.share}>
+                            {shown.percent.toFixed(1)}
+                          </strong>
+                          % of {outcomeLabel.toLowerCase()} cases in {place} may be
+                          attributable to heat exposure.
                         </>
                       ) : (
                         shown.message
                       )}
                     </p>
-                    {shown.change && <p className={styles.change}>{shown.change}</p>}
+                    {shown.percent !== null && shown.range && (
+                      <p className={styles.change}>{shown.range}</p>
+                    )}
                     {shown.ratio && (
                       <p className={styles.change} data-testid="outlook-ratio">
                         {RATIO_LABEL[shown.ratio.kind]} {shown.ratio.value.toFixed(2)}{" "}
@@ -407,6 +488,7 @@ export function HeatOutlookPanel({
                         {shown.ratio.high.toFixed(2)})
                       </p>
                     )}
+                    {shown.change && <p className={styles.change}>{shown.change}</p>}
                     {shown.ratio && (
                       <div className={base.precisionRow}>
                         <span className={base.precisionLabel}>Precision:</span>
@@ -430,10 +512,8 @@ export function HeatOutlookPanel({
                 the first load asks for one map rather than one per guess. A
                 place with nothing to show keeps the map, so another place
                 can be picked from it. */}
-                {(view === "observed" ? observedData : projectedData) ||
-                settled.state !== "loading" ? (
+                {viewData || settled.state !== "loading" ? (
                   <SpatialRiskMap
-                    key={view}
                     embedded
                     geographyId={mapGeographyId}
                     accessToken={accessToken}
@@ -511,15 +591,19 @@ function useMapSource({
   view,
   outcome,
   mapGeographyId,
+  accessToken,
   observed,
   projected,
+  forecastMonth,
   choice,
 }: {
-  view: OutlookView;
+  view: DashboardView;
   outcome: string;
   mapGeographyId: string;
+  accessToken: string;
   observed: ObservedRisk | null;
   projected: HeatOutlook | null;
+  forecastMonth: string | undefined;
   choice: Choices & { reference: OutlookReference };
 }) {
   // The map shows the selection the API resolved, so it matches the figures,
@@ -531,13 +615,15 @@ function useMapSource({
           month: observed?.month ?? choice.month,
           selector: observed?.selector ?? choice.selector,
         }
-      : {
-          outcome,
-          scenario: projected?.scenario ?? choice.scenario,
-          period: projected?.period ?? choice.period,
-          selector: projected?.selector ?? choice.selector,
-          reference: choice.reference,
-        };
+      : view === "forecast"
+        ? { outcome, month: forecastMonth }
+        : {
+            outcome,
+            scenario: projected?.scenario ?? choice.scenario,
+            period: projected?.period ?? choice.period,
+            selector: projected?.selector ?? choice.selector,
+            reference: choice.reference,
+          };
   const key = `${view}:${Object.values(selection).join(":")}`;
   return useMemo(
     () => ({
@@ -546,7 +632,14 @@ function useMapSource({
       load: (token: string) =>
         view === "observed"
           ? fetchObservedRiskMap(mapGeographyId, token, selection)
-          : fetchHeatOutlookMap(mapGeographyId, token, selection),
+          : view === "forecast"
+            ? fetchForecastMap(
+                mapGeographyId,
+                outcome,
+                forecastMonth,
+                token || accessToken,
+              )
+            : fetchHeatOutlookMap(mapGeographyId, token, selection),
     }),
     // key carries every field of selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -556,8 +649,10 @@ function useMapSource({
 
 type Figure = {
   percent: number | null;
-  when: string;
-  range: string;
+  /** Opens the summary sentence: the temperature and when it applies. */
+  lead: string;
+  /** The share's interval or spread, under the sentence. */
+  range: string | null;
   message: string;
   change: string | null;
   ratio: OutlookRatio | null;
@@ -567,8 +662,8 @@ type Figure = {
 
 const EMPTY_FIGURE: Figure = {
   percent: null,
-  when: "",
-  range: "",
+  lead: "",
+  range: null,
   message: "",
   change: null,
   ratio: null,
@@ -592,9 +687,14 @@ function observedFigure(observed: ObservedRisk | null): Figure {
   }
   const where =
     observed.level === "country" ? `, averaged over ${estimate.counties} counties` : "";
+  // LBW lists each pregnancy month by name; under-5 has one mean daily max.
+  const label = monthLabel(observed.month);
+  const temp = observed.inputs.find(
+    (item) => item.label === label || item.label === "Mean daily max",
+  )?.era5_c;
   return {
     percent: estimate.value_percent,
-    when: `in ${monthLabel(observed.month)}${where}`,
+    lead: sentenceCase(`${temperatureLead("", temp)}in ${label}${where}`),
     range: ciText(estimate.low_percent, estimate.high_percent),
     message: estimate.message ?? note ?? "No estimate is reported for this choice.",
     change: null,
@@ -619,11 +719,11 @@ function projectedFigure(
     return {
       ...EMPTY_FIGURE,
       percent: peak.part.value_percent,
-      when: `in the highest-risk months (${peak.label}) of ${periodLabel}`,
+      lead: `${temperatureLead("projected average", meanTmax(outlook, peak.months))}in the highest-risk months (${peak.label}) of ${periodLabel}`,
       range:
         peak.gcm_min_percent !== null && peak.gcm_max_percent !== null
-          ? ` (climate-model range ${peak.gcm_min_percent.toFixed(1)} to ${peak.gcm_max_percent.toFixed(1)}%)`
-          : "",
+          ? `Climate-model range ${peak.gcm_min_percent.toFixed(1)} to ${peak.gcm_max_percent.toFixed(1)}%`
+          : null,
       message: peak.part.message ?? note ?? "No peak-season estimate is reported.",
       note,
     };
@@ -634,7 +734,7 @@ function projectedFigure(
   const percent = heat?.value_percent ?? null;
   return {
     percent,
-    when: `in an average year of ${periodLabel}`,
+    lead: `${temperatureLead("projected average annual", meanTmax(outlook))}in ${periodLabel}`,
     range: ciText(heat?.low_percent ?? null, heat?.high_percent ?? null),
     message: heat?.message ?? note ?? "No annual summary is reported for this choice.",
     change:
@@ -645,6 +745,54 @@ function projectedFigure(
     thin: heat?.thin_data && heat.message && percent !== null ? heat.message : null,
     note,
   };
+}
+
+/** The seasonal forecast for one month, central estimate and its precision. */
+function forecastFigure(
+  forecast: PlaceForecast | null,
+  month: string | undefined,
+): Figure {
+  if (!forecast || !month) return EMPTY_FIGURE;
+  const row = forecast.months.find((item) => item.month === month);
+  if (!row || row.value_percent === null) {
+    return {
+      ...EMPTY_FIGURE,
+      message: "No forecast estimate is reported for this month.",
+    };
+  }
+  return {
+    ...EMPTY_FIGURE,
+    percent: row.value_percent,
+    lead: `${temperatureLead("forecasted", row.tmax_c)}in ${monthLabel(month)}`,
+    range:
+      row.low_percent !== null && row.high_percent !== null
+        ? `Forecast-system range ${row.low_percent.toFixed(1)} to ${row.high_percent.toFixed(1)}%`
+        : null,
+    ratio: row.ratio ?? null,
+  };
+}
+
+function defaultForecastMonth(forecast: PlaceForecast | null): string | undefined {
+  return forecast?.months.find((item) => item.value_percent !== null)?.month;
+}
+
+/** "At a forecasted maximum temperature of 31.2 °C " — empty without one. */
+function temperatureLead(kind: string, celsius: number | null | undefined): string {
+  if (celsius === null || celsius === undefined) return "";
+  return `At a ${kind ? `${kind} ` : ""}maximum temperature of ${celsius.toFixed(1)} °C `;
+}
+
+function sentenceCase(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Mean daily maximum over the typical months given (all twelve by default). */
+function meanTmax(outlook: HeatOutlook, months?: number[]): number | null {
+  const temps = outlook.months
+    .filter((item) => !months || months.includes(item.month))
+    .map((item) => item.tmax_c)
+    .filter((value): value is number => value !== null);
+  return temps.length > 0 ? temps.reduce((a, b) => a + b, 0) / temps.length : null;
 }
 
 function ControlRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -693,26 +841,70 @@ function ObservedControls({
   observed: ObservedRisk;
   onMonth: (month: string) => void;
 }) {
-  const intensity = useMemo(
-    () =>
-      Object.fromEntries(
-        observed.history
-          .filter((item) => item.value_percent !== null)
-          .map((item) => [item.month, item.value_percent as number]),
-      ),
-    [observed.history],
-  );
   return (
-    <ControlRow label="Month">
+    <MonthYearPicker
+      idPrefix="observed-month"
+      available={observed.available_months}
+      value={observed.month ?? ""}
+      renderRow={controlRow}
+      onChange={onMonth}
+    />
+  );
+}
+
+/** A labelled row of the control box, for the month picker's two rows. */
+function controlRow(label: string, content: ReactNode) {
+  return <ControlRow label={label}>{content}</ControlRow>;
+}
+
+function ForecastControls({
+  forecast,
+  month,
+  onMonth,
+}: {
+  forecast: PlaceForecast;
+  month: string | undefined;
+  onMonth: (month: string) => void;
+}) {
+  const months = forecast.months.filter((item) => item.value_percent !== null);
+  const first = months[0]?.month;
+  const last = months.at(-1)?.month;
+  return (
+    <>
       <MonthYearPicker
-        idPrefix="observed-month"
-        available={observed.available_months}
-        observed={observed.available_months}
-        value={observed.month ?? ""}
-        intensity={intensity}
+        idPrefix="forecast-month"
+        available={months.map((item) => item.month)}
+        value={month ?? ""}
+        unavailableTitle="Outside the forecast window"
+        renderRow={controlRow}
         onChange={onMonth}
       />
-    </ControlRow>
+      {first && last && (
+        <p className={styles.note}>
+          Forecasts are available for the next {months.length} months (
+          {monthLabel(first)} – {monthLabel(last)}).
+        </p>
+      )}
+    </>
+  );
+}
+
+function MonthLegend({ unavailable }: { unavailable: string }) {
+  return (
+    <div className={styles.legend} aria-hidden="true">
+      <span>
+        <i data-key="selected" />
+        Selected
+      </span>
+      <span>
+        <i data-key="available" />
+        Available
+      </span>
+      <span>
+        <i data-key="off" />
+        {unavailable}
+      </span>
+    </div>
   );
 }
 
@@ -746,17 +938,6 @@ function ProjectedControls({
   );
   return (
     <>
-      <ControlRow label="Scenario">
-        <Choice
-          label="Scenario"
-          value={outlook.scenario}
-          options={outlook.scenarios.map((option: OutlookOption) => ({
-            value: option.code,
-            label: option.label,
-          }))}
-          onChange={(next) => choose({ scenario: next })}
-        />
-      </ControlRow>
       {durations.length > 1 && (
         <ControlRow label="Period length">
           <Choice
@@ -807,6 +988,13 @@ function ProjectedControls({
           />
         )}
       </ControlRow>
+      <ControlRow label="Emission scenario">
+        <ScenarioChoice
+          value={outlook.scenario}
+          options={outlook.scenarios}
+          onChange={(next) => choose({ scenario: next })}
+        />
+      </ControlRow>
       <ControlRow label="Reference period">
         <Choice
           label="Reference period"
@@ -833,6 +1021,44 @@ function ProjectedControls({
         predict the conditions in any individual year.
       </p>
     </>
+  );
+}
+
+/** Emission scenarios as cards: the plain-language name over its SSP code. */
+function ScenarioChoice({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: OutlookOption[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className={styles.scenarios} role="group" aria-label="Emission scenario">
+      {options.map((option) => {
+        // Published labels read "SSP3-7.0 (medium-high emissions)".
+        const parts = option.label.match(/^(\S+)\s*\((.+)\)$/);
+        const name = parts ? parts[2] : option.label;
+        return (
+          <button
+            key={option.code}
+            type="button"
+            className={styles.scenario}
+            aria-pressed={option.code === value}
+            onClick={() => onChange(option.code)}
+          >
+            <span className={styles.scenarioName}>
+              {name.charAt(0).toUpperCase() + name.slice(1)}
+            </span>
+            {parts && <span className={styles.scenarioCode}>{parts[1]}</span>}
+            {option.code === value && (
+              <Icon name="check" size={16} className={styles.scenarioTick} />
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1022,10 +1248,10 @@ function formatShare(part: OutlookPart): string {
   return `${part.value_percent.toFixed(1)}%${range}`;
 }
 
-function ciText(low: number | null, high: number | null): string {
+function ciText(low: number | null, high: number | null): string | null {
   return low === null || high === null
-    ? ""
-    : ` (95% CI ${low.toFixed(1)} to ${high.toFixed(1)}%)`;
+    ? null
+    : `95% CI ${low.toFixed(1)} to ${high.toFixed(1)}%`;
 }
 
 function monthLabel(month: string): string {

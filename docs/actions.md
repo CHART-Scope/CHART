@@ -6,6 +6,43 @@ evidence behind it. It appears on the dashboard (**Recommended actions**),
 on its own page (**See all recommended actions**), in Explore (**Act on it**)
 and in the ranking for a saved plan ([Recommendations and AI](recommendations.md)).
 
+## How planners see them
+
+- **Dashboard:** actions sit in three columns, before, during and after the
+  heat season, from each action's **Season** field. An action tagged with
+  several seasons appears in each column. Each card shows its first
+  department and its status.
+- **See all recommended actions** has two views, switched beside the title
+  and kept in the URL (`view=gantt`):
+  - **List:** one card per action. Filters cover department, intervention
+    type, cost, timeframe (`season=`) and status.
+  - **Gantt chart:** the same actions on the place's 12-month planning
+    cycle. Its before, during and after months come from the place's
+    [heat-season calendar](#heat-season-calendars); the cycle starts at the
+    first preparation month and each card spans its first to last season.
+    If the calendar cannot load, the cycle falls back to India's official
+    season. A line marks today, and the footnote links to the settings.
+
+## Heat-season calendars
+
+Settings → **Heat seasons** (administrators) sets, for every place, which
+calendar months are before (preparation), during (response) and after
+(review) the heat season, or outside the cycle. Pick a phase, click months to
+paint them and **Save**; the preview shows the strip the Gantt chart will
+draw from this month on.
+
+- Stored in `heat_season_setting` (migration 033) as twelve letters from
+  January: `b`, `d`, `a` or `o`. Read from the first preparation month they
+  must run before, during, after, then off, with at least one during month.
+- A place without its own calendar inherits its nearest ancestor's (a
+  district its state's), and a country without one uses its official season
+  from `chart/climate/heat_seasons.json` with the four months before it as
+  preparation and the rest as review. **Use <parent>** drops a place's own
+  calendar so it inherits again.
+- `GET /heat-seasons` and `GET /heat-seasons/{geography_id}` are open to
+  dashboard readers for places in their scope; `PUT` and `DELETE` are for
+  `chart_admin` and write a `heat_season_changed` audit event.
+
 ## How actions get from curators to the app
 
 ```

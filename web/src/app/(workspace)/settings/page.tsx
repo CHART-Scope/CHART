@@ -13,6 +13,7 @@ import {
   UserManagement,
 } from "@/features/planning";
 import { ResetInstallationCard } from "@/features/planning/ResetInstallationCard";
+import { HeatSeasonsCard } from "@/features/settings/HeatSeasonsCard";
 import { JobsCard } from "@/features/settings/JobsCard";
 import { ModelReleasesCard } from "@/features/settings/ModelReleasesCard";
 import { ModelSettingsCard } from "@/features/settings/ModelSettingsCard";
@@ -22,26 +23,32 @@ import { isLive, useBackgroundJobs } from "@/lib/backgroundJobs";
 
 import styles from "./page.module.css";
 
-type Tab = "workspace" | "data" | "models" | "recommendations" | "users" | "jobs";
+type Tab =
+  "workspace" | "models" | "seasons" | "data" | "vra" | "recommendations" | "jobs";
 
-/** Installation tabs, after Workspace; administrators only. */
-const ADMIN_TABS: Tab[] = ["data", "models", "recommendations", "users", "jobs"];
+/** Every signed-in planner: where they plan, and what the models offer. */
+const PLANNER_TABS: Tab[] = ["workspace", "models"];
+/** Installation tabs, administrators only. */
+const ADMIN_TABS: Tab[] = ["seasons", "data", "vra", "recommendations", "jobs"];
 const LABELS: Record<Tab, string> = {
   workspace: "Workspace",
-  data: "Data",
   models: "Models",
+  seasons: "Heat seasons",
+  data: "Data",
+  vra: "VRA",
   recommendations: "Recommendations",
-  users: "Users",
   jobs: "Jobs",
 };
 
 /**
- * Settings, one tab at a time. Every signed-in user with a planning area has
- * Workspace (planning location and model options). Administrators also get
- * the installation tabs: climate Data, Models, Users (with the reset folded
- * away at its foot) and background Jobs. The tab lives in `?tab=`, so it can
- * be linked to and survives a reload; a tab the user may not open falls back
- * to Workspace.
+ * Settings, one tab at a time. Workspace is about where and with whom you
+ * plan: the planning location, and for administrators the people with
+ * access (with the reset folded away at its foot). Models
+ * holds every model option and, for administrators, the installed releases.
+ * Administrators also get Heat seasons, climate Data, the vulnerability
+ * assessment (VRA), Recommendations and background Jobs. The tab lives in
+ * `?tab=`, so it can be linked to and survives a reload; a tab the user may
+ * not open falls back to Workspace.
  */
 export default function SettingsPage() {
   return (
@@ -57,7 +64,7 @@ function Settings() {
   const searchParams = useSearchParams();
   const requested = searchParams.get("tab");
   const isAdmin = session.user.roles.includes("chart_admin");
-  const allowed: Tab[] = isAdmin ? ["workspace", ...ADMIN_TABS] : ["workspace"];
+  const allowed: Tab[] = isAdmin ? [...PLANNER_TABS, ...ADMIN_TABS] : PLANNER_TABS;
   const tab = allowed.find((item) => item === requested) ?? "workspace";
 
   // The tab is client state mirrored into the URL: the native History API
@@ -87,31 +94,34 @@ function Settings() {
           geographyScopes={session.user.geographyScopes}
           activeGeographyId={session.user.activeGeographyId}
         />
+        {isAdmin ? (
+          <>
+            <UserManagement accessToken={session.accessToken} />
+            <ResetInstallationCard accessToken={session.accessToken} />
+          </>
+        ) : null}
+      </>
+    ),
+    models: (
+      <>
         <ModelSettingsCard
           accessToken={session.accessToken}
           activeGeographyId={session.user.activeGeographyId}
         />
+        {isAdmin ? <ModelReleasesCard accessToken={session.accessToken} /> : null}
       </>
     ),
-    data: (
-      <>
-        <ClimateDataCard accessToken={session.accessToken} />
-        <VraIndicatorsCard
-          accessToken={session.accessToken}
-          geographyScopes={session.user.geographyScopes}
-          activeGeographyId={session.user.activeGeographyId}
-          initialFrame={searchParams.get("vra_frame")}
-        />
-      </>
+    seasons: <HeatSeasonsCard canEdit />,
+    data: <ClimateDataCard accessToken={session.accessToken} />,
+    vra: (
+      <VraIndicatorsCard
+        accessToken={session.accessToken}
+        geographyScopes={session.user.geographyScopes}
+        activeGeographyId={session.user.activeGeographyId}
+        initialFrame={searchParams.get("vra_frame")}
+      />
     ),
-    models: <ModelReleasesCard accessToken={session.accessToken} />,
     recommendations: <RecommendationSettingsCard />,
-    users: (
-      <>
-        <UserManagement accessToken={session.accessToken} />
-        <ResetInstallationCard accessToken={session.accessToken} />
-      </>
-    ),
     jobs: <JobsCard />,
   }[tab];
 
@@ -122,7 +132,7 @@ function Settings() {
         title="Shape how CHART plans with you"
         lede={
           isAdmin
-            ? "Where you plan and which model options the dashboard offers, plus this installation's data, models, people and background jobs."
+            ? "Where you plan, who has access and which model options the dashboard offers, plus this installation's heat seasons, data, vulnerability assessment and background jobs."
             : "Choose where you plan and which model options the dashboard offers."
         }
       />

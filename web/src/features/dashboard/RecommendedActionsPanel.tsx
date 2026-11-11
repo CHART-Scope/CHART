@@ -3,31 +3,17 @@
 import Link from "next/link";
 import { useCallback, useState } from "react";
 
-import { Icon, type IconName } from "@/components/Icon";
+import { Icon } from "@/components/Icon";
 import {
   ActionPanel,
+  seasons,
   statusLabels,
+  timingSeason,
   useActionProgress,
   useHeatActions,
 } from "@/features/actions";
 
 import styles from "./RecommendedActionsPanel.module.css";
-
-type Tone = { toneClass: string; icon: IconName };
-
-// Action types (the feed's vocabulary) by their first word.
-const TYPE_TONES: Record<string, Tone> = {
-  Behaviour: { toneClass: styles.tBehaviour, icon: "users" },
-  Capacity: { toneClass: styles.tBehaviour, icon: "users" },
-  Clinical: { toneClass: styles.tBehaviour, icon: "heart-handshake" },
-  Supplies: { toneClass: styles.tBehaviour, icon: "droplet" },
-  Environment: { toneClass: styles.tEnvironment, icon: "leaf" },
-  Infrastructure: { toneClass: styles.tEnvironment, icon: "building" },
-  Policy: { toneClass: styles.tPolicy, icon: "policy" },
-  Financing: { toneClass: styles.tPolicy, icon: "policy" },
-  Early: { toneClass: styles.tPolicy, icon: "alert-triangle" },
-};
-const NEUTRAL: Tone = { toneClass: styles.tNeutral, icon: "dots" };
 
 type Props = {
   /** Page geography; the "See all" page is scoped to it. */
@@ -42,8 +28,10 @@ type Props = {
 };
 
 /**
- * The dashboard's short list of recommended actions. Opens the same detail
- * panel as the full actions page, and "See all" goes there.
+ * The dashboard's recommended actions in three columns: before, during and
+ * after the heat season (an action recommended for several seasons appears
+ * in each). Opens the same detail panel as the full actions page, and
+ * "See all" goes there.
  */
 export function RecommendedActionsPanel({
   geographyId,
@@ -87,36 +75,49 @@ export function RecommendedActionsPanel({
             </button>
           </p>
         ) : null}
-        <ul className={styles.list}>
-          {actions.map((action) => (
-            <li key={action.id}>
-              <button
-                type="button"
-                className={styles.item}
-                onClick={() => setSelectedId(action.id)}
-                aria-label={`Open ${action.title}`}
+        <div className={styles.seasons}>
+          {seasons.map((season) => {
+            const inSeason = actions.filter((action) =>
+              action.seasons.includes(season),
+            );
+            return (
+              <section
+                key={season}
+                className={styles.season}
+                aria-label={timingSeason[season]}
               >
-                <div className={styles.itemBody}>
-                  <p className={styles.title}>{action.title}</p>
-                  <div className={styles.pillRow}>
-                    {action.action_types[0] ? (
-                      <CategoryPill label={action.action_types[0]} />
-                    ) : null}
-                    {action.departments[0] ? (
-                      <span className={`${styles.pill} ${styles.tNeutral}`}>
-                        {action.departments[0]}
-                      </span>
-                    ) : null}
-                    <span className={styles.status}>
-                      {statusLabels[progress.statusOf(action.id)]}
-                    </span>
-                  </div>
-                </div>
-                <Icon name="arrow-right" size={16} className={styles.itemChevron} />
-              </button>
-            </li>
-          ))}
-        </ul>
+                <h3 className={styles.seasonTitle}>{timingSeason[season]}</h3>
+                {inSeason.length === 0 && !loading && !error ? (
+                  <p className={styles.none}>No actions for this season yet.</p>
+                ) : null}
+                <ul className={styles.list}>
+                  {inSeason.map((action) => (
+                    <li key={action.id}>
+                      <button
+                        type="button"
+                        className={styles.item}
+                        onClick={() => setSelectedId(action.id)}
+                        aria-label={`Open ${action.title}`}
+                      >
+                        <p className={styles.title}>{action.title}</p>
+                        <div className={styles.pillRow}>
+                          {action.departments[0] ? (
+                            <span className={styles.pill}>{action.departments[0]}</span>
+                          ) : null}
+                          <span
+                            className={`${styles.pill} ${styles[progress.statusOf(action.id)]}`}
+                          >
+                            {statusLabels[progress.statusOf(action.id)]}
+                          </span>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
         <Link href={seeAllHref} className={styles.seeAll}>
           See all recommended actions
         </Link>
@@ -128,15 +129,5 @@ export function RecommendedActionsPanel({
         onClose={closePanel}
       />
     </>
-  );
-}
-
-function CategoryPill({ label }: { label: string }) {
-  const tone = TYPE_TONES[label.split(/[\s:]/)[0]] ?? NEUTRAL;
-  return (
-    <span className={`${styles.pill} ${tone.toneClass}`}>
-      <Icon name={tone.icon} size={12} />
-      {label}
-    </span>
   );
 }

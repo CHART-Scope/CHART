@@ -34,14 +34,14 @@ needs no server access to get in.
    (`POST /setup/complete`) and gives it the installed country.
 5. CHART opens the dashboard for that country. Invite everyone else (below).
 
-Before setup, `admin` lands on **Settings → Users**; only an administrator
+Before setup, `admin` lands on **Settings → Workspace**; only an administrator
 can open `/onboarding`.
 
 ## Inviting people
 
 Signed in as `admin` (or any CHART administrator):
 
-1. Open **Settings → Users** and fill in **Invite a person**: full name,
+1. Open **Settings → Workspace** and fill in **Invite a person**: full name,
    email address, role and planning area.
 2. Choose **Send invitation**. They receive **You are invited to CHART**; the
    link works for 7 days.

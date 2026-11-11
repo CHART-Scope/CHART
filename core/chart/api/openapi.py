@@ -749,6 +749,57 @@ OPERATION_DOCUMENTATION: dict[
             )
         },
     ),
+    ("get", "/heat-seasons"): OperationDocumentation(
+        summary="List heat-season calendars",
+        description=(
+            "Every place the caller can read, parents before children, with the "
+            "heat-season calendar in effect: twelve letters from January (b before, "
+            "d during, a after, o outside the cycle). state says whether the place "
+            "has its own calendar (custom), inherits an ancestor's (inherited, with "
+            "inherited_from), uses the country's official season (official) or has "
+            "none (unset). Requires a dashboard reader role."
+        ),
+        success_responses={
+            "200": "Each readable place with its calendar in effect, its own months and where they come from."
+        },
+    ),
+    ("get", "/heat-seasons/{geography_id}"): OperationDocumentation(
+        summary="Read the heat-season calendar in effect for a place",
+        description=(
+            "The place's own calendar, else its nearest ancestor's, else the "
+            "country's official season with the four months before it as "
+            "preparation. Lays out the recommended-actions Gantt chart. Requires "
+            "read access to the place (GEOGRAPHY_NOT_ALLOWED, "
+            "HEAT_SEASON_GEOGRAPHY_NOT_FOUND)."
+        ),
+        success_responses={
+            "200": "The twelve-month calendar in effect for the place and the place or season it comes from."
+        },
+    ),
+    ("put", "/heat-seasons/{geography_id}"): OperationDocumentation(
+        summary="Save a place's own heat-season calendar",
+        description=(
+            "Stores twelve months for the place; its children inherit them unless "
+            "they have their own. Read from the first preparation month the months "
+            "must run before, during, after, then off, with at least one during "
+            "month (HEAT_SEASON_INVALID). Administrators only "
+            "(ROLE_NOT_ALLOWED). Records a heat_season_changed audit event."
+        ),
+        success_responses={
+            "200": "The saved calendar as it now applies to the place, with its source and state."
+        },
+    ),
+    ("delete", "/heat-seasons/{geography_id}"): OperationDocumentation(
+        summary="Drop a place's own calendar so it inherits again",
+        description=(
+            "Removes the place's own calendar; it then inherits its parent's or "
+            "the official season. Administrators only. "
+            "Records a heat_season_changed audit event when a calendar was removed."
+        ),
+        success_responses={
+            "200": "The calendar that now applies: the parent's or the official season, with its origin."
+        },
+    ),
     ("get", "/saved-plans"): OperationDocumentation(
         summary="List the user's saved plans",
         description=(

@@ -32,6 +32,7 @@ export const ICON_NAMES = [
   "heart-handshake",
   "dots",
   "check",
+  "edit",
   "maternal-health",
   "mother-baby",
   "baby",
@@ -550,6 +551,15 @@ export function IconSprite() {
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </symbol>
+        <symbol id="ic-edit" viewBox="0 0 24 24">
+          <path
+            d="M4 20h4L19 9l-4-4L4 16z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
             strokeLinejoin="round"
           />
         </symbol>

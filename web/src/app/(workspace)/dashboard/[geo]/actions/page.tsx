@@ -7,12 +7,17 @@ import { use, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import {
   ActionRepository,
+  ActionViewToggle,
+  type ActionView,
+  FALLBACK_CALENDAR,
   PlanRecommendations,
   seasons,
   useActionProgress,
   useHeatActions,
 } from "@/features/actions";
+import { type HeatSeasonLayout } from "@/features/actions/ActionGantt";
 import { DashboardHeader } from "@/features/dashboard";
+import { getHeatSeason } from "@/lib/heatSeasonsClient";
 import { getSavedPlan, type SavedPlan } from "@/lib/savedPlansClient";
 import { useGeographies } from "@/lib/useGeographies";
 import { useModelCatalog } from "@/lib/useModelCatalog";
@@ -23,6 +28,7 @@ type Query = {
   admin_unit?: string;
   outcome?: string;
   season?: string;
+  view?: string;
   action?: string;
   plan?: string;
 };
@@ -52,13 +58,18 @@ export default function RecommendedActionsPage(props: PageProps) {
     return () => controller.abort();
   }, [planId]);
   const loadedPlan = plan?.id === planId ? plan : undefined;
-  // Season and the open action live in the URL so a reload, the back button
-  // or a shared link land on the same view. A plan opens on its own season.
+  // The view, timeframe and open action live in the URL so a reload, the
+  // back button or a shared link land on the same view. A plan opens on its
+  // own season; "all" records clearing it.
   const season =
-    seasons.find((value) => value === query.season) ??
-    loadedPlan?.data?.signals.timing ??
-    seasons[0];
+    query.season === "all"
+      ? null
+      : (seasons.find((value) => value === query.season) ??
+        loadedPlan?.data?.signals.timing ??
+        null);
+  const view: ActionView = query.view === "gantt" ? "gantt" : "list";
   const selectedId = query.action ?? null;
+  const heatSeason = useHeatSeasonLayout(placeId);
 
   const { geographies } = useGeographies();
   const { catalog } = useModelCatalog(geographyId);
@@ -86,12 +97,18 @@ export default function RecommendedActionsPage(props: PageProps) {
   if (query.admin_unit) dashboardQuery.set("admin_unit", query.admin_unit);
   const dashboardHref = `/dashboard/${encodeURIComponent(geographyId)}?${dashboardQuery}`;
 
-  function setQuery(change: { season?: string; action?: string | null }) {
+  function setQuery(change: {
+    season?: string | null;
+    view?: ActionView;
+    action?: string | null;
+  }) {
     const next = new URLSearchParams(dashboardQuery);
     if (planId) next.set("plan", planId);
-    const merged = { season, action: selectedId, ...change };
-    // With a plan the default season is the plan's, so record any choice.
-    if (planId || merged.season !== seasons[0]) next.set("season", merged.season);
+    const merged = { season, view, action: selectedId, ...change };
+    // With a plan the default season is the plan's, so record clearing it.
+    if (merged.season) next.set("season", merged.season);
+    else if (planId) next.set("season", "all");
+    if (merged.view === "gantt") next.set("view", "gantt");
     if (merged.action) next.set("action", merged.action);
     router.replace(`/dashboard/${encodeURIComponent(geographyId)}/actions?${next}`, {
       scroll: false,
@@ -109,12 +126,16 @@ export default function RecommendedActionsPage(props: PageProps) {
         healthDomainLabel={domainLabel}
       />
       <div className={styles.intro}>
-        <h1 className={styles.title}>Recommended actions</h1>
-        <p className={styles.lede}>
-          Actions recommended for {domainLabel.toLowerCase()} under{" "}
-          {hazardLabel.toLowerCase()}, with the context, steps and evidence behind each
-          one. Set a status or assign districts to track follow-up.
-        </p>
+        <div>
+          <h1 className={styles.title}>Recommended actions</h1>
+          <p className={styles.lede}>
+            Actions recommended for {domainLabel.toLowerCase()} under{" "}
+            {hazardLabel.toLowerCase()} — filtered from the CHART action repository,
+            with the context, steps and evidence behind each one. Set a status to track
+            follow-up.
+          </p>
+        </div>
+        <ActionViewToggle view={view} onChange={(next) => setQuery({ view: next })} />
       </div>
       {planId && !loadedPlan ? (
         <p role="status" className={styles.lede}>
@@ -150,12 +171,40 @@ export default function RecommendedActionsPage(props: PageProps) {
       <ActionRepository
         actions={actions}
         progress={progress}
+        view={view}
         season={season}
         onSeasonChange={(next) => setQuery({ season: next, action: null })}
+        heatSeason={heatSeason}
         selectedId={selectedId}
         onSelect={(action) => setQuery({ action })}
         contextLabel={`${hazardLabel} · ${domainLabel} · ${trail.at(-1)}`}
       />
     </main>
   );
+}
+
+/** The place's heat-season calendar from Settings > Heat seasons (its own,
+ * an ancestor's or the official season), or India's until it loads, so the
+ * cycle still draws when it cannot. */
+function useHeatSeasonLayout(placeId: string) {
+  const [loaded, setLoaded] = useState<{ id: string; layout: HeatSeasonLayout }>();
+  useEffect(() => {
+    const controller = new AbortController();
+    getHeatSeason(placeId, controller.signal)
+      .then((season) => {
+        if (controller.signal.aborted || !season.months) return;
+        setLoaded({
+          id: placeId,
+          layout: {
+            calendar: season.months,
+            placeName: season.inherited_from ?? season.name,
+          },
+        });
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [placeId]);
+  return loaded?.id === placeId
+    ? loaded.layout
+    : { calendar: FALLBACK_CALENDAR, placeName: null };
 }

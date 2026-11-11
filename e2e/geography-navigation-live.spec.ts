@@ -123,16 +123,17 @@ for (const place of cases) {
       );
       await expect(
         panel
-          .getByRole("group", { name: "Scenario", exact: true })
-          .getByRole("button", { name: "SSP1-2.6 (low emissions)", exact: true }),
+          .getByRole("group", { name: "Emission scenario", exact: true })
+          .getByRole("button", { name: "Low emissions SSP1-2.6", exact: true }),
       ).toHaveAttribute("aria-pressed", "true");
       const selector = panel.getByRole("combobox", {
         name: outcome === "lbw" ? "Pregnancy window" : "Age group",
         exact: true,
       });
-      await expect(selector).toContainText(
-        outcome === "lbw" ? "Whole pregnancy" : "Neonatal (0-27 days)",
-      );
+      // LBW has only the whole pregnancy on by default, so no dropdown;
+      // under-five offers several age groups.
+      if (outcome === "lbw") await expect(selector).toHaveCount(0);
+      else await expect(selector).toContainText("Neonatal (0-27 days)");
       await expect(
         panel
           .getByRole("group", { name: "Period length", exact: true })
@@ -141,9 +142,10 @@ for (const place of cases) {
       await page.reload();
       await expectRoute(page, place.parent, filters, place.child);
       await expect(projected).toHaveAttribute("aria-selected", "true");
-      await expect(selector).toContainText(
-        outcome === "lbw" ? "Whole pregnancy" : "Neonatal (0-27 days)",
-      );
+      // LBW has only the whole pregnancy on by default, so no dropdown;
+      // under-five offers several age groups.
+      if (outcome === "lbw") await expect(selector).toHaveCount(0);
+      else await expect(selector).toContainText("Neonatal (0-27 days)");
       await expect(panel.getByTestId("outlook-estimate")).toContainText(
         place.childName,
       );
@@ -247,9 +249,10 @@ for (const place of cases) {
       await expect(panel.getByTestId("outlook-source")).toHaveText(parentSource);
       await projected.click();
       await expectRoute(page, place.parent, filters);
-      await expect(selector).toContainText(
-        outcome === "lbw" ? "Whole pregnancy" : "Neonatal (0-27 days)",
-      );
+      // LBW has only the whole pregnancy on by default, so no dropdown;
+      // under-five offers several age groups.
+      if (outcome === "lbw") await expect(selector).toHaveCount(0);
+      else await expect(selector).toContainText("Neonatal (0-27 days)");
       await expect(panel.getByTestId("outlook-estimate")).toBeVisible();
       await expect(panel.getByRole("alert")).toHaveCount(0);
     });

@@ -182,7 +182,7 @@ test("an assessed state shows its map, its ranking and one area opened up", asyn
   await expect(page.getByText("Area detail", { exact: true })).toHaveCount(0);
 
   // A planner is offered nothing administrative.
-  await expect(page.getByRole("link", { name: /Settings → Data/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Settings → VRA/ })).toHaveCount(0);
   expect(api.requests.filter((r) => /coverage|template|values|runs/.test(r))).toEqual(
     [],
   );
@@ -206,9 +206,9 @@ test("before any run the page says so, and sends an admin to Settings", async ({
   );
 
   await page
-    .getByRole("link", { name: "Load indicators and run it in Settings → Data" })
+    .getByRole("link", { name: "Load indicators and run it in Settings → VRA" })
     .click();
-  await page.waitForURL(/\/settings\?tab=data&vra_frame=geo-in-madhya-pradesh$/);
+  await page.waitForURL(/\/settings\?tab=vra&vra_frame=geo-in-madhya-pradesh$/);
   await expect(card(page)).toBeVisible();
   await expect(
     card(page).getByRole("combobox", { name: "Place to assess" }),
@@ -224,7 +224,7 @@ test("a planner sees the empty state without an admin link", async ({ page }) =>
       "An administrator runs it from Settings once indicator data is loaded.",
     ),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: /Settings → Data/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Settings → VRA/ })).toHaveCount(0);
   await page.screenshot({ path: `${evidence}/empty-planner.png`, fullPage: true });
 });
 
@@ -232,7 +232,7 @@ test("an admin uploads values, sees each rejected row, runs, and the page shows 
   page,
 }) => {
   const api = await installVra(page);
-  await page.goto(`/settings?tab=data&vra_frame=${MP}`);
+  await page.goto(`/settings?tab=vra&vra_frame=${MP}`);
   const indicators = card(page);
   await expect(
     indicators.getByRole("combobox", { name: "Place to assess" }),
@@ -360,7 +360,7 @@ test("a planner has no indicators card and the admin endpoints refuse them", asy
   page,
 }) => {
   const api = await installVra(page, { ...planner, assessed: ["mp"] });
-  await page.goto(`/settings?tab=data&vra_frame=${MP}`);
+  await page.goto(`/settings?tab=vra&vra_frame=${MP}`);
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByText("Planning location")).toBeVisible();
   await expect(card(page)).toHaveCount(0);
@@ -449,7 +449,7 @@ test("the page and the indicators card fit a phone without sideways scrolling", 
   await noSidewaysScroll(page);
   await page.screenshot({ path: `${evidence}/drilldown-phone.png`, fullPage: true });
 
-  await page.goto(`/settings?tab=data&vra_frame=${MP}`);
+  await page.goto(`/settings?tab=vra&vra_frame=${MP}`);
   await card(page)
     .getByRole("button", { name: /^Sensitivity/ })
     .click();

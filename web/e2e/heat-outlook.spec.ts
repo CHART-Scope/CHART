@@ -144,7 +144,7 @@ test("the Kenya dashboard estimates for Kenya as a whole", async ({ page }) => {
   const api = await installKenya(page);
   await page.goto("/dashboard/geo-ke?outcome=lbw");
   await expect(panel(page).getByTestId("outlook-estimate")).toContainText(
-    /in Kenya.*averaged over \d+ counties/,
+    /averaged over \d+ counties, [\d.]+% of .* in Kenya/,
   );
   await page.waitForTimeout(400);
   await page.screenshot({

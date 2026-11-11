@@ -105,7 +105,7 @@ test("when the areas cannot be read, sign-in still lands on the Planning center"
   await page.waitForURL("**/plan");
 });
 
-test("the default admin, before setup gives it an area, lands on Settings → Users, or back on setup", async ({
+test("the default admin, before setup gives it an area, lands on Settings → Workspace to manage people, or back on setup", async ({
   page,
 }) => {
   const api = await installFakeApi(page);
@@ -123,7 +123,7 @@ test("the default admin, before setup gives it an area, lands on Settings → Us
   api.on(/^\/api\/setup$/, (route) => json(route, { requiresOnboarding: false }));
 
   await page.goto(callback);
-  await page.waitForURL("**/settings?tab=users");
+  await page.waitForURL(/\/settings$/);
   await expect(page.getByRole("heading", { name: "People and access" })).toBeVisible();
 
   // "Set up CHART" asked for sign-in: the admin goes back to setup.

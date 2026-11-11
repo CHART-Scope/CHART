@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { InlineSelect } from "@/components/InlineSelect";
 
@@ -43,6 +43,11 @@ export type MonthYearPickerProps = {
   intensity?: Readonly<Record<string, number>>;
   yearsBack?: number;
   idPrefix?: string;
+  /** Tooltip on a month with no data (a forecast says why it is off). */
+  unavailableTitle?: string;
+  /** Lays the year and the months out as two labelled rows of the caller's
+   * control box instead of side by side. */
+  renderRow?: (label: string, content: ReactNode) => ReactNode;
 };
 
 function yearOf(key: string): number {
@@ -64,6 +69,8 @@ export function MonthYearPicker({
   intensity = {},
   yearsBack = DEFAULT_YEARS_BACK,
   idPrefix = "month-year",
+  unavailableTitle = "No data for this month",
+  renderRow,
 }: MonthYearPickerProps) {
   const years = useMemo(() => {
     const fromData = [...new Set(available.map(yearOf))].filter(Number.isFinite);
@@ -103,51 +110,63 @@ export function MonthYearPicker({
     };
   }, [intensity]);
 
+  const yearSelect = (
+    <div className={styles.yearRow}>
+      <InlineSelect
+        menu
+        size="sm"
+        aria-label="Year"
+        value={String(year)}
+        onChange={(value) => setViewYear(Number(value))}
+        options={years.map((item) => ({ value: String(item), label: String(item) }))}
+      />
+    </div>
+  );
+  const monthGrid = (
+    <div className={styles.monthGrid} role="group" aria-label={`Months in ${year}`}>
+      {MONTH_LABELS.map((label, i) => {
+        const key = `${year}-${String(i + 1).padStart(2, "0")}`;
+        const isAvailable = availableSet.has(key);
+        const isSelected = key === value;
+        return (
+          <button
+            key={key}
+            type="button"
+            id={`${idPrefix}-${key}`}
+            className={styles.monthButton}
+            aria-pressed={isSelected}
+            data-selected={isSelected || undefined}
+            data-observed={observedSet.has(key) || undefined}
+            data-band={isAvailable ? bandFor(key) || undefined : undefined}
+            disabled={!isAvailable}
+            // A month with no data is shown, not hidden: the gap is
+            // information, and a grid that changes shape is hard to scan.
+            title={
+              !isAvailable
+                ? unavailableTitle
+                : intensity[key] !== undefined
+                  ? `${intensity[key].toFixed(1)}% attributable`
+                  : undefined
+            }
+            onClick={() => onChange(key)}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+  if (renderRow)
+    return (
+      <>
+        {renderRow("Year", yearSelect)}
+        {renderRow("Month", monthGrid)}
+      </>
+    );
   return (
     <div className={styles.picker}>
-      <div className={styles.yearRow}>
-        <InlineSelect
-          menu
-          size="sm"
-          aria-label="Year"
-          value={String(year)}
-          onChange={(value) => setViewYear(Number(value))}
-          options={years.map((item) => ({ value: String(item), label: String(item) }))}
-        />
-      </div>
-
-      <div className={styles.monthGrid} role="group" aria-label={`Months in ${year}`}>
-        {MONTH_LABELS.map((label, i) => {
-          const key = `${year}-${String(i + 1).padStart(2, "0")}`;
-          const isAvailable = availableSet.has(key);
-          const isSelected = key === value;
-          return (
-            <button
-              key={key}
-              type="button"
-              id={`${idPrefix}-${key}`}
-              className={styles.monthButton}
-              aria-pressed={isSelected}
-              data-selected={isSelected || undefined}
-              data-observed={observedSet.has(key) || undefined}
-              data-band={isAvailable ? bandFor(key) || undefined : undefined}
-              disabled={!isAvailable}
-              // A month with no data is shown, not hidden: the gap is
-              // information, and a grid that changes shape is hard to scan.
-              title={
-                !isAvailable
-                  ? "No data for this month"
-                  : intensity[key] !== undefined
-                    ? `${intensity[key].toFixed(1)}% attributable`
-                    : undefined
-              }
-              onClick={() => onChange(key)}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
+      {yearSelect}
+      {monthGrid}
     </div>
   );
 }

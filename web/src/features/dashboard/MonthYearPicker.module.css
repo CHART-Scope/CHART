@@ -11,13 +11,11 @@
   gap: var(--space-2);
 }
 
+/* One row of fixed chips that wraps when narrow, as in the design. */
 .monthGrid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 4px;
-  width: 100%;
-  max-width: none;
-  justify-content: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
 }
 
 .monthButton {
@@ -33,7 +31,8 @@
   transition:
     border-color 140ms ease,
     background-color 140ms ease;
-  min-height: 34px;
+  width: 46px;
+  min-height: 36px;
   border-radius: 8px;
 }
 .monthButton[data-band="1"] {
@@ -71,9 +70,12 @@
   box-shadow: inset 0 -2px 0 var(--color-lime);
 }
 
+/* Months without data stay in place, filled grey, as in the design's legend. */
 .monthButton:disabled {
-  opacity: 0.35;
-  cursor: default;
+  background: var(--color-grey-light, #eceae7);
+  border-color: var(--color-grey-light, #eceae7);
+  color: var(--color-text-faint);
+  cursor: not-allowed;
 }
 
 .monthButton:focus-visible {
@@ -84,10 +86,5 @@
 @media (prefers-reduced-motion: reduce) {
   .monthButton {
     transition: none;
-  }
-}
-@container risk-panel (min-width: 760px) {
-  .monthGrid {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
   }
 }

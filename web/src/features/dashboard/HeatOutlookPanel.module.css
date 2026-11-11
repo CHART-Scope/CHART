@@ -51,7 +51,8 @@
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
-  background: var(--surface-muted, #f5f4ef);
+  /* Lighter than the grey of an unavailable month, so those still read. */
+  background: var(--surface-app);
   transition: opacity 180ms var(--ease-out-soft);
 }
 
@@ -249,4 +250,111 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+}
+
+/* Under the month picker: what the three month states mean. */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: calc(-1 * var(--space-1));
+  font-size: var(--fs-micro);
+  color: var(--color-text-muted);
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.legend i[data-key="selected"] {
+  background: var(--color-nexus);
+}
+
+.legend i[data-key="available"] {
+  background: var(--surface-card);
+  border: 1.5px solid var(--border-subtle);
+}
+
+.legend i[data-key="off"] {
+  background: var(--color-grey-light);
+}
+
+.scenarios {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-2);
+}
+
+.scenario {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 9px 34px 9px 14px;
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-card);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.scenario:hover {
+  border-color: var(--color-nexus);
+}
+
+.scenario[aria-pressed="true"] {
+  background: var(--color-nexus);
+  border-color: var(--color-nexus);
+  color: var(--color-white);
+}
+
+.scenario:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.scenarioName {
+  font-size: var(--fs-body-sm);
+  font-weight: 500;
+}
+
+.scenarioCode {
+  font-family: var(--font-display);
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.scenarioTick {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+}
+
+/* The headline share, set larger inside the sentence as in the design. */
+.share {
+  font-family: var(--font-display);
+  font-size: 1.5em;
+  color: var(--color-maroon);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scenario {
+    transition: none;
+  }
 }
