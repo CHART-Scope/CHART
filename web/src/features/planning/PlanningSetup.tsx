@@ -20,11 +20,6 @@ type Props = {
   error: string | null;
   onChange: (selection: PlanningSelection) => void;
   onStart: () => void;
-  /** Optional inline element rendered above the "What would you like to
-   * plan for" heading — the planning page passes an
-   * `<InlineContextSwitcher />` so the family flip is one control, no
-   * separate context card taking up space. */
-  contextSwitcher?: ReactNode;
   /** The user's saved plans, listed under the sentence. */
   savedPlans?: ReactNode;
 };
@@ -38,7 +33,6 @@ export function PlanningSetup({
   error,
   onChange,
   onStart,
-  contextSwitcher,
   savedPlans,
 }: Props) {
   const activeArea = useMemo(
@@ -95,7 +89,6 @@ export function PlanningSetup({
   return (
     <div className={styles.wrap}>
       <header className={styles.header}>
-        {contextSwitcher}
         <h1 className={styles.title}>What would you like to plan for, together?</h1>
         <p className={styles.lede}>
           Build a sentence below. CHART will generate the shared risk picture,

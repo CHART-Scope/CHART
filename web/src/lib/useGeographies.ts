@@ -8,7 +8,7 @@ import { listGeographies, type GeographyRecord } from "@/lib/planningClient";
 /**
  * Shared client-side cache of the /geographies response. Every
  * component that needs the list (DashboardContextBar,
- * InlineContextSwitcher, GeographyContextCard, PlanningApp, the
+ * GeographyContextCard, PlanningApp, the
  * dashboard page) should call this hook instead of firing its own
  * ``listGeographies()`` — otherwise a single dashboard mount issues
  * five identical concurrent HTTPS round-trips for the same JSON.

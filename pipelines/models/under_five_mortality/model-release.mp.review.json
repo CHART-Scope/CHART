@@ -4,7 +4,7 @@
   "module": "prediction",
   "outcome": "under_5_mortality",
   "climate_hazard": "extreme_heat",
-  "health_domain": "child_health",
+  "health_domain": "maternal_newborn_child_health",
   "version": "0.1.0-review",
   "runtime": {
     "adapter": "compact_r_registry",
@@ -31,7 +31,7 @@
   },
   "presentation": {
     "climate_hazard_label": "Extreme heat",
-    "health_domain_label": "Child health",
+    "health_domain_label": "Maternal, newborn and child health",
     "outcome_label": "Under-five mortality",
     "dashboard_title": "Protecting children under five from extreme heat",
     "population_label": "case-control rows",
