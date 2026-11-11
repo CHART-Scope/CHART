@@ -227,7 +227,8 @@ body {
 }
 
 .pf-v5-c-form-control > input {
-  min-height: 38px;
+  /* Design system: text inputs are 44 high, buttons 48 (L). */
+  min-height: 44px;
   padding: 9px 12px;
   color: var(--chart-charcoal);
   background: transparent;
@@ -250,9 +251,9 @@ body {
 
 .pf-v5-c-button.pf-m-primary,
 #kc-login {
-  min-height: 38px;
+  min-height: 48px;
   border: 1px solid var(--chart-nexus);
-  border-radius: var(--chart-radius-sm);
+  border-radius: var(--chart-radius-md);
   color: var(--chart-white);
   background: var(--chart-nexus);
   font-family: var(--chart-font-body);
@@ -554,15 +555,13 @@ a {
   }
 
   .pf-v5-c-form-control > input {
-    min-height: 44px;
     font-size: 14px;
   }
 
   .pf-v5-c-button.pf-m-primary,
   #kc-login {
-    min-height: 46px;
-    border-radius: var(--chart-radius-md);
-    font-size: 15px;
+    font-family: var(--chart-font-display);
+    font-size: 16px;
     font-weight: 600;
   }
 }

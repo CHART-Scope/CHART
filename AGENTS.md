@@ -65,6 +65,31 @@ CHART is a monorepo;
 - Update relevant documentation when behavior, architecture, setup, or commands
   change.
 
+## Design System
+
+- The visual reference is the "00 · Design system" artboard on the CHART
+  user-flow canvas; in code it is `web/src/styles/tokens.css`, documented in
+  `docs/design-system.md`. Read that doc before building or changing UI.
+- Use tokens, not literals: colours, font sizes, spacing, radii and control
+  heights come from `tokens.css`. If a value has no token, add one token rather
+  than repeating a hex or pixel value in a module.
+- Use the shared components and never restyle them locally: `Button` /
+  `buttonClassName` (sizes `lg` 48, `md` 40, `sm` 32; variants `primary`,
+  `secondary`, `ghost`, `inverse`, `icon`), `InlineSelect`, `Modal`,
+  `PageHeader`.
+- Fira Sans 600 for headings, labels, numbers and buttons; Noto Sans for body
+  text.
+- Spacing is a 4px scale (4, 8, 12, 16, 24, 32, 48, 64, 88). Snap off-scale
+  values from designs to the nearest step.
+- Controls are a fixed height plus side padding: inputs 44, tags 28, sentence
+  pills 40, filter selects 32.
+- Lime only on charcoal; status colours are a tint fill with full-strength
+  text.
+- The Keycloak sign-in theme (`infra/keycloak/themes/chart/login`) mirrors the
+  tokens; when its CSS changes, bump `?v=` in `theme.properties`.
+- E2E for UI changes asserts the design-system values that matter on the
+  changed component (control height, colour, font).
+
 ## Mandatory E2E Testing
 
 - Never write unit tests. Every code change must add or update E2E coverage for
