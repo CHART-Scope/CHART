@@ -8,7 +8,6 @@ back through the outlook and planning endpoints that apply them.
 
 from __future__ import annotations
 
-from contextlib import nullcontext
 from datetime import date, datetime, timezone
 
 import pytest
@@ -19,7 +18,6 @@ from chart.api.app import app
 from chart.audit import service as audit_service
 from chart.auth.service import require_current_user, require_reader
 from chart.climate.schemas import PredictRequest
-from chart.heat_outlook import routes as outlook_routes
 from chart.climate.service import (
     ClimateServiceError,
     get_planning_options,
@@ -69,10 +67,9 @@ def test_settings_require_sign_in() -> None:
     assert anonymous.put("/model-settings/KE/lbw", json=_lbw()).status_code == 401
 
 
-def test_kenya_lbw_defaults_to_whole_pregnancy_only(client, monkeypatch) -> None:
-    # The map's shapes need PostGIS; a refused selection never reaches them.
-    monkeypatch.setattr(outlook_routes, "get_session_factory", lambda: nullcontext)
-
+def test_kenya_lbw_defaults_to_whole_pregnancy_only(client) -> None:
+    # The outlook reads the place's heat season from the settings store; the
+    # map's shapes need PostGIS, but a refused selection never reaches them.
     body = client.get("/model-settings?country=KE&outcome=lbw").json()
 
     assert [o["code"] for o in body["available"]["selectors"]] == [
