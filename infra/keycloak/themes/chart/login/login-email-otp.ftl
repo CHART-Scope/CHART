@@ -16,8 +16,11 @@
                         <span class="${properties.kcFormLabelTextClass!}">${msg("loginEmailOtp")}</span>
                     </label>
                 </div>
+                <#-- The provider compares the code exactly and its codes are
+                     capitals and digits. The field shows capitals (CSS), so
+                     send capitals too, without spaces from a copied code. -->
                 <span class="${properties.kcInputClass!} chart-code <#if messagesPerField.existsError('email-otp')>${properties.kcError!}</#if>">
-                    <input id="email-otp" name="email-otp" type="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="6" autofocus dir="ltr" aria-invalid="<#if messagesPerField.existsError('email-otp')>true</#if>"<#if messagesPerField.existsError('email-otp')> aria-describedby="input-error-email-otp-code"</#if>/>
+                    <input id="email-otp" name="email-otp" type="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" oninput="this.value = this.value.replace(/\s/g, '').toUpperCase().slice(0, 6)" autofocus dir="ltr" aria-invalid="<#if messagesPerField.existsError('email-otp')>true</#if>"<#if messagesPerField.existsError('email-otp')> aria-describedby="input-error-email-otp-code"</#if>/>
                 </span>
                 <#if messagesPerField.existsError('email-otp')>
                     <span id="input-error-email-otp-code" class="chart-field-error" aria-live="polite">${kcSanitize(messagesPerField.get('email-otp'))?no_esc}</span>
