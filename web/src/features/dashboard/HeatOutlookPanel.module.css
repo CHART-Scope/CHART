@@ -130,10 +130,6 @@
   opacity: 0.6;
 }
 
-.table tr[data-peak] th {
-  color: var(--color-maroon);
-}
-
 @container risk-panel (max-width: 570px) {
   .controlRow {
     grid-template-columns: 1fr;
@@ -154,74 +150,11 @@
   font-size: var(--fs-body);
 }
 
-.note,
-.warning {
+.note {
   margin: 0;
   font-size: var(--fs-caption);
   line-height: 1.45;
   color: var(--color-text-muted);
-}
-
-.warning {
-  padding: var(--space-1) var(--space-2);
-  border-left: 3px solid var(--color-amber);
-  background: var(--color-amber-tint);
-  color: var(--color-text);
-}
-
-.block {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  overflow-x: auto;
-}
-
-.subtitle {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-h3);
-  font-weight: 600;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--fs-body-sm);
-  font-variant-numeric: tabular-nums;
-}
-
-.table th,
-.table td {
-  padding: var(--space-1) var(--space-2);
-  text-align: left;
-  border-bottom: 1px solid var(--border-hairline);
-  white-space: nowrap;
-}
-
-.table thead th {
-  font-family: var(--font-display);
-  font-size: var(--fs-eyebrow);
-  letter-spacing: var(--ls-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-
-.table tbody th {
-  font-weight: 500;
-}
-
-.table td {
-  font-family: var(--font-display);
-}
-
-.table tr[aria-current="true"] {
-  background: var(--color-nexus-tint);
-}
-
-.flag {
-  color: var(--color-amber);
-  font-size: var(--fs-micro);
 }
 
 .source {
@@ -360,9 +293,18 @@
 }
 
 /* A small way out to the methodology, at the foot of the details. */
+/* The panel label with its "See more" methodology link beside it. */
+.label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
 .methodology {
-  align-self: flex-start;
   color: var(--color-nexus);
   font-size: var(--fs-caption);
   font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
 }

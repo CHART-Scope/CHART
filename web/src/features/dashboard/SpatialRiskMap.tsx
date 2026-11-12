@@ -37,6 +37,8 @@ type Props = {
   embedded?: boolean;
   dataRefreshKey?: number;
   geographyId: string;
+  /** The framed place's name, for the heading: "constituencies in Mombasa". */
+  placeName?: string;
   accessToken?: string;
   month?: string | null;
   outcome?: string;
@@ -165,6 +167,7 @@ export function SpatialRiskMap({
   embedded = false,
   dataRefreshKey = 0,
   geographyId,
+  placeName,
   accessToken,
   month,
   outcome,
@@ -382,7 +385,10 @@ export function SpatialRiskMap({
     null as ProjectedArea | null,
   );
   const areaLevel = pluralizeLevel(shapes[0]?.area.level);
-  const heading = scale.heading.replace("{areas}", areaLevel);
+  const heading = scale.heading.replace(
+    "{areas}",
+    placeName ? `${areaLevel} in ${placeName}` : areaLevel,
+  );
 
   if (error) {
     return (

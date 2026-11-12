@@ -340,3 +340,18 @@ test("switching county keeps the card, the figures and the actions on screen", a
   expect(blanked).toEqual([]);
   expect(api.unhandled).toEqual([]);
 });
+
+test("the map heading names the place it frames on every tab", async ({ page }) => {
+  const api = await installKenya(page);
+  serveForecast(api);
+  await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
+  const outlook = panel(page);
+  const heading = outlook.getByRole("heading", { name: /^Risk across / });
+  // Kajiado is selected; the map frames Kenya's counties.
+  for (const tab of ["Observed", "Forecasted", "Projected"]) {
+    await outlook.getByRole("tab", { name: tab }).click();
+    await expect(heading).toHaveText(
+      "Risk across counties in Kenya · area-level estimates",
+    );
+  }
+});

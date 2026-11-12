@@ -95,9 +95,8 @@ test("Kenya under-five: post-neonatal by default, approximate death dates noted,
   await expect(outlook.getByRole("combobox", { name: "Age group" })).toContainText(
     "Post-neonatal",
   );
-  await expect(
-    outlook.getByRole("note").filter({ hasText: "Approximate death dates." }),
-  ).toBeVisible();
+  // The model's caveat card is gone: no "Approximate death dates." note.
+  await expect(outlook.getByText("Approximate death dates.")).toHaveCount(0);
   await expect(outlook.getByRole("group", { name: "Time horizon" })).toContainText(
     "1991–2020 (baseline)",
   );

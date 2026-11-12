@@ -21,7 +21,6 @@ import {
   type ObservedRisk,
   type OutlookCapabilities,
   type OutlookOption,
-  type OutlookPart,
   type OutlookRatio,
   type OutlookReference,
   type OutlookView,
@@ -47,11 +46,6 @@ const MONTHS = [
   "Nov",
   "Dec",
 ];
-const SIDE_LABEL = {
-  heat: "Heat",
-  cool: "Cooler than usual",
-  total: "Total temperature effect",
-} as const;
 /** The concise modelling methodology in the published documentation. */
 const METHODOLOGY_URL = "https://chart-scope.github.io/CHART/docs/methodology/";
 const RATIO_LABEL = { odds_ratio: "Odds ratio", risk_ratio: "Risk ratio" } as const;
@@ -89,6 +83,8 @@ type Props = {
   geographyId: string;
   /** The place the map frames (the dashboard's page geography). */
   mapGeographyId: string;
+  /** Its name, for the map heading. */
+  mapPlaceName?: string;
   accessToken: string;
   outcome: string;
   outcomeLabel: string;
@@ -116,6 +112,7 @@ type Props = {
 export function HeatOutlookPanel({
   geographyId,
   mapGeographyId,
+  mapPlaceName,
   accessToken,
   outcome,
   outcomeLabel,
@@ -295,7 +292,18 @@ export function HeatOutlookPanel({
       }
     >
       <div className={styles.headRow}>
-        <p className={base.eyebrow}>Climate attributable health risk</p>
+        <p className={`${base.eyebrow} ${styles.label}`}>
+          Climate attributable health risk
+          <a
+            className={styles.methodology}
+            href={METHODOLOGY_URL}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="See more about how these estimates are made"
+          >
+            See more
+          </a>
+        </p>
         {/* Saved plans hold observed or projected views only; the button
         stays put on the forecast so the tabs do not shift the layout. */}
         {onSavePlan && (
@@ -426,12 +434,6 @@ export function HeatOutlookPanel({
 
           {view === "observed" && viewData && <MonthLegend unavailable="No data yet" />}
 
-          {shown.note && (
-            <p className={styles.warning} role="note">
-              {shown.note}
-            </p>
-          )}
-
           <div className={styles.results} data-busy={busy || undefined}>
             <div className={base.riskLayout}>
               <div className={base.estimate}>
@@ -501,6 +503,7 @@ export function HeatOutlookPanel({
                   <SpatialRiskMap
                     embedded
                     geographyId={mapGeographyId}
+                    placeName={mapPlaceName}
                     accessToken={accessToken}
                     outcome={outcome}
                     selectedGeographyId={geographyId}
@@ -515,25 +518,6 @@ export function HeatOutlookPanel({
               </div>
             </div>
           </div>
-
-          {view === "projection" && projectedData && (
-            <details className={base.details}>
-              <summary>Seasonal pattern and all periods</summary>
-              <p className={styles.note}>{projectedData.reference_note}</p>
-              {projectedData.months.length > 0 && (
-                <TypicalMonths outlook={projectedData} />
-              )}
-              <PeriodSummary outlook={projectedData} />
-              <a
-                className={styles.methodology}
-                href={METHODOLOGY_URL}
-                target="_blank"
-                rel="noreferrer"
-              >
-                How these estimates are made
-              </a>
-            </details>
-          )}
         </>
       )}
 
@@ -656,7 +640,6 @@ type Figure = {
   change: string | null;
   ratio: OutlookRatio | null;
   thin: string | null;
-  note: string | null;
 };
 
 const EMPTY_FIGURE: Figure = {
@@ -667,7 +650,6 @@ const EMPTY_FIGURE: Figure = {
   change: null,
   ratio: null,
   thin: null,
-  note: null,
 };
 
 function observedFigure(observed: ObservedRisk | null): Figure {
@@ -677,7 +659,6 @@ function observedFigure(observed: ObservedRisk | null): Figure {
   if (!estimate || !observed.month) {
     return {
       ...EMPTY_FIGURE,
-      note,
       message:
         observed.outcome === "lbw"
           ? "No month has enough ERA5 data yet: a birth month needs its own temperature and the eight months before it."
@@ -700,7 +681,6 @@ function observedFigure(observed: ObservedRisk | null): Figure {
     ratio: estimate.ratio,
     thin:
       estimate.thin_data && estimate.value_percent !== null ? estimate.message : null,
-    note,
   };
 }
 
@@ -733,7 +713,6 @@ function projectedFigure(
           ? `Climate-model range ${peak.gcm_min_percent.toFixed(1)} to ${peak.gcm_max_percent.toFixed(1)}%`
           : null,
       message: peak.part.message ?? note ?? "No peak-season estimate is reported.",
-      note,
     };
   }
   const current = outlook.period_summary.find((row) => row.period === outlook.period);
@@ -751,7 +730,6 @@ function projectedFigure(
         : null,
     ratio: heat?.ratio ?? null,
     thin: heat?.thin_data && heat.message && percent !== null ? heat.message : null,
-    note,
   };
 }
 
@@ -1069,135 +1047,6 @@ function ScenarioChoice({
       })}
     </div>
   );
-}
-
-function TypicalMonths({ outlook }: { outlook: HeatOutlook }) {
-  const sides = outlook.months[0].parts.map((part) => part.side);
-  const showOddsRatio = outlook.months.some((month) => month.odds_ratio);
-  const peak = new Set(outlook.peak_season?.months ?? []);
-  return (
-    <div className={styles.block}>
-      <h3 className={styles.subtitle}>Seasonal pattern (typical month)</h3>
-      <table className={styles.table} aria-label="Typical month">
-        <thead>
-          <tr>
-            <th scope="col">Month</th>
-            <th scope="col">Mean daily max</th>
-            {sides.map((side) => (
-              <th key={side} scope="col">
-                {SIDE_LABEL[side]} share (model range)
-              </th>
-            ))}
-            {showOddsRatio && <th scope="col">Odds ratio (95% CI)</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {outlook.months.map((month) => (
-            <tr key={month.month} data-peak={peak.has(month.month) || undefined}>
-              <th scope="row">{MONTHS[month.month - 1]}</th>
-              <td>{month.tmax_c === null ? "–" : `${month.tmax_c.toFixed(1)} °C`}</td>
-              {month.parts.map((part) => (
-                <td key={part.side}>{formatShare(part)}</td>
-              ))}
-              {showOddsRatio && (
-                <td>
-                  {month.odds_ratio
-                    ? `${month.odds_ratio.value.toFixed(2)} (${month.odds_ratio.low.toFixed(2)}–${month.odds_ratio.high.toFixed(2)}) at ${month.odds_ratio.at_tmax_c.toFixed(1)} °C`
-                    : "–"}
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <Messages parts={outlook.months.flatMap((month) => month.parts)} />
-    </div>
-  );
-}
-
-function PeriodSummary({ outlook }: { outlook: HeatOutlook }) {
-  if (outlook.period_summary.length === 0) {
-    return (
-      <p className={styles.note}>
-        No period summary is reported for this{" "}
-        {outlook.outcome === "lbw" ? "window" : "age group"}.
-      </p>
-    );
-  }
-  const multipleSides = outlook.period_summary[0].parts.length > 1;
-  return (
-    <div className={styles.block}>
-      <h3 className={styles.subtitle}>
-        By period, {outlook.scenarios.find((s) => s.code === outlook.scenario)?.label}
-      </h3>
-      <table className={styles.table} aria-label="By period">
-        <thead>
-          <tr>
-            <th scope="col">Period</th>
-            {multipleSides && <th scope="col">Side</th>}
-            <th scope="col">Share (95% CI)</th>
-            <th scope="col">Ratio (95% CI)</th>
-            <th scope="col">Climate-model range</th>
-            <th scope="col">Change vs baseline</th>
-          </tr>
-        </thead>
-        <tbody>
-          {outlook.period_summary.flatMap((row) =>
-            row.parts.map((part) => (
-              <tr
-                key={`${row.period}-${part.side}`}
-                aria-current={row.period === outlook.period || undefined}
-              >
-                <th scope="row">
-                  {row.label}
-                  {row.is_baseline ? " (baseline)" : ""}
-                </th>
-                {multipleSides && <td>{SIDE_LABEL[part.side]}</td>}
-                <td>
-                  {formatShare(part)}
-                  {part.thin_data && <span className={styles.flag}> thin data</span>}
-                </td>
-                <td>
-                  {part.ratio
-                    ? `${part.ratio.value.toFixed(2)} (${part.ratio.low.toFixed(2)}–${part.ratio.high.toFixed(2)})`
-                    : "–"}
-                </td>
-                <td>
-                  {part.value_percent === null || part.gcm_min_percent === null
-                    ? "–"
-                    : `${part.gcm_min_percent.toFixed(1)}–${part.gcm_max_percent?.toFixed(1)}%`}
-                </td>
-                <td>
-                  {part.value_percent === null || part.change_pp === null
-                    ? "–"
-                    : `${signed(part.change_pp)} pts (${signed(part.change_low_pp)} to ${signed(part.change_high_pp)})`}
-                </td>
-              </tr>
-            )),
-          )}
-        </tbody>
-      </table>
-      <Messages parts={outlook.period_summary.flatMap((row) => row.parts)} />
-    </div>
-  );
-}
-
-function Messages({ parts }: { parts: OutlookPart[] }) {
-  const messages = [...new Set(parts.map((part) => part.message).filter(Boolean))];
-  return messages.map((message) => (
-    <p key={message} className={styles.note} role="note">
-      {message}
-    </p>
-  ));
-}
-
-function formatShare(part: OutlookPart): string {
-  if (part.value_percent === null) return "Not shown";
-  const range =
-    part.low_percent === null || part.high_percent === null
-      ? ""
-      : ` (${part.low_percent.toFixed(1)} to ${part.high_percent.toFixed(1)})`;
-  return `${part.value_percent.toFixed(1)}%${range}`;
 }
 
 function ciText(low: number | null, high: number | null): string | null {

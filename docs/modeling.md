@@ -46,10 +46,10 @@ outcome-specific baseline; signed changes remain meaningful even where negative
 attributable burden is suppressed. These are scenario averages, not exact-year
 weather or death forecasts. Missing values are not replaced with zero.
 
-The Projected view shows a short scenario-average explanation beside the
-filters and seasonal tables under **Seasonal pattern and all periods**. Full
-methodology and source provenance remain in this documentation and the
-published outlook metadata; they are not displayed in a dashboard disclosure.
+The panel has no seasonal or all-periods tables; a **See more** link beside
+its label opens the published methodology. Full methodology and source
+provenance remain in this documentation and the published outlook metadata;
+they are not displayed in a dashboard disclosure.
 
 ### Future ERA5 downscaling (not implemented)
 

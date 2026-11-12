@@ -134,6 +134,8 @@ function Dashboard({
 
   const displayedAdminUnit =
     optimisticAdminUnit === undefined ? effectiveAdminUnit : optimisticAdminUnit;
+  // The map frames the URL's place (a leaf link is moved to its parent below).
+  const mapPlaceName = geographies.find((geo) => geo.id === geographyId)?.name;
 
   useEffect(() => {
     if (!adminUnit || geographies.length === 0 || effectiveAdminUnit) return;
@@ -421,6 +423,7 @@ function Dashboard({
         dataRefreshKey={mapRefresh}
         embedded
         geographyId={geographyId}
+        placeName={mapPlaceName}
         accessToken={session.accessToken}
         month={observedMonth}
         outcome={outcome}
@@ -542,6 +545,7 @@ function Dashboard({
               placeLabel={effectiveGeography?.name ?? stateLabel}
               geographyId={displayedAdminUnit ?? geographyId}
               mapGeographyId={geographyId}
+              mapPlaceName={mapPlaceName}
               accessToken={session.accessToken}
               outcome={outcome}
               outcomeLabel={outcomeLabel}

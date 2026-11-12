@@ -164,9 +164,8 @@ test("Kenya under-five observed: post-neonatal by default, newborn deaths carry 
   await expect(outlook.getByRole("combobox", { name: "Age group" })).toContainText(
     "Post-neonatal",
   );
-  await expect(
-    outlook.getByRole("note").filter({ hasText: "Approximate death dates." }),
-  ).toBeVisible();
+  // The model's caveat card is gone: no "Approximate death dates." note.
+  await expect(outlook.getByText("Approximate death dates.")).toHaveCount(0);
   const estimate = outlook.getByTestId("outlook-estimate");
   if (latest.estimate.value_percent !== null)
     await expect(estimate).toContainText(
@@ -247,11 +246,19 @@ test("projected reference periods: the configured heat season and the highest-ri
   await outlook.getByRole("tab", { name: "Projected" }).click();
 
   const reference = outlook.getByRole("group", { name: "Reference period" });
-  // The details end with a small link to the published methodology.
-  await outlook.getByText("Seasonal pattern and all periods").click();
-  await expect(
-    outlook.getByRole("link", { name: "How these estimates are made" }),
-  ).toHaveAttribute("href", "https://chart-scope.github.io/CHART/docs/methodology/");
+  // No seasonal tables; a "See more" link beside the panel label opens the
+  // published methodology.
+  await expect(outlook.getByText("Seasonal pattern and all periods")).toHaveCount(0);
+  await expect(outlook.locator("table")).toHaveCount(0);
+  const seeMore = outlook
+    .getByText("Climate attributable health risk")
+    .getByRole("link", { name: /See more/ });
+  await expect(seeMore).toHaveText("See more");
+  await expect(seeMore).toHaveAttribute(
+    "href",
+    "https://chart-scope.github.io/CHART/docs/methodology/",
+  );
+  await expect(seeMore).toHaveCSS("color", "rgb(56, 62, 233)");
   // The season and averaging note under the controls is gone.
   await expect(outlook.getByText(/Meteorological Department\)/)).toHaveCount(0);
   await expect(outlook.getByText(/Projections average the selected years/)).toHaveCount(
