@@ -77,6 +77,12 @@ and the map's shading, not the place, question or columns.
   seasons, named without its months for now; or **highest-risk months**, the
   three months the model ranks highest).
 
+The panel shows no caveat card: a release's model caveat (for example the
+national LBW model's climate-zone note) stays in the API's `selector_note` and
+in the release documentation, and is used only as the message when no estimate
+is reported. A **See more** link beside the panel label opens the published
+methodology; there are no seasonal or all-periods tables.
+
 Switching place, tab, month or scenario never blanks the card. Each place's
 capabilities and actions are cached for the session; while a new place's
 figures load, the previous ones stay on screen dimmed and still named after

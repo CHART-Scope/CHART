@@ -111,7 +111,8 @@ for (const [country, username, level] of [
       outlook.locator("summary").filter({
         hasText: /^Seasonal pattern and all periods$/,
       }),
-    ).toBeVisible();
+    ).toHaveCount(0);
+    await expect(outlook.getByRole("link", { name: /See more/ })).toBeVisible();
     await expect(
       outlook.locator("summary").filter({
         hasText: /^Data and model details$/,

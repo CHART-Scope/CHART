@@ -297,7 +297,7 @@ summary (the 3rd trimester) shows every county as "Not reported", and a county
 with no published file as "Not integrated".
 
 **3rd-trimester odds ratio by month.** The tables carry no per-county
-odds ratio for the 3rd trimester. The seasonal pattern reads it from the
+odds ratio for the 3rd trimester. The API's month table reads it from the
 modeller's national T3 exposure-response curve at the hottest of the three
 trimester months for that county, scenario and period: the worst case. Below
 the minimum-risk temperature it is 1.
