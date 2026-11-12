@@ -173,6 +173,12 @@ answers any read already made this visit, including hover prefetches.
 Responses are keyed by the caller's Authorization header; the cache is on
 where `CHART_READ_CACHE=1` (the deployed API).
 
+A frame's outlines are fetched once. The first map of a frame brings its
+boundaries; every later one (another time, month, layer, population or the
+VRA overlay) is requested with `geometry=false` and carries only the values,
+which are laid on the kept outlines (`web/src/lib/mapOutlines.ts`, shared with
+the dashboard).
+
 ## Loading
 
 Each read is made once per page and only once every choice it depends on is

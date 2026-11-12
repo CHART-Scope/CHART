@@ -1,7 +1,8 @@
-"""``?geometry=false`` on any map read: values only, no outlines.
+"""``?geometry=false`` on any read: values only, no outlines.
 
-Every map endpoint builds its areas through ``chart.risk.service.load_map_view``,
-which simplifies and serialises each boundary on every request. A frame's
+Every map, climate layer and population read builds its areas through
+``chart.risk.service.load_map_view``, which simplifies and serialises each
+boundary on every request. A frame's
 outlines are the same for every month, view and setting, so the dashboard keeps
 them from the first response and asks later maps for values alone. This ASGI
 middleware turns the flag into ``map_geometry_wanted`` for the request; the
@@ -18,7 +19,8 @@ from chart.risk.service import map_geometry_wanted
 
 
 def wants_values_only(scope: Scope) -> bool:
-    if scope["type"] != "http" or not scope["path"].rstrip("/").endswith("/map"):
+    # Any path: reads that build no map areas simply never consult the flag.
+    if scope["type"] != "http":
         return False
     query = parse_qs(scope.get("query_string", b"").decode("latin-1"))
     return query.get("geometry", [""])[-1].strip().lower() in {"false", "0", "no"}
