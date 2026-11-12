@@ -17,10 +17,10 @@ For each operation, the explorer shows:
 - reusable models in the **Schemas** section.
 
 !!! info "Explore here; run requests locally"
-This embedded explorer is intentionally read-only so that browsing the
-public documentation cannot send an accidental write to a live CHART
-deployment. To execute requests, start the API and open the runnable local
-Swagger interface.
+    This embedded explorer is intentionally read-only so that browsing the
+    public documentation cannot send an accidental write to a live CHART
+    deployment. To execute requests, start the API and open the runnable local
+    Swagger interface.
 
 After starting the API, open `http://127.0.0.1:3210/docs` for runnable Swagger.
 
@@ -57,8 +57,8 @@ make climate-api
 Parameter semantics and availability statuses are explained in [Climate API](climate-api.md).
 
 ??? info "Regenerate the contract"
-The embedded contract is generated from the single FastAPI application.
-Contributors can refresh the checked-in snapshot with:
+    The embedded contract is generated from the single FastAPI application.
+    Contributors can refresh the checked-in snapshot with:
 
     ```bash
     make climate-openapi
