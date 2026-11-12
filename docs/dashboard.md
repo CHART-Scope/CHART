@@ -101,7 +101,11 @@ last colours, then the figures shade over and the map's fills fade to the new
 values. Each place's outlines are kept from its first map; every later map of
 that place (another tab, month or setting) is requested with `geometry=false`
 and carries only each area's value, reason and odds ratio, which are laid on
-the kept outlines. Signing out clears the cache. Settings keeps a tab you have
+the kept outlines. Published reads and outlines are also kept in the tab's
+sessionStorage, so a reload draws them at once and refreshes them behind the
+page; the stored copy names its user and is dropped for anyone else. While the
+session is restored the dashboard placeholder already shows the science video.
+Signing out clears the cache. Settings keeps a tab you have
 opened mounted (hidden) so going back to it does not reload it.
 
 The sentence under the icon array reads "At a [forecasted / projected

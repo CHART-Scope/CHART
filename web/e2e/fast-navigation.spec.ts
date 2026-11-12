@@ -1,6 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { geographies, installFakeApi, json, type FakeApi } from "./support/fakeApi";
+import {
+  accessToken,
+  geographies,
+  installFakeApi,
+  json,
+  type FakeApi,
+} from "./support/fakeApi";
 import { installKenya } from "./support/kenya";
 
 // Moving around the signed-in app reuses what it already has. A new place
@@ -207,4 +213,118 @@ test("after the first map, the dashboard asks only for values and keeps the outl
   expect(maps().filter((request) => !request.includes("geometry=false"))).toHaveLength(
     1,
   );
+});
+
+test("a reload draws what this tab already read, then refreshes it", async ({
+  page,
+}) => {
+  const api = await installKenya(page);
+  await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
+  const outlook = page.getByTestId("heat-outlook");
+  const estimate = outlook.getByTestId("outlook-estimate");
+  await expect(estimate).toContainText("may be attributable to heat exposure.");
+  const shown = (await estimate.textContent()) ?? "";
+  await expect(outlook.locator("svg path[data-interactive]").first()).toBeVisible();
+  // Let the debounced write of the cache land.
+  await page.waitForTimeout(600);
+
+  // Hold every published read: whatever the card shows came from the tab.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/api/chart/heat-outlook/**", async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await page.route("**/api/chart/geographies", async (route) => {
+    await held;
+    await route.fallback();
+  });
+  const before = api.requests.length;
+  await page.reload();
+  await expect(estimate).toHaveText(shown);
+  await expect(page.getByRole("combobox", { name: "County" })).toBeVisible();
+  await expect(page.getByTestId("dashboard-panel-placeholder")).toHaveCount(0);
+  await page.screenshot({ path: `${evidence}/reload-from-tab.png` });
+
+  release();
+  // Refreshed behind the page, and the map asks only for values: its outlines
+  // were kept too.
+  await expect
+    .poll(() =>
+      api.requests
+        .slice(before)
+        .filter((request) => /\/heat-outlook\/geo-ke\/.*map\?/.test(request)),
+    )
+    .not.toHaveLength(0);
+  const maps = api.requests
+    .slice(before)
+    .filter((request) => /\/heat-outlook\/geo-ke\/.*map\?/.test(request));
+  expect(maps.every((request) => request.includes("geometry=false"))).toBe(true);
+  await expect
+    .poll(() => api.requests.slice(before).some((r) => r.includes("/observed?")))
+    .toBe(true);
+  await expect(estimate).toHaveText(shown);
+});
+
+test("another user signing in on the tab never sees the last user's reads", async ({
+  page,
+}) => {
+  const api = await installKenya(page);
+  await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
+  const estimate = page.getByTestId("heat-outlook").getByTestId("outlook-estimate");
+  await expect(estimate).toContainText("may be attributable to heat exposure.");
+  await page.waitForTimeout(600);
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("chart.query-cache.v1")),
+  ).toContain('"userId":"e2e-user"');
+
+  // Same tab, a different account; hold its reads to see what is drawn first.
+  // A later page.route wins over the fake API's own /auth/me.
+  await page.route("**/api/chart/auth/me", (route) =>
+    json(route, {
+      userId: "someone-else",
+      username: "other",
+      roles: ["health_planning_lead"],
+      geographyScopes: ["/kenya"],
+    }),
+  );
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/api/chart/heat-outlook/**", async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await page.reload();
+  await expect(
+    page.getByRole("navigation", { name: "Main" }).getByRole("link").first(),
+  ).toBeVisible();
+  await expect(estimate).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(() => sessionStorage.getItem("chart.query-cache.v1") ?? ""),
+    )
+    .not.toContain('"userId":"e2e-user"');
+  release();
+  await expect(estimate).toContainText("may be attributable to heat exposure.");
+});
+
+test("while the session is restored, the science video is already there", async ({
+  page,
+}) => {
+  const api = await installKenya(page);
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  api.on(/^\/api\/auth\/keycloak-refresh$/, async (route) => {
+    await held;
+    return json(route, { access_token: accessToken });
+  });
+  await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
+  await expect(page.getByLabel("Loading dashboard")).toBeVisible();
+  await expect(page.getByLabel("CHART explainer video")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Understanding the science" }),
+  ).toHaveCSS("font-family", /Fira Sans/);
+  await page.screenshot({ path: `${evidence}/restoring-video.png` });
+  release();
+  await expect(page.getByTestId("heat-outlook")).toBeVisible();
 });

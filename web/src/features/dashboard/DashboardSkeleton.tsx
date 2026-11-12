@@ -1,8 +1,10 @@
 import { Skeleton, SkeletonCard, SkeletonText } from "@/components/Skeleton";
 
 import styles from "./DashboardSkeleton.module.css";
+import { ScienceVideo } from "./ScienceVideo";
 
-/** Reserve the same learning column and combined risk card as the loaded page. */
+/** Reserve the same learning column and combined risk card as the loaded page.
+ * The science card needs no session or data, so it is drawn for real. */
 export function DashboardSkeleton() {
   return (
     <div className={styles.wrap} aria-busy="true" aria-label="Loading dashboard">
@@ -14,11 +16,7 @@ export function DashboardSkeleton() {
       <Skeleton width="60%" height="2rem" />
       <div className={styles.grid}>
         <div className={styles.wrap}>
-          <SkeletonCard label="Loading the science introduction">
-            <Skeleton width="60%" height="0.75rem" />
-            <Skeleton height="150px" radius="md" />
-            <SkeletonText lines={2} />
-          </SkeletonCard>
+          <ScienceVideo />
           <SkeletonCard label="Loading risk and prevention">
             <SkeletonText lines={2} />
             <div className={styles.columns}>

@@ -11,7 +11,35 @@ import type { MapArea, MapResponse } from "./dashboardClient";
  */
 type Outlines = Map<number, MapArea["geometry"]>;
 
-const outlines = new Map<string, Outlines>();
+const STORAGE_KEY = "chart.map-outlines.v1";
+
+// Kept in this tab's sessionStorage too, so a reload's first map is values
+// only. Keys carry the user, so another user's session never reads them.
+function readStored(): Map<string, Outlines> {
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    const entries = raw
+      ? (JSON.parse(raw) as [string, [number, MapArea["geometry"]][]][])
+      : [];
+    return new Map(entries.map(([key, areas]) => [key, new Map(areas)]));
+  } catch {
+    return new Map();
+  }
+}
+
+function writeStored() {
+  try {
+    window.sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([...outlines].map(([key, areas]) => [key, [...areas]])),
+    );
+  } catch {
+    // Full or blocked: the outlines in memory still serve this visit.
+  }
+}
+
+const outlines: Map<string, Outlines> =
+  typeof window === "undefined" ? new Map() : readStored();
 // A full map in flight per frame: a second map asked for meanwhile (a tab or
 // layer fetched ahead) waits for its outlines instead of fetching them again.
 const pending = new Map<string, Promise<unknown>>();
@@ -19,6 +47,11 @@ const pending = new Map<string, Promise<unknown>>();
 export function clearMapOutlines() {
   outlines.clear();
   pending.clear();
+  try {
+    window.sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Storage blocked: nothing was kept.
+  }
 }
 
 // Scoped responses differ by caller; the next user starts empty.
@@ -29,6 +62,7 @@ function keep(key: string, response: MapResponse) {
     key,
     new Map(response.areas.map((area) => [area.admin_unit_id, area.geometry])),
   );
+  writeStored();
 }
 
 /** The values laid on the kept outlines, or null when an area is new to them. */
