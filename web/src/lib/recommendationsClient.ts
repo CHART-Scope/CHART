@@ -1,24 +1,9 @@
 import { authFetch } from "@/lib/authFetch";
 
 /**
- * Typed client for plan recommendations and how they are produced. The
- * Python API ranks the actions and writes the insight; provider credentials
+ * Typed client for how recommendations are produced. Provider credentials
  * never reach the browser.
  */
-
-export type PlanRecommendationResult = {
-  ranker: string;
-  ranker_model: string | null;
-  ranker_note: string | null;
-  items: { id: string; reasons: string[] }[];
-  insight: {
-    provider: string;
-    model: string | null;
-    text: string;
-    generated: boolean;
-    note: string | null;
-  };
-};
 
 export type ProviderOption = {
   id: string;
@@ -53,8 +38,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   INSIGHT_MODEL_REQUIRED: "Choose a model for this provider.",
   INSIGHT_MODELS_UNAVAILABLE:
     "The provider's models could not be listed. Type the model ID instead.",
-  SAVED_PLAN_NOT_FOUND: "This plan no longer exists.",
-  GEOGRAPHY_OUT_OF_SCOPE: "You do not have access to this place.",
 };
 
 async function failure(response: Response, fallback: string): Promise<Error> {
@@ -65,25 +48,6 @@ async function failure(response: Response, fallback: string): Promise<Error> {
   } catch {
     return new Error(fallback);
   }
-}
-
-export async function fetchPlanRecommendations(
-  planId: string,
-  signal?: AbortSignal,
-): Promise<PlanRecommendationResult> {
-  const response = await authFetch(
-    `/api/chart/saved-plans/${encodeURIComponent(planId)}/recommendations`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ limit: 3 }),
-      signal,
-      // A language model may take a while to write the insight.
-      timeoutMs: 60_000,
-    },
-  );
-  if (!response.ok) throw await failure(response, "Recommendations could not load.");
-  return (await response.json()) as PlanRecommendationResult;
 }
 
 export async function fetchRecommendationSettings(

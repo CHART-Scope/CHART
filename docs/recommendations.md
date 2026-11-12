@@ -1,9 +1,12 @@
 # Recommendations and AI
 
-A saved plan's actions page ranks the [action repository](actions.md) for
-that plan and shows a short insight beside the ranking. Both are produced by
-the Python API (`chart.recommendations`) from the published heat actions for
-the plan's country; the browser only renders the answer.
+The Python API (`chart.recommendations`) ranks the published heat actions in
+the [action repository](actions.md) for a saved plan's country and writes a
+short insight beside the ranking
+(`POST /saved-plans/{id}/recommendations`). The web app does not show either
+for now: the "Recommended for your plan" panel and its placeholder AI insight
+were removed from the actions page, which opens a saved plan on the plan's
+season.
 
 ## What is configurable
 

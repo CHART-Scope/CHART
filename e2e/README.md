@@ -100,9 +100,9 @@ validated Kajiado observed month. They cover privacy between users, geography
 scope (including a district-only planner), denied roles, invalid areas and
 selections without writes, and repeated deletes. The planning catalogue must
 never list a published outcome under an "unspecified" health domain. In the
-browser a planner saves a view from the dashboard, opens its ranked
-recommendations and placeholder AI insight, reopens it from Start planning,
-removes it and sees an explicit error for a missing plan.
+browser a planner saves a view from the dashboard, opens its actions on the
+plan's season (with no ranked panel or AI insight), reopens it from Start
+planning, removes it and sees an explicit error for a missing plan.
 
 Recommendation regressions run against a local stand-in for an
 OpenAI-compatible model server and the classifier (`e2e/stub_ai_server.py`, on

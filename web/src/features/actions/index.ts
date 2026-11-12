@@ -6,6 +6,5 @@ export {
   type ActionView,
 } from "./ActionRepository";
 export { FALLBACK_CALENDAR } from "./actionCycle";
-export { PlanRecommendations } from "./PlanRecommendations";
-export { planFigureSentence, riskLabels, timingSeason } from "./planLabels";
+export { riskLabels, timingSeason } from "./planLabels";
 export { statusLabels, useActionProgress } from "./useActionProgress";

@@ -3,8 +3,8 @@
 The action repository is the set of reviewed actions CHART recommends: what
 to do about a climate-health risk, who does it, when, at what cost, and the
 evidence behind it. It appears on the dashboard (**Recommended actions**),
-on its own page (**See all recommended actions**), in Explore (**Act on it**)
-and in the ranking for a saved plan ([Recommendations and AI](recommendations.md)).
+on its own page (**See all recommended actions**) and in Explore (**Act on
+it**); a saved plan opens it on the plan's season.
 
 ## How planners see them
 

@@ -4,7 +4,7 @@ import { signInWithEmailCode as signIn } from "./emailCode";
 
 const evidence = process.env.CHART_E2E_EVIDENCE!;
 
-test("a planner saves a dashboard view, reads its recommendations and removes it", async ({
+test("a planner saves a dashboard view, opens its actions and removes it", async ({
   page,
 }) => {
   test.setTimeout(150_000);
@@ -50,36 +50,27 @@ test("a planner saves a dashboard view, reads its recommendations and removes it
 
   await dialog.getByRole("link", { name: "See recommendations" }).click();
   await expect(page).toHaveURL(/\/dashboard\/geo-ke-kajiado\/actions\?.*plan=/);
-  const panel = page.getByRole("region", { name: name });
-  await expect(panel).toBeVisible();
-  // The saved figure is the one the dashboard showed.
+  await expect(
+    page.getByRole("heading", { name: "Recommended actions", level: 1 }),
+  ).toBeVisible();
+  // The plan opens the repository on its own season; the ranked "Recommended
+  // for your plan" panel and its placeholder AI insight are gone.
+  await expect(page.getByRole("combobox", { name: "Timeframe" })).toContainText(
+    "Before heat season",
+  );
+  await expect(page.getByText("Recommended for your plan")).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "AI insight" })).toHaveCount(0);
+  // The saved figure is the one the dashboard showed (checked on /plan below).
   const percent = shown.match(/(\d+\.\d)%/)?.[1];
   expect(percent).toBeTruthy();
-  await expect(panel.getByTestId("plan-figure")).toContainText(`${percent}%`);
-  await expect(panel.getByTestId("plan-figure")).toContainText("2027");
-  const ranked = panel.getByRole("list", { name: "Recommended actions for this plan" });
-  await expect(ranked.locator(":scope > li")).toHaveCount(3);
-  await expect(
-    page.getByRole("tab", { name: /Before heat season/, selected: true }),
-  ).toBeVisible();
-  const insight = panel.getByRole("complementary", { name: "AI insight" });
-  await expect(insight).toContainText("Placeholder");
-  await expect(insight).toContainText("not by an AI model");
-  await expect(panel).toContainText("Ranked by season, outcome and cost rules.");
-  // Ranked from the published feed for Kenya (e2e/fixtures/airtable_actions.json).
-  await expect(ranked.getByRole("button").first()).toHaveText(
-    "Counsel pregnant women on heat",
-  );
-  await expect(ranked.locator(":scope > li").first()).toContainText(
-    "Targets low birth weight, this plan's outcome.",
-  );
-  // The action repository below: Kenya's actions, never India's or a Draft.
+  // Kenya's actions from the published feed (e2e/fixtures/airtable_actions.json),
+  // never India's or a Draft.
   const repository = page.getByRole("list", { name: "Before heat season actions" });
   await expect(repository).toContainText("County heat early warning");
   await expect(repository).not.toContainText("Act on IMD heat alerts");
   await expect(page.locator("body")).not.toContainText("Unreviewed draft action");
-  const first = await ranked.getByRole("button").first().innerText();
-  await ranked.getByRole("button").first().click();
+  const first = "Counsel pregnant women on heat";
+  await repository.getByRole("button").filter({ hasText: first }).click();
   await expect(page).toHaveURL(/action=/);
   const detail = page.getByRole("dialog", { name: first });
   await expect(detail).toBeVisible();
@@ -95,7 +86,7 @@ test("a planner saves a dashboard view, reads its recommendations and removes it
     "https://www.who.int/e2e-heat",
   );
   await page.reload();
-  await expect(page.getByRole("region", { name: name })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: first })).toBeVisible();
   await page.screenshot({
     path: `${evidence}/saved-plan-recommendations.png`,
     fullPage: true,

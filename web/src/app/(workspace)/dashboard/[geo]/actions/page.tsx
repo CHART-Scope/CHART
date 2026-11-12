@@ -9,7 +9,6 @@ import {
   ActionViewToggle,
   type ActionView,
   FALLBACK_CALENDAR,
-  PlanRecommendations,
   seasons,
   useActionProgress,
   useHeatActions,
@@ -93,7 +92,6 @@ export default function RecommendedActionsPage(props: PageProps) {
   const entry = catalog?.find((item) => item.outcome === outcome);
   const hazardLabel = entry?.climate_hazard_label ?? "Extreme heat";
   const domainLabel = entry?.health_domain_label ?? "Maternal and child health";
-  const outcomeLabel = (entry?.outcome_label ?? "low birth weight").toLowerCase();
 
   const dashboardQuery = new URLSearchParams({ outcome });
   if (query.admin_unit) dashboardQuery.set("admin_unit", query.admin_unit);
@@ -159,14 +157,6 @@ export default function RecommendedActionsPage(props: PageProps) {
             Try again
           </Button>
         </div>
-      ) : null}
-      {loadedPlan?.data && !loading && !error ? (
-        <PlanRecommendations
-          plan={loadedPlan.data}
-          actions={actions}
-          outcomeLabel={outcomeLabel}
-          onOpen={(action) => setQuery({ action })}
-        />
       ) : null}
       <ActionRepository
         actions={actions}
