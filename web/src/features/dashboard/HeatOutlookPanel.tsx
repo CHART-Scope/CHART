@@ -713,12 +713,21 @@ function projectedFigure(
     (option) => option.code === outlook.period,
   )?.label;
   const note = outlook.selector_note;
-  if (reference === "peak" && outlook.peak_season) {
-    const peak = outlook.peak_season;
+  const peak =
+    reference === "season"
+      ? outlook.heat_season_share
+      : reference === "peak"
+        ? outlook.peak_season
+        : null;
+  if (peak) {
+    const when =
+      reference === "season"
+        ? "the peak heat season"
+        : `the highest-risk months (${peak.label})`;
     return {
       ...EMPTY_FIGURE,
       percent: peak.part.value_percent,
-      lead: `${temperatureLead("projected average", meanTmax(outlook, peak.months))}in the highest-risk months (${peak.label}) of ${periodLabel}`,
+      lead: `${temperatureLead("projected average", meanTmax(outlook, peak.months))}in ${when} of ${periodLabel}`,
       range:
         peak.gcm_min_percent !== null && peak.gcm_max_percent !== null
           ? `Climate-model range ${peak.gcm_min_percent.toFixed(1)} to ${peak.gcm_max_percent.toFixed(1)}%`
@@ -999,13 +1008,21 @@ function ProjectedControls({
           options={[
             { value: "annual", label: "Annual average" },
             {
+              value: "season",
+              label: "Peak heat season",
+              disabled: !outlook.heat_season_share,
+              title: outlook.heat_season_share
+                ? "The heat season set in Settings"
+                : "No heat season is set for this place",
+            },
+            {
               value: "peak",
               label: outlook.peak_season
                 ? `Highest-risk months (${outlook.peak_season.label})`
                 : "Highest-risk months",
               disabled: !outlook.peak_season,
               title: outlook.peak_season
-                ? undefined
+                ? "The three months the model finds most affected by heat"
                 : "No seasonal pattern for this choice",
             },
           ]}

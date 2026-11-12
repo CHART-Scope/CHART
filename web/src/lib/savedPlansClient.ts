@@ -14,7 +14,7 @@ export type PlanChoices = {
   period?: string | null;
   selector?: string | null;
   observed_selector?: string | null;
-  reference?: "annual" | "peak";
+  reference?: "annual" | "season" | "peak";
 };
 
 export type PlanFigure = {

@@ -90,6 +90,8 @@ export type HeatOutlook = {
     parts: OutlookPeriodPart[];
   }[];
   peak_season: PeakSeason | null;
+  /** The share over the place's heat season as configured in Settings. */
+  heat_season_share?: PeakSeason | null;
   heat_season?: OfficialHeatSeason | null;
   data_modes: OutlookView[];
 };
@@ -131,7 +133,9 @@ export type ObservedRisk = {
 
 export type ObservedSelection = { outcome: string; month?: string; selector?: string };
 
-export type OutlookReference = "annual" | "peak";
+/** Annual average; the configured heat season ("season"); or the three
+ * months with the highest heat share ("peak"). */
+export type OutlookReference = "annual" | "season" | "peak";
 
 export type OutlookSelection = {
   outcome: string;

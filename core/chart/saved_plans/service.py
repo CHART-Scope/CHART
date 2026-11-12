@@ -14,6 +14,7 @@ from typing import Any, Literal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from chart.heat_seasons.service import season_months
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import can_read_geography_path
 from chart.climate.heat_seasons import heat_season
@@ -169,6 +170,7 @@ def capture_figure(
                 period=choices.period,
                 selector=choices.selector,
                 restriction=restriction,
+                season_months=season_months(session, place.id),
             )
             resolved = choices.model_copy(
                 update={
@@ -233,11 +235,16 @@ def _projected_figure(outlook, reference: str, seasonal: dict) -> PlanFigure:
         "selector_label": _label(outlook.selectors, outlook.selector),
         **seasonal,
     }
-    if reference == "peak" and outlook.peak_season:
+    peak, when = None, ""
+    if reference == "season":
+        peak, when = outlook.heat_season_share, "the peak heat season"
+    elif reference == "peak" and outlook.peak_season:
         peak = outlook.peak_season
+        when = f"the highest-risk months ({peak.label})"
+    if peak:
         return PlanFigure(
             **common,
-            when=f"the highest-risk months ({peak.label}) of {period} under {scenario}",
+            when=f"{when} of {period} under {scenario}",
             percent=peak.part.value_percent,
             low_percent=peak.part.low_percent,
             high_percent=peak.part.high_percent,

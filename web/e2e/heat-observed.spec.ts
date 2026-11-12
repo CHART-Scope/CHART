@@ -238,7 +238,7 @@ test("a failing observed request says so and leaves the projection usable", asyn
   await expect(outlook.getByTestId("outlook-estimate")).toContainText("11.1%");
 });
 
-test("the projected highest-risk months rank by share, not temperature", async ({
+test("projected reference periods: the configured heat season and the highest-risk months", async ({
   page,
 }) => {
   const api = await installKenya(page);
@@ -247,8 +247,6 @@ test("the projected highest-risk months rank by share, not temperature", async (
   await outlook.getByRole("tab", { name: "Projected" }).click();
 
   const reference = outlook.getByRole("group", { name: "Reference period" });
-  // "Peak heat season" was read as the weather season; it is not one.
-  await expect(outlook.getByText(/Peak heat season/)).toHaveCount(0);
   // The details end with a small link to the published methodology.
   await outlook.getByText("Seasonal pattern and all periods").click();
   await expect(
@@ -259,15 +257,32 @@ test("the projected highest-risk months rank by share, not temperature", async (
   await expect(outlook.getByText(/Projections average the selected years/)).toHaveCount(
     0,
   );
+  await expect(reference.getByRole("button")).toHaveText([
+    "Annual average",
+    "Peak heat season",
+    "Highest-risk months (Jul–Sep)",
+  ]);
+  const estimate = outlook.getByTestId("outlook-estimate");
+
+  // The heat season set in Settings (Kenya's Dec–Mar), named without months.
+  // Births in those months carry no excess heat risk in Kajiado.
+  await reference
+    .getByRole("button", { name: "Peak heat season", exact: true })
+    .click();
+  await expect(estimate).toContainText("No excess heat risk estimated");
+  await expect(estimate).not.toContainText("Dec–Mar");
+  await expect
+    .poll(() => api.requests.some((request) => request.includes("reference=season")))
+    .toBe(true);
+
+  // The three months the model ranks highest, by share.
   await reference
     .getByRole("button", { name: /Highest-risk months \(Jul–Sep\)/ })
     .click();
-  await expect(outlook.getByTestId("outlook-estimate")).toContainText(
+  await expect(estimate).toContainText(
     "in the highest-risk months (Jul–Sep) of 2041–2060",
   );
-  await expect(outlook.getByTestId("outlook-estimate")).toContainText(
-    "Climate-model range",
-  );
+  await expect(estimate).toContainText("Climate-model range");
   await expect
     .poll(() => api.requests.some((request) => request.includes("reference=peak")))
     .toBe(true);

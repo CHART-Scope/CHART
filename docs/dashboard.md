@@ -72,8 +72,10 @@ and the map's shading, not the place, question or columns.
   10 or 20 years, when the release publishes several — picking one opens its
   first future period, named in the sentence; otherwise the periods
   themselves), **Emission scenario** (cards with the plain-language name over
-  the SSP code) and **Reference period** (annual average or highest-risk
-  months).
+  the SSP code) and **Reference period** (annual average; **peak heat
+  season**, the share over the place's heat season as set in Settings › Heat
+  seasons, named without its months for now; or **highest-risk months**, the
+  three months the model ranks highest).
 
 Switching place, tab, month or scenario never blanks the card. Each place's
 capabilities and actions are cached for the session; while a new place's

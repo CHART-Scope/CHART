@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from chart.heat_seasons.service import season_months
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import can_read_geography_path, require_reader
 from chart.model_settings.service import live_restriction, outlook_restriction
@@ -125,6 +126,8 @@ def read_heat_outlook(
     selector: Annotated[str | None, Query(max_length=32)] = None,
 ) -> HeatOutlookResponse:
     require_read_access(user, geography_id)
+    with get_session_factory()() as session:
+        months = season_months(session, geography_id)
     try:
         return load_outlook(
             geography_id,
@@ -133,6 +136,7 @@ def read_heat_outlook(
             period=period,
             selector=selector,
             restriction=_restriction(geography_id, outcome),
+            season_months=months,
         )
     except ViewTurnedOff as exc:
         raise HTTPException(status_code=404, detail="VIEW_TURNED_OFF") from exc
@@ -156,7 +160,7 @@ def read_heat_outlook_map(
     scenario: Annotated[str | None, Query(max_length=16)] = None,
     period: Annotated[str | None, Query(max_length=16)] = None,
     selector: Annotated[str | None, Query(max_length=32)] = None,
-    reference: Annotated[str, Query(pattern="^(annual|peak)$")] = "annual",
+    reference: Annotated[str, Query(pattern="^(annual|peak|season)$")] = "annual",
 ) -> MapResponse:
     require_read_access(user, geography_id)
     restriction = _restriction(geography_id, outcome)

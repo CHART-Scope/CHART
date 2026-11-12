@@ -12,7 +12,10 @@ import {
 
 // Responses produced by the real Python service from the modeller's published
 // Kenya tables (v2_2026_10_06) and the dev database's county shapes. The
-// browser sees his numbers and real geometry, not invented ones.
+// browser sees his numbers and real geometry, not invented ones. The heat-season
+// shares ("heat_season_share", map values "|season") were added later by the
+// same service over Kenya's official season (Dec–Mar), from the 2026-10-22
+// tables.
 type MapValues = Record<string, Record<string, Record<string, unknown>>>;
 type Option = { code: string; label: string; exploratory?: boolean };
 type Outlook = Record<string, unknown> & { selectors: Option[]; scenarios: Option[] };
@@ -273,8 +276,10 @@ export async function installKenya(
   });
   api.on(/^\/api\/chart\/heat-outlook\/[^/]+\/map$/, (route, url) => {
     const { outcome, selector, enabled } = selection(url);
-    const peak = url.searchParams.get("reference") === "peak" ? "|peak" : "";
-    const values = fixtures.mapValues[`${outcome}|${selector}${peak}`];
+    const reference = url.searchParams.get("reference");
+    const suffix =
+      reference === "peak" || reference === "season" ? `|${reference}` : "";
+    const values = fixtures.mapValues[`${outcome}|${selector}${suffix}`];
     if (!published || !values)
       return json(route, { error: "OUTLOOK_NOT_PUBLISHED" }, 404);
     if (!enabled) return json(route, { error: "OUTLOOK_SELECTION_INVALID" }, 422);

@@ -131,6 +131,9 @@ class HeatOutlookResponse(BaseModel):
     months: list[OutlookMonth]
     period_summary: list[OutlookPeriod]
     peak_season: PeakSeason | None = None
+    #: The heat share over the place's heat season as configured in Settings
+    #: (its own, an ancestor's or the official season), not ranked by share.
+    heat_season_share: PeakSeason | None = None
     heat_season: OfficialHeatSeason | None = None
     data_modes: list[str] = ["observed", "projection"]
 
