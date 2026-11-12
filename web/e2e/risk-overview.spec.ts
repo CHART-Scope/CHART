@@ -90,10 +90,15 @@ test("the three tabs swap figures and map in place; the forecast follows its mon
   const estimate = outlook.getByTestId("outlook-estimate");
   await expect(estimate).toContainText("may be attributable to heat exposure.");
   await expect(outlook.getByText("No data yet")).toBeVisible();
-  // The forecast is only asked for once its tab opens.
-  expect(api.requests.some((request) => request.includes("/forecast"))).toBe(false);
+  // Every tab's figures and map load with the first, so switching is instant.
+  const forecastReads = /\/heat-outlook\/geo-ke(-kajiado)?\/forecast(\/map)?\?/;
+  await expect
+    .poll(() => api.requests.filter((request) => forecastReads.test(request)).length)
+    .toBe(2);
   const map = outlook.locator('svg[role="group"]');
   await expect(map).toHaveCount(1);
+  // Mark the map: switching tab must recolour it, never replace it.
+  await map.evaluate((element) => element.setAttribute("data-e2e-kept", "map"));
   const observedMap = await map.boundingBox();
   const observedFigures = await outlook
     .getByRole("img", { name: /of 100/ })
@@ -101,6 +106,10 @@ test("the three tabs swap figures and map in place; the forecast follows its mon
 
   await outlook.getByRole("tab", { name: "Forecasted" }).click();
   await expect(page).toHaveURL(/view=forecast/);
+  // Answered from what was already loaded: no new forecast request, no
+  // placeholder, the same map element.
+  expect(api.requests.filter((request) => forecastReads.test(request))).toHaveLength(2);
+  await expect(outlook.locator('svg[data-e2e-kept="map"]')).toHaveCount(1);
   await expect(estimate).toContainText(
     "At a forecasted maximum temperature of 28.0 °C in Nov 2026, 12.0% of low birth weight cases in Kajiado County may be attributable to heat exposure.",
   );

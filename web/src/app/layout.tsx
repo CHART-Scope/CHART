@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { AuditRuntime } from "@/lib/audit/AuditRuntime";
+import { QueryProvider } from "@/lib/queryClient";
 
 import "../styles/tokens.css";
 import "../styles/globals.css";
@@ -17,7 +18,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <AuditRuntime />
-        {children}
+        <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 
 import { PageHeader } from "@/components/PageHeader";
 import { Tabs, type TabItem } from "@/components/Tabs";
@@ -87,7 +87,12 @@ function Settings() {
     label: value === "jobs" && liveJobs > 0 ? `Jobs (${liveJobs})` : LABELS[value],
   }));
 
-  const panel = {
+  // Tabs already opened stay mounted, hidden: going back is instant, keeps
+  // any half-filled form, and does not re-read what the card just loaded.
+  const [visited, setVisited] = useState<Tab[]>([tab]);
+  if (!visited.includes(tab)) setVisited([...visited, tab]);
+
+  const panels: Record<Tab, ReactNode> = {
     workspace: (
       <>
         <GeographyContextCard
@@ -123,7 +128,14 @@ function Settings() {
     ),
     recommendations: <RecommendationSettingsCard />,
     jobs: <JobsCard />,
-  }[tab];
+  };
+  const panel = visited
+    .filter((value) => allowed.includes(value))
+    .map((value) => (
+      <div key={value} hidden={value !== tab} className={styles.panelGroup}>
+        {panels[value]}
+      </div>
+    ));
 
   return (
     <div className={styles.layout}>

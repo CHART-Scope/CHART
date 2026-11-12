@@ -70,6 +70,10 @@ make web
 make verify
 ```
 
+`make web` runs `next dev` with Turbopack (each route compiles in under a
+second, with less memory than webpack); production builds and the E2E suite
+still use `next build --webpack`.
+
 Adding a place or model: [docs/add-geography-and-model.md](docs/add-geography-and-model.md).
 
 Load observed climate history once per country after setup (see

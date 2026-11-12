@@ -14,6 +14,12 @@
   animation: rise 0.3s ease-out both;
 }
 
+/* One tab's cards. `display: contents` keeps them direct flex items of the
+   panel; the guard lets the `hidden` attribute still hide an inactive tab. */
+.panelGroup:not([hidden]) {
+  display: contents;
+}
+
 @keyframes rise {
   from {
     opacity: 0;

@@ -13,7 +13,7 @@
  */
 
 import { authFetch, readErrorCode } from "./authFetch";
-import type { MapResponse } from "./dashboardClient";
+import { mapGeometryParam, type MapResponse } from "./dashboardClient";
 
 export type VraComponent = "hazard" | "exposure" | "sensitivity" | "adaptive_capacity";
 export type VraRoute = "computed" | "upload" | "manual" | "pull";
@@ -228,9 +228,11 @@ export async function fetchVraAssessment(
 export async function fetchVraMap(
   geographyId: string,
   accessToken: string | null | undefined,
-  options: Options = {},
+  options: Options & { geometry?: boolean } = {},
 ): Promise<MapResponse> {
-  const response = await authFetch(`${base(geographyId)}/map`, {
+  const query = mapGeometryParam(new URLSearchParams(), options.geometry ?? true);
+  const suffix = query.size ? `?${query}` : "";
+  const response = await authFetch(`${base(geographyId)}/map${suffix}`, {
     accessToken,
     signal: options.signal,
     // Revalidated by ETag; the server rebuilds only when its data changes.

@@ -1,5 +1,5 @@
 import { authFetch } from "./authFetch";
-import { type MapResponse } from "./dashboardClient";
+import { mapGeometryParam, type MapResponse } from "./dashboardClient";
 
 /**
  * Typed client for the published heat outlook: the modelling team's
@@ -170,12 +170,14 @@ export async function fetchHeatOutlookMap(
   geographyId: string,
   accessToken: string | null | undefined,
   selection: OutlookSelection & { reference?: OutlookReference },
+  geometry = true,
 ): Promise<MapResponse> {
   const params = new URLSearchParams({ outcome: selection.outcome });
   if (selection.scenario) params.set("scenario", selection.scenario);
   if (selection.period) params.set("period", selection.period);
   if (selection.selector) params.set("selector", selection.selector);
   if (selection.reference) params.set("reference", selection.reference);
+  mapGeometryParam(params, geometry);
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/map?${params}`,
     { accessToken, cache: "default" },
@@ -212,9 +214,11 @@ export async function fetchObservedRiskMap(
   geographyId: string,
   accessToken: string | null | undefined,
   selection: ObservedSelection,
+  geometry = true,
 ): Promise<MapResponse> {
+  const params = mapGeometryParam(observedParams(selection), geometry);
   const response = await authFetch(
-    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/observed/map?${observedParams(selection)}`,
+    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/observed/map?${params}`,
     { accessToken, cache: "default" },
   );
   if (!response.ok) throw new Error("The observed map could not load.");
@@ -363,9 +367,11 @@ export async function fetchForecastMap(
   outcome: string,
   month?: string | null,
   accessToken?: string | null,
+  geometry = true,
 ): Promise<ForecastMap> {
   const params = new URLSearchParams({ outcome });
   if (month) params.set("month", month);
+  mapGeometryParam(params, geometry);
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/forecast/map?${params}`,
     accessToken === undefined

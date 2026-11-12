@@ -83,11 +83,26 @@ in the release documentation, and is used only as the message when no estimate
 is reported. A **See more** link beside the panel label opens the published
 methodology; there are no seasonal or all-periods tables.
 
-Switching place, tab, month or scenario never blanks the card. Each place's
-capabilities and actions are cached for the session; while a new place's
-figures load, the previous ones stay on screen dimmed and still named after
-their place, and are replaced (or cleared, if the new place has none) when the
-answer arrives. The map keeps its last shading until the next one loads.
+Switching place, tab, month or scenario never blanks the card. The overview is
+drawn by the dashboard layout (`web/src/app/(workspace)/dashboard/layout.tsx`)
+rather than the `[geo]` page, so a new place updates the mounted dashboard
+instead of rebuilding it. Reads go through one client-side query cache
+(TanStack Query, `web/src/lib/queryClient.tsx`): the place list, model
+catalogs, capabilities and each outlook view are kept for the session, so a
+place, month or setting seen before answers from memory. Published views are
+not re-read during a session; saving model settings in Settings clears them
+(and the kept maps) so the dashboard reads them afresh.
+
+All three tabs (Observed, Forecasted, Projected) load together, and once the
+open tab is drawn the other tabs' maps are fetched too, so switching tab is
+instant. The icon array and the map stay mounted throughout: while a new
+selection loads, the icon array keeps its last share and the map its shapes and
+last colours, then the figures shade over and the map's fills fade to the new
+values. Each place's outlines are kept from its first map; every later map of
+that place (another tab, month or setting) is requested with `geometry=false`
+and carries only each area's value, reason and odds ratio, which are laid on
+the kept outlines. Signing out clears the cache. Settings keeps a tab you have
+opened mounted (hidden) so going back to it does not reload it.
 
 The sentence under the icon array reads "At a [forecasted / projected
 average annual] maximum temperature of X °C in <when>, N% of <outcome> cases
