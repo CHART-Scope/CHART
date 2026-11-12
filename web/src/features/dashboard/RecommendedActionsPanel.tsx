@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useState } from "react";
 
-import { Icon } from "@/components/Icon";
+import { buttonClassName } from "@/components/Button";
 import {
   ActionPanel,
   seasons,
@@ -57,10 +57,6 @@ export function RecommendedActionsPanel({
           <p className={styles.eyebrow} id="recommended-actions-heading">
             Recommended actions
           </p>
-          <span className={styles.filterChip} title={`Filtered by ${hazardLabel}`}>
-            <Icon name="sun" size={12} />
-            For {hazardLabel.toLowerCase()}
-          </span>
         </header>
         {loading ? (
           <p className={styles.status} role="status">
@@ -118,7 +114,10 @@ export function RecommendedActionsPanel({
             );
           })}
         </div>
-        <Link href={seeAllHref} className={styles.seeAll}>
+        <Link
+          href={seeAllHref}
+          className={buttonClassName({ variant: "secondary", block: true })}
+        >
           See all recommended actions
         </Link>
       </section>

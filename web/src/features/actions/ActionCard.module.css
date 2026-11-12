@@ -37,7 +37,7 @@
   height: 70px;
   border-radius: var(--radius-md);
   background: #efeef4;
-  color: var(--color-nexus);
+  font-size: var(--fs-emoji);
 }
 .body {
   display: flex;
