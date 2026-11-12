@@ -16,6 +16,7 @@ import {
 } from "@/features/dashboard";
 import { DashboardContextBar } from "@/features/dashboard";
 import { exposedPopulationFigure, iconArrayFigure } from "@/features/dashboard/figures";
+import { can } from "@/lib/access";
 import { useGeographies } from "@/lib/useGeographies";
 import { useModelCatalog } from "@/lib/useModelCatalog";
 import { type GeographyRecord } from "@/lib/planningClient";
@@ -227,6 +228,8 @@ function Dashboard({
   ]);
 
   const currentGeography = geographies.find((geo) => geo.id === geographyId);
+  // Preparing a month runs the models: risk write at this place.
+  const canRunModels = can(session.user, "risk", "write", currentGeography?.path ?? "");
   const selectedGeographyId = displayedAdminUnit ?? geographyId;
   const effectiveGeography =
     geographies.find((geo) => geo.id === selectedGeographyId) ?? currentGeography;
@@ -375,19 +378,7 @@ function Dashboard({
         )
       }
       accessToken={observedModelAvailable ? session.accessToken : undefined}
-      canPrepare={
-        observedModelAvailable &&
-        batchEnabled &&
-        session.user.roles.some((role) =>
-          [
-            "chart_admin",
-            "health_planning_lead",
-            "cross_sector_planning_lead",
-            "health_implementation_officer",
-            "cross_sector_implementation_officer",
-          ].includes(role),
-        )
-      }
+      canPrepare={observedModelAvailable && batchEnabled && canRunModels}
     >
       <SpatialRiskMap
         dataRefreshKey={mapRefresh}
@@ -402,19 +393,7 @@ function Dashboard({
         // nothing is picked out among them when you land on a
         // division directly rather than choosing a sub-area.
         selectedGeographyId={displayedAdminUnit ?? geographyId}
-        canPrepare={
-          observedModelAvailable &&
-          batchEnabled &&
-          session.user.roles.some((role) =>
-            [
-              "chart_admin",
-              "health_planning_lead",
-              "cross_sector_planning_lead",
-              "health_implementation_officer",
-              "cross_sector_implementation_officer",
-            ].includes(role),
-          )
-        }
+        canPrepare={observedModelAvailable && batchEnabled && canRunModels}
         onSelect={(nextGeography) =>
           selectMapArea(nextGeography, { ...choices, view: "observed" })
         }

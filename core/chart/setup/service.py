@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import secrets
-import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import cast
@@ -13,8 +12,11 @@ from typing import cast
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
+from chart.access.guards import context_for
+from chart.access.principal import Principal, forget
+from chart.access.workspaces import ensure_workspace
 from chart.auth.schemas import CurrentUserContext
-from chart.identity import IdentityError, add_to_groups, delete_user, upsert_user
+from chart.identity import IdentityError, delete_user, ensure_account
 from chart.model_registry.runtime import prepare_model_release
 from chart.model_registry.schemas import (
     GeographyPlaceSpec,
@@ -51,14 +53,15 @@ from chart.shared.db.models import (
     PredictionRequestRecord,
     PredictionResult,
     SetupStateRecord,
-    UserGeographyScopeRecord,
-    UserRoleRecord,
+    AccessRole,
+    Department,
+    Membership,
+    MembershipGrant,
     VraIndicatorValue,
     VraIngestion,
     VraResult,
     VraResultIndicator,
     VraRun,
-    WorkspaceMemberRecord,
     WorkspaceRecord,
 )
 from chart.shared.db.session import get_session_factory
@@ -118,9 +121,7 @@ def get_status(*, session_factory=None) -> SetupStatus:
         geography_count = (
             session.scalar(select(func.count()).select_from(AppGeography)) or 0
         )
-        member_count = (
-            session.scalar(select(func.count()).select_from(WorkspaceMemberRecord)) or 0
-        )
+        member_count = session.scalar(select(func.count()).select_from(Membership)) or 0
         complete = bool(state and state.completed and geography_count and member_count)
         return SetupStatus(
             completed=complete,
@@ -274,22 +275,13 @@ def get_options() -> SetupOptions:
 def bootstrap(
     input_data: BootstrapSetupInput, *, session_factory=None
 ) -> BootstrapSetupResponse:
-    release_geography = _validate_setup_geographies(input_data)
+    _validate_setup_geographies(input_data)
     session_factory = session_factory or get_session_factory()
     operation_id = _claim_bootstrap(input_data, session_factory)
-    paths = [release_geography.root_path]
-    selected_path = (
-        input_data.geographies[-1].path
-        if input_data.geographies
-        else release_geography.root_path
-    )
     try:
-        identity = upsert_user(
+        identity = ensure_account(
             name=input_data.admin.name.strip(),
             email=input_data.admin.email.strip().lower(),
-            username=input_data.admin.username.strip().lower(),
-            roles=["chart_admin", "content_editor"],
-            group_paths=list(dict.fromkeys(paths)),
             operation_id=operation_id,
         )
     except IdentityError as error:
@@ -300,16 +292,11 @@ def bootstrap(
         )
         _mark_bootstrap_failed(operation_id, setup_code, session_factory)
         raise SetupError(setup_code, error.status_code) from error
-    user = CurrentUserContext(
-        userId=identity.user_id,
+    user = context_for(
+        Principal(user_id=identity.user_id, is_platform_admin=True),
         username=identity.username,
         email=identity.email,
-        roles=["chart_admin", "content_editor"],
-        geographyScopes=paths,
-        activeGeographyId=selected_path,
-        geographyLevel=(
-            input_data.geographies[0].level if input_data.geographies else "country"
-        ),
+        display_name=input_data.admin.name.strip(),
     )
     try:
         result = complete(
@@ -569,7 +556,7 @@ def complete(
     session_factory=None,
     provisioning_token: str | None = None,
 ) -> SetupStatus:
-    if "chart_admin" not in user.roles:
+    if not user.is_platform_admin:
         raise SetupError("SETUP_FORBIDDEN", 403)
     primary_sector_id, collaborating_sector_ids = _selected_sectors(
         input_data.primarySectorId,
@@ -579,17 +566,6 @@ def complete(
     country_code = input_data.countryCode.strip().upper()
     root_id = release_geography.root_id
     root_path = release_geography.root_path
-    if provisioning_token is None and not any(
-        scope.rstrip("/") == root_path.rstrip("/")
-        or scope.startswith(root_path.rstrip("/") + "/")
-        for scope in user.geography_scopes
-    ):
-        # The signed-in administrator who runs setup (the default `admin`)
-        # manages the installed country; bootstrap gives its admin the same.
-        try:
-            add_to_groups(user.user_id, [root_path])
-        except IdentityError as error:
-            raise SetupError("SETUP_IDENTITY_GROUP_FAILED", 502) from error
     session_factory = session_factory or get_session_factory()
     with session_factory() as session:
         state = session.get(SetupStateRecord, SETUP_ID, with_for_update=True)
@@ -649,47 +625,13 @@ def complete(
                 row.sortOrder,
             )
         session.flush()
-        # First-run administrators manage the installed country and may switch
-        # among its model-backed areas. Later user assignments stay scoped to
-        # their explicitly selected place.
-        scopes = input_data.geographies[-1:] if input_data.geographies else []
-        persisted_scope_ids = (
-            [root_id]
-            if provisioning_token is not None
-            else [row.id for row in scopes] or [root_id]
-        )
-        _persist_user(
-            session,
-            user,
-            persisted_scope_ids,
-        )
-        workspace_id = f"workspace-{country_code.lower()}-default"
-        workspace = session.get(WorkspaceRecord, workspace_id)
-        if workspace is None:
-            workspace = WorkspaceRecord(id=workspace_id)
-            session.add(workspace)
-        workspace.name = f"{input_data.countryName.strip()} CHART setup"
-        workspace.planning_cycle = str(__import__("datetime").date.today().year)
+        # The administrator running setup is a platform admin and the new
+        # workspace's Workspace admin over the whole country.
+        _persist_admin(session, user)
+        workspace = ensure_workspace(session, country_code, created_by=user.user_id)
+        workspace.planning_cycle = str(date.today().year)
         workspace.status = "active"
-        workspace.geography_id = scopes[-1].id if scopes else root_id
-        workspace.created_by_user_id = user.user_id
-        workspace.owner_user_id = user.user_id
-        session.flush()
-        member = session.scalar(
-            select(WorkspaceMemberRecord).where(
-                WorkspaceMemberRecord.workspace_id == workspace.id,
-                WorkspaceMemberRecord.user_id == user.user_id,
-            )
-        )
-        if member is None:
-            session.add(
-                WorkspaceMemberRecord(
-                    id=f"member-{uuid.uuid4()}",
-                    workspace_id=workspace.id,
-                    user_id=user.user_id,
-                    role="owner",
-                )
-            )
+        _grant_workspace_admin(session, workspace.id, user.user_id, root_id)
         # Seed the setup country first so its releases appear first in the
         # auto-seed order, then fan out to every other country whose manifest
         # is present on disk. Setup used to install only the selected country,
@@ -737,7 +679,7 @@ def sync_deployed_models(
 ) -> ModelSyncResponse:
     """Install newly deployed manifests without resetting user or workspace data."""
 
-    if "chart_admin" not in user.roles:
+    if not user.is_platform_admin:
         raise SetupError("SETUP_FORBIDDEN", 403)
     return restore_deployed_models(
         session_factory=session_factory, require_complete=True
@@ -792,7 +734,7 @@ def restore_deployed_models(
 
 
 def reset(user: CurrentUserContext) -> SetupStatus:
-    if "chart_admin" not in user.roles:
+    if not user.is_platform_admin:
         raise SetupError("SETUP_FORBIDDEN", 403)
     with get_session_factory()() as session:
         state = session.get(SetupStateRecord, SETUP_ID)
@@ -814,8 +756,11 @@ def reset(user: CurrentUserContext) -> SetupStatus:
         # respects the FK graph (children first). Country config and seed
         # reference tables (data_source, provenance) are intentionally not
         # touched.
-        session.execute(delete(WorkspaceMemberRecord))
+        # Memberships, grants, roles, departments and invitations go with
+        # their workspace (ON DELETE CASCADE); departments from before
+        # workspaces have none.
         session.execute(delete(WorkspaceRecord))
+        session.execute(delete(Department))
         # VRA values and results hang off admin units and geographies; the
         # catalogue (vra_indicator) is shipped reference data and stays.
         session.execute(delete(VraResultIndicator))
@@ -854,8 +799,6 @@ def reset(user: CurrentUserContext) -> SetupStatus:
         session.execute(delete(ErfParameters))
         session.execute(delete(DataSource))
         session.execute(delete(Geography))
-        session.execute(delete(UserGeographyScopeRecord))
-        session.execute(delete(UserRoleRecord))
         session.execute(delete(AppUser))
 
         if state is None:
@@ -904,9 +847,7 @@ def _claim_bootstrap(input_data, session_factory) -> str:
     with session_factory() as session:
         state = session.get(SetupStateRecord, SETUP_ID, with_for_update=True)
         assert state is not None
-        member_count = (
-            session.scalar(select(func.count()).select_from(WorkspaceMemberRecord)) or 0
-        )
+        member_count = session.scalar(select(func.count()).select_from(Membership)) or 0
         if state.completed or member_count or state.phase == "requires_admin":
             raise SetupError("SETUP_BOOTSTRAP_LOCKED", 409)
 
@@ -967,39 +908,59 @@ def _aware(value: datetime) -> datetime:
     return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
 
 
-def _persist_user(session, user, geography_ids):
+def _persist_admin(session, user: CurrentUserContext) -> None:
     record = session.get(AppUser, user.user_id)
     if record is None:
         record = AppUser(
-            id=user.user_id, username=user.username, display_name=user.username
+            id=user.user_id,
+            username=user.username,
+            display_name=user.display_name or user.username,
         )
         session.add(record)
     record.email = user.email
     record.status = "active"
-    session.execute(
-        delete(UserRoleRecord).where(UserRoleRecord.user_id == user.user_id)
-    )
-    session.execute(
-        delete(UserGeographyScopeRecord).where(
-            UserGeographyScopeRecord.user_id == user.user_id
+    record.is_platform_admin = True
+    session.flush()
+    forget(user.user_id)
+
+
+def _grant_workspace_admin(
+    session, workspace_id: str, user_id: str, geography_id: str
+) -> None:
+    membership = session.scalar(
+        select(Membership).where(
+            Membership.workspace_id == workspace_id, Membership.user_id == user_id
         )
     )
-    for role in user.roles:
+    if membership is None:
+        membership = Membership(
+            workspace_id=workspace_id, user_id=user_id, status="active"
+        )
+        session.add(membership)
+        session.flush()
+    role_id = session.scalar(
+        select(AccessRole.id).where(
+            AccessRole.workspace_id == workspace_id,
+            AccessRole.key == "workspace_admin",
+        )
+    )
+    grant = session.scalar(
+        select(MembershipGrant).where(
+            MembershipGrant.membership_id == membership.id,
+            MembershipGrant.geography_id == geography_id,
+        )
+    )
+    if grant is None:
         session.add(
-            UserRoleRecord(user_id=user.user_id, role=role, source="onboarding")
-        )
-    for geography_id in geography_ids:
-        geography = session.get(AppGeography, geography_id)
-        if geography:
-            session.add(
-                UserGeographyScopeRecord(
-                    id=f"user-geo-{uuid.uuid4()}",
-                    user_id=user.user_id,
-                    geography_id=geography_id,
-                    source="onboarding",
-                    external_group_path=geography.path,
-                )
+            MembershipGrant(
+                membership_id=membership.id,
+                role_id=role_id,
+                geography_id=geography_id,
             )
+        )
+    else:
+        grant.role_id = role_id
+    session.flush()
 
 
 def _upsert_place(session, place_id, country, level, label, name, parent, path, order):

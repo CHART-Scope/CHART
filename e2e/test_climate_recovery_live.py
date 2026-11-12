@@ -138,9 +138,11 @@ def test_active_run_is_not_failed_for_age_or_duplicated(
             assert saved.dagster_run_id == run.run_id
 
 
-def test_ingestion_job_controls_require_real_administrator(client, tokens):
-    for headers, status in (({}, 401), (tokens["india-planner"], 403)):
-        assert client.get(ENDPOINT, headers=headers).status_code == status
-        assert (
-            client.post(ENDPOINT, json=REQUEST, headers=headers).status_code == status
-        )
+def test_queuing_a_pull_needs_data_write(client, tokens):
+    assert client.get(ENDPOINT).status_code == 401
+    assert client.post(ENDPOINT, json=REQUEST).status_code == 401
+    # A planning lead reads data (the job list) but cannot queue a pull.
+    assert client.get(ENDPOINT, headers=tokens["india-planner"]).status_code == 200
+    refused = client.post(ENDPOINT, json=REQUEST, headers=tokens["india-planner"])
+    assert refused.status_code == 403
+    assert refused.json()["error"] == "CAPABILITY_NOT_ALLOWED"

@@ -1,9 +1,9 @@
 import type { GeographyRecord } from "@/lib/planningClient";
 
 /**
- * True when `scopes` grants the user access to `area`. A parent scope grants
- * its descendants; a child scope must not pull ancestors into scope — a
- * division-level user cannot navigate up to the state.
+ * True when the user may open `area`: a place they work on, one below it, or
+ * one above it, which reads as context (docs/access-control.md). A place
+ * beside theirs (a sibling district) stays out.
  */
 export function isInScope(area: GeographyRecord, scopes: string[]): boolean {
   if (scopes.length === 0) return false;
@@ -12,8 +12,8 @@ export function isInScope(area: GeographyRecord, scopes: string[]): boolean {
     const scope = normalizeScope(raw);
     if (!scope) return false;
     if (scope === area.id) return true;
-    if (scope === areaPath) return true;
-    return areaPath.startsWith(`${scope}/`);
+    if (scope === "/" || scope === areaPath) return true;
+    return areaPath.startsWith(`${scope}/`) || scope.startsWith(`${areaPath}/`);
   });
 }
 

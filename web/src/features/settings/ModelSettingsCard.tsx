@@ -41,9 +41,15 @@ const VIEW_LABELS: Record<string, string> = {
   live: "Monthly model",
 };
 
-type Props = { accessToken: string; activeGeographyId?: string };
+type Props = {
+  accessToken: string;
+  activeGeographyId?: string;
+  /** Whether the person may change a country's settings (risk manage
+   * there); others read them. */
+  canEdit: (countryPath: string) => boolean;
+};
 
-export function ModelSettingsCard({ accessToken, activeGeographyId }: Props) {
+export function ModelSettingsCard({ accessToken, activeGeographyId, canEdit }: Props) {
   const [items, setItems] = useState<ModelSettings[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -65,6 +71,8 @@ export function ModelSettingsCard({ accessToken, activeGeographyId }: Props) {
   ].map(([value, label]) => ({ value, label }));
   const rootPath = activeGeographyId?.split("/").slice(0, 2).join("/");
   const planningCountry = geographies?.find((geo) => geo.path === rootPath)?.name;
+  const countryPath = (code: string) =>
+    geographies?.find((geo) => !geo.parentId && geo.countryCode === code)?.path ?? "";
   const country =
     picked ??
     countries.find((option) => option.label === planningCountry)?.value ??
@@ -104,6 +112,7 @@ export function ModelSettingsCard({ accessToken, activeGeographyId }: Props) {
                 key={`${item.country_code}|${item.outcome}`}
                 item={item}
                 accessToken={accessToken}
+                editable={canEdit(countryPath(item.country_code))}
               />
             ))}
         </div>
@@ -118,9 +127,11 @@ type SaveState =
 function ModelSettingsForm({
   item,
   accessToken,
+  editable,
 }: {
   item: ModelSettings;
   accessToken: string;
+  editable: boolean;
 }) {
   const [saved, setSaved] = useState(item);
   const [draft, setDraft] = useState<ModelSettingsValues>(item.settings);
@@ -161,7 +172,7 @@ function ModelSettingsForm({
   }
 
   return (
-    <fieldset className={styles.item}>
+    <fieldset className={styles.item} disabled={!editable}>
       <legend className={styles.itemTitle}>{title}</legend>
       <OptionGroup
         legend={available.selector_label}
@@ -188,14 +199,18 @@ function ModelSettingsForm({
         onChange={(dataModes) => update({ ...draft, data_modes: dataModes })}
       />
       <div className={styles.footer}>
-        <Button
-          size="sm"
-          onClick={() => void save()}
-          disabled={state.kind === "saving"}
-          aria-label={`Save ${title}`}
-        >
-          {state.kind === "saving" ? "Saving…" : "Save"}
-        </Button>
+        {editable ? (
+          <Button
+            size="sm"
+            onClick={() => void save()}
+            disabled={state.kind === "saving"}
+            aria-label={`Save ${title}`}
+          >
+            {state.kind === "saving" ? "Saving…" : "Save"}
+          </Button>
+        ) : (
+          <span className={styles.saved}>A workspace admin changes these.</span>
+        )}
         {state.kind === "saved" ? (
           <span className={styles.saved} role="status">
             Saved.

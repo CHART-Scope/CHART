@@ -1,8 +1,9 @@
 """HTTP endpoints for plan recommendations and how they are produced.
 
-Any dashboard reader may rank actions for their own saved plans. Choosing the
-ranker and the insight provider/model, and listing a provider's models, is for
-``chart_admin``; credentials stay in the server environment.
+Anyone who can read a saved plan may rank actions for it. Choosing the ranker
+and the insight provider/model, and listing a provider's models, is for
+platform admins (installation-wide); credentials stay in the server
+environment.
 """
 
 from __future__ import annotations
@@ -13,8 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from starlette.concurrency import run_in_threadpool
 
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import require_any_role, require_current_user
-from chart.risk.routes import risk_reader_roles
+from chart.access.guards import require_platform_admin
+from chart.auth.service import require_current_user
 from chart.saved_plans.service import SavedPlanError
 from chart.shared.db.session import get_session_factory
 
@@ -50,7 +51,6 @@ async def recommend_for_plan(
     request: RecommendationRequest,
     user: CurrentUser,
 ) -> RecommendationResponse:
-    require_any_role(user, risk_reader_roles)
     # A language model may take seconds; keep the event loop free.
     return await run_in_threadpool(_call, service.recommend, user, plan_id, request)
 
@@ -61,7 +61,7 @@ async def recommend_for_plan(
     summary="Read how recommendations are ranked and explained",
 )
 def read_recommendation_settings(user: CurrentUser) -> RecommendationSettingsResponse:
-    require_any_role(user, {"chart_admin"})
+    require_platform_admin(user)
     return _call(service.read_settings)
 
 
@@ -73,7 +73,7 @@ def read_recommendation_settings(user: CurrentUser) -> RecommendationSettingsRes
 def write_recommendation_settings(
     values: RecommendationSettings, user: CurrentUser
 ) -> RecommendationSettingsResponse:
-    require_any_role(user, {"chart_admin"})
+    require_platform_admin(user)
     return _call(service.update_settings, user, values)
 
 
@@ -85,7 +85,7 @@ def write_recommendation_settings(
 async def list_provider_models(
     provider: Annotated[str, Path(max_length=32)], user: CurrentUser
 ) -> ProviderModels:
-    require_any_role(user, {"chart_admin"})
+    require_platform_admin(user)
     try:
         return await run_in_threadpool(service.models_for, provider)
     except service.RecommendationError as exc:

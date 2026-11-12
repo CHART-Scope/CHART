@@ -35,33 +35,34 @@ class IdentityConfig:
     client_id: str
 
 
-def upsert_user(
-    *,
-    name: str,
-    email: str,
-    username: str,
-    roles: list[str],
-    group_paths: list[str],
-    operation_id: str | None = None,
+def ensure_account(
+    *, name: str, email: str, operation_id: str | None = None
 ) -> IdentityUser:
+    """The Keycloak account for an email, created when missing.
+
+    Accounts carry no CHART access (that lives in CHART's database), so an
+    existing account is reused rather than refused: inviting someone already
+    signed up elsewhere only adds a membership. Sign-in is by emailed code;
+    there is no password.
+    """
     config = _config()
     token = _admin_token(config)
-    groups = [_ensure_group_path(config, token, path) for path in group_paths]
+    username = email.strip().lower()
     user = _find_user(config, token, username, email)
-    body = {
-        "username": username,
-        "email": email,
-        "firstName": name,
-        "enabled": True,
-        "emailVerified": True,
-        **(
-            {"attributes": {"chartProvisioningOperation": [operation_id]}}
-            if operation_id
-            else {}
-        ),
-    }
     created = False
     if user is None:
+        body = {
+            "username": username,
+            "email": email,
+            "firstName": name,
+            "enabled": True,
+            "emailVerified": True,
+            **(
+                {"attributes": {"chartProvisioningOperation": [operation_id]}}
+                if operation_id
+                else {}
+            ),
+        }
         try:
             _request(
                 config,
@@ -79,58 +80,30 @@ def upsert_user(
         user = _find_user(config, token, username, email)
         if user is None:
             raise IdentityError("USER_IDENTITY_USER_CREATE_FAILED")
-        if not created and not _matches_operation(user, operation_id):
-            raise IdentityError("USER_IDENTITY_USER_CONFLICT", 409)
-    elif not _matches_operation(user, operation_id):
-        # User creation must not silently take over an existing account and
-        # escalate its privileges. Only an explicit retry of the same
-        # provisioning saga may resume an existing identity.
-        raise IdentityError("USER_IDENTITY_USER_CONFLICT", 409)
-    else:
-        _request(
-            config,
-            token,
-            "PUT",
-            f"/users/{urllib.parse.quote(user['id'])}",
-            body=body,
-            expected={204},
-            conflict_code="USER_IDENTITY_USER_CONFLICT",
-        )
-
-    user_id = str(user["id"])
-    for group in groups:
-        _request(
-            config,
-            token,
-            "PUT",
-            f"/users/{urllib.parse.quote(user_id)}/groups/{urllib.parse.quote(group['id'])}",
-            expected={204},
-        )
-    _add_client_roles(config, token, user_id, roles)
     return IdentityUser(
-        user_id=user_id,
-        username=username,
+        user_id=str(user["id"]),
+        username=str(user.get("username") or username),
         email=email,
         created=created,
     )
 
 
-def add_to_groups(user_id: str, group_paths: list[str]) -> None:
-    """Give an existing account geography groups (its planning areas)."""
+INVITATION_LIFESPAN_SECONDS = 7 * 24 * 3600
+
+
+def find_account(username: str) -> IdentityUser | None:
+    """The Keycloak account with this username or email, if any."""
     config = _config()
     token = _admin_token(config)
-    for path in group_paths:
-        group = _ensure_group_path(config, token, path)
-        _request(
-            config,
-            token,
-            "PUT",
-            f"/users/{urllib.parse.quote(user_id)}/groups/{urllib.parse.quote(group['id'])}",
-            expected={204},
-        )
-
-
-INVITATION_LIFESPAN_SECONDS = 7 * 24 * 3600
+    user = _find_user(config, token, username, username)
+    if user is None:
+        return None
+    return IdentityUser(
+        user_id=str(user["id"]),
+        username=str(user.get("username") or username),
+        email=str(user.get("email") or ""),
+        created=False,
+    )
 
 
 def send_invitation(user_id: str) -> None:
@@ -174,6 +147,32 @@ def disable_user(user_id: str) -> None:
     )
 
 
+def enable_user(user_id: str) -> None:
+    config = _config()
+    token = _admin_token(config)
+    _request(
+        config,
+        token,
+        "PUT",
+        f"/users/{urllib.parse.quote(user_id)}",
+        body={"enabled": True},
+        expected={204},
+    )
+
+
+def sign_out(user_id: str) -> None:
+    """End the person's Keycloak sessions so no new token is issued."""
+    config = _config()
+    token = _admin_token(config)
+    _request(
+        config,
+        token,
+        "POST",
+        f"/users/{urllib.parse.quote(user_id)}/logout",
+        expected={204},
+    )
+
+
 def delete_user(user_id: str) -> None:
     config = _config()
     token = _admin_token(config)
@@ -207,12 +206,6 @@ def recover_admin(*, username: str, email: str) -> IdentityUser:
             "emailVerified": True,
         },
         expected={204},
-    )
-    _add_client_roles(
-        config,
-        token,
-        user_id,
-        ["chart_admin", "content_editor"],
     )
     return IdentityUser(
         user_id=user_id,
@@ -294,80 +287,6 @@ def _matches_operation(user: dict, operation_id: str | None) -> bool:
     if isinstance(value, list):
         return operation_id in value
     return value == operation_id
-
-
-def _ensure_group_path(config, token, group_path):
-    parts = [part for part in group_path.split("/") if part]
-    if not parts:
-        raise IdentityError("USER_IDENTITY_GROUP_FAILED", 400)
-    parent = None
-    for name in parts:
-        groups = _list_groups(config, token, parent)
-        existing = next((group for group in groups if group.get("name") == name), None)
-        if existing is None:
-            path = f"/groups/{parent['id']}/children" if parent else "/groups"
-            try:
-                _request(
-                    config,
-                    token,
-                    "POST",
-                    path,
-                    body={"name": name},
-                    expected={201, 204},
-                    conflict_code="USER_IDENTITY_GROUP_CONFLICT",
-                )
-            except IdentityError as error:
-                # Another setup request may have created the same group first.
-                if error.code != "USER_IDENTITY_GROUP_CONFLICT":
-                    raise
-            groups = _list_groups(config, token, parent)
-            existing = next(
-                (group for group in groups if group.get("name") == name), None
-            )
-        if existing is None:
-            raise IdentityError("USER_IDENTITY_GROUP_FAILED")
-        parent = existing
-    return parent
-
-
-def _list_groups(config, token, parent):
-    if parent is None:
-        path = "/groups?briefRepresentation=false"
-    else:
-        parent_id = urllib.parse.quote(str(parent["id"]))
-        path = f"/groups/{parent_id}/children?briefRepresentation=false"
-    return _request(config, token, "GET", path)
-
-
-def _add_client_roles(config, token, user_id, role_names):
-    clients = _request(
-        config,
-        token,
-        "GET",
-        f"/clients?{urllib.parse.urlencode({'clientId': config.client_id})}",
-    )
-    client = next(
-        (item for item in clients if item.get("clientId") == config.client_id), None
-    )
-    if client is None:
-        raise IdentityError("USER_IDENTITY_CLIENT_MISSING")
-    roles = [
-        _request(
-            config,
-            token,
-            "GET",
-            f"/clients/{client['id']}/roles/{urllib.parse.quote(name)}",
-        )
-        for name in role_names
-    ]
-    _request(
-        config,
-        token,
-        "POST",
-        f"/users/{urllib.parse.quote(user_id)}/role-mappings/clients/{client['id']}",
-        body=roles,
-        expected={204},
-    )
 
 
 def _request(

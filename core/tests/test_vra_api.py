@@ -31,10 +31,14 @@ from sqlalchemy import event, func, select
 from chart.api.app import app
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import require_current_user, require_reader
+
+from access_support import member
 from chart.setup.service import restore_deployed_models
 from chart.shared.db import session as db_session
 from chart.shared.db.base import Base
 from chart.shared.db.models import (
+    Department,
+    DepartmentOwnership,
     AdminUnit,
     AppGeography,
     ClimateRun,
@@ -64,15 +68,9 @@ def division(code: str) -> str:
     return f"{MP}-division-{code}"
 
 
-def _user(user_id: str, roles: list[str], scopes: list[str]) -> CurrentUserContext:
-    return CurrentUserContext(
-        user_id=user_id, username=user_id, roles=roles, geography_scopes=scopes
-    )
-
-
-ADMIN = _user("admin", ["chart_admin"], ["/india", "/kenya"])
-PLANNER = _user("planner", ["health_planning_lead"], ["/india/madhya-pradesh"])
-KENYA_ADMIN = _user("kenya-admin", ["chart_admin"], ["/kenya"])
+ADMIN = member("admin", "workspace_admin", ["/india", "/kenya"])
+PLANNER = member("planner", "planning_lead", ["/india/madhya-pradesh"])
+KENYA_ADMIN = member("kenya-admin", "workspace_admin", ["/kenya"])
 
 
 def _square(index: int, postgres: bool) -> str:
@@ -786,7 +784,7 @@ def test_non_admins_cannot_write_or_read_coverage(as_user) -> None:
         response = getattr(planner, method)(path)
         assert (response.status_code, response.json()["error"]) == (
             403,
-            "ROLE_NOT_ALLOWED",
+            "CAPABILITY_NOT_ALLOWED",
         )
     denied = _upload(planner, _csv([_row("bhopal", "exp.population_density", 1)]))
     assert denied.status_code == 403
@@ -1148,3 +1146,60 @@ def test_a_run_stores_hot_day_change_from_the_daily_maxima(as_user, factory) -> 
     assert ("haz.extreme_hot_days_change", units["bhopal"]) in stored
     # Divisions without a long enough daily record get no value at all.
     assert len({unit for _, unit in stored}) == 2
+
+
+def test_a_division_reader_sees_the_state_frame_but_only_their_own_area(
+    as_user, factory
+) -> None:
+    _prepared(as_user, factory)
+    as_user(ADMIN).post(f"/vra/{MP}/runs")
+    reader = as_user(member("rewa", "planning_lead", ["/india/madhya-pradesh/rewa"]))
+    # The state above their division reads as context, sibling detail does not.
+    assessment = reader.get(f"/vra/{MP}/assessment")
+    assert assessment.status_code == 200, assessment.text
+    assert [a["geography_id"] for a in assessment.json()["areas"]] == [division("rewa")]
+    shaded = reader.get(f"/vra/{MP}/map").json()["areas"]
+    assert [a["geography_id"] for a in shaded] == [division("rewa")]
+    assert reader.get(f"/vra/{MP}/areas/{division('rewa')}").status_code == 200
+    sibling = reader.get(f"/vra/{MP}/areas/{division('sagar')}")
+    assert (sibling.status_code, sibling.json()["error"]) == (
+        403,
+        "GEOGRAPHY_OUT_OF_SCOPE",
+    )
+    # Reading never lifts to writing.
+    assert reader.post(f"/vra/{MP}/runs").status_code == 403
+
+
+def test_rows_for_another_departments_indicator_group_are_refused(
+    as_user, factory
+) -> None:
+    with factory() as session:
+        session.add(Department(id=1, country_code="IN", name="Health"))
+        session.add(Department(id=2, country_code="IN", name="Labour"))
+        session.flush()
+        session.add(
+            DepartmentOwnership(
+                department_id=2,
+                resource_kind="vra_indicator_group",
+                resource_key="Occupational exposure",
+            )
+        )
+        session.commit()
+    health_officer = member(
+        "dina", "data_officer", ["/india/madhya-pradesh"], departments={1: "Health"}
+    )
+    body = _csv(
+        [
+            _row("bhopal", "exp.population_density", 300),
+            _row("bhopal", "exp.workers_share", 40),
+        ]
+    )
+    result = _upload(as_user(health_officer), body).json()
+    assert (result["rows_accepted"], result["rows_rejected"]) == (1, 1)
+    assert "belongs to other departments" in result["rejections"][0]["reason"]
+    # The owning department's member, and anyone managing VRA, may write it.
+    labour_officer = member(
+        "lal", "data_officer", ["/india/madhya-pradesh"], departments={2: "Labour"}
+    )
+    assert _upload(as_user(labour_officer), body).json()["rows_rejected"] == 0
+    assert _upload(as_user(ADMIN), body).json()["rows_rejected"] == 0

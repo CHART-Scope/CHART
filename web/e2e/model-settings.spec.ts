@@ -5,7 +5,8 @@ import { installKenya } from "./support/kenya";
 // Settings live on the admin settings page; the dashboard reads the options
 // the API leaves on. The fake API applies the saved settings to the Kenya
 // outlook exactly as the Python service does (see support/kenya.ts).
-const admin = { roles: ["chart_admin", "health_planning_lead"] };
+// Country-wide model settings are changed with risk manage: a Workspace admin.
+const admin = { who: { role: "workspace_admin" as const } };
 
 const settingsFor = (page: Page, title: string) =>
   page.getByRole("group", { name: title, exact: true });
@@ -160,18 +161,22 @@ test("countries outside the user's scope are not listed", async ({ page }) => {
   await expect(page.getByRole("group", { name: "Low birth weight" })).toHaveCount(0);
 });
 
-test("any signed-in planner can change model settings, without the admin cards", async ({
+test("a planning lead reads model settings but cannot change them", async ({
   page,
 }) => {
-  await installKenya(page, true, ["/kenya"], { roles: ["health_planning_lead"] });
+  const api = await installKenya(page, true, ["/kenya"], {
+    who: { role: "planning_lead" },
+  });
   await page.goto("/settings?tab=models");
 
   const lbw = settingsFor(page, "Low birth weight");
   await expect(lbw).toBeVisible();
-  // Installation administration stays with admins: only Workspace and
-  // Models, and no release management.
+  // A planning lead runs people and departments but not the installation:
+  // no Roles, Data, Jobs or release management.
   await expect(page.getByRole("tablist").getByRole("tab")).toHaveText([
     "Workspace",
+    "People",
+    "Departments",
     "Models",
   ]);
   await expect(page.getByText("Climate data", { exact: true })).toHaveCount(0);
@@ -179,14 +184,14 @@ test("any signed-in planner can change model settings, without the admin cards",
     page.getByRole("heading", { name: "Installed model releases" }),
   ).toHaveCount(0);
 
+  // Read only: the options show, nothing can be ticked or saved.
   const windows = lbw.getByRole("group", { name: "Pregnancy windows" });
-  await windows.getByRole("checkbox", { name: /1st trimester/ }).check();
-  const saved = page.waitForRequest(
-    (request) =>
-      request.method() === "PUT" && request.url().endsWith("/model-settings/KE/lbw"),
+  await expect(windows.getByRole("checkbox", { name: /1st trimester/ })).toBeDisabled();
+  await expect(lbw.getByRole("button", { name: "Save Low birth weight" })).toHaveCount(
+    0,
   );
-  await lbw.getByRole("button", { name: "Save Low birth weight" }).click();
-  expect((await saved).postDataJSON().selectors).toEqual(["P", "T1"]);
+  await expect(lbw.getByText("A workspace admin changes these.")).toBeVisible();
+  expect(api.settingsWrites).toEqual([]);
   await page.screenshot({
     path: "../outputs/e2e/web/model-settings-planner.png",
     fullPage: true,

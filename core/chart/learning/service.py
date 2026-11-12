@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from chart.shared.db.models import (
@@ -202,12 +202,17 @@ def load_taxonomies(
 
 
 def user_countries(session: Session, geography_ids: list[str]) -> list[str]:
-    """Country names behind a user's geography scope, for ranking by place."""
+    """Country names behind a user's places (geography ids or paths, as the
+    signed-in person carries paths), for ranking by place."""
 
     if not geography_ids:
         return []
     scoped = session.scalars(
-        select(AppGeography).where(AppGeography.id.in_(geography_ids))
+        select(AppGeography).where(
+            or_(
+                AppGeography.id.in_(geography_ids), AppGeography.path.in_(geography_ids)
+            )
+        )
     )
     codes = {row.country_code for row in scoped}
     if not codes:

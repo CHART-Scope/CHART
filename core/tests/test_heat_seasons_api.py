@@ -18,6 +18,8 @@ from sqlalchemy import select
 from chart.api.app import app
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import require_current_user
+
+from access_support import member
 from chart.shared.db import session as db_session
 from chart.shared.db.base import Base
 from chart.shared.db.models import (
@@ -30,17 +32,9 @@ from chart.shared.db.models import (
 INDIA, MP, SHEOPUR, KENYA = "geo-in", "geo-in-mp", "geo-in-mp-sheopur", "geo-ke"
 
 
-def _user(
-    roles: list[str], scopes: list[str], user_id: str = "lead"
-) -> CurrentUserContext:
-    return CurrentUserContext(
-        user_id=user_id, username=user_id, roles=roles, geography_scopes=scopes
-    )
-
-
-LEAD = _user(["chart_admin"], ["/india"])
-OFFICER = _user(["health_planning_lead"], ["/india"], "officer")
-KENYA_LEAD = _user(["chart_admin"], ["/kenya"], "kenya-lead")
+LEAD = member("lead", "workspace_admin", ["/india"])
+OFFICER = member("officer", "planning_lead", ["/india"])
+KENYA_LEAD = member("kenya-lead", "workspace_admin", ["/kenya"])
 
 
 @pytest.fixture
@@ -222,7 +216,7 @@ def test_planning_leads_may_read_but_not_change_calendars(as_user, factory) -> N
     ):
         assert (response.status_code, response.json()["error"]) == (
             403,
-            "ROLE_NOT_ALLOWED",
+            "CAPABILITY_NOT_ALLOWED",
         )
     with factory() as session:
         assert session.scalars(select(AuditEventRecord)).all() == []

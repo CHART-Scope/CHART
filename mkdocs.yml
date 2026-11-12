@@ -66,6 +66,7 @@ nav:
   - Getting started: getting-started.md
   - Installation setup: installation-setup.md
   - Sign-in and email: sign-in.md
+  - Users and capabilities (design): access-control.md
   - Architecture:
       - Observed climate data: observed-climate.md
   - Infrastructure:

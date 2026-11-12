@@ -11,6 +11,16 @@ evidence in `outputs/e2e/orchestration/recent-climate-top-up/`. `make e2e-core`
 builds the core wheel and checks it ships every runtime JSON file
 (`outputs/e2e/core/package-data.json`).
 
+`make e2e-access` covers access control ([access control](../docs/access-control.md))
+through the API with only the Keycloak token check stood in for: grants
+covering below and reading above, overlapping grants, the department rule,
+platform admins, invitation acceptance at first sign-in (and uninvited or
+unverified sign-ins creating nothing), no grant above one's own, editing and
+disabling members, revoked and expired invitations, department rows and
+ownership, isolation between workspaces, and the first-admin rule. It also
+runs migrations 035 and 036 on a throwaway database in the local PostgreSQL
+service (`make postgres`), with evidence in `outputs/e2e/access/junit.xml`.
+
 Prerequisites: Docker with `chart-postgis:16`,
 `quay.io/keycloak/keycloak:26.6.4` and `axllent/mailpit:v1.30.0`, the repository Python and web dependencies,
 Playwright Chromium, and the four extracted modeller handovers in
@@ -23,7 +33,9 @@ named disposable containers on free loopback ports, migrates a fresh database,
 publishes a representative 2027 start year
 with 5/10/20-year windows plus the supplied original periods, and registers
 geographies twice to verify retry safety. It uses real signed Keycloak tokens
-for separate India/Kenya planning users and a denied-role user. It verifies
+for India, Kenya and district planning leads, whose access comes from
+invitations in CHART's database (`e2e/seed_people.py`), and an uninvited user
+who holds nothing. It verifies
 published district/constituency coverage, persisted parent relationships,
 selection errors, authentication/authorization, scope isolation, unavailable
 observed estimates, browser selectors and session restoration.
@@ -34,15 +46,16 @@ from `infra/keycloak/Dockerfile`, serves Keycloak under `/identity` with its own
 database, applies the sync image to its disposable realm, Keycloak emails
 each code to the run's own Mailpit, and `e2e/emailCode.ts` reads it through
 Mailpit's API. `email-code-signin-live.spec.ts` checks that a wrong code is
-refused, that an account an administrator adds through the API has no password
-and signs in with an emailed code, that disabling it stops sign-in, and that an
-unknown address gets an error and no email. An administrator invites someone
-in Settings → Users; the invitation arrives in Mailpit, its link is accepted,
-and the invited person signs in with a code and lands on their area's
-dashboard; "Send invitation again" emails a second link. The Keycloak
-administration sign-in is checked for CHART's look. The default `admin` signs
-in with `admin`/`admin`, must choose a new password, lands on Settings → Users
-and can invite; the first password then stops working. API tests still take tokens by
+refused; that an address invited through the API has no password, signs in
+with an emailed code, lands on its place, and holds nothing once its
+membership is disabled; and that an unknown address gets an error and no
+email. A platform admin invites someone in Settings → People; the invitation
+arrives in Mailpit, its link is accepted, and the invited person signs in with
+a code and lands on their place's dashboard; Resend emails a second link. The
+Keycloak administration sign-in is checked for CHART's look. The seeded
+`admin` signs in with `admin`/`admin` and must choose a new password; with a
+platform admin already recorded, its Keycloak `chart_admin` role grants
+nothing, and the first password then stops working. API tests still take tokens by
 password grant, which only the disposable realm allows.
 
 An upgrade regression recreates the legacy fixed-level checks on the disposable

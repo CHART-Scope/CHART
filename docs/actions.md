@@ -23,6 +23,19 @@ it**); a saved plan opens it on the plan's season.
     If the calendar cannot load, the cycle falls back to India's official
     season. A line marks today, and the footnote links to the settings.
 
+## Departments
+
+Each workspace keeps its own departments as rows, never a fixed list
+(Settings → **Departments**; [access control](access-control.md)). A new
+workspace starts with Health, Climate change, Environment, Water, Disaster
+management, Urban development and Labour. Every member picks the ones they
+work in; departments write adds one (also from an invitation), and
+departments manage renames, archives (kept on past records) or deletes an
+unused one. A Workspace admin sets which data sources and VRA indicator
+groups each department owns: writes to those then need one of its
+departments unless the person manages that area. Assigning actions to
+departments comes with the action status work.
+
 ## Heat-season calendars
 
 Settings → **Heat seasons** (administrators) sets, for every place, which

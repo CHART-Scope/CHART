@@ -1,7 +1,8 @@
 """HTTP endpoints for the vulnerability and resilience assessment.
 
-Reads follow the dashboard map's rule (reader role and geography scope);
-uploads, runs, coverage and the template are for ``chart_admin`` within scope.
+Reads need vra read at the frame; uploads, runs, coverage and the template
+need vra write there. Rows for an indicator group (category) owned by other
+departments are refused unless the uploader manages VRA.
 """
 
 from __future__ import annotations
@@ -9,21 +10,15 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from sqlalchemy import select
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import JSONResponse
 
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import (
-    require_any_role,
-    require_current_user,
-    require_reader,
-    require_geography_access,
-)
-from chart.risk.routes import (
-    _require_read_access,
-    _resolve_place_path,
-    risk_reader_roles,
-)
+from chart.access.guards import can, require_capability
+from chart.auth.service import require_current_user, require_reader
+from chart.risk.routes import _resolve_place_path
+from chart.shared.db.models import AppGeography, DepartmentOwnership
 from chart.risk.schemas import MapResponse
 from chart.risk.service import NoAdminUnitForGeography, resolve_map_frame
 from chart.shared.db.session import get_session_factory
@@ -46,24 +41,57 @@ Reader = Annotated[CurrentUserContext, Depends(require_reader)]
 
 
 def _require_admin(user: CurrentUserContext, geography_id: str) -> None:
-    require_any_role(user, {"chart_admin"})
-    require_geography_access(user, _resolve_place_path(geography_id))
-    _require_frame_scope(user, geography_id)
+    _require(user, geography_id, "write")
 
 
 def _require_reader(user: CurrentUserContext, geography_id: str) -> None:
-    _require_read_access(user, geography_id)
-    _require_frame_scope(user, geography_id)
+    _require(user, geography_id, "read")
 
 
-def _require_frame_scope(user: CurrentUserContext, geography_id: str) -> None:
-    """A leaf comparison includes siblings, so its parent must be in scope."""
+def _require(user: CurrentUserContext, geography_id: str, level: str) -> None:
+    """At the place and its map frame: a leaf comparison includes siblings."""
+    require_capability(user, "vra", level, _resolve_place_path(geography_id))
     with get_session_factory()() as session:
         try:
             frame = resolve_map_frame(session, geography_id)
         except NoAdminUnitForGeography as exc:
             raise HTTPException(status_code=404, detail="GEOGRAPHY_NOT_FOUND") from exc
-        require_geography_access(user, frame.path)
+        require_capability(user, "vra", level, frame.path)
+
+
+def _readable_areas(user: CurrentUserContext, result):
+    """Keep the frame's areas the person reads: reading a place above one's
+    grants shows its figures, not the detail of sibling areas."""
+    if not hasattr(result, "areas"):
+        return result
+    with get_session_factory()() as session:
+        paths: dict[str, str] = {
+            id_: path
+            for id_, path in session.execute(select(AppGeography.id, AppGeography.path))
+        }
+    result.areas = [
+        area
+        for area in result.areas
+        if area.geography_id in paths
+        and can(user, "vra", "read", paths[area.geography_id])
+    ]
+    return result
+
+
+def _indicator_writer(user: CurrentUserContext, geography_id: str):
+    """Whether the uploader may write an indicator's group at the place."""
+    place = _resolve_place_path(geography_id)
+    with get_session_factory()() as session:
+        owners: dict[str, set[int]] = {}
+        for key, department in session.execute(
+            select(
+                DepartmentOwnership.resource_key, DepartmentOwnership.department_id
+            ).where(DepartmentOwnership.resource_kind == "vra_indicator_group")
+        ):
+            owners.setdefault(key, set()).add(department)
+    return lambda indicator: can(
+        user, "vra", "write", place, owners.get(indicator.category, set())
+    )
 
 
 def _call(fn, *args):
@@ -87,7 +115,6 @@ def _call(fn, *args):
     "/indicators", response_model=IndicatorList, summary="List the VRA catalogue"
 )
 def read_indicators(user: Reader) -> IndicatorList:
-    require_any_role(user, risk_reader_roles)
     return IndicatorList(items=_call(service.list_indicators))
 
 
@@ -98,7 +125,7 @@ def read_indicators(user: Reader) -> IndicatorList:
 )
 def read_assessment(geography_id: str, user: Reader) -> AssessmentResponse:
     _require_reader(user, geography_id)
-    return _call(service.load_assessment, geography_id)
+    return _readable_areas(user, _call(service.load_assessment, geography_id))
 
 
 @router.get(
@@ -108,7 +135,7 @@ def read_assessment(geography_id: str, user: Reader) -> AssessmentResponse:
 )
 def read_map(geography_id: str, user: Reader) -> MapResponse:
     _require_reader(user, geography_id)
-    return _call(service.load_map, geography_id)
+    return _readable_areas(user, _call(service.load_map, geography_id))
 
 
 @router.get(
@@ -120,7 +147,11 @@ def read_area(
     geography_id: str, area_geography_id: str, user: Reader
 ) -> AreaDetailResponse:
     _require_reader(user, geography_id)
-    return _call(service.load_area, geography_id, area_geography_id)
+    result = _call(service.load_area, geography_id, area_geography_id)
+    # The area must be in the frame (the service says so) and readable.
+    if not isinstance(result, JSONResponse):
+        require_capability(user, "vra", "read", _resolve_place_path(area_geography_id))
+    return result
 
 
 @router.get(
@@ -201,6 +232,7 @@ async def upload_values(
         user.user_id,
         indicator_code,
         level,
+        await run_in_threadpool(_indicator_writer, user, geography_id),
     )
 
 

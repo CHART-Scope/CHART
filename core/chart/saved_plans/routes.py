@@ -1,8 +1,8 @@
 """HTTP endpoints for saved plans.
 
-Any dashboard reader may save the views they can read. Plans are private: a
-user only ever sees, opens or removes their own, and a plan for a place that
-has since left their scope is hidden from the list and refused when opened.
+Anyone with plans write at a place may save a view of it. Plans are private:
+a user only ever sees, opens or removes their own, and a plan for a place they
+can no longer read plans at is hidden from the list and refused when opened.
 """
 
 from __future__ import annotations
@@ -12,8 +12,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Response
 
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import require_any_role, require_current_user
-from chart.risk.routes import risk_reader_roles
+from chart.auth.service import require_current_user
 from chart.shared.db.session import get_session_factory
 
 from . import service
@@ -26,7 +25,6 @@ PlanId = Annotated[str, Path(min_length=36, max_length=36)]
 
 
 def _call(user: CurrentUserContext, fn, *args):
-    require_any_role(user, risk_reader_roles)
     with get_session_factory()() as session:
         try:
             return fn(session, user, *args)

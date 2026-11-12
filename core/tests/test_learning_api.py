@@ -12,6 +12,8 @@ from sqlalchemy.pool import StaticPool
 
 from chart.api.app import app
 from chart.auth.schemas import CurrentUserContext
+
+from access_support import member
 from chart.auth.service import require_current_user
 from chart.learning import routes as learning_routes
 from chart.shared.db.base import Base
@@ -187,17 +189,9 @@ def _seed_learning_fixture(session: Session) -> None:
     )
 
 
-def _override_user(
-    *, roles: list[str] | None = None, scopes: list[str] | None = None
-) -> CurrentUserContext:
-    return CurrentUserContext(
-        userId=USER_ID,
-        username="planner",
-        email=None,
-        roles=roles if roles is not None else ["health_planning_lead"],
-        geographyScopes=scopes if scopes is not None else [GEOGRAPHY_ID],
-        activeGeographyId=GEOGRAPHY_ID,
-        geographyLevel="geo_level_1",
+def _override_user(*, scopes: list[str] | None = None) -> CurrentUserContext:
+    return member(
+        USER_ID, "planning_lead", scopes if scopes is not None else ["/kenya/homa-bay"]
     )
 
 

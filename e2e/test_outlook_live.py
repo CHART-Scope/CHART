@@ -308,11 +308,16 @@ def test_leaf_scoped_user_never_receives_siblings(client, tokens):
                 area["geography_id"] == leaf.rsplit("/", 1)[-1]
                 for area in response.json()["areas"]
             )
-    denied_parent = client.get(
+    # The division above reads as context, showing only the planner's district.
+    parent = client.get(
         "/heat-outlook/geo-in-madhya-pradesh-division-bhopal/map",
+        params={"outcome": "lbw"},
         headers=tokens["district-planner"],
     )
-    assert denied_parent.status_code == 403
+    assert parent.status_code == 200, parent.text
+    assert [area["geography_id"] for area in parent.json()["areas"]] == [
+        "geo-in-madhya-pradesh-district-bhopal"
+    ]
     denied_sibling = client.get(
         "/heat-outlook/geo-in-madhya-pradesh-district-rajgarh",
         headers=tokens["district-planner"],
@@ -631,17 +636,21 @@ def test_observed_boundary_only_map_still_isolates_leaf_scope(client, tokens):
         "geo-in-madhya-pradesh-district-bhopal"
     ]
     assert response.json()["areas"][0]["value_percent"] is None
-    for place in (
-        "geo-in-madhya-pradesh-division-bhopal",
-        "geo-in-madhya-pradesh-district-rajgarh",
-    ):
-        assert (
-            client.get(
-                f"/heat-outlook/{place}/observed/map",
-                headers=tokens["district-planner"],
-            ).status_code
-            == 403
-        )
+    # The division above reads, keeping only the planner's own district;
+    # a sibling district is refused.
+    parent = client.get(
+        "/heat-outlook/geo-in-madhya-pradesh-division-bhopal/observed/map",
+        headers=tokens["district-planner"],
+    )
+    assert parent.status_code == 200, parent.text
+    assert [area["geography_id"] for area in parent.json()["areas"]] == [
+        "geo-in-madhya-pradesh-district-bhopal"
+    ]
+    sibling = client.get(
+        "/heat-outlook/geo-in-madhya-pradesh-district-rajgarh/observed/map",
+        headers=tokens["district-planner"],
+    )
+    assert sibling.status_code == 403
 
 
 def test_restored_observed_still_enforces_auth_and_scopes(client, tokens):
@@ -650,9 +659,12 @@ def test_restored_observed_still_enforces_auth_and_scopes(client, tokens):
         assert client.get(path).status_code == 401
         assert client.get(path, headers=tokens["india-planner"]).status_code == 403
         assert client.get(path, headers=tokens["denied"]).status_code == 403
+    # The division above a district reads as context; a sibling does not.
     for suffix in ("/capabilities", "/observed"):
-        path = "/heat-outlook/geo-in-madhya-pradesh-division-bhopal" + suffix
-        assert client.get(path, headers=tokens["district-planner"]).status_code == 403
+        above = "/heat-outlook/geo-in-madhya-pradesh-division-bhopal" + suffix
+        assert client.get(above, headers=tokens["district-planner"]).status_code == 200
+        beside = "/heat-outlook/geo-in-madhya-pradesh-district-rajgarh" + suffix
+        assert client.get(beside, headers=tokens["district-planner"]).status_code == 403
     path = "/risk/geo-in-madhya-pradesh-division-bhopal/monthly"
     assert client.get(path).status_code == 401
     assert client.get(path, headers=tokens["kenya-planner"]).status_code == 403

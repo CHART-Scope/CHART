@@ -1,7 +1,7 @@
 """HTTP endpoints for heat-season calendars (Settings > Heat seasons).
 
-Any dashboard reader may read the calendars of places they can see; saving
-and resetting are for administrators (``chart_admin``).
+Anyone who reads heat seasons at a place may read its calendar; saving and
+resetting need seasons manage there.
 """
 
 from __future__ import annotations
@@ -11,8 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import require_any_role, require_current_user
-from chart.risk.routes import risk_reader_roles
+from chart.auth.service import require_current_user
 from chart.shared.db.session import get_session_factory
 
 from . import service
@@ -24,7 +23,6 @@ CurrentUser = Annotated[CurrentUserContext, Depends(require_current_user)]
 
 
 def _call(fn, user: CurrentUserContext, *args):
-    require_any_role(user, risk_reader_roles)
     with get_session_factory()() as session:
         try:
             return fn(session, user, *args)

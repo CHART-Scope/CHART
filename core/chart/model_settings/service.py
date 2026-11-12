@@ -32,7 +32,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import can_read_geography_path
+from chart.access.guards import can
 from chart.climate.planning_targets import heat_season_calendar
 from chart.climate.source_policy import APPROVED_PROJECTION_SCENARIOS
 from chart.heat_outlook.service import (
@@ -119,7 +119,7 @@ def get_settings(
 ) -> ModelSettingsResponse:
     country_code = country_code.upper()
     with (session_factory or get_session_factory())() as session:
-        country = _require_country_access(session, user, country_code)
+        country = _require_country_access(session, user, country_code, "read")
         support = _support(session, country_code, outcome)
         if support is None:
             raise ModelSettingsError("MODEL_SETTINGS_NOT_AVAILABLE", 404)
@@ -139,7 +139,7 @@ def list_settings(
         ).all()
         items = []
         for country in countries:
-            if not can_read_geography_path(user, country.path):
+            if not can(user, "risk", "read", country.path):
                 continue
             code = country.country_code.upper()
             for outcome in _outcomes(session, code):
@@ -160,7 +160,7 @@ def update_settings(
 ) -> ModelSettingsResponse:
     country_code = country_code.upper()
     with (session_factory or get_session_factory())() as session:
-        country = _require_country_access(session, user, country_code)
+        country = _require_country_access(session, user, country_code, "manage")
         support = _support(session, country_code, outcome)
         if support is None:
             raise ModelSettingsError("MODEL_SETTINGS_NOT_AVAILABLE", 404)
@@ -499,7 +499,7 @@ def _outcomes(session: Session, country_code: str) -> list[str]:
 
 
 def _require_country_access(
-    session: Session, user: CurrentUserContext, country_code: str
+    session: Session, user: CurrentUserContext, country_code: str, level: str
 ) -> AppGeography:
     country = session.scalar(
         select(AppGeography).where(
@@ -509,8 +509,11 @@ def _require_country_access(
     )
     if country is None:
         raise ModelSettingsError("MODEL_SETTINGS_NOT_AVAILABLE", 404)
-    if not can_read_geography_path(user, country.path):
+    if not can(user, "risk", "read", country.path):
         raise ModelSettingsError("GEOGRAPHY_OUT_OF_SCOPE", 403)
+    # Country-wide model settings are managed with risk manage there.
+    if not can(user, "risk", level, country.path):
+        raise ModelSettingsError("CAPABILITY_NOT_ALLOWED", 403)
     return country
 
 

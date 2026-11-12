@@ -355,14 +355,14 @@ async function ensureDefaultAdmin(token, env) {
   const [user] = await find();
   await givePasswordSignIn(user.id);
   const client = await getClient(token, "chart-core");
-  const roles = await Promise.all(
-    ["chart_admin", "content_editor"].map((name) =>
-      fetchJson(
-        `${keycloakUrl}/admin/realms/${targetRealm}/clients/${client.id}/roles/${name}`,
-        { headers: authHeaders(token) },
-      ),
+  // chart_admin only makes this account CHART's first platform admin while
+  // there is none; every other permission lives in CHART's database.
+  const roles = [
+    await fetchJson(
+      `${keycloakUrl}/admin/realms/${targetRealm}/clients/${client.id}/roles/chart_admin`,
+      { headers: authHeaders(token) },
     ),
-  );
+  ];
   await fetchOk(`${usersUrl}/${user.id}/role-mappings/clients/${client.id}`, {
     method: "POST",
     headers: jsonHeaders(token),

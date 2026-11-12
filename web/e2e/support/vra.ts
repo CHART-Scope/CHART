@@ -1,5 +1,6 @@
 import { type Page } from "@playwright/test";
 
+import { meAs, ROLES, type Who } from "./access";
 import { catalogEntry, installFakeApi, json, type FakeApi } from "./fakeApi";
 import { fixtures as kenyaFixtures } from "./kenya";
 
@@ -597,8 +598,8 @@ export type VraApi = FakeApi & {
 };
 
 export type VraOptions = {
-  roles?: string[];
-  geographyScopes?: string[];
+  /** Who is signed in: a Workspace admin of India and Kenya by default. */
+  who?: Who;
   /** Frames that already hold values and a stored run. */
   assessed?: ("mp" | "ke")[];
   /** Frames that hold uploaded values but have never been run. */
@@ -612,9 +613,15 @@ export async function installVra(
   const api = (await installFakeApi(page)) as VraApi;
   api.uploads = [];
   api.runs = [];
-  const roles = options.roles ?? ["chart_admin", "health_planning_lead"];
-  const scopes = options.geographyScopes ?? ["/india", "/kenya"];
-  const isAdmin = roles.includes("chart_admin");
+  const who: Who = options.who ?? {
+    role: "workspace_admin",
+    places: ["/india", "/kenya"],
+  };
+  // Uploads, runs and coverage need vra write (the fake does not split by place).
+  const scopes = who.platformAdmin ? ["/india", "/kenya"] : (who.places ?? ["/india"]);
+  const isAdmin =
+    who.platformAdmin ||
+    (who.role ? ROLES[who.role].capabilities.vra !== "read" : false);
   const byId = new Map([
     [madhyaPradesh.id, madhyaPradesh],
     [kenya.id, kenya],
@@ -639,12 +646,7 @@ export async function installVra(
   }
 
   api.on(/^\/api\/chart\/auth\/me$/, (route) =>
-    json(route, {
-      userId: "e2e-user",
-      username: isAdmin ? "admin" : "planner",
-      roles,
-      geographyScopes: scopes,
-    }),
+    json(route, meAs({ username: isAdmin ? "admin" : "planner", ...who })),
   );
   api.on(/^\/api\/chart\/geographies$/, (route) => json(route, vraGeographies));
   api.on(/^\/api\/chart\/model-catalog$/, (route) =>

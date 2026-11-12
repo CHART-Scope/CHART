@@ -34,21 +34,25 @@ needs no server access to get in.
    (`POST /setup/complete`) and gives it the installed country.
 5. CHART opens the dashboard for that country. Invite everyone else (below).
 
-Before setup, `admin` lands on **Settings → Workspace**; only an administrator
-can open `/onboarding`.
+Before setup, `admin` lands on **Settings → Workspace**; only a platform admin
+can open `/onboarding`. The seeded `admin` becomes CHART's first platform admin
+at its first sign-in (its Keycloak `chart_admin` role counts only while the
+installation has no platform admin).
 
 ## Inviting people
 
-Signed in as `admin` (or any CHART administrator):
+Signed in as `admin`, or anyone with people write in the workspace
+([access control](access-control.md)):
 
-1. Open **Settings → Workspace** and fill in **Invite a person**: full name,
-   email address, role and planning area.
+1. Open **Settings → People** and choose **Invite someone**: full name, email,
+   a role at one or more places, and departments.
 2. Choose **Send invitation**. They receive **You are invited to CHART**; the
-   link works for 7 days.
+   invitation lasts 7 days.
 3. They choose **Accept and sign in**, then sign in with their email address
-   and the code CHART emails them. They land on their area's dashboard.
+   and the code CHART emails them. The first sign-in applies their access, and
+   they land on their place's dashboard.
 
-**Send invitation again** beside a person emails a fresh link. While Amazon
+**Resend** beside a pending or expired invitation emails it again. While Amazon
 SES is in sandbox mode, an invitee's address must be verified in SES first,
 or Settings reports that the invitation could not be sent. More detail:
 [inviting people](sign-in.md#inviting-people).
@@ -87,12 +91,12 @@ Run one command per line; a long line wrapped in a terminal paste breaks.
 `complete()` in `core/chart/setup/service.py`, called as the signed-in
 administrator:
 
-1. **Identity** — when the administrator's token does not already cover the
-   chosen country, adds the account to that country's Keycloak group
-   (`502 SETUP_IDENTITY_GROUP_FAILED` if Keycloak refuses; nothing is written).
-2. **Complete** — upserts geography rows, creates the default workspace,
-   records the administrator's `AppUser` row and scope, prepares the installed
-   models, and marks setup `completed`.
+1. **Access** — needs a platform admin (`403 SETUP_FORBIDDEN`). Keycloak is
+   not changed.
+2. **Complete** — upserts geography rows, creates the country's workspace with
+   the default roles and departments, records the administrator as a platform
+   admin with a Workspace admin grant over the whole country, prepares the
+   installed models, and marks setup `completed`.
 
 Wizard state in the browser is held in a `zustand` store persisted to
 `localStorage` under the key `chart:onboarding`, so refreshing mid-wizard does
@@ -152,36 +156,22 @@ Two categories of setting live in different places:
   `CHART_BOOTSTRAP_TOKEN`) are set by the Makefile so the Python API and the
   R inference container always agree. They stay out of `.env` to avoid drift
   between the two processes.
-- **Application behavior flags** (`CHART_ENABLE_REVIEW_MODELS`,
-  `CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES`, `EMAIL_*`) live in `core/.env`
+- **Application behavior flags** (`CHART_ENABLE_REVIEW_MODELS`, `EMAIL_*`)
+  live in `core/.env`
   because they don't need to match anything outside the API process.
 
 In production, put these settings in the gitignored
 `~/chart-deploy/aws/.env.prod` file on EC2. Docker Compose assigns each service
 only the values declared in `infra/aws/docker-compose.yml`.
 
-## Admin geography scope
+## Platform admin places
 
-By default an installation administrator sees exactly the geographies granted
-by their Keycloak groups — the same strict scope every other user gets. Set
-`CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES=true` in `core/.env` to widen the
-admin's scope to every family root with an active model release, so the
-Settings context switcher lists every geography the deployment holds (India,
-Kenya, and any future country whose manifest ends up under
-`pipelines/models/`).
-
-Only the literal string `true` opts in — `"1"`, `"yes"`, and `"True"` are all
-treated as false, so a typo cannot silently open scope up. The union runs
-after the existing chart_admin country-level collapse, so both broadenings
-compose cleanly. Non-admins are never affected.
-
-If the flag is flipped off while an admin is signed in with a widened area
-active, the frontend's remembered `X-Chart-Active-Geography` will point at a
-geography now out of scope. `apply_active_geography` silently drops the stale
-header and lands the session on the admin's original Keycloak country
-instead of returning a 403. Direct route queries
-(`/auth/geography-access?geography=...`) still enforce the scope, so this is
-a UX fallback for stale client hints only.
+A platform admin works from every workspace's country, plus every country with
+an active model release, so the Settings and dashboard switchers list every
+geography the deployment holds before its workspace is set up. Everyone else
+works from their grants. A remembered `X-Chart-Active-Geography` that is no
+longer readable is dropped silently (the session lands on the first place)
+instead of returning a 403; direct reads still enforce access.
 
 ## Model registry control token
 
@@ -257,12 +247,13 @@ port 8000 is free.
 
 ## Reset
 
-The user-management page exposes a **Reset installation** button. It calls
-`POST /setup/reset` (requires `chart_admin`) and:
+**Settings → Workspace** has a **Reset installation** button, folded away under
+**Danger zone** for platform admins. It calls `POST /setup/reset` (platform
+admins only) and:
 
-- Deletes every workspace and workspace member.
-- Deletes every `AppUser` row (cascades to `user_roles` and
-  `user_geography_scopes`).
+- Deletes every workspace, with its roles, memberships, grants, departments
+  and invitations.
+- Deletes every `AppUser` row.
 - Best-effort deletes the first administrator from Keycloak, unless it is the
   default `admin`, which stays to run setup again.
 - Clears every field on `setup_state` — `phase` returns to `uninitialized`,
@@ -354,4 +345,4 @@ For a full Keycloak nuke (drop the database and re-seed from
 - Wizard component: `web/src/features/onboarding/OnboardingWizard.tsx`
 - Persisted store: `web/src/features/onboarding/store.ts`
 - Reset flow: `core/chart/setup/service.py:reset`
-- Realm seed (no users, no groups): `infra/keycloak/chart-realm.json`
+- Realm seed (no users, no groups; one client role, `chart_admin`): `infra/keycloak/chart-realm.json`

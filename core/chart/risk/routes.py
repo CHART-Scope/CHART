@@ -7,12 +7,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 
+from chart.access.guards import require_capability
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import (
-    require_any_role,
-    require_current_user,
-    require_geography_access,
-)
+from chart.auth.service import require_current_user
 from chart.shared.db.models import AppGeography
 from chart.shared.db.session import get_session_factory
 
@@ -37,18 +34,6 @@ from .service import (
 router = APIRouter(prefix="/risk", tags=["risk"])
 
 
-risk_reader_roles = frozenset(
-    {
-        "chart_admin",
-        "health_planning_lead",
-        "cross_sector_planning_lead",
-        "health_implementation_officer",
-        "cross_sector_implementation_officer",
-        "public_viewer",
-    }
-)
-
-
 def _resolve_place_path(geography_id: str) -> str:
     """Return the AppGeography.path used for scope checks.
 
@@ -69,9 +54,7 @@ def _resolve_place_path(geography_id: str) -> str:
 
 
 def _require_read_access(user: CurrentUserContext, geography_id: str) -> None:
-    require_any_role(user, risk_reader_roles)
-    place_path = _resolve_place_path(geography_id)
-    require_geography_access(user, place_path)
+    require_capability(user, "risk", "read", _resolve_place_path(geography_id))
 
 
 @router.get(

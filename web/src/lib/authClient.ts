@@ -1,4 +1,5 @@
 import { flushAuditNow, recordAuditEvent, resetAuditSession } from "@/lib/audit";
+import { hasAccess, type AccessHolder } from "@/lib/access";
 import { submitSignOut } from "@/lib/signOutRequest";
 
 /**
@@ -25,10 +26,13 @@ import { submitSignOut } from "@/lib/signOutRequest";
  * nothing keyed on the session refetches every five minutes.
  */
 
-export type CurrentUser = {
+export type CurrentUser = AccessHolder & {
   userId: string;
   username: string;
-  roles: string[];
+  email?: string | null;
+  displayName?: string | null;
+  /** The places the person works from, broadest first (their grants; every
+   * workspace's country for a platform admin). */
   geographyScopes: string[];
   activeGeographyId?: string;
 };
@@ -294,8 +298,8 @@ export function takeSignedOutReason(): SignOutReason | null {
  * else without one (such as a brokered sign-in nobody has set up) gets the
  * public map. */
 export function signedInHomePath(user: CurrentUser) {
-  if (user.roles.length > 0 && user.geographyScopes.length > 0) return "/plan";
-  return user.roles.includes("chart_admin") ? "/settings" : "/explore";
+  if (hasAccess(user) && user.geographyScopes.length > 0) return "/plan";
+  return user.isPlatformAdmin ? "/settings" : "/explore";
 }
 
 /** Milliseconds until the token should be renewed (30 s before it expires). */
@@ -387,7 +391,7 @@ async function startSession(accessToken: string) {
   if (!previous || previous.user.userId !== user.userId) {
     recordAuditEvent({
       event_type: "signin",
-      payload: { username: user.username, roles: user.roles },
+      payload: { username: user.username, platformAdmin: user.isPlatformAdmin },
     });
   }
   noteActivity(true);
@@ -628,7 +632,8 @@ async function finishSignOut(
 function sameIdentity(left: CurrentUser, right: CurrentUser) {
   return (
     left.userId === right.userId &&
-    left.roles.join("|") === right.roles.join("|") &&
+    left.isPlatformAdmin === right.isPlatformAdmin &&
+    JSON.stringify(left.workspaces) === JSON.stringify(right.workspaces) &&
     left.geographyScopes.join("|") === right.geographyScopes.join("|")
   );
 }

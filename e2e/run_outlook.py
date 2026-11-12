@@ -42,14 +42,6 @@ def wait_http(url: str, process=None) -> None:
     raise RuntimeError(f"Service did not become ready: {url}")
 
 
-def nested_group(path: str) -> dict:
-    name, _, remainder = path.partition("/")
-    return {
-        "name": name,
-        **({"subGroups": [nested_group(remainder)]} if remainder else {}),
-    }
-
-
 def main() -> int:
     run_id = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
     evidence = ROOT / "outputs/e2e/outlook" / run_id
@@ -67,7 +59,7 @@ def main() -> int:
         "working_tree": subprocess.check_output(
             ["git", "status", "--short"], cwd=ROOT, text=True
         ),
-        "fixtures": "Supplied handovers imported twice into disposable PostGIS; isolated real Keycloak realm with India/Kenya planners and denied-role user, run in the deployment's chart-keycloak image and given email-code sign-in by its chart-keycloak-config image; Mailpit receives the codes; e2e/fixtures/airtable_actions.json published to a local action feed by chart.actions.publish",
+        "fixtures": "Supplied handovers imported twice into disposable PostGIS; isolated real Keycloak realm (sign-in only) with India/Kenya/district planners invited in CHART (e2e/seed_people.py) and an uninvited user, run in the deployment's chart-keycloak image and given email-code sign-in by its chart-keycloak-config image; Mailpit receives the codes; e2e/fixtures/airtable_actions.json published to a local action feed by chart.actions.publish",
         "source": str(source),
         "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
@@ -98,26 +90,12 @@ def main() -> int:
             "loginTheme": "chart",
             "enabled": True,
             "sslRequired": "none",
-            "roles": {
-                "realm": [
-                    {"name": "health_planning_lead"},
-                    {"name": "content_editor"},
-                    {"name": "chart_admin"},
-                ],
-                "client": {
-                    "chart-core": [
-                        {"name": "health_planning_lead"},
-                        {"name": "chart_admin"},
-                        {"name": "content_editor"},
-                    ]
-                },
-            },
-            "groups": [
-                nested_group(
-                    "india/state/madhya-pradesh/division/bhopal/district/bhopal"
-                ),
-                {"name": "kenya"},
-            ],
+            # Keycloak only signs people in. CHART's database holds what they
+            # may do: e2e/seed_people.py invites the planners and records
+            # typography-admin as the platform admin.
+            # The deploy's sync gives the seeded `admin` this role, as in
+            # production; it bootstraps nothing here, a platform admin exists.
+            "roles": {"client": {"chart-core": [{"name": "chart_admin"}]}},
             "clients": [
                 {
                     "clientId": "chart-web",
@@ -127,17 +105,6 @@ def main() -> int:
                     "redirectUris": [origin + "/*"],
                     "webOrigins": [origin],
                     "protocolMappers": [
-                        {
-                            "name": "groups",
-                            "protocol": "openid-connect",
-                            "protocolMapper": "oidc-group-membership-mapper",
-                            "config": {
-                                "claim.name": "groups",
-                                "full.path": "true",
-                                "access.token.claim": "true",
-                                "id.token.claim": "true",
-                            },
-                        },
                         {
                             "name": "audience",
                             "protocol": "openid-connect",
@@ -149,8 +116,6 @@ def main() -> int:
                         },
                     ],
                 },
-                # Accounts an administrator adds through the API get chart-core
-                # client roles, as in production.
                 {"clientId": "chart-core", "publicClient": False},
             ],
             "users": [
@@ -161,26 +126,16 @@ def main() -> int:
                     "lastName": name,
                     "email": name + "@example.invalid",
                     "emailVerified": True,
-                    "groups": ["/" + country],
-                    "realmRoles": (
-                        [role, "health_planning_lead"]
-                        if role == "chart_admin"
-                        else [role]
-                    ),
                     "credentials": [
                         {"type": "password", "value": password, "temporary": False}
                     ],
                 }
-                for name, country, role in [
-                    ("india-planner", "india", "health_planning_lead"),
-                    ("kenya-planner", "kenya", "health_planning_lead"),
-                    (
-                        "district-planner",
-                        "india/state/madhya-pradesh/division/bhopal/district/bhopal",
-                        "health_planning_lead",
-                    ),
-                    ("denied", "india", "content_editor"),
-                    ("typography-admin", "india", "chart_admin"),
+                for name in [
+                    "india-planner",
+                    "kenya-planner",
+                    "district-planner",
+                    "denied",
+                    "typography-admin",
                 ]
             ],
         }
@@ -455,6 +410,14 @@ def main() -> int:
                 )
                 subprocess.run(
                     [sys.executable, "e2e/seed_observed.py"],
+                    cwd=ROOT,
+                    env=env,
+                    check=True,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                )
+                subprocess.run(
+                    [sys.executable, "e2e/seed_people.py"],
                     cwd=ROOT,
                     env=env,
                     check=True,

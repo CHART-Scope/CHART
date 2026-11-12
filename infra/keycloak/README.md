@@ -1,6 +1,6 @@
 # Keycloak
 
-Keycloak is the identity system. CHART is the policy system (geography, workspace, roles).
+Keycloak is the identity system. CHART is the policy system (workspaces, roles at places, departments).
 
 ## Local start
 
@@ -9,7 +9,7 @@ make identity
 make identity-sync
 ```
 
-`make identity-sync` re-applies the realm settings, email-code sign-in, seed groups and users to an existing realm. Run it after changing `chart-realm.json` or `sync-realm.js`, or after a volume reset.
+`make identity-sync` re-applies the realm settings, email-code sign-in and the seeded administrator to an existing realm. Run it after changing `chart-realm.json` or `sync-realm.js`, or after a volume reset.
 
 Use `make identity-restart` after changing local theme files.
 
@@ -81,9 +81,10 @@ Google hosted-domain claim against `scopeimpact.fi`. Microsoft Entra can be adde
 later as a tenant-specific OpenID Connect provider. Cognito is not needed while
 Keycloak remains the broker.
 
-An SSO login proves identity but does not grant CHART data access. A brokered user
-sees the public map until an administrator gives them a CHART client role and
-geography group.
+An SSO login proves identity but does not grant CHART data access. Access is
+by invitation only: a brokered user holds nothing until someone invites their
+verified email in CHART (Settings > People), and the invitation applies at their
+first sign-in.
 
 `CHART_WEB_ORIGIN` is also the source of truth for the `chart-web` callback, web
 origins, and post-logout redirects. Use the canonical HTTPS origin in production;
@@ -101,22 +102,17 @@ password for a `chart-web` token directly.
 One: the default administrator `admin`, created by `sync-realm.js` when the
 realm has no `admin` (first password `CHART_ADMIN_INITIAL_PASSWORD`, default
 `admin`, which must be changed at the first sign-in). It has the
-`chart_admin` and `content_editor` roles, runs setup at `/onboarding` and
-invites everyone else. An existing `admin` is never modified. It signs in
-with a password; every other account signs in with an emailed code.
+`chart_admin` role, runs setup at `/onboarding` and invites everyone else.
+An existing `admin` is never modified. It signs in with a password; every
+other account signs in with an emailed code.
 
-## Roles
+## Roles and access
 
-Client roles on `chart-core`:
+Keycloak only proves who someone is. What they may do - their workspaces,
+roles at places and departments - lives in CHART's database
+([access control](../../docs/access-control.md)), and the API reads it on
+every request.
 
-- `chart_admin`
-- `content_editor`
-- `health_planning_lead`
-- `cross_sector_planning_lead`
-- `health_implementation_officer`
-- `cross_sector_implementation_officer`
-- `public_viewer`
-
-## Geography groups
-
-Geography scope is represented by Keycloak groups. The realm ships without any pre-seeded groups — the installation setup wizard and `_ensure_group_path` in `core/chart/identity/service.py` create the required groups on demand from the country and administrative-area choices made during onboarding.
+The one client role on `chart-core` is `chart_admin`: it makes the seeded
+account CHART's first platform admin while the installation has none.
+Tokens carry no groups. Roles and groups from older realms are ignored.

@@ -23,19 +23,23 @@ OPERATION_DOCUMENTATION: dict[
     ("get", "/auth/me"): OperationDocumentation(
         summary="Resolve the signed-in user's CHART access context",
         description=(
-            "Validates the Keycloak bearer token and returns the CHART user, roles, "
-            "allowed geography paths, and active geography used to scope subsequent "
-            "requests. Supply an active geography only when the user can access it."
+            "Validates the Keycloak bearer token, then reads what the person may do "
+            "from CHART's database: account status, platform admin, and per "
+            "workspace their grants (a role at a place, with the role's level per "
+            "module) and departments, plus the places they work from and the active "
+            "one. The first sign-in of an invited email accepts its invitations. "
+            "Supply an active geography only when the user can read it."
         ),
         success_responses={
-            "200": "The authenticated user's role and geography access context."
+            "200": "The signed-in person, their workspaces, grants and departments."
         },
     ),
     ("get", "/auth/geography-access"): OperationDocumentation(
         summary="Check the current user's access to one geography",
         description=(
             "Normalizes the requested geography path and evaluates it against the "
-            "signed-in user's role and assigned geography scope. Use this before "
+            "signed-in person's grants (readable at or below a grant, or above it "
+            "for context). Use this before "
             "showing geography-specific controls; protected endpoints still enforce "
             "the same authorization independently."
         ),
@@ -98,7 +102,7 @@ OPERATION_DOCUMENTATION: dict[
     ("post", "/climate/predict"): OperationDocumentation(
         summary="Submit or reuse a durable climate-health prediction",
         description=(
-            "Validates role and geography scope, resolves the three-month input window, "
+            "Requires risk write at the place, resolves the three-month input window, "
             "and creates or reuses an idempotent prediction request in Postgres. A 200 "
             "response contains an already completed result; a 202 response identifies "
             "queued work that Dagster will execute."
@@ -184,7 +188,7 @@ OPERATION_DOCUMENTATION: dict[
     ("post", "/setup/models/sync"): OperationDocumentation(
         summary="Install newly deployed model releases without resetting CHART",
         description=(
-            "Requires a CHART administrator. Discovers enabled model manifests, "
+            "Requires a platform admin. Discovers enabled model manifests, "
             "verifies and prepares their immutable artifacts, and activates their "
             "geography assignments while preserving users, workspaces, and saved "
             "planning data. Use this after deploying a new release to an existing "
@@ -215,76 +219,6 @@ OPERATION_DOCUMENTATION: dict[
         ),
         success_responses={
             "200": "The published actions, where they were read from and when they were published."
-        },
-    ),
-    ("get", "/users"): OperationDocumentation(
-        summary="List users within the caller's administrative scope",
-        description=(
-            "Returns CHART users the authenticated caller is permitted to administer, "
-            "constrained by role and geography assignments. The response is intended "
-            "for user-management screens and does not grant access beyond the caller's "
-            "existing scope."
-        ),
-        success_responses={
-            "200": "The user accounts visible within the caller's role and geography scope."
-        },
-    ),
-    ("post", "/users"): OperationDocumentation(
-        summary="Create or invite a user within administrative scope",
-        description=(
-            "Creates the CHART user assignment requested by an authorized administrator "
-            "after validating role and geography boundaries, with no password, and "
-            "has Keycloak email the person an invitation to sign in with a code. The "
-            "account stands even if the email fails; `invitation` says which, and "
-            "`POST /users/{user_id}/invitation` sends it again."
-        ),
-        success_responses={
-            "200": "The invited user, their CHART access and whether the invitation was sent."
-        },
-    ),
-    ("post", "/users/{user_id}/invitation"): OperationDocumentation(
-        summary="Email a person their CHART invitation again",
-        description=(
-            "Has Keycloak email the invitation again for an active account: a link "
-            "that confirms the address and opens CHART's sign-in, where the person "
-            "signs in with an emailed code. Administrators only. Answers 502 "
-            "USER_INVITE_FAILED when the email could not be sent."
-        ),
-        success_responses={
-            "200": "The person and their CHART access, with invitation set to sent once Keycloak accepted the email."
-        },
-    ),
-    ("post", "/users/{user_id}/disable"): OperationDocumentation(
-        summary="Disable a user within the caller's administrative scope",
-        description=(
-            "Disables the selected CHART account after confirming that the signed-in "
-            "administrator may manage that user's role and geography. Disabled users "
-            "remain auditable but can no longer use protected application workflows."
-        ),
-        success_responses={
-            "200": "The disabled user record and its updated account state."
-        },
-    ),
-    ("post", "/workspaces"): OperationDocumentation(
-        summary="Create a geography-scoped planning workspace",
-        description=(
-            "Creates a durable planning workspace owned by the authenticated user and "
-            "bound to an authorized geography. The workspace becomes the container for "
-            "saved planning choices and analytical results."
-        ),
-        success_responses={
-            "201": "The newly created planning workspace and its ownership metadata."
-        },
-    ),
-    ("get", "/workspaces/{workspace_id}"): OperationDocumentation(
-        summary="Read an authorized planning workspace",
-        description=(
-            "Returns a durable planning workspace only when the signed-in user has the "
-            "required ownership, role, and geography access. Callers cannot use a known "
-            "workspace identifier to cross authorization boundaries."
-        ),
-        success_responses={
-            "200": "The requested workspace when it is visible to the authenticated user."
         },
     ),
     ("get", "/live"): OperationDocumentation(
@@ -325,7 +259,8 @@ OPERATION_DOCUMENTATION: dict[
         description=(
             "Returns every country and each of its administrative areas with the "
             "number of distinct months of observed climate data held, and the "
-            "range those months span. Requires the chart_admin role. Months "
+            "range those months span, for the countries where the caller reads "
+            "data. Months "
             "are counted distinctly rather than by row because each month "
             "holds several variables, which would otherwise read as several "
             "times more coverage than exists. A country's range is the union "
@@ -344,7 +279,8 @@ OPERATION_DOCUMENTATION: dict[
         description=(
             "Queues a single Copernicus download covering every deployed area "
             "in one country and returns immediately with the job to poll. "
-            "Requires the chart_admin role. Accepted rather than performed "
+            "Requires data write over the country, and one of the ERA5 source's "
+            "owning departments when it has any. Accepted rather than performed "
             "because a pull takes minutes while the web proxy times out after "
             "fifteen seconds. Omitting months requests the last twelve "
             "complete ones; the month in progress is never requested because "
@@ -361,7 +297,8 @@ OPERATION_DOCUMENTATION: dict[
         description=(
             "Returns recent country-wide climate pulls, newest first, with "
             "their status, stage, and how many of the country's areas have "
-            "been written so far. Requires the chart_admin role. Progress is "
+            "been written so far, for countries where the caller reads data. "
+            "Progress is "
             "reported per area because one download feeds every area in the "
             "country, and a country of forty-seven would otherwise look "
             "stalled while it works."
@@ -375,8 +312,8 @@ OPERATION_DOCUMENTATION: dict[
         description=(
             "Returns every administrative area beneath the selected geography "
             "with its display geometry and, where one exists, the share of "
-            "cases attributable to heat for the requested month. Requires a "
-            "risk reader role and access to the exact geography path. Areas "
+            "cases attributable to heat for the requested month. Requires risk "
+            "read at the exact geography path. Areas "
             "with no fitted model for the outcome, and areas whose month has "
             "not been computed, are returned with a null value and a "
             "missing_reason of no_model or no_prediction rather than being "
@@ -398,7 +335,7 @@ OPERATION_DOCUMENTATION: dict[
         summary="Read independent observed and projection availability",
         description=(
             "Resolves sources for the exact geography and outcome, subject to "
-            "risk-reader roles, geography scope and country model settings. "
+            "risk read at the geography and the country's model settings. "
             "Published handover projections retain their own release. Observed "
             "may use the existing calibrated Kenya outlook scorer or an exact "
             "active monthly model assignment. The observed source identifies its "
@@ -424,8 +361,8 @@ OPERATION_DOCUMENTATION: dict[
             "window or age group) filter the publication. Supplied periods retain "
             "their coefficient confidence intervals; derived 5/10/20-year periods "
             "offer climate-model ranges, not confidence intervals, and omit "
-            "unavailable temperature summaries. Requires a risk reader role and "
-            "access to the geography path. No health model is evaluated on request. "
+            "unavailable temperature summaries. Requires risk read at the "
+            "geography path. No health model is evaluated on request. "
             "Installed handovers take precedence over legacy Kenya publications. "
             "Release-specific display rules return suppressed values as null with "
             "an explanatory message; country settings restrict offered selections."
@@ -444,8 +381,8 @@ OPERATION_DOCUMENTATION: dict[
             "display geometry and the published annual-average attributable share "
             "for the "
             "chosen outcome, scenario, period and selector, in the same shape as "
-            "the risk map so the dashboard draws it identically. Requires a risk "
-            "reader role and access to the geography path, and filters returned "
+            "the risk map so the dashboard draws it identically. Requires risk "
+            "read at the geography path, and filters returned "
             "areas to the caller's allowed paths. Coverage follows the installed "
             "geography hierarchy and publication, including India districts and "
             "Kenya constituencies. Areas whose share "
@@ -477,8 +414,8 @@ OPERATION_DOCUMENTATION: dict[
             "reads the birth month and the eight before it; under-five scores each "
             "day of the month on that day and the three before it and averages "
             "them. month (YYYY-MM) defaults to the newest month with complete "
-            "inputs; selector is the pregnancy window or the age group. Requires a "
-            "risk reader role and access to the geography path. The guides' "
+            "inputs; selector is the pregnancy window or the age group. Requires "
+            "risk read at the geography path. The guides' "
             "display rules apply, so suppressed values arrive as null with the "
             "message to show in their place. The legacy observed release is "
             "selected independently of a newer projection publication. India "
@@ -498,8 +435,8 @@ OPERATION_DOCUMENTATION: dict[
         description=(
             "Returns the counties of Kenya with their display geometry and each "
             "county's heat-attributable share for one observed month, scored as "
-            "in the observed estimate. Requires a risk reader role and access to "
-            "the geography path. Counties without complete ERA5 inputs carry "
+            "in the observed estimate. Requires risk read at the geography "
+            "path. Counties without complete ERA5 inputs carry "
             "missing_reason not_reported; suppressed shares carry no_excess. "
             "County requests retain the Kenya county frame even when their "
             "projection frame contains constituencies. Returned areas remain "
@@ -587,7 +524,7 @@ OPERATION_DOCUMENTATION: dict[
             "(hazard, exposure, sensitivity or adaptive capacity), unit, direction "
             "relative to risk (+1 more is worse, -1 more is better), how values "
             "arrive (computed, upload, manual or pull) and whether it is scored "
-            "(included), shown as context, or dropped. Requires a risk reader role."
+            "(included), shown as context, or dropped. Open to any reader."
         ),
         success_responses={
             "200": (
@@ -604,8 +541,8 @@ OPERATION_DOCUMENTATION: dict[
             "siblings), with each area's risk, class, rank, component scores, "
             "coverage and driving indicators. Scores are 0-1 and relative within "
             "the frame; missing scores are null with a reason, never zero. run is "
-            "null until an administrator runs an assessment. Requires a risk "
-            "reader role and access to the geography path."
+            "null until someone with vra write runs an assessment. Requires vra "
+            "read at the geography path and its frame."
         ),
         success_responses={
             "200": (
@@ -621,7 +558,7 @@ OPERATION_DOCUMENTATION: dict[
             "map's shape, with value_percent set to the latest VRA risk score "
             "times 100. Areas scored without enough evidence carry missing_reason "
             "insufficient_data; areas no run has covered carry not_assessed. "
-            "Requires a risk reader role and access to the geography path."
+            "Requires vra read at the geography path and its frame."
         ),
         success_responses={
             "200": (
@@ -637,8 +574,8 @@ OPERATION_DOCUMENTATION: dict[
             "every scored indicator in the catalogue, the raw value and vintage "
             "used, the normalised score, weight and contribution, the source and "
             "quality flags, and why it was excluded when it was (missing, "
-            "no_data, too_few_areas, no_spread). Requires a risk reader role and "
-            "access to the geography path."
+            "no_data, too_few_areas, no_spread). Requires vra read at the "
+            "geography path and its frame."
         ),
         success_responses={
             "200": (
@@ -650,11 +587,11 @@ OPERATION_DOCUMENTATION: dict[
     ("get", "/vra/{geography_id}/coverage"): OperationDocumentation(
         summary="Read VRA indicator coverage and upload history for a frame",
         description=(
-            "For administrators: how many of the frame's child areas hold a value "
+            "How many of the frame's child areas hold a value "
             "for each catalogue indicator, the vintages held and when they were "
             "last updated, plus the most recent uploads with their row-level "
-            "rejections. Requires the chart_admin role and access to the "
-            "geography path."
+            "rejections. Requires vra write at the geography path and its "
+            "frame."
         ),
         success_responses={
             "200": (
@@ -666,11 +603,11 @@ OPERATION_DOCUMENTATION: dict[
     ("get", "/vra/{geography_id}/template.csv"): OperationDocumentation(
         summary="Download the VRA value upload template for a frame",
         description=(
-            "For administrators: a CSV with one blank row per child area and per "
+            "A CSV with one blank row per child area and per "
             "indicator entered by upload or by hand, in the columns the upload "
             "accepts (area_code, area_name, indicator_code, value, vintage, "
-            "source_name, source_url, notes). Requires the chart_admin role and "
-            "access to the geography path."
+            "source_name, source_url, notes). Requires vra write at the "
+            "geography path and its frame."
         ),
         success_responses={
             "200": (
@@ -682,13 +619,15 @@ OPERATION_DOCUMENTATION: dict[
     ("post", "/vra/{geography_id}/values"): OperationDocumentation(
         summary="Upload VRA indicator values for a frame's areas as CSV",
         description=(
-            "For administrators: send the template columns as text/csv. Each row "
+            "Send the template columns as text/csv. Each row "
             "is checked (the area must be a child of the frame, the indicator must "
             "exist and be neither dropped nor computed, the value numeric and a "
             "percentage within 0-100, the vintage present); blank values are "
             "skipped. Valid rows are upserted on indicator, area and vintage. If "
             "no row is valid the upload is recorded as failed and nothing is "
-            "written. Requires the chart_admin role and access to the geography."
+            "written. Requires vra write at the geography; rows for an indicator "
+            "group owned by other departments are rejected unless the uploader "
+            "manages VRA."
         ),
         success_responses={
             "200": (
@@ -700,13 +639,13 @@ OPERATION_DOCUMENTATION: dict[
     ("post", "/vra/{geography_id}/runs"): OperationDocumentation(
         summary="Run the vulnerability assessment for a frame's child areas",
         description=(
-            "For administrators: recomputes the climate-derived hazard indicators "
+            "Recomputes the climate-derived hazard indicators "
             "from stored ERA5 months, scores every child area with method vra-v1 "
             "(5th-95th percentile min-max, equal weights, two-thirds coverage "
             "rule, geometric mean of hazard, exposure and vulnerability, quartile "
             "classes) and stores the run with its bounds and input and output "
-            "hashes. Synchronous. Requires the chart_admin role and access to the "
-            "geography path."
+            "hashes. Synchronous. Requires vra write at the geography path and "
+            "its frame."
         ),
         success_responses={
             "200": (
@@ -724,7 +663,7 @@ OPERATION_DOCUMENTATION: dict[
             "Each item carries the options the published outlook tables and active "
             "model releases support, tagged by the view that uses them, and the "
             "effective settings: the stored ones, or the defaults when none are "
-            "saved. Any signed-in user may read them; roles are not restricted yet."
+            "saved. Requires risk read at the country."
         ),
         success_responses={
             "200": (
@@ -741,8 +680,8 @@ OPERATION_DOCUMENTATION: dict[
             "tables and releases support: unknown codes are refused "
             "(MODEL_SETTINGS_OPTION_UNKNOWN), every view keeps at least one option "
             "(MODEL_SETTINGS_OPTION_REQUIRED) and each default must be switched on "
-            "(MODEL_SETTINGS_DEFAULT_NOT_ENABLED). Requires access to the country "
-            "path; any signed-in role may write for now. Every change records a "
+            "(MODEL_SETTINGS_DEFAULT_NOT_ENABLED). Requires risk manage over the "
+            "country (CAPABILITY_NOT_ALLOWED). Every change records a "
             "model_settings_changed audit event with the values before and after."
         ),
         success_responses={
@@ -750,6 +689,257 @@ OPERATION_DOCUMENTATION: dict[
                 "The saved settings as they now apply, with the available options "
                 "and who last changed them."
             )
+        },
+    ),
+    ("get", "/access/check"): OperationDocumentation(
+        summary="Check whether I may do one thing at a place",
+        description=(
+            "Answers whether the signed-in person holds level (read, write or "
+            "manage) on module at place, applying the same rule every protected "
+            "route uses. department lists the owning departments of the action, "
+            "data source or VRA indicator group being written: a write to an owned "
+            "resource needs one of them unless the person manages the module. "
+            "Refusals carry CAPABILITY_NOT_ALLOWED or ACCOUNT_DISABLED."
+        ),
+        success_responses={
+            "200": "Whether the capability is held, with the refusal code when not."
+        },
+    ),
+    ("get", "/workspaces"): OperationDocumentation(
+        summary="List the workspaces I belong to",
+        description=(
+            "One workspace per country. A platform admin sees every workspace on the "
+            "installation; anyone else sees those they hold an active membership in. "
+            "Each item carries the country, its place and the number of active "
+            "members."
+        ),
+        success_responses={
+            "200": "The caller's workspaces with their country and active member count."
+        },
+    ),
+    ("post", "/workspaces"): OperationDocumentation(
+        summary="Create a country's workspace",
+        description=(
+            "Creates the workspace for an installed country with the default roles "
+            "(Workspace admin, Planning lead, Implementation officer, Data officer, "
+            "Viewer) and the starting departments. Platform admins only "
+            "(PLATFORM_ADMIN_REQUIRED); WORKSPACE_EXISTS when the country has one, "
+            "COUNTRY_NOT_FOUND when it is not installed."
+        ),
+        success_responses={
+            "201": "The new workspace with its country and member count."
+        },
+    ),
+    ("get", "/workspaces/{workspace_id}/roles"): OperationDocumentation(
+        summary="List a workspace's roles and their capabilities",
+        description=(
+            "The workspace's roles with their level (read, write or manage) on each "
+            "module, and the list of modules in order, for the Roles table and the "
+            "role pickers. Role capabilities are read only in this version. Members "
+            "and platform admins only; others get WORKSPACE_NOT_FOUND."
+        ),
+        success_responses={
+            "200": "The modules and each role with its level per module."
+        },
+    ),
+    ("get", "/workspaces/{workspace_id}/resources"): OperationDocumentation(
+        summary="List data sources and VRA indicator groups",
+        description=(
+            "The data sources (ERA5 and registered sources) and VRA indicator groups "
+            "(catalogue categories) a department can be made to own. Ownership "
+            "narrows writes: a data or VRA write to an owned resource needs one of "
+            "its departments unless the person manages the module."
+        ),
+        success_responses={
+            "200": "Every resource a department can own, by kind, key and name."
+        },
+    ),
+    ("get", "/workspaces/{workspace_id}/members"): OperationDocumentation(
+        summary="List the members I can see",
+        description=(
+            "Members whose grants overlap a place where the caller reads people (at, "
+            "below or above their own grants), with each grant (role at a place), "
+            "departments, status, last sign-in and whether the caller may change them "
+            "(people manage over all their grants, never oneself)."
+        ),
+        success_responses={
+            "200": "The visible members with their grants, departments and status."
+        },
+    ),
+    ("put", "/workspaces/{workspace_id}/members/{user_id}"): OperationDocumentation(
+        summary="Change a member's grants and departments",
+        description=(
+            "Replaces the member's grants and departments. Needs people manage over "
+            "every current and new grant place, and no new role may exceed what the "
+            "caller holds at that place (GRANT_EXCEEDS_YOUR_ACCESS). Grants must sit "
+            "inside the workspace's country (GRANT_PLACE_INVALID). Takes effect on "
+            "the member's next request; recorded as membership_changed."
+        ),
+        success_responses={
+            "200": "The member as now stored, with their new grants and departments."
+        },
+    ),
+    (
+        "post",
+        "/workspaces/{workspace_id}/members/{user_id}/disable",
+    ): OperationDocumentation(
+        summary="Disable a member in this workspace",
+        description=(
+            "Sets the membership to disabled so it grants nothing from the member's "
+            "next request. When it was their last active membership their Keycloak "
+            "sessions are ended too. Needs people manage over all their grants; never "
+            "oneself (MEMBER_SELF_EDIT). Recorded as membership_disabled."
+        ),
+        success_responses={
+            "200": "The member, now disabled in this workspace and granted nothing."
+        },
+    ),
+    (
+        "post",
+        "/workspaces/{workspace_id}/members/{user_id}/enable",
+    ): OperationDocumentation(
+        summary="Enable a disabled member again",
+        description=(
+            "Restores a disabled membership with the grants and departments it had. "
+            "Needs people manage over all their grants; never oneself. Recorded as "
+            "membership_enabled. The member signs in again with an emailed code."
+        ),
+        success_responses={
+            "200": "The member, active again in this workspace with their grants."
+        },
+    ),
+    ("get", "/workspaces/{workspace_id}/invitations"): OperationDocumentation(
+        summary="List invitations to this workspace",
+        description=(
+            "Pending, accepted, revoked and expired invitations (newest first, up to "
+            "200) whose grants overlap the caller's people places, with the grants "
+            "and departments each gives, who sent it and when it expires. Pending "
+            "invitations past their expiry are marked expired on read."
+        ),
+        success_responses={
+            "200": "Invitations the caller can see, with their grants and status."
+        },
+    ),
+    ("post", "/workspaces/{workspace_id}/invitations"): OperationDocumentation(
+        summary="Invite someone to a workspace by email",
+        description=(
+            "Invites an email with one or more grants and departments; new department "
+            "names are added first (needs departments write). Each grant needs people "
+            "write at its place and a role no higher than the caller's there. Someone "
+            "already signed up elsewhere is given the access at once; otherwise a "
+            "Keycloak account is made and the invitation emailed, accepted at first "
+            "sign-in. INVITATION_PENDING or MEMBER_EXISTS when already invited or a "
+            "member."
+        ),
+        success_responses={
+            "201": "The invitation, its grants and departments, and whether the email went out."
+        },
+    ),
+    (
+        "post",
+        "/workspaces/{workspace_id}/invitations/{invitation_id}/resend",
+    ): OperationDocumentation(
+        summary="Resend a pending or expired invitation",
+        description=(
+            "Emails the invitation again and extends it by seven days. Needs people "
+            "write over its grants. Accepted or revoked invitations are refused "
+            "(INVITATION_NOT_PENDING). email_sent reports whether Keycloak accepted "
+            "the email."
+        ),
+        success_responses={
+            "200": "The invitation with its new expiry and whether the email went out."
+        },
+    ),
+    (
+        "post",
+        "/workspaces/{workspace_id}/invitations/{invitation_id}/revoke",
+    ): OperationDocumentation(
+        summary="Revoke a pending invitation",
+        description=(
+            "Withdraws a pending invitation so signing in with it grants nothing. "
+            "Needs people write over its grants; anything but a pending invitation is "
+            "refused (INVITATION_NOT_PENDING). Recorded as invitation_revoked."
+        ),
+        success_responses={
+            "200": "The invitation, now revoked so signing in with it grants nothing."
+        },
+    ),
+    ("get", "/workspaces/{workspace_id}/departments"): OperationDocumentation(
+        summary="List a workspace's departments and mine",
+        description=(
+            "The workspace's departments sorted by name, archived ones included and "
+            "flagged, with active member counts, the data sources and VRA indicator "
+            "groups each owns, and the ids of the caller's own. Needs departments "
+            "read anywhere in the workspace."
+        ),
+        success_responses={
+            "200": "The departments with members and ownership, and the caller's own."
+        },
+    ),
+    ("post", "/workspaces/{workspace_id}/departments"): OperationDocumentation(
+        summary="Add a department to a workspace",
+        description=(
+            "Adds a department members can then pick. Names are trimmed and must be 2 "
+            "to 120 characters (DEPARTMENT_NAME_INVALID); a name the workspace has in "
+            "any letter case is refused (DEPARTMENT_EXISTS). Needs departments write "
+            "anywhere in the workspace."
+        ),
+        success_responses={
+            "201": "The department list with the new department included."
+        },
+    ),
+    ("put", "/workspaces/{workspace_id}/departments/mine"): OperationDocumentation(
+        summary="Set the departments I work in",
+        description=(
+            "Replaces the caller's departments in the workspace with the ids given; "
+            "archived, unknown or other workspaces' ids are refused "
+            "(DEPARTMENT_UNKNOWN). Any active member may set their own."
+        ),
+        success_responses={
+            "200": "The department list with the caller's new selection."
+        },
+    ),
+    (
+        "patch",
+        "/workspaces/{workspace_id}/departments/{department_id}",
+    ): OperationDocumentation(
+        summary="Rename or archive a department",
+        description=(
+            "Renames a department or archives and restores it. Archiving hides it "
+            "from pickers and removes it from what narrows writes, but keeps it on "
+            "past records. Needs departments manage anywhere in the workspace."
+        ),
+        success_responses={
+            "200": "The workspace's department list after the rename or archive."
+        },
+    ),
+    (
+        "delete",
+        "/workspaces/{workspace_id}/departments/{department_id}",
+    ): OperationDocumentation(
+        summary="Delete a department nobody uses",
+        description=(
+            "Deletes a department with no members, invitations or owned resources; "
+            "one in use is refused (DEPARTMENT_IN_USE) and should be archived "
+            "instead. Needs departments manage anywhere in the workspace."
+        ),
+        success_responses={
+            "200": "The department list without the deleted department."
+        },
+    ),
+    (
+        "put",
+        "/workspaces/{workspace_id}/departments/{department_id}/ownership",
+    ): OperationDocumentation(
+        summary="Set the resources a department owns",
+        description=(
+            "Replaces the data sources and VRA indicator groups the department owns. "
+            "Writes to an owned resource then need one of its departments unless the "
+            "person manages the module; unowned resources stay open to anyone with "
+            "write. Workspace admins only (workspace manage)."
+        ),
+        success_responses={
+            "200": "The workspace's department list showing the new ownership."
         },
     ),
     ("get", "/heat-seasons"): OperationDocumentation(
@@ -760,7 +950,7 @@ OPERATION_DOCUMENTATION: dict[
             "d during, a after, o outside the cycle). state says whether the place "
             "has its own calendar (custom), inherits an ancestor's (inherited, with "
             "inherited_from), uses the country's official season (official) or has "
-            "none (unset). Requires a dashboard reader role."
+            "none (unset). Lists places where the caller reads heat seasons."
         ),
         success_responses={
             "200": "Each readable place with its calendar in effect, its own months and where they come from."
@@ -785,8 +975,8 @@ OPERATION_DOCUMENTATION: dict[
             "Stores twelve months for the place; its children inherit them unless "
             "they have their own. Read from the first preparation month the months "
             "must run before, during, after, then off, with at least one during "
-            "month (HEAT_SEASON_INVALID). Administrators only "
-            "(ROLE_NOT_ALLOWED). Records a heat_season_changed audit event."
+            "month (HEAT_SEASON_INVALID). Requires seasons manage at the place "
+            "(CAPABILITY_NOT_ALLOWED). Records a heat_season_changed audit event."
         ),
         success_responses={
             "200": "The saved calendar as it now applies to the place, with its source and state."
@@ -809,8 +999,8 @@ OPERATION_DOCUMENTATION: dict[
             "Returns the caller's own saved plans, newest first, each with the "
             "dashboard choices that reopen it, the published estimate captured "
             "when it was saved and the deterministic risk_level/timing signals "
-            "recommendations are keyed on. Plans for places no longer in the "
-            "caller's geography scope are omitted. Requires a dashboard reader role."
+            "recommendations are keyed on. Plans for places where the caller no "
+            "longer reads plans are omitted."
         ),
         success_responses={
             "200": "The caller's saved plans for places they can still read, newest first; empty when none."
@@ -877,7 +1067,7 @@ OPERATION_DOCUMENTATION: dict[
         description=(
             "Returns the chosen ranker and insight provider/model with every "
             "option and whether the server environment enables it (credentials "
-            "are never stored or returned). Administrators only (chart_admin)."
+            "are never stored or returned). Platform admins only."
         ),
         success_responses={
             "200": "The current ranker and insight settings, with which options this server can offer."
@@ -890,7 +1080,7 @@ OPERATION_DOCUMENTATION: dict[
             "Refuses unknown options (RANKER_UNKNOWN, INSIGHT_PROVIDER_UNKNOWN), "
             "options the environment does not enable (RANKER_NOT_CONFIGURED, "
             "INSIGHT_PROVIDER_NOT_CONFIGURED) and a language model provider "
-            "without a model (INSIGHT_MODEL_REQUIRED). Administrators only; "
+            "without a model (INSIGHT_MODEL_REQUIRED). Platform admins only; "
             "every change records a recommendation_settings_changed audit event."
         ),
         success_responses={
@@ -1081,7 +1271,7 @@ OPERATION_DOCUMENTATION: dict[
             "Finds the manifest whose id matches the URL parameter, re-parses "
             "its ModelReleaseSpec, and calls prepare_model_release to re-POST "
             "/models/load to the R runtime. Does not touch the database or "
-            "reactivate the release. Requires the chart_admin role. Useful "
+            "reactivate the release. Requires a platform admin. Useful "
             "after an R container restart or after a manifest edit that swaps "
             "an artifact's SHA-256."
         ),
@@ -1101,7 +1291,7 @@ OPERATION_DOCUMENTATION: dict[
             "The half-open probe closes it automatically once R recovers, but "
             "an operator investigating after an outage can call this endpoint "
             "to skip the wait instead of restarting the API container. "
-            "Requires the chart_admin role. Only "
+            "Requires a platform admin. Only "
             "clears state in the calling process; other API replicas keep "
             "their own counter until reset individually or until their next "
             "half-open probe succeeds."

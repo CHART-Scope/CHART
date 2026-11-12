@@ -7,7 +7,7 @@ import { TextInput } from "@/components/TextInput";
 import { resetAuditSession, stopAuditFlush } from "@/lib/audit";
 import { clearStoredAuthSession } from "@/lib/authClient";
 import { resetInstallation } from "@/lib/setupClient";
-import styles from "./UserManagement.module.css";
+import styles from "./ResetInstallationCard.module.css";
 
 const RESET_CONFIRM_PHRASE = "RESET";
 

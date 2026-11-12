@@ -11,6 +11,8 @@ is country-specific.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import csv
 import hashlib
 import io
@@ -589,8 +591,12 @@ def ingest_csv(
     user_id: str | None,
     indicator_code: str | None = None,
     level: str | None = None,
+    may_write: Callable[[VraIndicator], bool] | None = None,
 ) -> IngestionResult:
     """Validate an upload row by row and upsert the valid rows.
+
+    ``may_write`` refuses rows for indicators whose group (category) is owned
+    by departments the uploader is not in.
 
     Blank values are skipped. If no row is valid the ingestion is recorded as
     failed and no value is written. Unrecoverable CSV syntax errors reject the
@@ -668,6 +674,11 @@ def ingest_csv(
             (row.get("area_code") or "").strip().lower(),
             (row.get("vintage") or "").strip(),
         )
+        if reason is None and may_write and not may_write(indicators[key[0]]):
+            reason = (
+                f"indicator group '{indicators[key[0]].category}' belongs to other "
+                "departments; ask a workspace admin or one of its members"
+            )
         if reason is None and key in seen:
             reason = (
                 f"duplicate of row {seen[key]} (same area, indicator and vintage); "
