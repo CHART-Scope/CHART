@@ -1,5 +1,7 @@
 import { type Page, type Route } from "@playwright/test";
 
+import { actionList } from "./actions";
+
 /**
  * The CHART API as the browser sees it, answered at the network boundary.
  *
@@ -91,6 +93,11 @@ export async function installFakeApi(
     if (path === "/api/chart/audit/events" || path.startsWith("/api/chart/audit")) {
       return json(route, {}, 202);
     }
+    // No published outlook map unless a spec installs one (Kenya does).
+    if (/^\/api\/chart\/heat-outlook\/[^/]+\/map$/.test(path))
+      return json(route, { error: "OUTLOOK_NOT_PUBLISHED" }, 404);
+    if (/^\/api\/chart\/heat-outlook\/[^/]+\/capabilities$/.test(path))
+      return json(route, { published: false, data_modes: [] });
     if (path === "/api/chart/geographies") return json(route, geographies);
     if (path === "/api/chart/model-catalog") return json(route, { items: catalog });
     if (/^\/api\/chart\/risk\/[^/]+\/map$/.test(path)) {
@@ -99,7 +106,29 @@ export async function installFakeApi(
     if (/^\/api\/chart\/risk\/[^/]+\/monthly$/.test(path)) {
       return json(route, options.monthly?.(url) ?? { admin_unit_id: 1, months: {} });
     }
-    if (path === "/api/chart/recommended-actions") return json(route, { items: [] });
+    if (path === "/api/chart/actions") return json(route, actionList);
+    if (path === "/api/chart/saved-plans" && method === "GET")
+      return json(route, { items: [] });
+    if (path === "/api/chart/recommendation-settings" && method === "GET") {
+      return json(route, {
+        settings: {
+          ranker: "rules",
+          insight_provider: "template",
+          insight_model: null,
+        },
+        rankers: [{ id: "rules", label: "Rules", available: true, reason: null }],
+        providers: [
+          { id: "template", label: "Template (no AI)", available: true, reason: null },
+        ],
+        updated_by_user_id: null,
+        updated_at: null,
+      });
+    }
+    // The vulnerability assessment, for specs that do not exercise it (see
+    // vra.ts for the full service): nothing held, nothing assessed.
+    if (/^\/api\/chart\/vra\/[^/]+\/coverage$/.test(path)) {
+      return json(route, { area_count: 0, indicators: [], ingestions: [] });
+    }
     if (path === "/api/chart/climate/predict") {
       return json(route, { request_id: 1, status: "queued" }, 202);
     }
@@ -187,6 +216,52 @@ export function catalogEntry(outcome: string, label: string, releaseId: string) 
     risk_description: null,
     release_ids: [releaseId],
   };
+}
+
+/**
+ * Answer `/api/auth/keycloak-refresh` with a new token on every call, valid
+ * for `lifetimeSeconds` of page time (the page clock, so `page.clock` drives
+ * expiry). `respond` may replace any answer, e.g. with a 503.
+ */
+export function rotateTokens(
+  page: Page,
+  api: FakeApi,
+  options: {
+    lifetimeSeconds?: number;
+    respond?: (call: number, route: Route) => Promise<void> | void | undefined;
+  } = {},
+) {
+  const issued: string[] = [];
+  let calls = 0;
+  api.on(/^\/api\/auth\/keycloak-refresh$/, async (route) => {
+    calls += 1;
+    const replaced = options.respond?.(calls, route);
+    if (replaced) return replaced;
+    const now = Math.floor((await page.evaluate(() => Date.now())) / 1000);
+    const token = fakeJwt({
+      sub: "e2e-user",
+      n: issued.length,
+      exp: now + (options.lifetimeSeconds ?? 300),
+    });
+    issued.push(token);
+    return json(route, { access_token: token });
+  });
+  return {
+    issued,
+    get calls() {
+      return calls;
+    },
+  };
+}
+
+/** The bearer token a request carried, or "" without one. */
+export function bearerOf(route: Route) {
+  return (
+    route
+      .request()
+      .headers()
+      .authorization?.replace(/^Bearer /, "") ?? ""
+  );
 }
 
 export function fakeJwt(payload: Record<string, unknown>) {

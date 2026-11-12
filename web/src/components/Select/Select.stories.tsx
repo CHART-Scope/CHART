@@ -66,4 +66,5 @@ export const Searchable: Story = {
     ].map((label) => ({ value: label, label })),
   },
 };
+export const Small: Story = { args: { size: "sm" } };
 export const Disabled: Story = { args: { disabled: true } };

@@ -2,15 +2,29 @@
 
 GitHub Actions builds CHART once and publishes commit-tagged images to GitHub
 Container Registry. The EC2 host does not clone the repository or build images.
-It receives this small deployment bundle, pulls the requested image tag, and
-runs Docker Compose.
+It pulls the requested image tag and runs Docker Compose. The host holds only
+what Compose reads:
+
+```txt
+~/chart-deploy/aws/
+  docker-compose.yml   copied by each deploy
+  Caddyfile            copied by each deploy
+  .env.prod            your settings and secrets (never in an image)
+  backups/             database dumps taken before migrations (14 days)
+```
+
+Each deploy deletes anything else there, including the `~/chart-deploy/keycloak`
+folder earlier releases copied. Keycloak's theme, email-code plugin and realm
+seed are built into the `chart-keycloak` image (`infra/keycloak/Dockerfile`).
 
 ## Release flow
 
-1. Pull requests run tests and validate all three deploy images.
-2. A push to `dev` runs the same validation, builds the Python, web, and LBW
-   images, and pushes both the commit SHA and `dev` tags to GHCR.
-3. CI copies `infra/aws` and `infra/keycloak` to `~/chart-deploy` on EC2.
+1. Pull requests run tests and validate every deploy image.
+2. A push to `dev` runs the same validation, builds the Python, web, LBW,
+   Keycloak and Keycloak realm sync images, and pushes both the commit SHA and
+   `dev` tags to GHCR.
+3. CI copies `docker-compose.yml` and `Caddyfile` to `~/chart-deploy/aws` on
+   EC2 and removes files earlier releases left there.
 4. EC2 logs in to GHCR and runs `docker compose pull` followed by
    `docker compose up -d --remove-orphans` using the host's single runtime file,
    `~/chart-deploy/aws/.env.prod`.
@@ -40,7 +54,10 @@ user's home directory.
 
 Set `MODEL_BUCKET_PUBLIC=0` and grant the EC2 instance role read access when the
 model S3 bucket is private. The default `MODEL_BUCKET_PUBLIC=1` uses anonymous
-read access. Ports 80 and 443 must be open, and the public domain must point to
+read access. Recommended actions are read from the public action feed in the
+`chart-actions-repository` bucket (see [docs/actions.md](../../docs/actions.md));
+set `CHART_ACTIONS_URL` in `.env.prod` only to use another feed, or empty to
+use the copy bundled with the image. Ports 80 and 443 must be open, and the public domain must point to
 the instance. Caddy uses port 80 for certificate issuance and HTTP-to-HTTPS
 redirects.
 
@@ -56,7 +73,10 @@ Create the single local runtime file:
 vim infra/aws/.env.prod
 ```
 
-Paste these seven settings with their real values:
+Paste these settings with their real values. The SMTP lines deliver sign-in
+codes; without them the deploy stops, because nobody could sign in
+([sign-in and email](../../docs/sign-in.md) covers SES setup and other
+providers):
 
 ```dotenv
 PUBLIC_ORIGIN=https://your-domain
@@ -66,7 +86,16 @@ CHART_BOOTSTRAP_TOKEN=your-bootstrap-token
 MODEL_CONTROL_TOKEN=your-model-control-token
 CDSAPI_URL=https://cds.climate.copernicus.eu/api
 CDSAPI_KEY=your-copernicus-key
+SMTP_HOST=email-smtp.eu-north-1.amazonaws.com
+SMTP_USERNAME=your-ses-smtp-username
+SMTP_PASSWORD=your-ses-smtp-password
+SMTP_FROM=no-reply@your-domain
+CHART_ADMIN_INITIAL_PASSWORD=a-long-random-first-password
 ```
+
+`CHART_ADMIN_INITIAL_PASSWORD` is the first password of the default `admin`
+account, changed at its first sign-in. Without it the account starts on
+`admin`, which a public server should never do.
 
 Save it, then copy that same file to the sandbox:
 

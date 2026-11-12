@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 import styles from "./Button.module.css";
 
-type Variant = "primary" | "secondary" | "ghost" | "icon";
+type Variant = "primary" | "secondary" | "ghost" | "inverse" | "icon";
 type Size = "sm" | "md" | "lg";
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -12,6 +12,17 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   leadingIcon?: ReactNode;
   trailingIcon?: ReactNode;
 };
+
+/** The button look for a link (`<a>`), so calls to action match buttons. */
+export function buttonClassName({
+  variant = "primary",
+  size = "md",
+  block = false,
+}: { variant?: Variant; size?: Size; block?: boolean } = {}) {
+  return [styles.btn, styles[variant], styles[size], block ? styles.block : ""]
+    .filter(Boolean)
+    .join(" ");
+}
 
 export function Button({
   variant = "primary",

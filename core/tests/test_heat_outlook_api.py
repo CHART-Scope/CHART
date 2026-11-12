@@ -9,23 +9,29 @@ display rules.
 from __future__ import annotations
 
 import csv
-from contextlib import nullcontext
 import json
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from chart.api.app import app
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import require_current_user
+from chart.auth.service import require_current_user, require_reader
 from chart.heat_outlook import routes as outlook_routes
 from chart.risk import routes as risk_routes
 from chart.heat_outlook import service as outlook_service
+from chart.heat_seasons import routes as heat_season_routes
 from chart.heat_outlook.publish import publish
 from chart.risk.schemas import MapArea, MapResponse
 from chart.heat_outlook.service import NO_EXCESS_LBW, NO_EXCESS_NEONATAL, THIN_DATA
+from chart.model_settings import service as settings_service
+from chart.shared.db.base import Base
+from chart.shared.db.models import AppGeography, CountryGeoConfig
 
 RELEASE = "v-test"
 KAJIADO = "geo-ke-kajiado"
@@ -89,7 +95,10 @@ def _lbw_tables(directory: Path) -> None:
                 "month": month,
                 "tmax": 25 + month * 0.5,
             }
-            for window, af in (("P", 0.1), ("T1", -0.02), ("T2", 0.05), ("T3", -0.1)):
+            # Births in Jul-Sep carry the most heat (the hot months fall in
+            # their pregnancies), so they are the peak, not the hottest months.
+            peak = 0.2 if period == "2041-2060" and month in (7, 8, 9) else 0.1
+            for window, af in (("P", peak), ("T1", -0.02), ("T2", 0.05), ("T3", -0.1)):
                 row |= {
                     f"af_heat_{window}_mean": af,
                     f"af_heat_{window}_min": af - 0.01,
@@ -191,7 +200,75 @@ def _user(**overrides) -> CurrentUserContext:
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
+def settings_db(monkeypatch):
+    """The model settings store, with Kenya as a country and no saved rows."""
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    with factory() as session:
+        session.add(
+            CountryGeoConfig(
+                country_code="KE", level_key="country", level_label="Country"
+            )
+        )
+        session.flush()
+        session.add(
+            AppGeography(
+                id="geo-ke",
+                country_code="KE",
+                level="country",
+                level_label="Country",
+                name="Kenya",
+                path="/kenya",
+            )
+        )
+        session.add(
+            CountryGeoConfig(
+                country_code="KE", level_key="county", level_label="County"
+            )
+        )
+        session.flush()
+        for name in ("Kajiado", "Narok"):
+            session.add(
+                AppGeography(
+                    id="geo-ke-" + name.lower(),
+                    country_code="KE",
+                    level="county",
+                    level_label="County",
+                    name=name,
+                    parent_id="geo-ke",
+                    path="/kenya/" + name.lower(),
+                )
+            )
+        session.commit()
+    monkeypatch.setattr(outlook_routes, "get_session_factory", lambda: factory)
+    monkeypatch.setattr(settings_service, "get_session_factory", lambda: factory)
+    return factory
+
+
+def enable_every_window(client: TestClient) -> None:
+    """Turn the trimesters on, as a user would on the settings page."""
+
+    response = client.put(
+        "/model-settings/KE/lbw",
+        json={
+            "selectors": ["P", "T1", "T2", "T3"],
+            "default_selector": "P",
+            "scenarios": ["ssp585"],
+            "default_scenario": "ssp585",
+            "data_modes": ["projection"],
+        },
+    )
+    assert response.status_code == 200, response.text
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch, settings_db) -> Iterator[TestClient]:
     _lbw_tables(tmp_path / "lbw_source")
     _u5_tables(tmp_path / "u5_source")
     cache = tmp_path / "models"
@@ -209,10 +286,14 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
         lambda geography_id: "/kenya" if geography_id == "geo-ke" else "/kenya/kajiado",
     )
     app.dependency_overrides[require_current_user] = lambda: _user()
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(require_current_user, None)
+        app.dependency_overrides.pop(require_reader, None)
 
 
 def test_lbw_whole_pregnancy_reads_months_and_periods(client) -> None:
@@ -242,9 +323,131 @@ def test_lbw_whole_pregnancy_reads_months_and_periods(client) -> None:
     assert ratio["precision"] == "high"
 
 
+def test_peak_season_is_the_three_months_with_the_highest_share(client) -> None:
+    body = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw").json()
+
+    peak = body["peak_season"]
+    # December is the hottest birth month in the table; the share decides.
+    assert peak["months"] == [7, 8, 9] and peak["label"] == "Jul–Sep"
+    assert peak["part"]["value_percent"] == 20.0
+    assert (peak["gcm_min_percent"], peak["gcm_max_percent"]) == (19.0, 21.0)
+    # This release has no ERA5 calibration, so only projections are offered.
+    assert body["data_modes"] == ["projection"]
+
+
+def test_outlook_carries_the_official_heat_season(client) -> None:
+    body = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw").json()
+
+    # The weather season (Kenya Meteorological Department) is reported beside,
+    # and distinct from, the months with the highest health share (Jul-Sep).
+    season = body["heat_season"]
+    assert season["months"] == [12, 1, 2, 3] and season["peak_month"] == 2
+    assert season["source_name"] == "Kenya Meteorological Department"
+    assert body["peak_season"]["months"] != season["months"][:3]
+
+
+def test_peak_heat_season_follows_the_configured_calendar(
+    client, monkeypatch, settings_db
+) -> None:
+    body = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw").json()
+    # No saved calendar: Kenya's official season, in season order.
+    season = body["heat_season_share"]
+    assert season["months"] == [12, 1, 2, 3] and season["label"] == "Dec–Mar"
+    assert season["part"]["value_percent"] == 10.0
+    # Distinct from the months the model ranks highest.
+    assert body["peak_season"]["months"] == [7, 8, 9]
+
+    # An administrator sets Kenya's season to Jul-Oct; Kajiado inherits it.
+    monkeypatch.setattr(heat_season_routes, "get_session_factory", lambda: settings_db)
+    app.dependency_overrides[require_current_user] = lambda: _user(
+        user_id="admin", username="admin", roles=["chart_admin"]
+    )
+    saved = client.put("/heat-seasons/geo-ke", json={"months": "oobbbbddddaa"})
+    assert saved.status_code == 200, saved.text
+    app.dependency_overrides[require_current_user] = lambda: _user()
+
+    season = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw").json()[
+        "heat_season_share"
+    ]
+    assert season["months"] == [7, 8, 9, 10] and season["label"] == "Jul–Oct"
+    # (20 + 20 + 20 + 10) / 4 percent.
+    assert season["part"]["value_percent"] == 17.5
+
+    frame = MapResponse(
+        geography_id="geo-ke",
+        outcome="lbw",
+        areas=[
+            MapArea(
+                geography_id=KAJIADO,
+                admin_unit_id=1,
+                code="kajiado",
+                name="Kajiado",
+                level="county",
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        outlook_service, "load_map_view", lambda *_a, **_k: frame.model_copy(deep=True)
+    )
+    body = client.get("/heat-outlook/geo-ke/map?outcome=lbw&reference=season").json()
+    assert body["metric"] == "heat_attributable_share_heat_season"
+    assert body["areas"][0]["value_percent"] == 17.5
+
+
+def test_peak_season_map_and_suppressed_window(client, monkeypatch) -> None:
+    enable_every_window(client)
+    t3 = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw&selector=T3").json()
+    assert t3["peak_season"]["part"]["value_percent"] is None
+    assert t3["peak_season"]["part"]["message"] == NO_EXCESS_LBW
+    assert t3["peak_season"]["gcm_min_percent"] is None
+
+    frame = MapResponse(
+        geography_id="geo-ke",
+        outcome="lbw",
+        areas=[
+            MapArea(
+                geography_id=KAJIADO,
+                admin_unit_id=1,
+                code="kajiado",
+                name="Kajiado",
+                level="county",
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        outlook_service, "load_map_view", lambda *_a, **_k: frame.model_copy(deep=True)
+    )
+    body = client.get("/heat-outlook/geo-ke/map?outcome=lbw&reference=peak").json()
+    assert body["metric"] == "heat_attributable_share_peak_season"
+    assert body["areas"][0]["value_percent"] == 20.0
+    bad = client.get("/heat-outlook/geo-ke/map?outcome=lbw&reference=summer")
+    assert bad.status_code == 422
+
+
+def test_projection_view_can_be_switched_off(client, monkeypatch) -> None:
+    monkeypatch.setattr(outlook_service, "_calibrated", lambda: True)
+    response = client.put(
+        "/model-settings/KE/lbw",
+        json={
+            "selectors": ["P"],
+            "default_selector": "P",
+            "scenarios": ["ssp585"],
+            "default_scenario": "ssp585",
+            "data_modes": ["observed"],
+        },
+    )
+    assert response.status_code == 200, response.text
+
+    off = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw")
+    assert off.status_code == 404
+    assert off.json()["error"] == "VIEW_TURNED_OFF"
+    assert client.get("/heat-outlook/geo-ke/map?outcome=lbw").status_code == 404
+
+
 def test_lbw_third_trimester_shows_odds_ratio_without_attributable_share(
     client,
 ) -> None:
+    enable_every_window(client)
     body = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw&selector=T3").json()
 
     month = body["months"][0]
@@ -259,6 +462,7 @@ def test_lbw_third_trimester_shows_odds_ratio_without_attributable_share(
 
 
 def test_lbw_negative_window_is_suppressed(client) -> None:
+    enable_every_window(client)
     body = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw&selector=T1").json()
 
     part = body["months"][0]["parts"][0]
@@ -316,10 +520,16 @@ def test_denies_other_geographies_and_roles(client) -> None:
     app.dependency_overrides[require_current_user] = lambda: _user(
         geography_scopes=["/india"]
     )
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     assert client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw").status_code == 403
     app.dependency_overrides[require_current_user] = lambda: _user(
         roles=["unknown_role"]
     )
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     assert client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw").status_code == 403
 
 
@@ -354,7 +564,6 @@ def test_map_shades_counties_with_the_published_annual_share(
     )
     # The frame (shapes) comes from the risk map, which needs PostGIS; the test
     # supplies it directly and checks the values laid over it.
-    monkeypatch.setattr(outlook_routes, "get_session_factory", lambda: nullcontext)
     calls: list[dict] = []
 
     def shapes_only(*_args, **kwargs):
@@ -373,6 +582,7 @@ def test_map_shades_counties_with_the_published_annual_share(
     # Only shapes are asked for: the live-prediction queries are skipped.
     assert all(call["with_values"] is False for call in calls)
 
+    enable_every_window(client)
     t3 = client.get("/heat-outlook/geo-ke/map?outcome=lbw&selector=T3").json()
     assert t3["areas"][0]["missing_reason"] == "not_reported"
     u5 = client.get(
@@ -385,15 +595,22 @@ def test_map_denies_other_geographies_and_roles(client) -> None:
     app.dependency_overrides[require_current_user] = lambda: _user(
         geography_scopes=["/india"]
     )
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     assert client.get("/heat-outlook/geo-ke/map?outcome=lbw").status_code == 403
     app.dependency_overrides[require_current_user] = lambda: _user(
         roles=["unknown_role"]
     )
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
     assert client.get("/heat-outlook/geo-ke/map?outcome=lbw").status_code == 403
 
 
 def test_map_rejects_unauthenticated_client() -> None:
     app.dependency_overrides.pop(require_current_user, None)
+    app.dependency_overrides.pop(require_reader, None)
     response = TestClient(app).get("/heat-outlook/geo-ke/map?outcome=lbw")
     assert response.status_code in (401, 403)
 

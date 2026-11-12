@@ -1200,50 +1200,6 @@ class ClimateIngestionJob(Base):
     )
 
 
-class RecommendedAction(Base):
-    """A reviewed intervention seeded from the solution repository.
-
-    Populated at onboarding from the bundled ``solution_repository/seed.json``;
-    later a scheduler or an external repository API will refresh rows in
-    place. ``slug`` is the natural identity that survives that refresh.
-    """
-
-    __tablename__ = "recommended_action"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    slug: Mapped[str] = mapped_column(String(160), nullable=False, unique=True)
-    source_record_id: Mapped[str | None] = mapped_column(String(64))
-    title: Mapped[str] = mapped_column(String(256), nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    # JSONB on Postgres (matches migration 017); portable JSON on SQLite so
-    # unit tests that hit Base.metadata.create_all can render the table.
-    climate_hazards: Mapped[list] = mapped_column(
-        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
-    )
-    solution_types: Mapped[list] = mapped_column(
-        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
-    )
-    cost_of_implementation: Mapped[str | None] = mapped_column(String(32))
-    useful_links: Mapped[list] = mapped_column(
-        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
-    )
-    case_studies: Mapped[list] = mapped_column(
-        JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list
-    )
-    source: Mapped[str] = mapped_column(
-        String(32), nullable=False, server_default="seed"
-    )
-    synced_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-
 class LearningTrack(Base):
     """One stop on the Learning Hub pathway.
 
@@ -1280,9 +1236,8 @@ class LearningResource(Base):
     ``embeddable`` rows may be played inline, because the rest have not been
     checked for permission to reframe them.
 
-    ``tracks`` and ``tags`` are denormalised label arrays, matching
-    ``RecommendedAction``. The taxonomy is derived from them at read time
-    instead of being stored in join tables.
+    ``tracks`` and ``tags`` are denormalised label arrays. The taxonomy is
+    derived from them at read time instead of being stored in join tables.
     """
 
     __tablename__ = "learning_resource"
@@ -1398,4 +1353,312 @@ class LearningPreferenceRecord(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ModelDisplaySetting(Base):
+    """Which model options one country offers for one outcome.
+
+    ``settings`` only narrows what the published tables and the active model
+    releases support (see ``chart.model_settings``); a missing row means the
+    agreed defaults. Every write is mirrored by a ``model_settings_changed``
+    audit event carrying the before and after values.
+    """
+
+    __tablename__ = "model_display_setting"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    country_code: Mapped[str] = mapped_column(String(8), nullable=False)
+    outcome: Mapped[str] = mapped_column(String(64), nullable=False)
+    settings: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False
+    )
+    updated_by_user_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "country_code", "outcome", name="uq_model_display_setting_country_outcome"
+        ),
+    )
+
+
+_JSON = JSON().with_variant(JSONB(), "postgresql")
+
+
+class VraIndicator(Base):
+    """One indicator in the vulnerability and resilience catalogue.
+
+    Synced from ``chart/vra/catalogue.json``; ``code`` is the stable key. The
+    direction is always relative to risk: +1 means more of it is worse.
+    """
+
+    __tablename__ = "vra_indicator"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    component: Mapped[str] = mapped_column(String(32), nullable=False)
+    category: Mapped[str] = mapped_column(String(64), nullable=False)
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    unit: Mapped[str] = mapped_column(String(64), nullable=False)
+    direction_to_risk: Mapped[int] = mapped_column(nullable=False)
+    route: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    ceew_ref: Mapped[str | None] = mapped_column(String(64))
+    catalogue_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class VraIngestion(Base):
+    """One checked CSV upload of indicator values for a frame's areas."""
+
+    __tablename__ = "vra_ingestion"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    frame_geography_id: Mapped[str] = mapped_column(
+        ForeignKey("geographies.id", ondelete="CASCADE"), nullable=False
+    )
+    route: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    file_name: Mapped[str | None] = mapped_column(String(256))
+    file_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    rows_accepted: Mapped[int] = mapped_column(nullable=False)
+    rows_rejected: Mapped[int] = mapped_column(nullable=False)
+    rejections: Mapped[list] = mapped_column(_JSON, nullable=False, default=list)
+    requested_by: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (Index("ix_vra_ingestion_frame", "frame_geography_id", "id"),)
+
+
+class VraIndicatorValue(Base):
+    """One indicator value for one area and vintage, with where it came from.
+
+    Uploaded values carry the row's source and the ingestion; values CHART
+    computes from climate data carry the ``climate_run`` they were read from.
+    """
+
+    __tablename__ = "vra_indicator_value"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    indicator_id: Mapped[int] = mapped_column(
+        ForeignKey("vra_indicator.id", ondelete="CASCADE"), nullable=False
+    )
+    admin_unit_id: Mapped[int] = mapped_column(
+        ForeignKey("admin_unit.id", ondelete="CASCADE"), nullable=False
+    )
+    vintage: Mapped[str] = mapped_column(String(32), nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    #: "observed" for uploads, "computed" for values derived by CHART.
+    method: Mapped[str] = mapped_column(String(32), nullable=False)
+    quality_flags: Mapped[dict] = mapped_column(_JSON, nullable=False, default=dict)
+    source_name: Mapped[str | None] = mapped_column(String(256))
+    source_url: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    ingestion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vra_ingestion.id", ondelete="SET NULL")
+    )
+    climate_run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("climate_run.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "indicator_id",
+            "admin_unit_id",
+            "vintage",
+            name="uq_vra_indicator_value_grain",
+        ),
+        Index("ix_vra_indicator_value_admin_unit", "admin_unit_id"),
+    )
+
+
+class VraRun(Base):
+    """One scoring of a frame's child areas, with everything needed to redo it."""
+
+    __tablename__ = "vra_run"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    frame_geography_id: Mapped[str] = mapped_column(
+        ForeignKey("geographies.id", ondelete="CASCADE"), nullable=False
+    )
+    method_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    catalogue_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: Percentiles, coverage rule, floor, per-indicator bounds and class breaks.
+    params: Mapped[dict] = mapped_column(_JSON, nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    output_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_by: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (Index("ix_vra_run_frame", "frame_geography_id", "id"),)
+
+
+class VraResult(Base):
+    """One area's component scores, risk, class and drivers in one run."""
+
+    __tablename__ = "vra_result"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("vra_run.id", ondelete="CASCADE"), nullable=False
+    )
+    admin_unit_id: Mapped[int] = mapped_column(
+        ForeignKey("admin_unit.id", ondelete="CASCADE"), nullable=False
+    )
+    hazard: Mapped[float | None] = mapped_column(Float)
+    exposure: Mapped[float | None] = mapped_column(Float)
+    sensitivity: Mapped[float | None] = mapped_column(Float)
+    adaptive_capacity: Mapped[float | None] = mapped_column(Float)
+    vulnerability: Mapped[float | None] = mapped_column(Float)
+    risk: Mapped[float | None] = mapped_column(Float)
+    risk_class: Mapped[str | None] = mapped_column(String(16))
+    rank: Mapped[int | None] = mapped_column()
+    missing_reason: Mapped[str | None] = mapped_column(String(32))
+    coverage: Mapped[dict] = mapped_column(_JSON, nullable=False, default=dict)
+    drivers: Mapped[list] = mapped_column(_JSON, nullable=False, default=list)
+
+    __table_args__ = (
+        UniqueConstraint("run_id", "admin_unit_id", name="uq_vra_result_area"),
+    )
+
+
+class VraResultIndicator(Base):
+    """One indicator's raw value, score and contribution for one area in a run."""
+
+    __tablename__ = "vra_result_indicator"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("vra_run.id", ondelete="CASCADE"), nullable=False
+    )
+    admin_unit_id: Mapped[int] = mapped_column(
+        ForeignKey("admin_unit.id", ondelete="CASCADE"), nullable=False
+    )
+    indicator_id: Mapped[int] = mapped_column(
+        ForeignKey("vra_indicator.id", ondelete="CASCADE"), nullable=False
+    )
+    value_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vra_indicator_value.id", ondelete="SET NULL")
+    )
+    vintage: Mapped[str | None] = mapped_column(String(32))
+    raw: Mapped[float | None] = mapped_column(Float)
+    normalised: Mapped[float | None] = mapped_column(Float)
+    weight: Mapped[float | None] = mapped_column(Float)
+    contribution: Mapped[float | None] = mapped_column(Float)
+    excluded_reason: Mapped[str | None] = mapped_column(String(32))
+
+    __table_args__ = (
+        UniqueConstraint(
+            "run_id",
+            "admin_unit_id",
+            "indicator_id",
+            name="uq_vra_result_indicator_grain",
+        ),
+    )
+
+
+class SavedPlan(Base):
+    """A dashboard view one user saved to plan from.
+
+    ``choices`` are the dashboard selections that reopen the view, resolved
+    by the API at save time. ``figure`` is the estimate the published model
+    gave for them then, so a plan keeps the modelling it was made from even
+    after a newer release replaces it. Plans are private to their owner.
+    """
+
+    __tablename__ = "saved_plan"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    geography_id: Mapped[str] = mapped_column(
+        ForeignKey("geographies.id", ondelete="CASCADE"), nullable=False
+    )
+    admin_unit_id: Mapped[str | None] = mapped_column(
+        ForeignKey("geographies.id", ondelete="CASCADE")
+    )
+    outcome: Mapped[str] = mapped_column(String(64), nullable=False)
+    choices: Mapped[dict] = mapped_column(_JSON, nullable=False)
+    figure: Mapped[dict] = mapped_column(_JSON, nullable=False)
+    # The last generated insight with the provider, model and ranking it was
+    # written for; reused until any of them changes, so a page view does not
+    # call the language model again.
+    insight: Mapped[dict | None] = mapped_column(_JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (Index("ix_saved_plan_user", "user_id", "created_at"),)
+
+
+class RecommendationSetting(Base):
+    """How the installation ranks actions and writes the insight beside them.
+
+    One row (id 1); no row means the rules ranking and the template insight.
+    Credentials never live here: provider keys and endpoints come from the
+    server environment (see ``chart.recommendations.providers``).
+    """
+
+    __tablename__ = "recommendation_setting"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ranker: Mapped[str] = mapped_column(String(32), nullable=False)
+    insight_provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    insight_model: Mapped[str | None] = mapped_column(String(200))
+    updated_by_user_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class HeatSeasonSetting(Base):
+    """A place's heat-season calendar: before, during and after months.
+
+    ``months`` holds one letter per calendar month, January first: ``b``
+    before (preparation), ``d`` during (response), ``a`` after (review) or
+    ``o`` outside the cycle. A place without a row inherits its nearest
+    ancestor's; a country without one uses its official season
+    (``chart.heat_seasons``).
+    """
+
+    __tablename__ = "heat_season_setting"
+
+    geography_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("geographies.id", ondelete="CASCADE"), primary_key=True
+    )
+    months: Mapped[str] = mapped_column(String(12), nullable=False)
+    source: Mapped[str | None] = mapped_column(String(200))
+    updated_by_user_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        # Portable for the SQLite test stores; migration 033 checks the
+        # letters too on PostgreSQL, and the service validates the cycle.
+        CheckConstraint("length(months) = 12", name="ck_heat_season_months"),
     )

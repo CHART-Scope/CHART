@@ -1,0 +1,2411 @@
+{
+ "source": "WorldPop Global2 R2025A, constrained, UN adjusted, 1 km",
+ "year": 2025,
+ "license": "CC BY 4.0",
+ "source_uri": "https://hub.worldpop.org/project/categories?id=3",
+ "citation": "Bondarenko M. et al. (2025). Global2: spatial distribution of population and age/sex structures 2015-2030, R2025A. WorldPop, University of Southampton.",
+ "method": "Sum of 1 km cells whose centre lies in the place; places with fewer than 50 centres weight each touched cell by the share of it they cover. Under five = ages 0 and 1-4; women 15-49 = female ages 15 to 49.",
+ "generated": "2026-10-31",
+ "places": {
+  "geo-in-madhya-pradesh": {
+   "total": 91088185,
+   "under5": 7801264,
+   "women_15_49": 23449588,
+   "area_km2": 308221.1
+  },
+  "geo-in-madhya-pradesh-district-agar-malwa": {
+   "total": 677579,
+   "under5": 58036,
+   "women_15_49": 174436,
+   "area_km2": 2945.8
+  },
+  "geo-in-madhya-pradesh-district-alirajpur": {
+   "total": 1160473,
+   "under5": 99344,
+   "women_15_49": 298796,
+   "area_km2": 3335.7
+  },
+  "geo-in-madhya-pradesh-district-anuppur": {
+   "total": 1247887,
+   "under5": 106872,
+   "women_15_49": 321279,
+   "area_km2": 3768.1
+  },
+  "geo-in-madhya-pradesh-district-ashoknagar": {
+   "total": 962541,
+   "under5": 82438,
+   "women_15_49": 247798,
+   "area_km2": 4736.2
+  },
+  "geo-in-madhya-pradesh-district-balaghat": {
+   "total": 2316897,
+   "under5": 198394,
+   "women_15_49": 596499,
+   "area_km2": 9244.7
+  },
+  "geo-in-madhya-pradesh-district-barwani": {
+   "total": 1656830,
+   "under5": 141836,
+   "women_15_49": 426574,
+   "area_km2": 5429.2
+  },
+  "geo-in-madhya-pradesh-district-betul": {
+   "total": 2069482,
+   "under5": 177219,
+   "women_15_49": 532786,
+   "area_km2": 10057.9
+  },
+  "geo-in-madhya-pradesh-district-bhind": {
+   "total": 1345075,
+   "under5": 115204,
+   "women_15_49": 346257,
+   "area_km2": 4465.5
+  },
+  "geo-in-madhya-pradesh-district-bhopal": {
+   "total": 3010596,
+   "under5": 257847,
+   "women_15_49": 775054,
+   "area_km2": 2767.3
+  },
+  "geo-in-madhya-pradesh-district-burhanpur": {
+   "total": 651155,
+   "under5": 55754,
+   "women_15_49": 167643,
+   "area_km2": 3231.3
+  },
+  "geo-in-madhya-pradesh-district-chhatarpur": {
+   "total": 1954929,
+   "under5": 167440,
+   "women_15_49": 503226,
+   "area_km2": 8674.3
+  },
+  "geo-in-madhya-pradesh-district-chhindwara": {
+   "total": 2662168,
+   "under5": 227983,
+   "women_15_49": 685367,
+   "area_km2": 11815.0
+  },
+  "geo-in-madhya-pradesh-district-damoh": {
+   "total": 1318093,
+   "under5": 112890,
+   "women_15_49": 339333,
+   "area_km2": 7302.5
+  },
+  "geo-in-madhya-pradesh-district-datia": {
+   "total": 748871,
+   "under5": 64143,
+   "women_15_49": 192756,
+   "area_km2": 2675.3
+  },
+  "geo-in-madhya-pradesh-district-dewas": {
+   "total": 2162026,
+   "under5": 185170,
+   "women_15_49": 556597,
+   "area_km2": 7012.2
+  },
+  "geo-in-madhya-pradesh-district-dhar": {
+   "total": 3128276,
+   "under5": 267926,
+   "women_15_49": 805350,
+   "area_km2": 8157.1
+  },
+  "geo-in-madhya-pradesh-district-dindori": {
+   "total": 748109,
+   "under5": 64072,
+   "women_15_49": 192599,
+   "area_km2": 5750.2
+  },
+  "geo-in-madhya-pradesh-district-east-nimar": {
+   "total": 1526150,
+   "under5": 130709,
+   "women_15_49": 392896,
+   "area_km2": 7476.8
+  },
+  "geo-in-madhya-pradesh-district-guna": {
+   "total": 1399123,
+   "under5": 119836,
+   "women_15_49": 360191,
+   "area_km2": 6381.8
+  },
+  "geo-in-madhya-pradesh-district-gwalior": {
+   "total": 2259391,
+   "under5": 193509,
+   "women_15_49": 581663,
+   "area_km2": 4563.3
+  },
+  "geo-in-madhya-pradesh-district-harda": {
+   "total": 661259,
+   "under5": 56635,
+   "women_15_49": 170236,
+   "area_km2": 3336.2
+  },
+  "geo-in-madhya-pradesh-district-hoshangabad": {
+   "total": 1465377,
+   "under5": 125505,
+   "women_15_49": 377250,
+   "area_km2": 6686.0
+  },
+  "geo-in-madhya-pradesh-district-indore": {
+   "total": 4176110,
+   "under5": 357670,
+   "women_15_49": 1075107,
+   "area_km2": 3909.9
+  },
+  "geo-in-madhya-pradesh-district-jabalpur": {
+   "total": 2819251,
+   "under5": 241459,
+   "women_15_49": 725794,
+   "area_km2": 5096.7
+  },
+  "geo-in-madhya-pradesh-district-jhabua": {
+   "total": 1657102,
+   "under5": 141914,
+   "women_15_49": 426620,
+   "area_km2": 3443.6
+  },
+  "geo-in-madhya-pradesh-district-katni": {
+   "total": 1492834,
+   "under5": 127856,
+   "women_15_49": 384319,
+   "area_km2": 5070.8
+  },
+  "geo-in-madhya-pradesh-district-mandla": {
+   "total": 1312724,
+   "under5": 112430,
+   "women_15_49": 337952,
+   "area_km2": 7510.3
+  },
+  "geo-in-madhya-pradesh-district-mandsaur": {
+   "total": 1756657,
+   "under5": 150476,
+   "women_15_49": 452230,
+   "area_km2": 5553.8
+  },
+  "geo-in-madhya-pradesh-district-morena": {
+   "total": 1651717,
+   "under5": 141465,
+   "women_15_49": 425220,
+   "area_km2": 4986.8
+  },
+  "geo-in-madhya-pradesh-district-narsimhapur": {
+   "total": 1405422,
+   "under5": 120370,
+   "women_15_49": 361815,
+   "area_km2": 5135.6
+  },
+  "geo-in-madhya-pradesh-district-neemuch": {
+   "total": 1133037,
+   "under5": 97048,
+   "women_15_49": 291689,
+   "area_km2": 4308.6
+  },
+  "geo-in-madhya-pradesh-district-niwari": {
+   "total": 529635,
+   "under5": 45379,
+   "women_15_49": 136221,
+   "area_km2": 1317.7
+  },
+  "geo-in-madhya-pradesh-district-panna": {
+   "total": 1121115,
+   "under5": 96025,
+   "women_15_49": 288581,
+   "area_km2": 7081.2
+  },
+  "geo-in-madhya-pradesh-district-raisen": {
+   "total": 1483160,
+   "under5": 127028,
+   "women_15_49": 381828,
+   "area_km2": 8477.4
+  },
+  "geo-in-madhya-pradesh-district-rajgarh": {
+   "total": 1665927,
+   "under5": 142684,
+   "women_15_49": 428879,
+   "area_km2": 6168.2
+  },
+  "geo-in-madhya-pradesh-district-ratlam": {
+   "total": 2025673,
+   "under5": 173500,
+   "women_15_49": 521491,
+   "area_km2": 4861.7
+  },
+  "geo-in-madhya-pradesh-district-rewa": {
+   "total": 3257111,
+   "under5": 278973,
+   "women_15_49": 838425,
+   "area_km2": 6296.8
+  },
+  "geo-in-madhya-pradesh-district-sagar": {
+   "total": 2223575,
+   "under5": 190442,
+   "women_15_49": 572438,
+   "area_km2": 10269.3
+  },
+  "geo-in-madhya-pradesh-district-satna": {
+   "total": 2981994,
+   "under5": 255404,
+   "women_15_49": 767642,
+   "area_km2": 7536.6
+  },
+  "geo-in-madhya-pradesh-district-sehore": {
+   "total": 1983681,
+   "under5": 169896,
+   "women_15_49": 510683,
+   "area_km2": 6568.5
+  },
+  "geo-in-madhya-pradesh-district-seoni": {
+   "total": 2065750,
+   "under5": 176914,
+   "women_15_49": 531817,
+   "area_km2": 8761.0
+  },
+  "geo-in-madhya-pradesh-district-shahdol": {
+   "total": 1949758,
+   "under5": 166985,
+   "women_15_49": 501969,
+   "area_km2": 5679.5
+  },
+  "geo-in-madhya-pradesh-district-shajapur": {
+   "total": 1125663,
+   "under5": 96409,
+   "women_15_49": 289793,
+   "area_km2": 3250.2
+  },
+  "geo-in-madhya-pradesh-district-sheopur": {
+   "total": 662738,
+   "under5": 56763,
+   "women_15_49": 170616,
+   "area_km2": 6607.3
+  },
+  "geo-in-madhya-pradesh-district-shivpuri": {
+   "total": 1866469,
+   "under5": 159858,
+   "women_15_49": 480505,
+   "area_km2": 10291.6
+  },
+  "geo-in-madhya-pradesh-district-sidhi": {
+   "total": 2139196,
+   "under5": 183214,
+   "women_15_49": 550723,
+   "area_km2": 4775.4
+  },
+  "geo-in-madhya-pradesh-district-singrauli": {
+   "total": 2821278,
+   "under5": 241643,
+   "women_15_49": 726235,
+   "area_km2": 5744.3
+  },
+  "geo-in-madhya-pradesh-district-tikamgarh": {
+   "total": 1136400,
+   "under5": 97333,
+   "women_15_49": 292522,
+   "area_km2": 3717.3
+  },
+  "geo-in-madhya-pradesh-district-ujjain": {
+   "total": 2774539,
+   "under5": 237630,
+   "women_15_49": 714284,
+   "area_km2": 6099.7
+  },
+  "geo-in-madhya-pradesh-district-umaria": {
+   "total": 880284,
+   "under5": 75393,
+   "women_15_49": 226622,
+   "area_km2": 4566.4
+  },
+  "geo-in-madhya-pradesh-district-vidisha": {
+   "total": 1601405,
+   "under5": 137155,
+   "women_15_49": 412269,
+   "area_km2": 7301.5
+  },
+  "geo-in-madhya-pradesh-district-west-nimar": {
+   "total": 2248092,
+   "under5": 192540,
+   "women_15_49": 578755,
+   "area_km2": 8020.6
+  },
+  "geo-in-madhya-pradesh-division-bhopal": {
+   "total": 9746069,
+   "under5": 834721,
+   "women_15_49": 2509048,
+   "area_km2": 31283.0
+  },
+  "geo-in-madhya-pradesh-division-chambal": {
+   "total": 3659818,
+   "under5": 313457,
+   "women_15_49": 942168,
+   "area_km2": 16059.6
+  },
+  "geo-in-madhya-pradesh-division-gwalior": {
+   "total": 7236417,
+   "under5": 619786,
+   "women_15_49": 1862918,
+   "area_km2": 28648.2
+  },
+  "geo-in-madhya-pradesh-division-indore": {
+   "total": 16207719,
+   "under5": 1387994,
+   "women_15_49": 4172650,
+   "area_km2": 43004.2
+  },
+  "geo-in-madhya-pradesh-division-jabalpur": {
+   "total": 14822825,
+   "under5": 1269449,
+   "women_15_49": 3816077,
+   "area_km2": 58384.4
+  },
+  "geo-in-madhya-pradesh-division-narmadapuram": {
+   "total": 4196475,
+   "under5": 359387,
+   "women_15_49": 1080365,
+   "area_km2": 20080.1
+  },
+  "geo-in-madhya-pradesh-division-rewa": {
+   "total": 11200020,
+   "under5": 959271,
+   "women_15_49": 2883138,
+   "area_km2": 24353.2
+  },
+  "geo-in-madhya-pradesh-division-sagar": {
+   "total": 8283560,
+   "under5": 709494,
+   "women_15_49": 2132273,
+   "area_km2": 38362.3
+  },
+  "geo-in-madhya-pradesh-division-shahdol": {
+   "total": 4079145,
+   "under5": 349354,
+   "women_15_49": 1050185,
+   "area_km2": 14014.0
+  },
+  "geo-in-madhya-pradesh-division-ujjain": {
+   "total": 11655296,
+   "under5": 998279,
+   "women_15_49": 3000551,
+   "area_km2": 34032.0
+  },
+  "geo-ke": {
+   "total": 56835857,
+   "under5": 7132211,
+   "women_15_49": 15079985,
+   "area_km2": 592064.4
+  },
+  "geo-ke-baringo": {
+   "total": 736753,
+   "under5": 104826,
+   "women_15_49": 175199,
+   "area_km2": 10840.7
+  },
+  "geo-ke-bomet": {
+   "total": 1005701,
+   "under5": 126438,
+   "women_15_49": 260055,
+   "area_km2": 2376.7
+  },
+  "geo-ke-bungoma": {
+   "total": 2218329,
+   "under5": 286489,
+   "women_15_49": 549355,
+   "area_km2": 3573.2
+  },
+  "geo-ke-busia": {
+   "total": 1016768,
+   "under5": 128333,
+   "women_15_49": 258412,
+   "area_km2": 1800.4
+  },
+  "geo-ke-constituency-ainabkoi": {
+   "total": 149348,
+   "under5": 17425,
+   "women_15_49": 42136,
+   "area_km2": 502.1
+  },
+  "geo-ke-constituency-ainamoi": {
+   "total": 206598,
+   "under5": 23165,
+   "women_15_49": 56848,
+   "area_km2": 245.2
+  },
+  "geo-ke-constituency-aldai": {
+   "total": 191022,
+   "under5": 22269,
+   "women_15_49": 48675,
+   "area_km2": 466.2
+  },
+  "geo-ke-constituency-alego-usonga": {
+   "total": 255496,
+   "under5": 31188,
+   "women_15_49": 62857,
+   "area_km2": 607.6
+  },
+  "geo-ke-constituency-awendo": {
+   "total": 126562,
+   "under5": 17201,
+   "women_15_49": 32049,
+   "area_km2": 264.2
+  },
+  "geo-ke-constituency-bahati": {
+   "total": 287151,
+   "under5": 35052,
+   "women_15_49": 80454,
+   "area_km2": 298.3
+  },
+  "geo-ke-constituency-balambala": {
+   "total": 63360,
+   "under5": 9167,
+   "women_15_49": 14261,
+   "area_km2": 4840.2
+  },
+  "geo-ke-constituency-banissa": {
+   "total": 166759,
+   "under5": 33809,
+   "women_15_49": 33835,
+   "area_km2": 3038.6
+  },
+  "geo-ke-constituency-baringo-central": {
+   "total": 97580,
+   "under5": 12448,
+   "women_15_49": 24700,
+   "area_km2": 661.1
+  },
+  "geo-ke-constituency-baringo-north": {
+   "total": 112648,
+   "under5": 15496,
+   "women_15_49": 25437,
+   "area_km2": 1631.3
+  },
+  "geo-ke-constituency-baringo-south": {
+   "total": 111174,
+   "under5": 17582,
+   "women_15_49": 25563,
+   "area_km2": 1825.6
+  },
+  "geo-ke-constituency-belgut": {
+   "total": 144382,
+   "under5": 15460,
+   "women_15_49": 39726,
+   "area_km2": 444.1
+  },
+  "geo-ke-constituency-bobasi": {
+   "total": 213017,
+   "under5": 23546,
+   "women_15_49": 55584,
+   "area_km2": 243.4
+  },
+  "geo-ke-constituency-bomachoge-borabu": {
+   "total": 119620,
+   "under5": 13657,
+   "women_15_49": 30833,
+   "area_km2": 118.2
+  },
+  "geo-ke-constituency-bomachoge-chache": {
+   "total": 106327,
+   "under5": 12015,
+   "women_15_49": 28143,
+   "area_km2": 101.8
+  },
+  "geo-ke-constituency-bomet-central": {
+   "total": 176097,
+   "under5": 21624,
+   "women_15_49": 46529,
+   "area_km2": 269.4
+  },
+  "geo-ke-constituency-bomet-east": {
+   "total": 170800,
+   "under5": 23023,
+   "women_15_49": 43592,
+   "area_km2": 314.8
+  },
+  "geo-ke-constituency-bonchari": {
+   "total": 154973,
+   "under5": 17632,
+   "women_15_49": 41560,
+   "area_km2": 126.3
+  },
+  "geo-ke-constituency-bondo": {
+   "total": 233481,
+   "under5": 30013,
+   "women_15_49": 60682,
+   "area_km2": 1310.1
+  },
+  "geo-ke-constituency-borabu": {
+   "total": 112811,
+   "under5": 11444,
+   "women_15_49": 29766,
+   "area_km2": 293.0
+  },
+  "geo-ke-constituency-budalangi": {
+   "total": 100679,
+   "under5": 12135,
+   "women_15_49": 24997,
+   "area_km2": 310.6
+  },
+  "geo-ke-constituency-bumula": {
+   "total": 245369,
+   "under5": 32051,
+   "women_15_49": 59879,
+   "area_km2": 345.5
+  },
+  "geo-ke-constituency-bura": {
+   "total": 403137,
+   "under5": 64791,
+   "women_15_49": 91397,
+   "area_km2": 13602.4
+  },
+  "geo-ke-constituency-buret": {
+   "total": 221605,
+   "under5": 26124,
+   "women_15_49": 59295,
+   "area_km2": 315.3
+  },
+  "geo-ke-constituency-butere": {
+   "total": 166356,
+   "under5": 19874,
+   "women_15_49": 40263,
+   "area_km2": 209.2
+  },
+  "geo-ke-constituency-butula": {
+   "total": 152294,
+   "under5": 19215,
+   "women_15_49": 37927,
+   "area_km2": 242.9
+  },
+  "geo-ke-constituency-buuri": {
+   "total": 138357,
+   "under5": 13557,
+   "women_15_49": 38012,
+   "area_km2": 1314.8
+  },
+  "geo-ke-constituency-cental-imenti": {
+   "total": 184072,
+   "under5": 17390,
+   "women_15_49": 47765,
+   "area_km2": 771.8
+  },
+  "geo-ke-constituency-changamwe": {
+   "total": 134022,
+   "under5": 15345,
+   "women_15_49": 40503,
+   "area_km2": 22.8
+  },
+  "geo-ke-constituency-chepalungu": {
+   "total": 248302,
+   "under5": 32125,
+   "women_15_49": 63490,
+   "area_km2": 544.1
+  },
+  "geo-ke-constituency-cherangany": {
+   "total": 249379,
+   "under5": 31574,
+   "women_15_49": 61723,
+   "area_km2": 627.4
+  },
+  "geo-ke-constituency-chesumei": {
+   "total": 197574,
+   "under5": 22746,
+   "women_15_49": 53862,
+   "area_km2": 485.2
+  },
+  "geo-ke-constituency-dadaab": {
+   "total": 288606,
+   "under5": 41773,
+   "women_15_49": 66451,
+   "area_km2": 6925.1
+  },
+  "geo-ke-constituency-dagoretti": {
+   "total": 359522,
+   "under5": 43336,
+   "women_15_49": 114738,
+   "area_km2": 24.5
+  },
+  "geo-ke-constituency-dujis": {
+   "total": 223296,
+   "under5": 33136,
+   "women_15_49": 52941,
+   "area_km2": 568.1
+  },
+  "geo-ke-constituency-eldama-ravine": {
+   "total": 144393,
+   "under5": 17853,
+   "women_15_49": 37591,
+   "area_km2": 931.9
+  },
+  "geo-ke-constituency-eldas": {
+   "total": 145211,
+   "under5": 22383,
+   "women_15_49": 30891,
+   "area_km2": 4740.0
+  },
+  "geo-ke-constituency-embakasi-central": {
+   "total": 251536,
+   "under5": 31331,
+   "women_15_49": 82978,
+   "area_km2": 8.2
+  },
+  "geo-ke-constituency-embakasi-east": {
+   "total": 690675,
+   "under5": 85462,
+   "women_15_49": 229943,
+   "area_km2": 85.9
+  },
+  "geo-ke-constituency-embakasi-north": {
+   "total": 116895,
+   "under5": 14488,
+   "women_15_49": 37660,
+   "area_km2": 5.4
+  },
+  "geo-ke-constituency-embakasi-south": {
+   "total": 243252,
+   "under5": 29606,
+   "women_15_49": 81005,
+   "area_km2": 17.6
+  },
+  "geo-ke-constituency-embakasi-west": {
+   "total": 322411,
+   "under5": 39673,
+   "women_15_49": 104686,
+   "area_km2": 9.7
+  },
+  "geo-ke-constituency-emgwen": {
+   "total": 158880,
+   "under5": 18360,
+   "women_15_49": 42268,
+   "area_km2": 362.0
+  },
+  "geo-ke-constituency-emuhaya": {
+   "total": 93635,
+   "under5": 10507,
+   "women_15_49": 21936,
+   "area_km2": 89.2
+  },
+  "geo-ke-constituency-emurua-dikirr": {
+   "total": 131816,
+   "under5": 19171,
+   "women_15_49": 30604,
+   "area_km2": 319.2
+  },
+  "geo-ke-constituency-endebess": {
+   "total": 129720,
+   "under5": 18521,
+   "women_15_49": 30628,
+   "area_km2": 669.2
+  },
+  "geo-ke-constituency-fafi": {
+   "total": 204094,
+   "under5": 29538,
+   "women_15_49": 47046,
+   "area_km2": 16583.1
+  },
+  "geo-ke-constituency-funyula": {
+   "total": 123427,
+   "under5": 15563,
+   "women_15_49": 29983,
+   "area_km2": 273.5
+  },
+  "geo-ke-constituency-gachoka": {
+   "total": 182011,
+   "under5": 18889,
+   "women_15_49": 46339,
+   "area_km2": 1323.3
+  },
+  "geo-ke-constituency-galole": {
+   "total": 198968,
+   "under5": 33495,
+   "women_15_49": 45635,
+   "area_km2": 9686.9
+  },
+  "geo-ke-constituency-ganze": {
+   "total": 191060,
+   "under5": 28462,
+   "women_15_49": 45580,
+   "area_km2": 2934.3
+  },
+  "geo-ke-constituency-garsen": {
+   "total": 118493,
+   "under5": 19630,
+   "women_15_49": 26265,
+   "area_km2": 15901.7
+  },
+  "geo-ke-constituency-gatanga": {
+   "total": 181408,
+   "under5": 19325,
+   "women_15_49": 46221,
+   "area_km2": 600.6
+  },
+  "geo-ke-constituency-gatundu-north": {
+   "total": 118124,
+   "under5": 12099,
+   "women_15_49": 30259,
+   "area_km2": 234.5
+  },
+  "geo-ke-constituency-gatundu-south": {
+   "total": 126834,
+   "under5": 12434,
+   "women_15_49": 32571,
+   "area_km2": 221.7
+  },
+  "geo-ke-constituency-gem": {
+   "total": 200278,
+   "under5": 24294,
+   "women_15_49": 48607,
+   "area_km2": 402.9
+  },
+  "geo-ke-constituency-gichugu": {
+   "total": 279210,
+   "under5": 24516,
+   "women_15_49": 75991,
+   "area_km2": 467.1
+  },
+  "geo-ke-constituency-gilgil": {
+   "total": 257962,
+   "under5": 30625,
+   "women_15_49": 69231,
+   "area_km2": 1263.9
+  },
+  "geo-ke-constituency-githunguri": {
+   "total": 174421,
+   "under5": 17360,
+   "women_15_49": 46096,
+   "area_km2": 173.0
+  },
+  "geo-ke-constituency-hamisi": {
+   "total": 169872,
+   "under5": 18668,
+   "women_15_49": 41103,
+   "area_km2": 186.5
+  },
+  "geo-ke-constituency-homa-bay": {
+   "total": 143295,
+   "under5": 19312,
+   "women_15_49": 38986,
+   "area_km2": 268.4
+  },
+  "geo-ke-constituency-igembe-central": {
+   "total": 236491,
+   "under5": 28500,
+   "women_15_49": 61898,
+   "area_km2": 802.4
+  },
+  "geo-ke-constituency-igembe-north": {
+   "total": 190737,
+   "under5": 23743,
+   "women_15_49": 49506,
+   "area_km2": 1076.0
+  },
+  "geo-ke-constituency-igembe-south": {
+   "total": 179223,
+   "under5": 21452,
+   "women_15_49": 49767,
+   "area_km2": 839.0
+  },
+  "geo-ke-constituency-ijara": {
+   "total": 143536,
+   "under5": 21240,
+   "women_15_49": 32661,
+   "area_km2": 8221.1
+  },
+  "geo-ke-constituency-ikolomani": {
+   "total": 117916,
+   "under5": 13193,
+   "women_15_49": 28996,
+   "area_km2": 143.8
+  },
+  "geo-ke-constituency-isiolo-north": {
+   "total": 241295,
+   "under5": 37522,
+   "women_15_49": 57839,
+   "area_km2": 15320.8
+  },
+  "geo-ke-constituency-isiolo-south": {
+   "total": 172416,
+   "under5": 24957,
+   "women_15_49": 35885,
+   "area_km2": 10077.7
+  },
+  "geo-ke-constituency-jomvu": {
+   "total": 192248,
+   "under5": 23615,
+   "women_15_49": 57561,
+   "area_km2": 31.7
+  },
+  "geo-ke-constituency-juja": {
+   "total": 679920,
+   "under5": 79974,
+   "women_15_49": 219669,
+   "area_km2": 373.4
+  },
+  "geo-ke-constituency-kabete": {
+   "total": 210614,
+   "under5": 23568,
+   "women_15_49": 65627,
+   "area_km2": 56.2
+  },
+  "geo-ke-constituency-kabondo-kasipul": {
+   "total": 132836,
+   "under5": 17085,
+   "women_15_49": 32939,
+   "area_km2": 246.7
+  },
+  "geo-ke-constituency-kabuchai": {
+   "total": 207005,
+   "under5": 26813,
+   "women_15_49": 51244,
+   "area_km2": 233.8
+  },
+  "geo-ke-constituency-kacheliba": {
+   "total": 132562,
+   "under5": 26679,
+   "women_15_49": 28370,
+   "area_km2": 4110.6
+  },
+  "geo-ke-constituency-kaiti": {
+   "total": 133402,
+   "under5": 12835,
+   "women_15_49": 34549,
+   "area_km2": 404.3
+  },
+  "geo-ke-constituency-kajiado-central": {
+   "total": 205783,
+   "under5": 32848,
+   "women_15_49": 48545,
+   "area_km2": 4305.4
+  },
+  "geo-ke-constituency-kajiado-east": {
+   "total": 425546,
+   "under5": 53223,
+   "women_15_49": 133175,
+   "area_km2": 3268.6
+  },
+  "geo-ke-constituency-kajiado-north": {
+   "total": 413655,
+   "under5": 49189,
+   "women_15_49": 129563,
+   "area_km2": 112.3
+  },
+  "geo-ke-constituency-kajiado-south": {
+   "total": 234146,
+   "under5": 36001,
+   "women_15_49": 56603,
+   "area_km2": 6338.7
+  },
+  "geo-ke-constituency-kajiado-west": {
+   "total": 260728,
+   "under5": 40304,
+   "women_15_49": 65400,
+   "area_km2": 7859.4
+  },
+  "geo-ke-constituency-kaloleni": {
+   "total": 209809,
+   "under5": 29893,
+   "women_15_49": 51705,
+   "area_km2": 668.3
+  },
+  "geo-ke-constituency-kamukunji": {
+   "total": 232273,
+   "under5": 27904,
+   "women_15_49": 72004,
+   "area_km2": 8.8
+  },
+  "geo-ke-constituency-kandara": {
+   "total": 165039,
+   "under5": 17420,
+   "women_15_49": 40586,
+   "area_km2": 210.0
+  },
+  "geo-ke-constituency-kanduyi": {
+   "total": 334990,
+   "under5": 42210,
+   "women_15_49": 90790,
+   "area_km2": 319.1
+  },
+  "geo-ke-constituency-kangema": {
+   "total": 110701,
+   "under5": 10421,
+   "women_15_49": 26888,
+   "area_km2": 351.3
+  },
+  "geo-ke-constituency-kangundo": {
+   "total": 94604,
+   "under5": 8616,
+   "women_15_49": 23337,
+   "area_km2": 171.0
+  },
+  "geo-ke-constituency-kapenguria": {
+   "total": 225670,
+   "under5": 38582,
+   "women_15_49": 52283,
+   "area_km2": 1776.2
+  },
+  "geo-ke-constituency-kapseret": {
+   "total": 217838,
+   "under5": 25080,
+   "women_15_49": 64477,
+   "area_km2": 357.1
+  },
+  "geo-ke-constituency-karachuonyo": {
+   "total": 192024,
+   "under5": 24554,
+   "women_15_49": 47252,
+   "area_km2": 747.5
+  },
+  "geo-ke-constituency-kasarani": {
+   "total": 1029031,
+   "under5": 128181,
+   "women_15_49": 334009,
+   "area_km2": 136.3
+  },
+  "geo-ke-constituency-kasipul": {
+   "total": 143301,
+   "under5": 18820,
+   "women_15_49": 36966,
+   "area_km2": 258.0
+  },
+  "geo-ke-constituency-kathiani": {
+   "total": 118978,
+   "under5": 11439,
+   "women_15_49": 30295,
+   "area_km2": 206.0
+  },
+  "geo-ke-constituency-keiyo-north": {
+   "total": 114761,
+   "under5": 14408,
+   "women_15_49": 30494,
+   "area_km2": 541.5
+  },
+  "geo-ke-constituency-keiyo-south": {
+   "total": 126532,
+   "under5": 15221,
+   "women_15_49": 32035,
+   "area_km2": 885.7
+  },
+  "geo-ke-constituency-kesses": {
+   "total": 200434,
+   "under5": 23554,
+   "women_15_49": 54806,
+   "area_km2": 670.8
+  },
+  "geo-ke-constituency-khwisero": {
+   "total": 119171,
+   "under5": 13618,
+   "women_15_49": 28323,
+   "area_km2": 144.4
+  },
+  "geo-ke-constituency-kiambaa": {
+   "total": 332486,
+   "under5": 38819,
+   "women_15_49": 105015,
+   "area_km2": 88.7
+  },
+  "geo-ke-constituency-kiambu": {
+   "total": 159698,
+   "under5": 17795,
+   "women_15_49": 51788,
+   "area_km2": 97.9
+  },
+  "geo-ke-constituency-kibra": {
+   "total": 164551,
+   "under5": 17367,
+   "women_15_49": 51113,
+   "area_km2": 12.3
+  },
+  "geo-ke-constituency-kibwezi-east": {
+   "total": 156807,
+   "under5": 15573,
+   "women_15_49": 40073,
+   "area_km2": 2219.3
+  },
+  "geo-ke-constituency-kibwezi-west": {
+   "total": 150683,
+   "under5": 14956,
+   "women_15_49": 40043,
+   "area_km2": 1767.8
+  },
+  "geo-ke-constituency-kieni": {
+   "total": 212697,
+   "under5": 21222,
+   "women_15_49": 55955,
+   "area_km2": 1814.0
+  },
+  "geo-ke-constituency-kigumo": {
+   "total": 170610,
+   "under5": 17645,
+   "women_15_49": 42092,
+   "area_km2": 316.2
+  },
+  "geo-ke-constituency-kiharu": {
+   "total": 161050,
+   "under5": 16141,
+   "women_15_49": 40720,
+   "area_km2": 305.7
+  },
+  "geo-ke-constituency-kikuyu": {
+   "total": 267427,
+   "under5": 29861,
+   "women_15_49": 83457,
+   "area_km2": 174.3
+  },
+  "geo-ke-constituency-kilgoris": {
+   "total": 291496,
+   "under5": 46091,
+   "women_15_49": 68564,
+   "area_km2": 2526.6
+  },
+  "geo-ke-constituency-kilifi-north": {
+   "total": 376807,
+   "under5": 50040,
+   "women_15_49": 102689,
+   "area_km2": 783.5
+  },
+  "geo-ke-constituency-kilifi-south": {
+   "total": 270140,
+   "under5": 35263,
+   "women_15_49": 73028,
+   "area_km2": 424.2
+  },
+  "geo-ke-constituency-kilimani": {
+   "total": 254537,
+   "under5": 26581,
+   "women_15_49": 80983,
+   "area_km2": 29.4
+  },
+  "geo-ke-constituency-kilome": {
+   "total": 141246,
+   "under5": 13530,
+   "women_15_49": 35454,
+   "area_km2": 823.4
+  },
+  "geo-ke-constituency-kimilili": {
+   "total": 184737,
+   "under5": 23433,
+   "women_15_49": 46102,
+   "area_km2": 177.5
+  },
+  "geo-ke-constituency-kiminini": {
+   "total": 277268,
+   "under5": 34268,
+   "women_15_49": 72221,
+   "area_km2": 368.6
+  },
+  "geo-ke-constituency-kinango": {
+   "total": 373298,
+   "under5": 62053,
+   "women_15_49": 89077,
+   "area_km2": 4834.1
+  },
+  "geo-ke-constituency-kinangop": {
+   "total": 156777,
+   "under5": 17119,
+   "women_15_49": 41844,
+   "area_km2": 538.8
+  },
+  "geo-ke-constituency-kipipiri": {
+   "total": 158342,
+   "under5": 16733,
+   "women_15_49": 40965,
+   "area_km2": 941.3
+  },
+  "geo-ke-constituency-kipkelion-east": {
+   "total": 153635,
+   "under5": 19757,
+   "women_15_49": 39276,
+   "area_km2": 751.3
+  },
+  "geo-ke-constituency-kipkelion-west": {
+   "total": 154232,
+   "under5": 21858,
+   "women_15_49": 36987,
+   "area_km2": 351.9
+  },
+  "geo-ke-constituency-kirinyaga-central": {
+   "total": 270721,
+   "under5": 23718,
+   "women_15_49": 73600,
+   "area_km2": 237.3
+  },
+  "geo-ke-constituency-kisauni": {
+   "total": 227133,
+   "under5": 28852,
+   "women_15_49": 68241,
+   "area_km2": 88.8
+  },
+  "geo-ke-constituency-kisumu-central": {
+   "total": 198489,
+   "under5": 23082,
+   "women_15_49": 63051,
+   "area_km2": 68.3
+  },
+  "geo-ke-constituency-kisumu-east": {
+   "total": 265510,
+   "under5": 34140,
+   "women_15_49": 76857,
+   "area_km2": 165.2
+  },
+  "geo-ke-constituency-kisumu-west": {
+   "total": 205109,
+   "under5": 23898,
+   "women_15_49": 54384,
+   "area_km2": 312.3
+  },
+  "geo-ke-constituency-kitui-central": {
+   "total": 159338,
+   "under5": 16229,
+   "women_15_49": 43637,
+   "area_km2": 728.8
+  },
+  "geo-ke-constituency-kitui-east": {
+   "total": 149727,
+   "under5": 16689,
+   "women_15_49": 37609,
+   "area_km2": 4726.6
+  },
+  "geo-ke-constituency-kitui-rural": {
+   "total": 124605,
+   "under5": 12454,
+   "women_15_49": 31790,
+   "area_km2": 1529.3
+  },
+  "geo-ke-constituency-kitui-south": {
+   "total": 199105,
+   "under5": 21558,
+   "women_15_49": 49979,
+   "area_km2": 12719.2
+  },
+  "geo-ke-constituency-kitui-west": {
+   "total": 124722,
+   "under5": 13131,
+   "women_15_49": 32534,
+   "area_km2": 630.9
+  },
+  "geo-ke-constituency-kitutu-chache-north": {
+   "total": 114259,
+   "under5": 12851,
+   "women_15_49": 29506,
+   "area_km2": 130.3
+  },
+  "geo-ke-constituency-kitutu-chache-south": {
+   "total": 147699,
+   "under5": 16977,
+   "women_15_49": 41698,
+   "area_km2": 97.3
+  },
+  "geo-ke-constituency-kitutu-masaba": {
+   "total": 207136,
+   "under5": 21509,
+   "women_15_49": 55488,
+   "area_km2": 253.6
+  },
+  "geo-ke-constituency-konoin": {
+   "total": 183618,
+   "under5": 21989,
+   "women_15_49": 47937,
+   "area_km2": 788.8
+  },
+  "geo-ke-constituency-kuresoi-north": {
+   "total": 217603,
+   "under5": 29565,
+   "women_15_49": 53277,
+   "area_km2": 610.7
+  },
+  "geo-ke-constituency-kuresoi-south": {
+   "total": 187848,
+   "under5": 26045,
+   "women_15_49": 46123,
+   "area_km2": 518.7
+  },
+  "geo-ke-constituency-kuria-east": {
+   "total": 138643,
+   "under5": 21339,
+   "women_15_49": 32641,
+   "area_km2": 237.8
+  },
+  "geo-ke-constituency-kuria-west": {
+   "total": 225747,
+   "under5": 33436,
+   "women_15_49": 56319,
+   "area_km2": 341.6
+  },
+  "geo-ke-constituency-kwanza": {
+   "total": 240010,
+   "under5": 31489,
+   "women_15_49": 59540,
+   "area_km2": 464.8
+  },
+  "geo-ke-constituency-lafey": {
+   "total": 95452,
+   "under5": 17152,
+   "women_15_49": 21504,
+   "area_km2": 3543.3
+  },
+  "geo-ke-constituency-lagdera": {
+   "total": 179085,
+   "under5": 25900,
+   "women_15_49": 38943,
+   "area_km2": 6453.5
+  },
+  "geo-ke-constituency-laikipia-east": {
+   "total": 335988,
+   "under5": 43068,
+   "women_15_49": 83714,
+   "area_km2": 3222.2
+  },
+  "geo-ke-constituency-laikipia-north": {
+   "total": 116961,
+   "under5": 16437,
+   "women_15_49": 29619,
+   "area_km2": 4916.1
+  },
+  "geo-ke-constituency-laikipia-west": {
+   "total": 197534,
+   "under5": 21551,
+   "women_15_49": 52206,
+   "area_km2": 1398.5
+  },
+  "geo-ke-constituency-laisamis": {
+   "total": 130503,
+   "under5": 21320,
+   "women_15_49": 28437,
+   "area_km2": 24080.9
+  },
+  "geo-ke-constituency-lamu-east": {
+   "total": 20141,
+   "under5": 2493,
+   "women_15_49": 4549,
+   "area_km2": 2370.9
+  },
+  "geo-ke-constituency-lamu-west": {
+   "total": 155317,
+   "under5": 20235,
+   "women_15_49": 36764,
+   "area_km2": 3892.5
+  },
+  "geo-ke-constituency-langata": {
+   "total": 232516,
+   "under5": 21402,
+   "women_15_49": 76631,
+   "area_km2": 209.8
+  },
+  "geo-ke-constituency-lari": {
+   "total": 148068,
+   "under5": 15970,
+   "women_15_49": 39070,
+   "area_km2": 466.0
+  },
+  "geo-ke-constituency-likoni": {
+   "total": 325862,
+   "under5": 42804,
+   "women_15_49": 97656,
+   "area_km2": 52.1
+  },
+  "geo-ke-constituency-likuyani": {
+   "total": 174100,
+   "under5": 20763,
+   "women_15_49": 43966,
+   "area_km2": 301.5
+  },
+  "geo-ke-constituency-limuru": {
+   "total": 185928,
+   "under5": 20396,
+   "women_15_49": 52393,
+   "area_km2": 284.9
+  },
+  "geo-ke-constituency-loima": {
+   "total": 135339,
+   "under5": 20023,
+   "women_15_49": 31959,
+   "area_km2": 9745.9
+  },
+  "geo-ke-constituency-luanda": {
+   "total": 124952,
+   "under5": 13944,
+   "women_15_49": 29948,
+   "area_km2": 83.6
+  },
+  "geo-ke-constituency-lugari": {
+   "total": 213706,
+   "under5": 26157,
+   "women_15_49": 53120,
+   "area_km2": 367.8
+  },
+  "geo-ke-constituency-lunga-lunga": {
+   "total": 440835,
+   "under5": 63296,
+   "women_15_49": 111933,
+   "area_km2": 2385.1
+  },
+  "geo-ke-constituency-lurambi": {
+   "total": 209728,
+   "under5": 23336,
+   "women_15_49": 57882,
+   "area_km2": 161.7
+  },
+  "geo-ke-constituency-maara": {
+   "total": 125701,
+   "under5": 11526,
+   "women_15_49": 31816,
+   "area_km2": 505.0
+  },
+  "geo-ke-constituency-machakos-town": {
+   "total": 237074,
+   "under5": 22828,
+   "women_15_49": 65481,
+   "area_km2": 757.0
+  },
+  "geo-ke-constituency-magarini": {
+   "total": 274829,
+   "under5": 40072,
+   "women_15_49": 66394,
+   "area_km2": 6977.3
+  },
+  "geo-ke-constituency-makadara": {
+   "total": 197176,
+   "under5": 21063,
+   "women_15_49": 63715,
+   "area_km2": 12.0
+  },
+  "geo-ke-constituency-makueni": {
+   "total": 278943,
+   "under5": 26587,
+   "women_15_49": 72769,
+   "area_km2": 1979.8
+  },
+  "geo-ke-constituency-malava": {
+   "total": 259804,
+   "under5": 32252,
+   "women_15_49": 64973,
+   "area_km2": 423.0
+  },
+  "geo-ke-constituency-malindi": {
+   "total": 246625,
+   "under5": 32609,
+   "women_15_49": 66830,
+   "area_km2": 576.9
+  },
+  "geo-ke-constituency-mandera-east": {
+   "total": 188038,
+   "under5": 30885,
+   "women_15_49": 41658,
+   "area_km2": 2551.4
+  },
+  "geo-ke-constituency-mandera-north": {
+   "total": 183769,
+   "under5": 31577,
+   "women_15_49": 35967,
+   "area_km2": 6129.8
+  },
+  "geo-ke-constituency-mandera-south": {
+   "total": 255733,
+   "under5": 49060,
+   "women_15_49": 53585,
+   "area_km2": 5541.1
+  },
+  "geo-ke-constituency-mandera-west": {
+   "total": 129461,
+   "under5": 27240,
+   "women_15_49": 25865,
+   "area_km2": 5174.1
+  },
+  "geo-ke-constituency-manyatta": {
+   "total": 202238,
+   "under5": 19163,
+   "women_15_49": 57358,
+   "area_km2": 358.2
+  },
+  "geo-ke-constituency-maragwa": {
+   "total": 232210,
+   "under5": 25044,
+   "women_15_49": 59160,
+   "area_km2": 462.0
+  },
+  "geo-ke-constituency-marakwet-east": {
+   "total": 110755,
+   "under5": 16535,
+   "women_15_49": 24673,
+   "area_km2": 810.0
+  },
+  "geo-ke-constituency-marakwet-west": {
+   "total": 161035,
+   "under5": 22317,
+   "women_15_49": 39173,
+   "area_km2": 769.0
+  },
+  "geo-ke-constituency-masinga": {
+   "total": 169691,
+   "under5": 18115,
+   "women_15_49": 42728,
+   "area_km2": 1406.4
+  },
+  "geo-ke-constituency-matayos": {
+   "total": 171817,
+   "under5": 21222,
+   "women_15_49": 45320,
+   "area_km2": 193.9
+  },
+  "geo-ke-constituency-mathare": {
+   "total": 103518,
+   "under5": 12392,
+   "women_15_49": 32163,
+   "area_km2": 2.9
+  },
+  "geo-ke-constituency-mathioya": {
+   "total": 118412,
+   "under5": 11785,
+   "women_15_49": 28973,
+   "area_km2": 279.7
+  },
+  "geo-ke-constituency-mathira": {
+   "total": 169240,
+   "under5": 15075,
+   "women_15_49": 44537,
+   "area_km2": 458.0
+  },
+  "geo-ke-constituency-matuga": {
+   "total": 236170,
+   "under5": 31904,
+   "women_15_49": 59818,
+   "area_km2": 1054.0
+  },
+  "geo-ke-constituency-matungu": {
+   "total": 188982,
+   "under5": 24462,
+   "women_15_49": 46915,
+   "area_km2": 277.8
+  },
+  "geo-ke-constituency-matungulu": {
+   "total": 194707,
+   "under5": 19388,
+   "women_15_49": 50898,
+   "area_km2": 581.4
+  },
+  "geo-ke-constituency-mavoko": {
+   "total": 526921,
+   "under5": 60707,
+   "women_15_49": 166951,
+   "area_km2": 842.5
+  },
+  "geo-ke-constituency-mbooni": {
+   "total": 226208,
+   "under5": 21688,
+   "women_15_49": 57908,
+   "area_km2": 980.4
+  },
+  "geo-ke-constituency-mogotio": {
+   "total": 117471,
+   "under5": 16323,
+   "women_15_49": 28591,
+   "area_km2": 1386.6
+  },
+  "geo-ke-constituency-moiben": {
+   "total": 238024,
+   "under5": 28216,
+   "women_15_49": 68437,
+   "area_km2": 775.4
+  },
+  "geo-ke-constituency-molo": {
+   "total": 185233,
+   "under5": 23216,
+   "women_15_49": 47581,
+   "area_km2": 506.2
+  },
+  "geo-ke-constituency-mosop": {
+   "total": 187654,
+   "under5": 22425,
+   "women_15_49": 47909,
+   "area_km2": 583.7
+  },
+  "geo-ke-constituency-moyale": {
+   "total": 158500,
+   "under5": 26430,
+   "women_15_49": 32899,
+   "area_km2": 9343.7
+  },
+  "geo-ke-constituency-mt-elgon": {
+   "total": 267663,
+   "under5": 39174,
+   "women_15_49": 60503,
+   "area_km2": 955.4
+  },
+  "geo-ke-constituency-muhoroni": {
+   "total": 169755,
+   "under5": 20550,
+   "women_15_49": 41717,
+   "area_km2": 664.1
+  },
+  "geo-ke-constituency-mukurweni": {
+   "total": 92809,
+   "under5": 8323,
+   "women_15_49": 22075,
+   "area_km2": 178.4
+  },
+  "geo-ke-constituency-mumias-east": {
+   "total": 140974,
+   "under5": 17385,
+   "women_15_49": 35581,
+   "area_km2": 175.0
+  },
+  "geo-ke-constituency-mumias-west": {
+   "total": 114747,
+   "under5": 14068,
+   "women_15_49": 29430,
+   "area_km2": 138.3
+  },
+  "geo-ke-constituency-mvita": {
+   "total": 141663,
+   "under5": 13857,
+   "women_15_49": 42638,
+   "area_km2": 14.7
+  },
+  "geo-ke-constituency-mwala": {
+   "total": 198651,
+   "under5": 18155,
+   "women_15_49": 49825,
+   "area_km2": 1018.7
+  },
+  "geo-ke-constituency-mwatate": {
+   "total": 100745,
+   "under5": 10836,
+   "women_15_49": 24352,
+   "area_km2": 3691.8
+  },
+  "geo-ke-constituency-mwea": {
+   "total": 205491,
+   "under5": 19919,
+   "women_15_49": 58585,
+   "area_km2": 432.5
+  },
+  "geo-ke-constituency-mwingi-east": {
+   "total": 139800,
+   "under5": 16636,
+   "women_15_49": 35701,
+   "area_km2": 4244.8
+  },
+  "geo-ke-constituency-mwingi-north": {
+   "total": 185512,
+   "under5": 22595,
+   "women_15_49": 46461,
+   "area_km2": 4697.3
+  },
+  "geo-ke-constituency-mwingi-west": {
+   "total": 160894,
+   "under5": 18089,
+   "women_15_49": 43007,
+   "area_km2": 1181.0
+  },
+  "geo-ke-constituency-naivasha": {
+   "total": 420848,
+   "under5": 50716,
+   "women_15_49": 120389,
+   "area_km2": 1722.8
+  },
+  "geo-ke-constituency-nakuru-town-east": {
+   "total": 193937,
+   "under5": 22684,
+   "women_15_49": 61853,
+   "area_km2": 157.4
+  },
+  "geo-ke-constituency-nakuru-town-west": {
+   "total": 265087,
+   "under5": 32640,
+   "women_15_49": 78988,
+   "area_km2": 139.6
+  },
+  "geo-ke-constituency-nambale": {
+   "total": 127703,
+   "under5": 16210,
+   "women_15_49": 32463,
+   "area_km2": 232.5
+  },
+  "geo-ke-constituency-nandi-hills": {
+   "total": 134258,
+   "under5": 15980,
+   "women_15_49": 35840,
+   "area_km2": 393.0
+  },
+  "geo-ke-constituency-narok-east": {
+   "total": 138786,
+   "under5": 22161,
+   "women_15_49": 31059,
+   "area_km2": 2055.9
+  },
+  "geo-ke-constituency-narok-north": {
+   "total": 309599,
+   "under5": 47977,
+   "women_15_49": 75563,
+   "area_km2": 2710.6
+  },
+  "geo-ke-constituency-narok-south": {
+   "total": 270865,
+   "under5": 46586,
+   "women_15_49": 60302,
+   "area_km2": 4834.4
+  },
+  "geo-ke-constituency-narok-west": {
+   "total": 281538,
+   "under5": 48377,
+   "women_15_49": 63586,
+   "area_km2": 5438.0
+  },
+  "geo-ke-constituency-navakholo": {
+   "total": 168716,
+   "under5": 21509,
+   "women_15_49": 41715,
+   "area_km2": 257.4
+  },
+  "geo-ke-constituency-ndaragwa": {
+   "total": 112495,
+   "under5": 11914,
+   "women_15_49": 28172,
+   "area_km2": 874.1
+  },
+  "geo-ke-constituency-ndhiwa": {
+   "total": 254589,
+   "under5": 39134,
+   "women_15_49": 61422,
+   "area_km2": 695.2
+  },
+  "geo-ke-constituency-ndia": {
+   "total": 193238,
+   "under5": 18001,
+   "women_15_49": 53138,
+   "area_km2": 338.3
+  },
+  "geo-ke-constituency-nithi": {
+   "total": 153686,
+   "under5": 15437,
+   "women_15_49": 40598,
+   "area_km2": 598.2
+  },
+  "geo-ke-constituency-njoro": {
+   "total": 296522,
+   "under5": 38230,
+   "women_15_49": 75159,
+   "area_km2": 778.8
+  },
+  "geo-ke-constituency-north-horr": {
+   "total": 174547,
+   "under5": 20632,
+   "women_15_49": 36262,
+   "area_km2": 40557.8
+  },
+  "geo-ke-constituency-north-imenti": {
+   "total": 201267,
+   "under5": 20139,
+   "women_15_49": 57817,
+   "area_km2": 302.0
+  },
+  "geo-ke-constituency-north-mugirango": {
+   "total": 128460,
+   "under5": 13848,
+   "women_15_49": 33981,
+   "area_km2": 170.1
+  },
+  "geo-ke-constituency-nyakach": {
+   "total": 166103,
+   "under5": 20083,
+   "women_15_49": 41289,
+   "area_km2": 402.5
+  },
+  "geo-ke-constituency-nyali": {
+   "total": 387838,
+   "under5": 44498,
+   "women_15_49": 120323,
+   "area_km2": 22.8
+  },
+  "geo-ke-constituency-nyando": {
+   "total": 178849,
+   "under5": 21360,
+   "women_15_49": 46055,
+   "area_km2": 603.3
+  },
+  "geo-ke-constituency-nyaribari-chache": {
+   "total": 205012,
+   "under5": 22532,
+   "women_15_49": 57539,
+   "area_km2": 135.6
+  },
+  "geo-ke-constituency-nyaribari-masaba": {
+   "total": 132687,
+   "under5": 14393,
+   "women_15_49": 34898,
+   "area_km2": 162.5
+  },
+  "geo-ke-constituency-nyatike": {
+   "total": 203221,
+   "under5": 30399,
+   "women_15_49": 51346,
+   "area_km2": 1214.0
+  },
+  "geo-ke-constituency-nyeri-town": {
+   "total": 158794,
+   "under5": 15866,
+   "women_15_49": 46273,
+   "area_km2": 169.3
+  },
+  "geo-ke-constituency-ol-jorok": {
+   "total": 174175,
+   "under5": 18878,
+   "women_15_49": 45297,
+   "area_km2": 625.3
+  },
+  "geo-ke-constituency-ol-kalou": {
+   "total": 69577,
+   "under5": 7845,
+   "women_15_49": 18183,
+   "area_km2": 287.1
+  },
+  "geo-ke-constituency-othaya": {
+   "total": 94308,
+   "under5": 8638,
+   "women_15_49": 24423,
+   "area_km2": 356.5
+  },
+  "geo-ke-constituency-pokot-south": {
+   "total": 246111,
+   "under5": 44239,
+   "women_15_49": 54760,
+   "area_km2": 1267.5
+  },
+  "geo-ke-constituency-rabai": {
+   "total": 160830,
+   "under5": 20778,
+   "women_15_49": 41258,
+   "area_km2": 233.9
+  },
+  "geo-ke-constituency-rangwe": {
+   "total": 127723,
+   "under5": 17137,
+   "women_15_49": 31383,
+   "area_km2": 290.7
+  },
+  "geo-ke-constituency-rarieda": {
+   "total": 169650,
+   "under5": 20725,
+   "women_15_49": 42062,
+   "area_km2": 679.0
+  },
+  "geo-ke-constituency-rongai": {
+   "total": 224198,
+   "under5": 27563,
+   "women_15_49": 59393,
+   "area_km2": 1020.1
+  },
+  "geo-ke-constituency-rongo": {
+   "total": 147519,
+   "under5": 19614,
+   "women_15_49": 38573,
+   "area_km2": 213.4
+  },
+  "geo-ke-constituency-roysambu": {
+   "total": 587091,
+   "under5": 71497,
+   "women_15_49": 197184,
+   "area_km2": 48.1
+  },
+  "geo-ke-constituency-ruaraka": {
+   "total": 174085,
+   "under5": 21121,
+   "women_15_49": 56659,
+   "area_km2": 7.2
+  },
+  "geo-ke-constituency-ruiru": {
+   "total": 402533,
+   "under5": 48381,
+   "women_15_49": 134466,
+   "area_km2": 153.2
+  },
+  "geo-ke-constituency-runyenjes": {
+   "total": 165990,
+   "under5": 15223,
+   "women_15_49": 44157,
+   "area_km2": 371.9
+  },
+  "geo-ke-constituency-sabatia": {
+   "total": 135790,
+   "under5": 14507,
+   "women_15_49": 33009,
+   "area_km2": 111.6
+  },
+  "geo-ke-constituency-saboti": {
+   "total": 243473,
+   "under5": 32097,
+   "women_15_49": 62436,
+   "area_km2": 355.1
+  },
+  "geo-ke-constituency-saku": {
+   "total": 111658,
+   "under5": 16252,
+   "women_15_49": 26111,
+   "area_km2": 2046.5
+  },
+  "geo-ke-constituency-samburu-east": {
+   "total": 94454,
+   "under5": 15820,
+   "women_15_49": 22309,
+   "area_km2": 10059.0
+  },
+  "geo-ke-constituency-samburu-north": {
+   "total": 102972,
+   "under5": 17359,
+   "women_15_49": 21644,
+   "area_km2": 8480.0
+  },
+  "geo-ke-constituency-samburu-west": {
+   "total": 199511,
+   "under5": 31605,
+   "women_15_49": 45393,
+   "area_km2": 2475.3
+  },
+  "geo-ke-constituency-seme": {
+   "total": 142618,
+   "under5": 17496,
+   "women_15_49": 35032,
+   "area_km2": 449.1
+  },
+  "geo-ke-constituency-shinyalu": {
+   "total": 173785,
+   "under5": 19661,
+   "women_15_49": 43056,
+   "area_km2": 408.3
+  },
+  "geo-ke-constituency-siakago": {
+   "total": 124600,
+   "under5": 13787,
+   "women_15_49": 32045,
+   "area_km2": 770.4
+  },
+  "geo-ke-constituency-sigor": {
+   "total": 131878,
+   "under5": 24588,
+   "women_15_49": 27945,
+   "area_km2": 2150.9
+  },
+  "geo-ke-constituency-sigowet-soin": {
+   "total": 143310,
+   "under5": 17205,
+   "women_15_49": 36679,
+   "area_km2": 463.8
+  },
+  "geo-ke-constituency-sirisia": {
+   "total": 136656,
+   "under5": 18103,
+   "women_15_49": 32066,
+   "area_km2": 210.2
+  },
+  "geo-ke-constituency-sotik": {
+   "total": 230653,
+   "under5": 28489,
+   "women_15_49": 59227,
+   "area_km2": 477.9
+  },
+  "geo-ke-constituency-south-imenti": {
+   "total": 227474,
+   "under5": 21634,
+   "women_15_49": 61118,
+   "area_km2": 661.6
+  },
+  "geo-ke-constituency-south-mugirango": {
+   "total": 185279,
+   "under5": 21582,
+   "women_15_49": 46666,
+   "area_km2": 209.6
+  },
+  "geo-ke-constituency-soy": {
+   "total": 244806,
+   "under5": 30067,
+   "women_15_49": 65008,
+   "area_km2": 655.5
+  },
+  "geo-ke-constituency-starehe": {
+   "total": 221622,
+   "under5": 21589,
+   "women_15_49": 71049,
+   "area_km2": 16.9
+  },
+  "geo-ke-constituency-suba-north": {
+   "total": 137450,
+   "under5": 18325,
+   "women_15_49": 35095,
+   "area_km2": 1050.5
+  },
+  "geo-ke-constituency-suba-south": {
+   "total": 137372,
+   "under5": 19838,
+   "women_15_49": 33975,
+   "area_km2": 1172.0
+  },
+  "geo-ke-constituency-subukia": {
+   "total": 104413,
+   "under5": 12472,
+   "women_15_49": 25885,
+   "area_km2": 454.0
+  },
+  "geo-ke-constituency-suna-east": {
+   "total": 143592,
+   "under5": 19856,
+   "women_15_49": 36285,
+   "area_km2": 206.4
+  },
+  "geo-ke-constituency-suna-west": {
+   "total": 172253,
+   "under5": 25801,
+   "women_15_49": 44627,
+   "area_km2": 284.0
+  },
+  "geo-ke-constituency-tarbaj": {
+   "total": 65959,
+   "under5": 12263,
+   "women_15_49": 14363,
+   "area_km2": 7542.2
+  },
+  "geo-ke-constituency-taveta": {
+   "total": 114788,
+   "under5": 13793,
+   "women_15_49": 29250,
+   "area_km2": 4007.5
+  },
+  "geo-ke-constituency-teso-north": {
+   "total": 158696,
+   "under5": 20452,
+   "women_15_49": 40454,
+   "area_km2": 254.2
+  },
+  "geo-ke-constituency-teso-south": {
+   "total": 198123,
+   "under5": 25507,
+   "women_15_49": 51265,
+   "area_km2": 304.4
+  },
+  "geo-ke-constituency-tetu": {
+   "total": 79577,
+   "under5": 7236,
+   "women_15_49": 19704,
+   "area_km2": 358.5
+  },
+  "geo-ke-constituency-tharaka": {
+   "total": 128431,
+   "under5": 14332,
+   "women_15_49": 34575,
+   "area_km2": 1477.9
+  },
+  "geo-ke-constituency-thika-town": {
+   "total": 398897,
+   "under5": 45820,
+   "women_15_49": 128965,
+   "area_km2": 219.1
+  },
+  "geo-ke-constituency-tiaty": {
+   "total": 174011,
+   "under5": 27767,
+   "women_15_49": 38559,
+   "area_km2": 4443.8
+  },
+  "geo-ke-constituency-tigania-east": {
+   "total": 207182,
+   "under5": 24190,
+   "women_15_49": 52354,
+   "area_km2": 833.3
+  },
+  "geo-ke-constituency-tigania-west": {
+   "total": 140229,
+   "under5": 14682,
+   "women_15_49": 36436,
+   "area_km2": 391.6
+  },
+  "geo-ke-constituency-tinderet": {
+   "total": 123491,
+   "under5": 15721,
+   "women_15_49": 30364,
+   "area_km2": 541.1
+  },
+  "geo-ke-constituency-tongaren": {
+   "total": 245093,
+   "under5": 31458,
+   "women_15_49": 59590,
+   "area_km2": 375.3
+  },
+  "geo-ke-constituency-turbo": {
+   "total": 317260,
+   "under5": 37750,
+   "women_15_49": 89571,
+   "area_km2": 435.0
+  },
+  "geo-ke-constituency-turkana-central": {
+   "total": 213081,
+   "under5": 34404,
+   "women_15_49": 51776,
+   "area_km2": 6616.4
+  },
+  "geo-ke-constituency-turkana-east": {
+   "total": 161075,
+   "under5": 16934,
+   "women_15_49": 37097,
+   "area_km2": 11183.9
+  },
+  "geo-ke-constituency-turkana-north": {
+   "total": 124299,
+   "under5": 19549,
+   "women_15_49": 28620,
+   "area_km2": 20901.2
+  },
+  "geo-ke-constituency-turkana-south": {
+   "total": 176237,
+   "under5": 23712,
+   "women_15_49": 41082,
+   "area_km2": 7418.6
+  },
+  "geo-ke-constituency-turkana-west": {
+   "total": 268272,
+   "under5": 37416,
+   "women_15_49": 65960,
+   "area_km2": 14669.3
+  },
+  "geo-ke-constituency-ugenya": {
+   "total": 151428,
+   "under5": 17823,
+   "women_15_49": 36969,
+   "area_km2": 321.1
+  },
+  "geo-ke-constituency-ugunja": {
+   "total": 115508,
+   "under5": 13523,
+   "women_15_49": 28601,
+   "area_km2": 191.5
+  },
+  "geo-ke-constituency-uriri": {
+   "total": 162625,
+   "under5": 23030,
+   "women_15_49": 39162,
+   "area_km2": 383.7
+  },
+  "geo-ke-constituency-vihiga": {
+   "total": 100732,
+   "under5": 10735,
+   "women_15_49": 24775,
+   "area_km2": 89.5
+  },
+  "geo-ke-constituency-voi": {
+   "total": 124127,
+   "under5": 14260,
+   "women_15_49": 33380,
+   "area_km2": 8581.3
+  },
+  "geo-ke-constituency-wajir-east": {
+   "total": 132325,
+   "under5": 18459,
+   "women_15_49": 29213,
+   "area_km2": 4279.5
+  },
+  "geo-ke-constituency-wajir-north": {
+   "total": 118290,
+   "under5": 20100,
+   "women_15_49": 25175,
+   "area_km2": 10398.4
+  },
+  "geo-ke-constituency-wajir-south": {
+   "total": 318219,
+   "under5": 49052,
+   "women_15_49": 72585,
+   "area_km2": 21580.4
+  },
+  "geo-ke-constituency-wajir-west": {
+   "total": 105971,
+   "under5": 16500,
+   "women_15_49": 21411,
+   "area_km2": 8123.5
+  },
+  "geo-ke-constituency-webuye-east": {
+   "total": 114980,
+   "under5": 14218,
+   "women_15_49": 28550,
+   "area_km2": 164.0
+  },
+  "geo-ke-constituency-webuye-west": {
+   "total": 183356,
+   "under5": 23326,
+   "women_15_49": 45601,
+   "area_km2": 236.1
+  },
+  "geo-ke-constituency-west-mugirango": {
+   "total": 160980,
+   "under5": 17704,
+   "women_15_49": 42698,
+   "area_km2": 179.4
+  },
+  "geo-ke-constituency-westlands": {
+   "total": 232599,
+   "under5": 21582,
+   "women_15_49": 73881,
+   "area_km2": 72.7
+  },
+  "geo-ke-constituency-wundanyi": {
+   "total": 55932,
+   "under5": 5592,
+   "women_15_49": 12927,
+   "area_km2": 850.7
+  },
+  "geo-ke-constituency-yatta": {
+   "total": 192478,
+   "under5": 19353,
+   "women_15_49": 50178,
+   "area_km2": 1060.8
+  },
+  "geo-ke-elgeyo-marakwet": {
+   "total": 464527,
+   "under5": 61853,
+   "women_15_49": 114568,
+   "area_km2": 2803.3
+  },
+  "geo-ke-embu": {
+   "total": 709614,
+   "under5": 70324,
+   "women_15_49": 188823,
+   "area_km2": 2904.4
+  },
+  "geo-ke-garissa": {
+   "total": 1126535,
+   "under5": 164577,
+   "women_15_49": 257966,
+   "area_km2": 43852.7
+  },
+  "geo-ke-homa-bay": {
+   "total": 1239914,
+   "under5": 170192,
+   "women_15_49": 310897,
+   "area_km2": 4679.7
+  },
+  "geo-ke-isiolo": {
+   "total": 418854,
+   "under5": 63346,
+   "women_15_49": 94976,
+   "area_km2": 25436.2
+  },
+  "geo-ke-kajiado": {
+   "total": 1566157,
+   "under5": 214556,
+   "women_15_49": 441173,
+   "area_km2": 21988.9
+  },
+  "geo-ke-kakamega": {
+   "total": 1730484,
+   "under5": 208630,
+   "women_15_49": 434759,
+   "area_km2": 2441.6
+  },
+  "geo-ke-kericho": {
+   "total": 1016051,
+   "under5": 122647,
+   "women_15_49": 266695,
+   "area_km2": 2577.0
+  },
+  "geo-ke-kiambu": {
+   "total": 3118830,
+   "under5": 352386,
+   "women_15_49": 960833,
+   "area_km2": 2573.0
+  },
+  "geo-ke-kilifi": {
+   "total": 1741216,
+   "under5": 238441,
+   "women_15_49": 450806,
+   "area_km2": 12653.3
+  },
+  "geo-ke-kirinyaga": {
+   "total": 972635,
+   "under5": 88396,
+   "women_15_49": 267874,
+   "area_km2": 1556.3
+  },
+  "geo-ke-kisii": {
+   "total": 1363581,
+   "under5": 153438,
+   "women_15_49": 362632,
+   "area_km2": 1313.8
+  },
+  "geo-ke-kisumu": {
+   "total": 1359987,
+   "under5": 164474,
+   "women_15_49": 366626,
+   "area_km2": 2665.3
+  },
+  "geo-ke-kitui": {
+   "total": 1246103,
+   "under5": 137635,
+   "women_15_49": 321331,
+   "area_km2": 30452.3
+  },
+  "geo-ke-kwale": {
+   "total": 1058492,
+   "under5": 158400,
+   "women_15_49": 263011,
+   "area_km2": 8383.7
+  },
+  "geo-ke-laikipia": {
+   "total": 614719,
+   "under5": 77348,
+   "women_15_49": 155806,
+   "area_km2": 9524.4
+  },
+  "geo-ke-lamu": {
+   "total": 181556,
+   "under5": 23453,
+   "women_15_49": 42724,
+   "area_km2": 6716.4
+  },
+  "geo-ke-machakos": {
+   "total": 1748722,
+   "under5": 180590,
+   "women_15_49": 485077,
+   "area_km2": 6033.5
+  },
+  "geo-ke-makueni": {
+   "total": 1086888,
+   "under5": 105079,
+   "women_15_49": 280688,
+   "area_km2": 8176.2
+  },
+  "geo-ke-mandera": {
+   "total": 1012187,
+   "under5": 188344,
+   "women_15_49": 210982,
+   "area_km2": 25779.0
+  },
+  "geo-ke-marsabit": {
+   "total": 594818,
+   "under5": 88099,
+   "women_15_49": 127876,
+   "area_km2": 75774.7
+  },
+  "geo-ke-meru": {
+   "total": 1711755,
+   "under5": 186079,
+   "women_15_49": 456675,
+   "area_km2": 6981.7
+  },
+  "geo-ke-migori": {
+   "total": 1335920,
+   "under5": 193119,
+   "women_15_49": 334758,
+   "area_km2": 3200.6
+  },
+  "geo-ke-mombasa": {
+   "total": 1463468,
+   "under5": 175002,
+   "women_15_49": 443635,
+   "area_km2": 267.4
+  },
+  "geo-ke-muranga": {
+   "total": 1139260,
+   "under5": 117524,
+   "women_15_49": 284056,
+   "area_km2": 2526.2
+  },
+  "geo-ke-nairobi": {
+   "total": 5731194,
+   "under5": 671439,
+   "women_15_49": 1862116,
+   "area_km2": 712.3
+  },
+  "geo-ke-nakuru": {
+   "total": 2649182,
+   "under5": 329795,
+   "women_15_49": 720434,
+   "area_km2": 7475.7
+  },
+  "geo-ke-nandi": {
+   "total": 1009658,
+   "under5": 119276,
+   "women_15_49": 263460,
+   "area_km2": 2830.2
+  },
+  "geo-ke-narok": {
+   "total": 1481335,
+   "under5": 237384,
+   "women_15_49": 344298,
+   "area_km2": 18020.0
+  },
+  "geo-ke-nyamira": {
+   "total": 628630,
+   "under5": 66987,
+   "women_15_49": 166999,
+   "area_km2": 897.9
+  },
+  "geo-ke-nyandarua": {
+   "total": 682713,
+   "under5": 73803,
+   "women_15_49": 177474,
+   "area_km2": 3268.0
+  },
+  "geo-ke-nyeri": {
+   "total": 805208,
+   "under5": 76369,
+   "women_15_49": 212571,
+   "area_km2": 3333.8
+  },
+  "geo-ke-samburu": {
+   "total": 385430,
+   "under5": 62887,
+   "women_15_49": 86638,
+   "area_km2": 20960.9
+  },
+  "geo-ke-siaya": {
+   "total": 1148936,
+   "under5": 140375,
+   "women_15_49": 285485,
+   "area_km2": 3498.3
+  },
+  "geo-ke-taita-taveta": {
+   "total": 394341,
+   "under5": 44357,
+   "women_15_49": 99581,
+   "area_km2": 17169.6
+  },
+  "geo-ke-tana-river": {
+   "total": 724402,
+   "under5": 118504,
+   "women_15_49": 164174,
+   "area_km2": 39221.2
+  },
+  "geo-ke-tharaka-nithi": {
+   "total": 357506,
+   "under5": 36579,
+   "women_15_49": 93801,
+   "area_km2": 2423.5
+  },
+  "geo-ke-trans-nzoia": {
+   "total": 1132275,
+   "under5": 147356,
+   "women_15_49": 284366,
+   "area_km2": 2465.2
+  },
+  "geo-ke-turkana": {
+   "total": 1072741,
+   "under5": 151284,
+   "women_15_49": 255196,
+   "area_km2": 63732.0
+  },
+  "geo-ke-uasin-gishu": {
+   "total": 1408757,
+   "under5": 167179,
+   "women_15_49": 394904,
+   "area_km2": 3429.5
+  },
+  "geo-ke-vihiga": {
+   "total": 612676,
+   "under5": 67021,
+   "women_15_49": 147635,
+   "area_km2": 558.5
+  },
+  "geo-ke-wajir": {
+   "total": 903629,
+   "under5": 141717,
+   "women_15_49": 197182,
+   "area_km2": 56636.1
+  },
+  "geo-ke-west-pokot": {
+   "total": 772337,
+   "under5": 138905,
+   "women_15_49": 172121,
+   "area_km2": 9510.0
+  }
+ }
+}

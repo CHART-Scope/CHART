@@ -466,11 +466,26 @@ def _build_long_term_scenario(name: str, rows: list[HealthImpact]) -> LongTermSc
     )
 
 
-#: Display simplification for map geometry. At this tolerance Madhya Pradesh's
-#: divisions drop from 4 MB of GeoJSON to 63 kB while the outlines stay
-#: recognisable. Applied to the response only - every climate extraction and
-#: every area calculation continues to use the unsimplified boundary.
+#: Display simplification for map geometry, at most this many degrees. At
+#: this tolerance Madhya Pradesh's divisions drop from 4 MB of GeoJSON to 63 kB
+#: while the outlines stay recognisable. Applied to the response only - every
+#: climate extraction and every area calculation continues to use the
+#: unsimplified boundary.
 MAP_SIMPLIFY_TOLERANCE_DEGREES = 0.01
+#: A small frame is simplified by this share of its width or height instead,
+#: whichever is larger. 0.01 degrees is about 1 km: Mombasa is 0.3 degrees
+#: across, and its constituencies, a few km wide, lost their outlines and no
+#: longer met their neighbours.
+MAP_SIMPLIFY_FRAME_SHARE = 1 / 1000
+
+
+def map_simplify_tolerance(bounds: list[float]) -> float:
+    """Display tolerance in degrees for a map frame ``[west, south, east, north]``."""
+    if not bounds:
+        return MAP_SIMPLIFY_TOLERANCE_DEGREES
+    west, south, east, north = bounds
+    span = max(east - west, north - south)
+    return min(MAP_SIMPLIFY_TOLERANCE_DEGREES, span * MAP_SIMPLIFY_FRAME_SHARE)
 
 
 def _has_children(session: Session, geography_id: str) -> bool:
@@ -483,6 +498,27 @@ def _has_children(session: Session, geography_id: str) -> bool:
         )
         or 0
     ) > 0
+
+
+def resolve_map_frame(session: Session, geography_id: str) -> AppGeography:
+    """The geography whose children a map of ``geography_id`` shows.
+
+    A selection with nothing beneath it is framed on its siblings rather than
+    on itself. Drilling into one division used to return that division alone:
+    a single polygon floating with nothing to compare it against, and no
+    visible change when moving between divisions, because every one of them
+    drew the same lone shape. Which area is highlighted is the caller's
+    business - the frame it sits in is the parent's children.
+    """
+
+    selected = session.get(AppGeography, geography_id)
+    if selected is None:
+        raise NoAdminUnitForGeography(geography_id)
+    if selected.parent_id is not None and not _has_children(session, selected.id):
+        parent = session.get(AppGeography, selected.parent_id)
+        if parent is not None:
+            return parent
+    return selected
 
 
 # The map query's columns, in select order. SQLAlchemy 2.1 types rows this wide
@@ -522,26 +558,32 @@ def load_map_view(
     the opposite of what an absent model means.
     """
 
-    selected = session.get(AppGeography, geography_id)
-    if selected is None:
-        raise NoAdminUnitForGeography(geography_id)
-
-    # A selection with nothing beneath it is framed on its siblings rather
-    # than on itself. Drilling into one division used to return that division
-    # alone: a single polygon floating with nothing to compare it against, and
-    # no visible change when moving between divisions, because every one of
-    # them drew the same lone shape. Which area is highlighted is the caller's
-    # business - the frame it sits in is the parent's children.
-    frame = selected
-    if selected.parent_id is not None and not _has_children(session, selected.id):
-        parent = session.get(AppGeography, selected.parent_id)
-        if parent is not None:
-            frame = parent
+    frame = resolve_map_frame(session, geography_id)
+    in_frame = (
+        AppGeography.country_code == frame.country_code,
+        # One hierarchy step per map: country -> states, state -> divisions,
+        # country -> counties. Selecting a leaf still frames it on its
+        # siblings because ``frame`` is moved to its parent above. This keeps
+        # the rule generic as more countries and levels are installed instead
+        # of skipping straight to the finest shape.
+        or_(AppGeography.id == frame.id, AppGeography.parent_id == frame.id),
+    )
+    extent = session.execute(
+        select(
+            func.min(AdminUnit.bbox_west),
+            func.min(AdminUnit.bbox_south),
+            func.max(AdminUnit.bbox_east),
+            func.max(AdminUnit.bbox_north),
+        )
+        .join(AppGeography, AppGeography.id == AdminUnit.app_geography_id)
+        .where(*in_frame)
+    ).one()
+    tolerance = map_simplify_tolerance(
+        [] if None in extent else [float(value) for value in extent]
+    )
 
     simplified = func.ST_AsGeoJSON(
-        func.ST_SimplifyPreserveTopology(
-            AdminUnit.boundary, MAP_SIMPLIFY_TOLERANCE_DEGREES
-        )
+        func.ST_SimplifyPreserveTopology(AdminUnit.boundary, tolerance)
     )
     rows = cast(
         list[_MapRow],
@@ -560,18 +602,7 @@ def load_map_view(
                 AppGeography.path,
             )
             .join(AppGeography, AppGeography.id == AdminUnit.app_geography_id)
-            .where(
-                AppGeography.country_code == frame.country_code,
-                # One hierarchy step per map: country -> states, state ->
-                # divisions, country -> counties. Selecting a leaf still frames
-                # it on its siblings because ``frame`` is moved to its parent
-                # above. This keeps the rule generic as more countries and levels
-                # are installed instead of skipping straight to the finest shape.
-                or_(
-                    AppGeography.id == frame.id,
-                    AppGeography.parent_id == frame.id,
-                ),
-            )
+            .where(*in_frame)
             .order_by(AppGeography.sort_order, AdminUnit.name)
         ).all(),
     )
@@ -731,6 +762,6 @@ def load_map_view(
             if west is None or south is None or east is None or north is None
             else [west, south, east, north]
         ),
-        simplify_tolerance_degrees=MAP_SIMPLIFY_TOLERANCE_DEGREES,
+        simplify_tolerance_degrees=tolerance,
         areas=areas,
     )

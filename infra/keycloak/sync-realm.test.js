@@ -101,8 +101,11 @@ test("web client settings use exact callback origins", () => {
   assert.deepEqual(buildWebClientSettings("https://chart.scopeimpact.fi"), {
     redirectUris: [
       "https://chart.scopeimpact.fi/auth/callback",
+      "https://chart.scopeimpact.fi/auth/signin",
       "http://localhost:3100/auth/callback",
+      "http://localhost:3100/auth/signin",
       "http://127.0.0.1:3100/auth/callback",
+      "http://127.0.0.1:3100/auth/signin",
     ],
     webOrigins: [
       "https://chart.scopeimpact.fi",
@@ -172,4 +175,29 @@ test("syncClientSettings creates a client the realm does not have yet", async ()
     calls.some((c) => c.startsWith("POST") && c.endsWith("/clients")),
     `expected the client to be created, saw: ${calls.join(", ")}`,
   );
+});
+
+test("syncClientSettings applies the seed's flow switches to an existing client", async () => {
+  // chart-web shipped with the password grant enabled; turning it off in the
+  // seed must reach realms that already hold the client.
+  const puts = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (init.method === "PUT") puts.push(JSON.parse(init.body));
+    const body = url.includes("clients?clientId=")
+      ? [{ id: "web-id", clientId: "chart-web" }]
+      : { id: "web-id", clientId: "chart-web", directAccessGrantsEnabled: true };
+    return { ok: true, status: 200, text: async () => JSON.stringify(body) };
+  };
+
+  try {
+    await syncClientSettings("token", [
+      { clientId: "chart-web", directAccessGrantsEnabled: false },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(puts.length, 1);
+  assert.equal(puts[0].directAccessGrantsEnabled, false);
 });

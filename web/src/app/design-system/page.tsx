@@ -78,7 +78,7 @@ export default function DesignSystemPage() {
                 <div
                   style={{
                     fontFamily: "var(--font-display)",
-                    fontSize: 22,
+                    fontSize: "var(--fs-hero)",
                     fontWeight: 500,
                   }}
                 >
@@ -86,7 +86,7 @@ export default function DesignSystemPage() {
                 </div>
                 <p
                   style={{
-                    fontSize: 11,
+                    fontSize: "var(--fs-eyebrow)",
                     color: "var(--color-text-muted)",
                     marginTop: 8,
                   }}
@@ -97,10 +97,10 @@ export default function DesignSystemPage() {
               </div>
               <div className={styles.stage} style={{ flex: 1, minWidth: 260 }}>
                 <div className={styles.stageLabel}>Body — Noto Sans Display</div>
-                <div style={{ fontSize: 16 }}>Aa The quick brown fox</div>
+                <div style={{ fontSize: "var(--fs-body)" }}>Aa The quick brown fox</div>
                 <p
                   style={{
-                    fontSize: 11,
+                    fontSize: "var(--fs-eyebrow)",
                     color: "var(--color-text-muted)",
                     marginTop: 8,
                   }}
@@ -114,7 +114,7 @@ export default function DesignSystemPage() {
           <Subblock title="Radius & elevation">
             <p
               style={{
-                fontSize: 12.5,
+                fontSize: "var(--fs-body-sm)",
                 color: "var(--color-text-muted)",
                 lineHeight: 1.7,
               }}
@@ -225,7 +225,7 @@ export default function DesignSystemPage() {
               <Panel eyebrow="Panel eyebrow label">
                 <div
                   style={{
-                    fontSize: 13,
+                    fontSize: "var(--fs-body)",
                     fontWeight: 500,
                     color: "var(--color-charcoal)",
                   }}
@@ -375,7 +375,7 @@ export default function DesignSystemPage() {
               <div className={styles.stageLabel}>Choropleth grid map (planned)</div>
               <p
                 style={{
-                  fontSize: 11.5,
+                  fontSize: "var(--fs-caption)",
                   color: "var(--color-text-muted)",
                   lineHeight: 1.6,
                 }}
@@ -541,7 +541,7 @@ function IconRow() {
             flexDirection: "column",
             alignItems: "center",
             gap: 6,
-            fontSize: 9.5,
+            fontSize: "var(--fs-micro)",
             color: "var(--color-text-muted)",
             textAlign: "center",
             padding: 12,

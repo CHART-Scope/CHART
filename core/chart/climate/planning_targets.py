@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Literal
 
+from .heat_seasons import heat_season, planning_window
 from .source_policy import (
     SEASONAL_RELEASE_DAY,
     resolve_month_source,
@@ -60,18 +61,17 @@ class LongTermProjectionOption:
     source_uri: str
 
 
-HEAT_SEASON_CALENDARS = {
-    "madhya-pradesh": HeatSeasonCalendar(
-        label="Hot-weather season",
-        start_month=3,
-        end_month=5,
-        source_name="India Meteorological Department",
-        source_uri=(
-            "https://internal.imd.gov.in/pages/press_release_mausam.php?"
-            "article_id=422421688.0"
-        ),
+def _india_calendar() -> HeatSeasonCalendar:
+    window = planning_window("IN")
+    season = heat_season("IN")
+    assert window is not None and season is not None
+    return HeatSeasonCalendar(
+        label=window.label,
+        start_month=window.months[0],
+        end_month=window.months[-1],
+        source_name=season.source_name,
+        source_uri=season.source_uri,
     )
-}
 
 
 def planning_options_for_place(
@@ -82,13 +82,7 @@ def planning_options_for_place(
 ) -> PlanningOptions:
     current_time = now or datetime.now(timezone.utc)
     current_month = current_time.date().replace(day=1)
-    calendar = HEAT_SEASON_CALENDARS.get(admin_unit_code)
-    if (
-        calendar is None
-        and geography_path
-        and geography_path.startswith("/india/madhya-pradesh/")
-    ):
-        calendar = HEAT_SEASON_CALENDARS["madhya-pradesh"]
+    calendar = heat_season_calendar(admin_unit_code, geography_path)
     return PlanningOptions(
         source_as_of=current_time.date(),
         custom_min_month=current_month,
@@ -99,6 +93,19 @@ def planning_options_for_place(
         ),
         long_term_projection=(_long_term_projection() if calendar else None),
     )
+
+
+def heat_season_calendar(
+    admin_unit_code: str, geography_path: str | None
+) -> HeatSeasonCalendar | None:
+    """The hot season a place plans for; long-term projections need one."""
+
+    # The live model is fitted for Madhya Pradesh only.
+    if admin_unit_code == "madhya-pradesh" or (
+        geography_path and geography_path.startswith("/india/madhya-pradesh/")
+    ):
+        return _india_calendar()
+    return None
 
 
 def _next_three_months(now: datetime) -> HeatSeasonOption:

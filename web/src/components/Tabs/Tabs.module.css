@@ -7,7 +7,12 @@
 .list {
   display: flex;
   gap: var(--space-5);
-  border-bottom: 1px solid var(--border-subtle);
+  /* A shadow rather than a border, so the selected tab's underline can sit
+     on it inside the scrolling bar: many tabs on a phone scroll here, never
+     the page. */
+  box-shadow: inset 0 -1px 0 var(--border-subtle);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .tab {
@@ -15,11 +20,12 @@
   background: transparent;
   border: none;
   padding: var(--space-1) 2px var(--space-2);
-  margin-bottom: -1px;
   font-family: var(--font-body);
   font-size: var(--fs-body-lg);
   color: var(--color-text-muted);
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
   border-bottom: 2px solid transparent;
   transition:
     color 120ms ease,

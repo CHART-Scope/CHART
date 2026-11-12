@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import styles from "./Modal.module.css";
@@ -35,6 +35,7 @@ export function Modal({
   children,
 }: Props) {
   const [mounted, setMounted] = useState(false);
+  const titleId = useId();
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -50,7 +51,13 @@ export function Modal({
 
   if (!open || !mounted) return null;
   return createPortal(
-    <div className={styles.backdrop} role="dialog" aria-modal="true" onClick={onClose}>
+    <div
+      className={styles.backdrop}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={!bare && title ? titleId : undefined}
+      onClick={onClose}
+    >
       <div
         className={[
           styles.card,
@@ -71,7 +78,11 @@ export function Modal({
             ×
           </button>
         )}
-        {!bare && title && <div className={styles.title}>{title}</div>}
+        {!bare && title && (
+          <div id={titleId} className={styles.title}>
+            {title}
+          </div>
+        )}
         {!bare && description && <p className={styles.desc}>{description}</p>}
         {children}
         {!bare && footer && <div className={styles.footer}>{footer}</div>}

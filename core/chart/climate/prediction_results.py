@@ -31,7 +31,7 @@ from chart.shared.db.models import DataLabel, PredictionResult
 
 from .daily_windows import month_days
 from .input_windows import target_months
-from .schemas import PredictResponse
+from .schemas import LbwPrediction, PredictResponse
 
 
 def resolve_horizon(planning_target: str) -> str:
@@ -105,7 +105,9 @@ def _daily_series_problem(result: PredictResponse, valid_month: date) -> str | N
     return None
 
 
-def warmest_exposure_c(result: PredictResponse) -> float | None:
+def warmest_exposure_c(
+    result: PredictResponse, prediction: LbwPrediction | None = None
+) -> float | None:
     """The warmest temperature the model actually scored.
 
     The odds ratio is cumulative over everything scored - the month and the
@@ -115,7 +117,8 @@ def warmest_exposure_c(result: PredictResponse) -> float | None:
     month that followed hot ones; checking monthly means for a daily model
     compared them against a reference set on daily maxima.
     """
-    scored = [value for value in result.prediction.temperatures_c if value is not None]
+    temperatures = (prediction or result.prediction).temperatures_c
+    scored = [value for value in temperatures if value is not None]
     return max(scored, default=None)
 
 
@@ -132,13 +135,15 @@ def upsert_prediction_result(
     input_statistic: str | None = None,
     climate_input_window_id: int | None = None,
     prediction_request_id: int | None = None,
+    prediction: LbwPrediction | None = None,
 ) -> PredictionResult:
     """Write one result on its grain, replacing any earlier value for it.
 
     Upsert rather than insert: recomputing a month should correct the row
-    rather than accumulate a second opinion beside it.
+    rather than accumulate a second opinion beside it. ``prediction`` picks
+    one pregnancy window of a multi-window result (default: the primary).
     """
-    prediction = result.prediction
+    prediction = prediction or result.prediction
     month_start = valid_month.replace(day=1)
     scenario = _resolve_scenario_label(result.projection_scenario)
     horizon = resolve_horizon(result.planning_target)
@@ -148,7 +153,7 @@ def upsert_prediction_result(
 
     fraction_milli = attributable_fraction_milli(
         prediction.odds_ratio,
-        temperature_c=warmest_exposure_c(result),
+        temperature_c=warmest_exposure_c(result, prediction),
         reference_temperature_c=prediction.reference_temperature_c,
     )
 

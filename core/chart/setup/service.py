@@ -14,7 +14,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
 from chart.auth.schemas import CurrentUserContext
-from chart.identity import IdentityError, delete_user, upsert_user
+from chart.identity import IdentityError, add_to_groups, delete_user, upsert_user
 from chart.model_registry.runtime import prepare_model_release
 from chart.model_registry.schemas import (
     GeographyPlaceSpec,
@@ -46,18 +46,23 @@ from chart.shared.db.models import (
     LearningResource,
     LearningTrack,
     ModelAreaMapping,
+    ModelDisplaySetting,
     ModelRelease,
     PredictionRequestRecord,
     PredictionResult,
-    RecommendedAction,
     SetupStateRecord,
     UserGeographyScopeRecord,
     UserRoleRecord,
+    VraIndicatorValue,
+    VraIngestion,
+    VraResult,
+    VraResultIndicator,
+    VraRun,
     WorkspaceMemberRecord,
     WorkspaceRecord,
 )
 from chart.shared.db.session import get_session_factory
-from chart.solution_repository.routes import SNAPSHOT_PATH as _SOLUTION_SEED_PATH
+from chart.vra.service import sync_catalogue as sync_vra_catalogue
 
 from .model_configs import configs_for_country, deployed_configs
 from .place_bootstrap import (
@@ -283,7 +288,6 @@ def bootstrap(
             name=input_data.admin.name.strip(),
             email=input_data.admin.email.strip().lower(),
             username=input_data.admin.username.strip().lower(),
-            password=input_data.admin.password,
             roles=["chart_admin", "content_editor"],
             group_paths=list(dict.fromkeys(paths)),
             operation_id=operation_id,
@@ -330,70 +334,6 @@ def bootstrap(
             email=identity.email,
         ),
     )
-
-
-def _auto_seed_recommended_actions(session) -> None:
-    """Upsert the bundled solution repository into ``recommended_action``.
-
-    Idempotent on ``slug``. Best-effort: a broken bundle logs a warning
-    but does not fail setup. Later, a scheduler or an external API will
-    refresh the same rows; the natural key stays valid across sources.
-    """
-
-    try:
-        raw = json.loads(_SOLUTION_SEED_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        logger.exception(
-            "auto_seed: could not read %s; recommended_action left empty",
-            _SOLUTION_SEED_PATH,
-        )
-        return
-
-    items = raw.get("items") or []
-    if not items:
-        logger.warning("auto_seed: solution seed has no items, skipping")
-        return
-
-    now = datetime.now(timezone.utc)
-    upserts = 0
-    for item in items:
-        slug = str(item.get("slug") or "").strip()
-        title = str(item.get("title") or "").strip()
-        description = str(item.get("description") or "").strip()
-        if not slug or not title:
-            continue
-        existing = session.scalar(
-            select(RecommendedAction).where(RecommendedAction.slug == slug)
-        )
-        if existing is None:
-            session.add(
-                RecommendedAction(
-                    slug=slug,
-                    source_record_id=item.get("sourceRecordId"),
-                    title=title,
-                    description=description,
-                    climate_hazards=list(item.get("climateHazards") or []),
-                    solution_types=list(item.get("solutionTypes") or []),
-                    cost_of_implementation=item.get("costOfImplementation"),
-                    useful_links=list(item.get("usefulLinks") or []),
-                    case_studies=list(item.get("caseStudies") or []),
-                    source="seed",
-                    synced_at=now,
-                )
-            )
-        else:
-            existing.source_record_id = item.get("sourceRecordId")
-            existing.title = title
-            existing.description = description
-            existing.climate_hazards = list(item.get("climateHazards") or [])
-            existing.solution_types = list(item.get("solutionTypes") or [])
-            existing.cost_of_implementation = item.get("costOfImplementation")
-            existing.useful_links = list(item.get("usefulLinks") or [])
-            existing.case_studies = list(item.get("caseStudies") or [])
-            existing.source = "seed"
-            existing.synced_at = now
-        upserts += 1
-    logger.warning("auto_seed: recommended_action upserts=%d", upserts)
 
 
 def _auto_seed_learning(session) -> None:
@@ -619,6 +559,9 @@ def _auto_seed_deployed_models(
             raise SetupError("SETUP_MODEL_PREPARATION_FAILED", 503) from error
 
 
+DEFAULT_ADMIN_USERNAME = "admin"
+
+
 def complete(
     input_data: CompleteSetupInput,
     user: CurrentUserContext,
@@ -636,6 +579,17 @@ def complete(
     country_code = input_data.countryCode.strip().upper()
     root_id = release_geography.root_id
     root_path = release_geography.root_path
+    if provisioning_token is None and not any(
+        scope.rstrip("/") == root_path.rstrip("/")
+        or scope.startswith(root_path.rstrip("/") + "/")
+        for scope in user.geography_scopes
+    ):
+        # The signed-in administrator who runs setup (the default `admin`)
+        # manages the installed country; bootstrap gives its admin the same.
+        try:
+            add_to_groups(user.user_id, [root_path])
+        except IdentityError as error:
+            raise SetupError("SETUP_IDENTITY_GROUP_FAILED", 502) from error
     session_factory = session_factory or get_session_factory()
     with session_factory() as session:
         state = session.get(SetupStateRecord, SETUP_ID, with_for_update=True)
@@ -747,16 +701,16 @@ def complete(
         for seed_country in seed_order:
             _auto_seed_deployed_models(session, seed_country, purge_stale=True)
         try:
-            _auto_seed_recommended_actions(session)
-        except Exception:  # noqa: BLE001 - best-effort, must not fail setup
-            logger.exception(
-                "auto_seed: recommended_action seed failed; setup will complete."
-            )
-        try:
             _auto_seed_learning(session)
         except Exception:  # noqa: BLE001 - best-effort, must not fail setup
             logger.exception(
                 "auto_seed: learning hub seed failed; setup will complete."
+            )
+        try:
+            sync_vra_catalogue(session)
+        except Exception:  # noqa: BLE001 - best-effort, must not fail setup
+            logger.exception(
+                "auto_seed: VRA catalogue sync failed; setup will complete."
             )
         state.completed = True
         state.phase = "complete"
@@ -804,6 +758,10 @@ def restore_deployed_models(
 
     session_factory = session_factory or get_session_factory()
     with session_factory() as session:
+        # The VRA catalogue ships with the code, so every start brings the
+        # stored copy up to date, whether or not setup has run.
+        sync_vra_catalogue(session)
+        session.commit()
         state = session.get(SetupStateRecord, SETUP_ID)
         if state is None or not state.completed:
             if require_complete:
@@ -839,19 +797,36 @@ def reset(user: CurrentUserContext) -> SetupStatus:
     with get_session_factory()() as session:
         state = session.get(SetupStateRecord, SETUP_ID)
         first_admin_user_id = state.first_admin_user_id if state else None
+        # The default `admin` (infra/keycloak/sync-realm.js) runs setup again
+        # after a reset, so its account stays; a bootstrap-made admin goes.
+        if first_admin_user_id:
+            first_admin = session.get(AppUser, first_admin_user_id)
+            if (
+                first_admin is not None
+                and first_admin.username == DEFAULT_ADMIN_USERNAME
+            ):
+                first_admin_user_id = None
 
         # Nuke everything a re-run of setup/bootstrap could collide with —
         # the previous reset only cleared workspace/user state and left the
         # model registry and its dependents behind, which is exactly what
         # tripped MODEL_RELEASE_IMMUTABLE on the second install. Order
-        # respects the FK graph (children first). Country config, seed
-        # reference tables (data_source, provenance), and RecommendedAction
-        # (upserted every setup) are intentionally not touched.
+        # respects the FK graph (children first). Country config and seed
+        # reference tables (data_source, provenance) are intentionally not
+        # touched.
         session.execute(delete(WorkspaceMemberRecord))
         session.execute(delete(WorkspaceRecord))
+        # VRA values and results hang off admin units and geographies; the
+        # catalogue (vra_indicator) is shipped reference data and stays.
+        session.execute(delete(VraResultIndicator))
+        session.execute(delete(VraResult))
+        session.execute(delete(VraRun))
+        session.execute(delete(VraIndicatorValue))
+        session.execute(delete(VraIngestion))
         session.execute(delete(HealthImpact))
         session.execute(delete(Covariate))
         session.execute(delete(AuditEventRecord))
+        session.execute(delete(ModelDisplaySetting))
         # Newer tables first: district_climate_day's foreign keys to
         # climate_run and admin_unit carry no ondelete, so they default to
         # RESTRICT and would block the deletes below once daily rows exist.

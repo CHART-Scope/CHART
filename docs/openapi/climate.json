@@ -293,6 +293,18 @@
               "type": "string",
               "title": "Geography Id"
             }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "default": "lbw",
+              "title": "Outcome"
+            }
           }
         ],
         "responses": {
@@ -337,7 +349,7 @@
             }
           }
         },
-        "description": "Builds the date choices supported for the selected geography, including the next three months, the configured hot season, and available long-term scenario periods. The response reflects current climate and model availability rather than a hard-coded calendar."
+        "description": "Builds the date choices supported for the selected geography, including the next three months, the configured hot season, and available long-term scenario periods. The response reflects current climate and model availability rather than a hard-coded calendar, narrowed by the country's model settings for the outcome (windows, scenarios and data modes switched off are withdrawn or marked MODEL_DATA_MODE_DISABLED)."
       }
     },
     "/climate/preview": {
@@ -1149,53 +1161,40 @@
         "description": "Requires a CHART administrator. Discovers enabled model manifests, verifies and prepares their immutable artifacts, and activates their geography assignments while preserving users, workspaces, and saved planning data. Use this after deploying a new release to an existing installation."
       }
     },
-    "/hazards": {
+    "/actions": {
       "get": {
         "tags": [
-          "solution-repository"
+          "actions"
         ],
-        "summary": "List public climate-health hazards",
-        "operationId": "list_hazards_hazards_get",
-        "responses": {
-          "200": {
-            "description": "The published public hazard catalog available to planning clients.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HazardListResponse"
-                }
-              }
-            }
-          }
-        },
-        "description": "Returns the published hazard catalog from the configured solution repository API or bundled public snapshot. Hazard identifiers connect planning risks to the solution records returned by the repository routes."
-      }
-    },
-    "/hazards/{hazard_id}": {
-      "get": {
-        "tags": [
-          "solution-repository"
-        ],
-        "summary": "Read one public hazard and its linked solutions",
-        "operationId": "get_hazard_hazards__hazard_id__get",
+        "summary": "List published recommended actions",
+        "description": "Returns the reviewed actions from the public action feed (CHART_ACTIONS_URL), or the copy bundled with CHART when the feed cannot be read. With a geography, only actions for its country are returned, in that country's wording. Public; no sign-in required.",
+        "operationId": "read_actions_actions_get",
         "parameters": [
           {
-            "name": "hazard_id",
-            "in": "path",
-            "required": true,
+            "name": "geography",
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": "string",
-              "title": "Hazard Id"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Geography"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "The requested hazard together with its currently published solutions.",
+            "description": "The published actions, where they were read from and when they were published.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HazardDetail"
+                  "$ref": "#/components/schemas/ActionList"
                 }
               }
             }
@@ -1210,152 +1209,7 @@
               }
             }
           }
-        },
-        "description": "Looks up a published hazard by its stable identifier and includes the public solution records associated with it. The route reads the configured remote repository when available and otherwise uses the bundled snapshot."
-      }
-    },
-    "/solutions": {
-      "get": {
-        "tags": [
-          "solution-repository"
-        ],
-        "summary": "Search and filter the public solution repository",
-        "operationId": "list_solutions_solutions_get",
-        "parameters": [
-          {
-            "name": "hazard",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Hazard"
-            }
-          },
-          {
-            "name": "solutionType",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Solutiontype"
-            }
-          },
-          {
-            "name": "cost",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Cost"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Search"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Status"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "default": 100,
-              "title": "Limit"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The public solutions matching the supplied filters and result limit.",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "description": "Returns published climate-health actions filtered by hazard, solution type, cost, publication status, or free-text search. Results come from the configured repository service or the bundled snapshot and remain public without CHART sign-in."
-      }
-    },
-    "/solutions/taxonomies": {
-      "get": {
-        "tags": [
-          "solution-repository"
-        ],
-        "summary": "List public solution taxonomy values",
-        "operationId": "list_taxonomies_solutions_taxonomies_get",
-        "responses": {
-          "200": {
-            "description": "The current public taxonomy values used by solution filters.",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "description": "Returns the controlled hazard, solution-type, cost, and status values used to classify published actions. Clients can use this catalog to construct valid solution filters without duplicating repository vocabularies."
+        }
       }
     },
     "/users": {
@@ -1406,7 +1260,7 @@
         },
         "responses": {
           "200": {
-            "description": "The created or invited user and their effective CHART access assignment.",
+            "description": "The invited user, their CHART access and whether the invitation was sent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1431,7 +1285,55 @@
             "bearerAuth": []
           }
         ],
-        "description": "Creates the CHART user assignment requested by an authorized administrator after validating role and geography boundaries. The route coordinates the application identity record without allowing the caller to delegate permissions they do not hold."
+        "description": "Creates the CHART user assignment requested by an authorized administrator after validating role and geography boundaries, with no password, and has Keycloak email the person an invitation to sign in with a code. The account stands even if the email fails; `invitation` says which, and `POST /users/{user_id}/invitation` sends it again."
+      }
+    },
+    "/users/{user_id}/invitation": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Email a person their CHART invitation again",
+        "operationId": "invitation_route_users__user_id__invitation_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The person and their CHART access, with invitation set to sent once Keycloak accepted the email.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Has Keycloak email the invitation again for an active account: a link that confirms the address and opens CHART's sign-in, where the person signs in with an emailed code. Administrators only. Answers 502 USER_INVITE_FAILED when the email could not be sent."
       }
     },
     "/users/{user_id}/disable": {
@@ -1925,12 +1827,70 @@
         "description": "Returns three overlaid RCP scenarios and their 5- / 15- / 25-year horizon rows for the requested admin_unit under an SSP2 population baseline. Missing scenarios are omitted, so the client renders the scenarios that are available today. Requires a bearer token and geography scope."
       }
     },
+    "/heat-outlook/{geography_id}/capabilities": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read independent observed and projection availability",
+        "operationId": "capabilities_heat_outlook__geography_id__capabilities_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Enabled views with independent source releases and availability reasons.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutlookCapabilities"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Resolves sources for the exact geography and outcome, subject to risk-reader roles, geography scope and country model settings. Published handover projections retain their own release. Observed may use the existing calibrated Kenya outlook scorer or an exact active monthly model assignment. The observed source identifies its release and batch support; unavailable or disabled views include a reason. No district or constituency inherits an ancestor's observed model. The new handovers are not relabelled as calibrated. Missing advertised projection files return OUTLOOK_NOT_PUBLISHED."
+      }
+    },
     "/heat-outlook/{geography_id}": {
       "get": {
         "tags": [
           "heat-outlook"
         ],
-        "summary": "Read the pre-computed heat outlook for a Kenyan place",
+        "summary": "Read a published geography heat outlook and its period options",
         "operationId": "read_heat_outlook_heat_outlook__geography_id__get",
         "security": [
           {
@@ -2031,7 +1991,7 @@
             }
           }
         },
-        "description": "Returns the modelling team's pre-computed heat outlook for a Kenyan county (geo-ke-<county>) or for Kenya as a whole (geo-ke): a typical month by calendar month, and a summary for each period with its 95% CI, climate-model range and change from the baseline. The outcome selects low birth weight (lbw) or under-five mortality (under_5_mortality); scenario, period and selector (the pregnancy window or the age group) filter the tables. Requires a risk reader role and access to the geography path. No model is evaluated at run time: the tables are read from the model bucket mirror. The guides' display rules are applied here, so suppressed values arrive as null with the message to show in their place."
+        "description": "Returns the modelling team's published heat outlook for a configured geography: typical calendar months, period summaries, available selections, provenance and baseline notes. Installed October 2026 handovers cover Madhya Pradesh's state, divisions and districts and Kenya's country, counties and supplied constituencies. The outcome selects low birth weight (lbw) or under-five mortality (under_5_mortality); scenario, period and selector (the pregnancy window or age group) filter the publication. Supplied periods retain their coefficient confidence intervals; derived 5/10/20-year periods offer climate-model ranges, not confidence intervals, and omit unavailable temperature summaries. Requires a risk reader role and access to the geography path. No health model is evaluated on request. Installed handovers take precedence over legacy Kenya publications. Release-specific display rules return suppressed values as null with an explanatory message; country settings restrict offered selections."
       }
     },
     "/heat-outlook/{geography_id}/map": {
@@ -2039,7 +1999,7 @@
         "tags": [
           "heat-outlook"
         ],
-        "summary": "Read Kenyan counties shaded by annual-average heat share",
+        "summary": "Read administrative areas shaded by their published heat outlook",
         "operationId": "read_heat_outlook_map_heat_outlook__geography_id__map_get",
         "security": [
           {
@@ -2116,11 +2076,22 @@
               ],
               "title": "Selector"
             }
+          },
+          {
+            "name": "reference",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(annual|peak|season)$",
+              "default": "annual",
+              "title": "Reference"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Kenyan counties with display geometry and each county's published annual-average share, or the reason it is absent.",
+            "description": "Permitted areas with display geometry and each area's published annual-average (or peak-season) share, or the reason it is absent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2140,7 +2111,1664 @@
             }
           }
         },
-        "description": "Returns the counties of Kenya with their display geometry and the modelling team's annual-average heat-attributable share for the chosen outcome, scenario, period and selector, in the same shape as the risk map so the dashboard draws it identically. Requires a risk reader role and access to the geography path. Counties whose share is suppressed by the display rules carry missing_reason no_excess; windows with no period summary carry not_reported; counties with no published file carry no_model. Nothing is computed on request."
+        "description": "Returns administrative areas in the selected geography frame with display geometry and the published annual-average attributable share for the chosen outcome, scenario, period and selector, in the same shape as the risk map so the dashboard draws it identically. Requires a risk reader role and access to the geography path, and filters returned areas to the caller's allowed paths. Coverage follows the installed geography hierarchy and publication, including India districts and Kenya constituencies. Areas whose share is suppressed by the display rules carry missing_reason no_excess; windows with no period summary carry not_reported; areas with no published file carry no_model. With reference=peak, each area is shaded by its highest-risk months' share instead: the three consecutive months with the highest heat share where available. With reference=season, each area is shaded by its mean heat share over its heat season as configured in Settings (its own calendar, an ancestor's, or the official season). No health model is evaluated on request."
+      }
+    },
+    "/heat-outlook/{geography_id}/observed": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Score an observed month for a Kenyan place from ERA5",
+        "operationId": "read_observed_heat_outlook__geography_id__observed_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The estimate with its 95% CI and ratio, the months that can be scored, the share for each of them, the temperatures used on both scales, and the notes the dashboard must display.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Scores one observed month for a Kenyan county (geo-ke-<county>), or the mean over Kenya's counties (geo-ke), with the modelling team's DLNM models, using the Copernicus ERA5 temperatures CHART has ingested. ERA5 is first moved onto the scale the models were fitted on by a fixed offset per county and calendar month. Low birth weight reads the birth month and the eight before it; under-five scores each day of the month on that day and the three before it and averages them. month (YYYY-MM) defaults to the newest month with complete inputs; selector is the pregnancy window or the age group. Requires a risk reader role and access to the geography path. The guides' display rules apply, so suppressed values arrive as null with the message to show in their place. The legacy observed release is selected independently of a newer projection publication. India monthly models use /risk/{geography_id}/monthly instead; unsupported finer geographies never inherit a county's calibrated estimate."
+      }
+    },
+    "/heat-outlook/{geography_id}/observed/map": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read Kenyan counties shaded by an observed month's heat share",
+        "description": "Returns the counties of Kenya with their display geometry and each county's heat-attributable share for one observed month, scored as in the observed estimate. Requires a risk reader role and access to the geography path. Counties without complete ERA5 inputs carry missing_reason not_reported; suppressed shares carry no_excess. County requests retain the Kenya county frame even when their projection frame contains constituencies. Returned areas remain restricted to the caller's geography permissions.",
+        "operationId": "read_observed_map_heat_outlook__geography_id__observed_map_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Kenyan counties with display geometry and each county's share for the observed month, or the reason it is absent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/heat-outlook/{geography_id}/climate": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read ERA5-Land temperature or heatwave days for a frame's areas",
+        "description": "Returns the frame's areas with display geometry and, for one month, either the monthly mean of daily maximum temperature (layer=tmax, degrees C) or heatwave days at the country's official threshold (layer=heat_days), from Copernicus ERA5-Land at 0.1 degrees. A map context layer only: no health estimate reads these values. available_months lists the months held. Readable without sign-in when public read is enabled; areas stay restricted to the caller's geography permissions.",
+        "operationId": "read_climate_layer_heat_outlook__geography_id__climate_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "layer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(tmax|heat_days)$",
+              "default": "tmax",
+              "title": "Layer"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The frame's areas with each area's value for the month, or not_reported, plus the months held.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClimateLayerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/heat-outlook/{geography_id}/population": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read WorldPop population for a frame's areas",
+        "description": "Returns the frame's areas with display geometry shaded by people per km2 of the chosen group (measure=total, under5 or women_15_49), with each area's counts in counts and the frame's own in place. From WorldPop Global2 R2025A (1 km, census-based, UN adjusted, CC BY 4.0) summed over CHART's boundaries. Context for the heat estimates, not an input. Readable without sign-in when public read is enabled.",
+        "operationId": "read_population_heat_outlook__geography_id__population_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "measure",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(total|under5|women_15_49)$",
+              "default": "total",
+              "title": "Measure"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The frame's areas with people per km2, each area's counts, and the source, licence and citation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PopulationMap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/heat-outlook/{geography_id}/forecast": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read a place's six-month seasonal forecast and heat shares",
+        "description": "Returns the next six months for one place from the Copernicus C3S multi-system seasonal forecast: each month's forecast mean daily maximum (the place's ERA5 normal plus the area-weighted anomaly) and the heat-attributable share scored with the place's model, with the coolest and warmest forecast system as the range. Built once per C3S issue; readable without sign-in when public read is enabled.",
+        "operationId": "read_forecast_heat_outlook__geography_id__forecast_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The issue, the forecast systems, and for each coming month the temperature and share with their ranges.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/heat-outlook/{geography_id}/forecast/map": {
+      "get": {
+        "tags": [
+          "heat-outlook"
+        ],
+        "summary": "Read a frame's areas shaded by a forecast month's heat share",
+        "description": "Returns the frame's areas with display geometry, each shaded by its own forecast heat share for one of the next six months (default the first), with its range across forecast systems and forecast temperature. Areas without a forecast are marked, never zeroed.",
+        "operationId": "read_forecast_map_heat_outlook__geography_id__forecast_map_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "lbw",
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "name": "selector",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Selector"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The frame's areas with the month's forecast share, ranges and temperatures, and the issue's months.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastMap"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vra/indicators": {
+      "get": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "List the vulnerability and resilience indicator catalogue",
+        "operationId": "read_indicators_vra_indicators_get",
+        "responses": {
+          "200": {
+            "description": "The catalogue of VRA indicators with component, unit, direction, route, status and rationale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicatorList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Returns every indicator in the VRA catalogue with its component (hazard, exposure, sensitivity or adaptive capacity), unit, direction relative to risk (+1 more is worse, -1 more is better), how values arrive (computed, upload, manual or pull) and whether it is scored (included), shown as context, or dropped. Requires a risk reader role."
+      }
+    },
+    "/vra/{geography_id}/assessment": {
+      "get": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Read the latest vulnerability assessment of a frame's areas",
+        "operationId": "read_assessment_vra__geography_id__assessment_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The frame, its latest run summary (or null) and every child area ranked by risk, unscored areas last.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns the latest VRA run for the child areas of the geography (framed as the dashboard map frames them: a leaf is framed on its siblings), with each area's risk, class, rank, component scores, coverage and driving indicators. Scores are 0-1 and relative within the frame; missing scores are null with a reason, never zero. run is null until an administrator runs an assessment. Requires a risk reader role and access to the geography path."
+      }
+    },
+    "/vra/{geography_id}/map": {
+      "get": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Read a frame's areas shaded by vulnerability assessment risk",
+        "operationId": "read_map_vra__geography_id__map_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The frame's areas with display geometry and VRA risk, or the reason the risk is absent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns the frame's child areas with display geometry in the risk map's shape, with value_percent set to the latest VRA risk score times 100. Areas scored without enough evidence carry missing_reason insufficient_data; areas no run has covered carry not_assessed. Requires a risk reader role and access to the geography path."
+      }
+    },
+    "/vra/{geography_id}/areas/{area_geography_id}": {
+      "get": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Read one area's vulnerability scores and indicator evidence",
+        "operationId": "read_area_vra__geography_id__areas__area_geography_id__get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "area_geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Area Geography Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The area's assessment and the per-indicator raw values, scores and sources behind it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AreaDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns one child area of the frame with its assessment and, for every scored indicator in the catalogue, the raw value and vintage used, the normalised score, weight and contribution, the source and quality flags, and why it was excluded when it was (missing, no_data, too_few_areas, no_spread). Requires a risk reader role and access to the geography path."
+      }
+    },
+    "/vra/{geography_id}/coverage": {
+      "get": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Read VRA indicator coverage and upload history for a frame",
+        "operationId": "read_coverage_vra__geography_id__coverage_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9_]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Area count, per-indicator coverage and vintages, and recent ingestions with their rejections.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoverageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "For administrators: how many of the frame's child areas hold a value for each catalogue indicator, the vintages held and when they were last updated, plus the most recent uploads with their row-level rejections. Requires the chart_admin role and access to the geography path."
+      }
+    },
+    "/vra/{geography_id}/template.csv": {
+      "get": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Download the VRA value upload template for a frame",
+        "operationId": "read_template_vra__geography_id__template_csv_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "indicator_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Indicator Code"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9_]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A text/csv template listing every child area and uploadable indicator with blank values."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "For administrators: a CSV with one blank row per child area and per indicator entered by upload or by hand, in the columns the upload accepts (area_code, area_name, indicator_code, value, vintage, source_name, source_url, notes). Requires the chart_admin role and access to the geography path."
+      }
+    },
+    "/vra/{geography_id}/values": {
+      "post": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Upload VRA indicator values for a frame's areas as CSV",
+        "operationId": "upload_values_vra__geography_id__values_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "file_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "File Name"
+            }
+          },
+          {
+            "name": "indicator_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Indicator Code"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9_]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ingestion id and status with accepted and rejected row counts and a reason for each rejected row.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/csv": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "description": "For administrators: send the template columns as text/csv. Each row is checked (the area must be a child of the frame, the indicator must exist and be neither dropped nor computed, the value numeric and a percentage within 0-100, the vintage present); blank values are skipped. Valid rows are upserted on indicator, area and vintage. If no row is valid the upload is recorded as failed and nothing is written. Requires the chart_admin role and access to the geography."
+      }
+    },
+    "/vra/{geography_id}/runs": {
+      "post": {
+        "tags": [
+          "vra"
+        ],
+        "summary": "Run the vulnerability assessment for a frame's child areas",
+        "description": "For administrators: recomputes the climate-derived hazard indicators from stored ERA5 months, scores every child area with method vra-v1 (5th-95th percentile min-max, equal weights, two-thirds coverage rule, geometric mean of hazard, exposure and vulnerability, quartile classes) and stores the run with its bounds and input and output hashes. Synchronous. Requires the chart_admin role and access to the geography path.",
+        "operationId": "create_run_vra__geography_id__runs_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9_]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The new assessment, in the same shape as the assessment read, with the stored run summary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/model-settings": {
+      "get": {
+        "tags": [
+          "model-settings"
+        ],
+        "summary": "Read model settings for the countries a user can see",
+        "operationId": "read_model_settings_model_settings_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "country",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z]{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available pregnancy windows or age groups, scenarios and data modes, with the options switched on and the defaults in use.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ModelSettingsListResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ModelSettingsResponse"
+                    }
+                  ],
+                  "title": "Response Read Model Settings Model Settings Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Without parameters, lists the model settings of every country whose path the signed-in user can read, one item per outcome. With country (ISO code, e.g. KE) and outcome (e.g. lbw), returns that one item. Each item carries the options the published outlook tables and active model releases support, tagged by the view that uses them, and the effective settings: the stored ones, or the defaults when none are saved. Any signed-in user may read them; roles are not restricted yet."
+      }
+    },
+    "/model-settings/{country_code}/{outcome}": {
+      "put": {
+        "tags": [
+          "model-settings"
+        ],
+        "summary": "Narrow the model options offered for a country and outcome",
+        "operationId": "write_model_settings_model_settings__country_code___outcome__put",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "country_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z]{2}$",
+              "title": "Country Code"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "title": "Outcome"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelSettingsValues"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The saved settings as they now apply, with the available options and who last changed them.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Stores which pregnancy windows or age groups, scenarios and data modes a country offers for an outcome. Settings may only narrow what the tables and releases support: unknown codes are refused (MODEL_SETTINGS_OPTION_UNKNOWN), every view keeps at least one option (MODEL_SETTINGS_OPTION_REQUIRED) and each default must be switched on (MODEL_SETTINGS_DEFAULT_NOT_ENABLED). Requires access to the country path; any signed-in role may write for now. Every change records a model_settings_changed audit event with the values before and after."
+      }
+    },
+    "/heat-seasons": {
+      "get": {
+        "tags": [
+          "heat-seasons"
+        ],
+        "summary": "List heat-season calendars",
+        "operationId": "list_heat_seasons_heat_seasons_get",
+        "responses": {
+          "200": {
+            "description": "Each readable place with its calendar in effect, its own months and where they come from.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeatSeasonList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Every place the caller can read, parents before children, with the heat-season calendar in effect: twelve letters from January (b before, d during, a after, o outside the cycle). state says whether the place has its own calendar (custom), inherits an ancestor's (inherited, with inherited_from), uses the country's official season (official) or has none (unset). Requires a dashboard reader role."
+      }
+    },
+    "/heat-seasons/{geography_id}": {
+      "get": {
+        "tags": [
+          "heat-seasons"
+        ],
+        "summary": "Read the heat-season calendar in effect for a place",
+        "operationId": "read_heat_season_heat_seasons__geography_id__get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The twelve-month calendar in effect for the place and the place or season it comes from.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeatSeasonCalendar"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "The place's own calendar, else its nearest ancestor's, else the country's official season with the four months before it as preparation. Lays out the recommended-actions Gantt chart. Requires read access to the place (GEOGRAPHY_NOT_ALLOWED, HEAT_SEASON_GEOGRAPHY_NOT_FOUND)."
+      },
+      "put": {
+        "tags": [
+          "heat-seasons"
+        ],
+        "summary": "Save a place's own heat-season calendar",
+        "operationId": "save_heat_season_heat_seasons__geography_id__put",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeatSeasonUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The saved calendar as it now applies to the place, with its source and state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeatSeasonCalendar"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Stores twelve months for the place; its children inherit them unless they have their own. Read from the first preparation month the months must run before, during, after, then off, with at least one during month (HEAT_SEASON_INVALID). Administrators only (ROLE_NOT_ALLOWED). Records a heat_season_changed audit event."
+      },
+      "delete": {
+        "tags": [
+          "heat-seasons"
+        ],
+        "summary": "Drop a place's own calendar so it inherits again",
+        "operationId": "reset_heat_season_heat_seasons__geography_id__delete",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "geography_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Geography Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The calendar that now applies: the parent's or the official season, with its origin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeatSeasonCalendar"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Removes the place's own calendar; it then inherits its parent's or the official season. Administrators only. Records a heat_season_changed audit event when a calendar was removed."
+      }
+    },
+    "/saved-plans": {
+      "get": {
+        "tags": [
+          "saved-plans"
+        ],
+        "summary": "List the user's saved plans",
+        "operationId": "list_saved_plans_saved_plans_get",
+        "responses": {
+          "200": {
+            "description": "The caller's saved plans for places they can still read, newest first; empty when none.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedPlanList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Returns the caller's own saved plans, newest first, each with the dashboard choices that reopen it, the published estimate captured when it was saved and the deterministic risk_level/timing signals recommendations are keyed on. Plans for places no longer in the caller's geography scope are omitted. Requires a dashboard reader role."
+      },
+      "post": {
+        "tags": [
+          "saved-plans"
+        ],
+        "summary": "Save a dashboard view with its published estimate",
+        "operationId": "create_saved_plan_saved_plans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedPlanCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The new saved plan with the published figure and risk reading captured for it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedPlanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Stores a named plan for a geography (and optional sub-area within it), outcome and observed or projected selection. The API resolves the selection and captures the estimate through the same outlook service as the dashboard; a view with no published estimate is saved with figure.status unavailable and a reason. Refuses places outside the caller's scope (GEOGRAPHY_OUT_OF_SCOPE), a sub-area outside its frame (PLAN_AREA_INVALID), a selection the publication does not contain (OUTLOOK_SELECTION_INVALID) and more than 100 plans per user (SAVED_PLAN_LIMIT)."
+      }
+    },
+    "/saved-plans/{plan_id}": {
+      "get": {
+        "tags": [
+          "saved-plans"
+        ],
+        "summary": "Open one of the caller's saved plans",
+        "operationId": "read_saved_plan_saved_plans__plan_id__get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 36,
+              "maxLength": 36,
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested saved plan with its captured figure, choices and risk reading.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedPlanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns one of the caller's plans. Another user's plan is reported as SAVED_PLAN_NOT_FOUND; a plan whose place has left the caller's scope is refused with GEOGRAPHY_OUT_OF_SCOPE."
+      },
+      "delete": {
+        "tags": [
+          "saved-plans"
+        ],
+        "summary": "Remove one of the caller's saved plans",
+        "operationId": "delete_saved_plan_saved_plans__plan_id__delete",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 36,
+              "maxLength": 36,
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The plan was removed; removing it again answers 404 SAVED_PLAN_NOT_FOUND."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Deletes one of the caller's plans for good. Another user's plan is reported as SAVED_PLAN_NOT_FOUND and left untouched, as is a plan that was already removed."
+      }
+    },
+    "/saved-plans/{plan_id}/recommendations": {
+      "post": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Rank repository actions for a saved plan, with an insight",
+        "operationId": "recommend_for_plan_saved_plans__plan_id__recommendations_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 36,
+              "maxLength": 36,
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The plan's top-ranked published actions with their reasons, and the insight beside them.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Ranks the candidate actions the browser sends for one of the caller's plans. The rules ranking (season, then cost unless heat risk is clearly raised, then health-led) is the default; a configured classifier replaces only the order and, if it fails, ranker falls back to rules with ranker_note set. The insight is a template unless an administrator chose a language model; it falls back to the template on any provider failure (insight.note) and a generated insight is reused until the provider, model or ranking changes. Ownership and scope follow GET /saved-plans/{plan_id}."
+      }
+    },
+    "/recommendation-settings": {
+      "get": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Read how recommendations are ranked and explained",
+        "operationId": "read_recommendation_settings_recommendation_settings_get",
+        "responses": {
+          "200": {
+            "description": "The current ranker and insight settings, with which options this server can offer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationSettingsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Returns the chosen ranker and insight provider/model with every option and whether the server environment enables it (credentials are never stored or returned). Administrators only (chart_admin)."
+      },
+      "put": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Choose the ranker and the insight provider and model",
+        "operationId": "write_recommendation_settings_recommendation_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendationSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The saved ranker and insight settings as they now apply, with the available options.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Stores the installation's ranker and insight provider/model. Refuses unknown options (RANKER_UNKNOWN, INSIGHT_PROVIDER_UNKNOWN), options the environment does not enable (RANKER_NOT_CONFIGURED, INSIGHT_PROVIDER_NOT_CONFIGURED) and a language model provider without a model (INSIGHT_MODEL_REQUIRED). Administrators only; every change records a recommendation_settings_changed audit event."
+      }
+    },
+    "/recommendation-settings/providers/{provider}/models": {
+      "get": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "List the models an insight provider offers",
+        "operationId": "list_provider_models_recommendation_settings_providers__provider__models_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 32,
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The models the provider offers and whether the list came from the provider or configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderModels"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Fetches the model list from the provider's API when it offers one (source provider), otherwise returns CHART_INSIGHT_MODELS (source configured). Fails with INSIGHT_MODELS_UNAVAILABLE when neither is available. Administrators only."
       }
     },
     "/learning/resources": {
@@ -2643,7 +4271,7 @@
           "model-releases"
         ],
         "summary": "List every registered model release",
-        "description": "Returns every ModelRelease row (active-first) with identity, version, model_files (filename + SHA-256), area count, the manifest source path discovered on disk, S3 base URI, git ref, and activation timestamp. Powers the admin Models page under /settings, where operators inspect what is loaded and trigger reloads.",
+        "description": "Returns every ModelRelease row (active-first) with identity, version, model_files (filename + SHA-256), area count, the manifest source path discovered on disk, S3 base URI, git ref, and activation timestamp. Requires a signed-in user because those fields are internal to the deployment. Powers the admin Models page under /settings, where operators inspect what is loaded and trigger reloads.",
         "operationId": "list_releases_model_releases_get",
         "responses": {
           "200": {
@@ -2656,7 +4284,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/model-releases/{release_id}/reload": {
@@ -2665,8 +4298,13 @@
           "model-releases"
         ],
         "summary": "Re-verify and re-warm one release into the R runtime",
-        "description": "Finds the manifest whose id matches the URL parameter, re-parses its ModelReleaseSpec, and calls prepare_model_release to re-POST /models/load to the R runtime. Does not touch the database or reactivate the release. Useful after an R container restart or after a manifest edit that swaps an artifact's SHA-256.",
+        "description": "Finds the manifest whose id matches the URL parameter, re-parses its ModelReleaseSpec, and calls prepare_model_release to re-POST /models/load to the R runtime. Does not touch the database or reactivate the release. Requires the chart_admin role. Useful after an R container restart or after a manifest edit that swaps an artifact's SHA-256.",
         "operationId": "reload_release_model_releases__release_id__reload_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "release_id",
@@ -2708,7 +4346,7 @@
           "model-releases"
         ],
         "summary": "Clear the LBW inference circuit breaker in this API process",
-        "description": "The R adapter's circuit breaker opens after INFERENCE_LBW_CIRCUIT_FAILURES consecutive failures (default 5) and stays open for INFERENCE_LBW_CIRCUIT_SECONDS (default 30). The half-open probe closes it automatically once R recovers, but an operator investigating after an outage can call this endpoint to skip the wait instead of restarting the API container. Only clears state in the calling process; other API replicas keep their own counter until reset individually or until their next half-open probe succeeds.",
+        "description": "The R adapter's circuit breaker opens after INFERENCE_LBW_CIRCUIT_FAILURES consecutive failures (default 5) and stays open for INFERENCE_LBW_CIRCUIT_SECONDS (default 30). The half-open probe closes it automatically once R recovers, but an operator investigating after an outage can call this endpoint to skip the wait instead of restarting the API container. Requires the chart_admin role. Only clears state in the calling process; other API replicas keep their own counter until reset individually or until their next half-open probe succeeds.",
         "operationId": "reset_inference_circuit_model_releases_circuit_reset_post",
         "responses": {
           "200": {
@@ -2721,7 +4359,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/internal/bootstrap-place": {
@@ -2968,6 +4611,314 @@
   },
   "components": {
     "schemas": {
+      "ActionContent": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "hazards": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Hazards",
+            "default": []
+          },
+          "health_outcomes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Health Outcomes",
+            "default": []
+          },
+          "target_populations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Populations",
+            "default": []
+          },
+          "action_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Action Types",
+            "default": []
+          },
+          "levels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Levels",
+            "default": []
+          },
+          "seasons": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "before",
+                "during",
+                "after"
+              ]
+            },
+            "type": "array",
+            "title": "Seasons",
+            "default": []
+          },
+          "departments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Departments",
+            "default": []
+          },
+          "stakeholders": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stakeholders",
+            "default": []
+          },
+          "cost_level": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "No additional cost",
+                  "Low",
+                  "Medium",
+                  "High",
+                  "Variable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Level"
+          },
+          "cost_reasoning": {
+            "type": "string",
+            "title": "Cost Reasoning",
+            "default": ""
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale",
+            "default": ""
+          },
+          "expected_outcomes": {
+            "type": "string",
+            "title": "Expected Outcomes",
+            "default": ""
+          },
+          "decision_trigger": {
+            "type": "string",
+            "title": "Decision Trigger",
+            "default": ""
+          },
+          "trigger_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Trigger Sources",
+            "default": []
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/Reference"
+            },
+            "type": "array",
+            "title": "References",
+            "default": []
+          },
+          "case_studies": {
+            "items": {
+              "$ref": "#/components/schemas/Reference"
+            },
+            "type": "array",
+            "title": "Case Studies",
+            "default": []
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/Image"
+            },
+            "type": "array",
+            "title": "Images",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ActionContent"
+      },
+      "ActionList": {
+        "properties": {
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "feed",
+              "bundled"
+            ],
+            "title": "Source"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ActionContent"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "country",
+          "source",
+          "published_at",
+          "items"
+        ],
+        "title": "ActionList",
+        "description": "Actions for one country (or all, generic wording) and where they came from."
+      },
+      "AreaAssessment": {
+        "properties": {
+          "geography_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geography Id"
+          },
+          "admin_unit_id": {
+            "type": "integer",
+            "title": "Admin Unit Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk"
+          },
+          "risk_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Class"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "components": {
+            "$ref": "#/components/schemas/Components"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "drivers": {
+            "items": {
+              "$ref": "#/components/schemas/Driver"
+            },
+            "type": "array",
+            "title": "Drivers"
+          },
+          "missing_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "admin_unit_id",
+          "code",
+          "name"
+        ],
+        "title": "AreaAssessment"
+      },
       "AreaBoundingBox": {
         "properties": {
           "north": {
@@ -3059,6 +5010,212 @@
           "name"
         ],
         "title": "AreaCoverage"
+      },
+      "AreaDetailResponse": {
+        "properties": {
+          "area": {
+            "$ref": "#/components/schemas/AreaAssessment"
+          },
+          "indicators": {
+            "items": {
+              "$ref": "#/components/schemas/AreaIndicator"
+            },
+            "type": "array",
+            "title": "Indicators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "area",
+          "indicators"
+        ],
+        "title": "AreaDetailResponse"
+      },
+      "AreaIndicator": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "component": {
+            "type": "string",
+            "title": "Component"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "direction_to_risk": {
+            "type": "integer",
+            "title": "Direction To Risk"
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw"
+          },
+          "vintage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vintage"
+          },
+          "normalised": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalised"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "contribution": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contribution"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "source_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Name"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "quality_flags": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Quality Flags"
+          },
+          "excluded_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "component",
+          "unit",
+          "direction_to_risk"
+        ],
+        "title": "AreaIndicator"
+      },
+      "AssessmentResponse": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "area_level_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Level Label"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/AreaAssessment"
+            },
+            "type": "array",
+            "title": "Areas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "name",
+          "area_level_label",
+          "run",
+          "areas"
+        ],
+        "title": "AssessmentResponse"
       },
       "AuditBatchAck": {
         "properties": {
@@ -3202,17 +5359,25 @@
             "title": "Client Seq"
           },
           "event_type": {
-            "type": "string",
-            "enum": [
-              "signin",
-              "signout",
-              "page_view",
-              "district_switch",
-              "whatif_tick",
-              "whatif_settled",
-              "prediction_submitted",
-              "prediction_completed",
-              "prediction_failed"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "signin",
+                  "signout",
+                  "page_view",
+                  "district_switch",
+                  "whatif_tick",
+                  "whatif_settled",
+                  "prediction_submitted",
+                  "prediction_completed",
+                  "prediction_failed"
+                ]
+              },
+              {
+                "type": "string",
+                "const": "model_settings_changed"
+              }
             ],
             "title": "Event Type"
           },
@@ -3434,6 +5599,44 @@
           "message"
         ],
         "title": "Availability"
+      },
+      "AvailableOptions": {
+        "properties": {
+          "selector_label": {
+            "type": "string",
+            "title": "Selector Label"
+          },
+          "selectors": {
+            "items": {
+              "$ref": "#/components/schemas/SettingOption"
+            },
+            "type": "array",
+            "title": "Selectors"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/SettingOption"
+            },
+            "type": "array",
+            "title": "Scenarios"
+          },
+          "data_modes": {
+            "items": {
+              "$ref": "#/components/schemas/SettingOption"
+            },
+            "type": "array",
+            "title": "Data Modes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "selector_label",
+          "selectors",
+          "scenarios",
+          "data_modes"
+        ],
+        "title": "AvailableOptions",
+        "description": "Everything the published tables and active model releases support."
       },
       "BootstrapAdminResponse": {
         "properties": {
@@ -3771,6 +5974,77 @@
         ],
         "title": "CircuitResetResponse"
       },
+      "ClimateLayerResponse": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric",
+            "default": "attributable_fraction"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": "percent"
+          },
+          "bounds": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Bounds"
+          },
+          "simplify_tolerance_degrees": {
+            "type": "number",
+            "title": "Simplify Tolerance Degrees",
+            "default": 0.0
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/MapArea"
+            },
+            "type": "array",
+            "title": "Areas"
+          },
+          "available_months": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Months",
+            "default": []
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "Copernicus ERA5-Land (0.1\u00b0), area mean of daily maxima"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "outcome"
+        ],
+        "title": "ClimateLayerResponse"
+      },
       "ClimateMonthResponse": {
         "properties": {
           "month": {
@@ -4042,6 +6316,67 @@
         ],
         "title": "CompleteSetupInput"
       },
+      "Components": {
+        "properties": {
+          "hazard": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hazard"
+          },
+          "exposure": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exposure"
+          },
+          "sensitivity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sensitivity"
+          },
+          "adaptive_capacity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adaptive Capacity"
+          },
+          "vulnerability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vulnerability"
+          }
+        },
+        "type": "object",
+        "title": "Components"
+      },
       "CountryCoverage": {
         "properties": {
           "country_code": {
@@ -4106,6 +6441,134 @@
         ],
         "title": "CountryCoverage"
       },
+      "Coverage": {
+        "properties": {
+          "hazard": {
+            "type": "number",
+            "title": "Hazard",
+            "default": 0.0
+          },
+          "exposure": {
+            "type": "number",
+            "title": "Exposure",
+            "default": 0.0
+          },
+          "sensitivity": {
+            "type": "number",
+            "title": "Sensitivity",
+            "default": 0.0
+          },
+          "adaptive_capacity": {
+            "type": "number",
+            "title": "Adaptive Capacity",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "title": "Coverage"
+      },
+      "CoverageIndicator": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "component": {
+            "type": "string",
+            "title": "Component"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "route": {
+            "type": "string",
+            "title": "Route"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "uploadable": {
+            "type": "boolean",
+            "title": "Uploadable"
+          },
+          "value_schema": {
+            "$ref": "#/components/schemas/ValueSchema"
+          },
+          "present": {
+            "type": "integer",
+            "title": "Present"
+          },
+          "vintages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Vintages"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "component",
+          "unit",
+          "route",
+          "status",
+          "uploadable",
+          "value_schema",
+          "present",
+          "vintages",
+          "updated_at"
+        ],
+        "title": "CoverageIndicator"
+      },
+      "CoverageResponse": {
+        "properties": {
+          "area_count": {
+            "type": "integer",
+            "title": "Area Count"
+          },
+          "indicators": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageIndicator"
+            },
+            "type": "array",
+            "title": "Indicators"
+          },
+          "ingestions": {
+            "items": {
+              "$ref": "#/components/schemas/IngestionItem"
+            },
+            "type": "array",
+            "title": "Ingestions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "area_count",
+          "indicators",
+          "ingestions"
+        ],
+        "title": "CoverageResponse"
+      },
       "CreateUserInput": {
         "properties": {
           "name": {
@@ -4134,11 +6597,6 @@
             "minLength": 2,
             "title": "Username"
           },
-          "password": {
-            "type": "string",
-            "minLength": 8,
-            "title": "Password"
-          },
           "roles": {
             "items": {
               "type": "string"
@@ -4161,7 +6619,6 @@
           "name",
           "email",
           "username",
-          "password",
           "roles",
           "geographyIds"
         ],
@@ -4358,6 +6815,34 @@
         ],
         "title": "CurrentUserContext"
       },
+      "Driver": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "component": {
+            "type": "string",
+            "title": "Component"
+          },
+          "normalised": {
+            "type": "number",
+            "title": "Normalised"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "component",
+          "normalised"
+        ],
+        "title": "Driver"
+      },
       "ErfParametersPublished": {
         "properties": {
           "id": {
@@ -4481,6 +6966,266 @@
           "error"
         ],
         "title": "ErrorResponse"
+      },
+      "ForecastMap": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric",
+            "default": "attributable_fraction"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": "percent"
+          },
+          "bounds": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Bounds"
+          },
+          "simplify_tolerance_degrees": {
+            "type": "number",
+            "title": "Simplify Tolerance Degrees",
+            "default": 0.0
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/MapArea"
+            },
+            "type": "array",
+            "title": "Areas"
+          },
+          "issue": {
+            "type": "string",
+            "title": "Issue"
+          },
+          "months": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Months"
+          },
+          "ranges": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Ranges",
+            "default": {}
+          },
+          "tmax_c": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Tmax C",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "outcome",
+          "issue",
+          "months"
+        ],
+        "title": "ForecastMap"
+      },
+      "ForecastMonth": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "tmax_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tmax C"
+          },
+          "tmax_low_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tmax Low C"
+          },
+          "tmax_high_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tmax High C"
+          },
+          "value_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Percent"
+          },
+          "low_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Percent"
+          },
+          "high_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Percent"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ratio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "month"
+        ],
+        "title": "ForecastMonth"
+      },
+      "ForecastResponse": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "issue": {
+            "type": "string",
+            "title": "Issue"
+          },
+          "selector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selector"
+          },
+          "selectors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Selectors"
+          },
+          "months": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastMonth"
+            },
+            "type": "array",
+            "title": "Months"
+          },
+          "systems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Systems"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_uri": {
+            "type": "string",
+            "title": "Source Uri"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "outcome",
+          "issue",
+          "selector",
+          "selectors",
+          "months",
+          "systems",
+          "source",
+          "source_uri",
+          "method"
+        ],
+        "title": "ForecastResponse"
       },
       "GeographyAccessResponse": {
         "properties": {
@@ -4631,176 +7376,6 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "HazardDetail": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "hazardGroup": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hazardgroup"
-          },
-          "imageUrl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Imageurl"
-          },
-          "solutionCount": {
-            "type": "integer",
-            "title": "Solutioncount"
-          },
-          "solutions": {
-            "items": {
-              "$ref": "#/components/schemas/HazardSolution"
-            },
-            "type": "array",
-            "title": "Solutions"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "label",
-          "solutionCount",
-          "solutions"
-        ],
-        "title": "HazardDetail"
-      },
-      "HazardItem": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "hazardGroup": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hazardgroup"
-          },
-          "imageUrl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Imageurl"
-          },
-          "solutionCount": {
-            "type": "integer",
-            "title": "Solutioncount"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "label",
-          "solutionCount"
-        ],
-        "title": "HazardItem"
-      },
-      "HazardListResponse": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/HazardItem"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "title": "HazardListResponse"
-      },
-      "HazardSolution": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "slug": {
-            "type": "string",
-            "title": "Slug"
-          },
-          "summary": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Summary"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "slug"
-        ],
-        "title": "HazardSolution"
-      },
       "HealthImpactPoint": {
         "properties": {
           "valid_month": {
@@ -4894,10 +7469,6 @@
           },
           "level": {
             "type": "string",
-            "enum": [
-              "county",
-              "country"
-            ],
             "title": "Level"
           },
           "outcome": {
@@ -4911,6 +7482,17 @@
           "source_uri": {
             "type": "string",
             "title": "Source Uri"
+          },
+          "metadata_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Note"
           },
           "baseline_period": {
             "type": "string",
@@ -4977,6 +7559,47 @@
             },
             "type": "array",
             "title": "Period Summary"
+          },
+          "peak_season": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeakSeason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "heat_season_share": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeakSeason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "heat_season": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OfficialHeatSeason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "data_modes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Data Modes",
+            "default": [
+              "observed",
+              "projection"
+            ]
           }
         },
         "type": "object",
@@ -5000,6 +7623,119 @@
           "period_summary"
         ],
         "title": "HeatOutlookResponse"
+      },
+      "HeatSeasonCalendar": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "level_label": {
+            "type": "string",
+            "title": "Level Label"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "own": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[bdao]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own"
+          },
+          "months": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[bdao]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Months"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "custom",
+              "inherited",
+              "official",
+              "unset"
+            ],
+            "title": "State"
+          },
+          "inherited_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inherited From"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "name",
+          "level_label",
+          "parent_id",
+          "depth",
+          "state"
+        ],
+        "title": "HeatSeasonCalendar"
+      },
+      "HeatSeasonList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HeatSeasonCalendar"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "HeatSeasonList"
       },
       "HeatSeasonOptionResponse": {
         "properties": {
@@ -5067,6 +7803,32 @@
         ],
         "title": "HeatSeasonOptionResponse"
       },
+      "HeatSeasonUpdate": {
+        "properties": {
+          "months": {
+            "type": "string",
+            "pattern": "^[bdao]{12}$",
+            "title": "Months"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "months"
+        ],
+        "title": "HeatSeasonUpdate"
+      },
       "HorizonCard": {
         "properties": {
           "horizon": {
@@ -5118,6 +7880,169 @@
         ],
         "title": "HorizonCard",
         "description": "One \"IN 3 MONTHS\" / \"IN 6 MONTHS\" style card."
+      },
+      "Image": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "url",
+          "filename"
+        ],
+        "title": "Image"
+      },
+      "IndicatorItem": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "component": {
+            "type": "string",
+            "title": "Component"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "direction_to_risk": {
+            "type": "integer",
+            "title": "Direction To Risk"
+          },
+          "route": {
+            "type": "string",
+            "title": "Route"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          },
+          "uploadable": {
+            "type": "boolean",
+            "title": "Uploadable"
+          },
+          "value_schema": {
+            "$ref": "#/components/schemas/ValueSchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "component",
+          "category",
+          "name",
+          "unit",
+          "direction_to_risk",
+          "route",
+          "status",
+          "rationale",
+          "uploadable",
+          "value_schema"
+        ],
+        "title": "IndicatorItem"
+      },
+      "IndicatorList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IndicatorItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "IndicatorList"
+      },
+      "IngestionItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
+          },
+          "rows_accepted": {
+            "type": "integer",
+            "title": "Rows Accepted"
+          },
+          "rows_rejected": {
+            "type": "integer",
+            "title": "Rows Rejected"
+          },
+          "rejections": {
+            "items": {
+              "$ref": "#/components/schemas/Rejection"
+            },
+            "type": "array",
+            "title": "Rejections"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "file_name",
+          "rows_accepted",
+          "rows_rejected",
+          "rejections",
+          "created_at",
+          "requested_by"
+        ],
+        "title": "IngestionItem"
       },
       "IngestionJobRequest": {
         "properties": {
@@ -5221,6 +8146,88 @@
           "updated_at"
         ],
         "title": "IngestionJobView"
+      },
+      "IngestionResult": {
+        "properties": {
+          "ingestion_id": {
+            "type": "integer",
+            "title": "Ingestion Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "rows_accepted": {
+            "type": "integer",
+            "title": "Rows Accepted"
+          },
+          "rows_rejected": {
+            "type": "integer",
+            "title": "Rows Rejected"
+          },
+          "rejections": {
+            "items": {
+              "$ref": "#/components/schemas/Rejection"
+            },
+            "type": "array",
+            "title": "Rejections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ingestion_id",
+          "status",
+          "rows_accepted",
+          "rows_rejected",
+          "rejections"
+        ],
+        "title": "IngestionResult"
+      },
+      "Insight": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "generated": {
+            "type": "boolean",
+            "title": "Generated"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "model",
+          "text",
+          "generated"
+        ],
+        "title": "Insight"
       },
       "LagWindowSpec": {
         "properties": {
@@ -5751,6 +8758,142 @@
         ],
         "title": "ModelFileInfo"
       },
+      "ModelSettingsListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelSettingsResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ModelSettingsListResponse"
+      },
+      "ModelSettingsResponse": {
+        "properties": {
+          "country_code": {
+            "type": "string",
+            "title": "Country Code"
+          },
+          "country_name": {
+            "type": "string",
+            "title": "Country Name"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "available": {
+            "$ref": "#/components/schemas/AvailableOptions"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/ModelSettingsValues"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default"
+          },
+          "updated_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By User Id"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "country_code",
+          "country_name",
+          "outcome",
+          "available",
+          "settings",
+          "is_default"
+        ],
+        "title": "ModelSettingsResponse"
+      },
+      "ModelSettingsValues": {
+        "properties": {
+          "selectors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Selectors"
+          },
+          "default_selector": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Selector"
+          },
+          "scenarios": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Scenarios"
+          },
+          "default_scenario": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Scenario"
+          },
+          "data_modes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Data Modes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "selectors",
+          "scenarios",
+          "data_modes"
+        ],
+        "title": "ModelSettingsValues",
+        "description": "The options left on. Codes must come from the available options."
+      },
       "ModelSyncResponse": {
         "properties": {
           "activeReleaseIds": {
@@ -5778,7 +8921,8 @@
             "type": "string",
             "enum": [
               "heat",
-              "cool"
+              "cool",
+              "total"
             ],
             "title": "Side"
           },
@@ -6214,6 +9358,334 @@
         "title": "MonthlyTemperature",
         "description": "The month's maximum temperature, area-level, from ERA5.\n\nThe variable is maximum temperature; the monthly value is the mean of\nits daily values, which is what the model was fitted on and therefore\nwhat it consumes. The month's single hottest day is deliberately not\nused. The dashboard says \"maximum temperature\" rather than \"average\nmaximum temperature\", which reads as a contradiction - agreed on the\n17 Sep modelling call."
       },
+      "ObservedCapability": {
+        "properties": {
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "outlook",
+                  "monthly"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "model_area_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Area Name"
+          },
+          "batch_enabled": {
+            "type": "boolean",
+            "title": "Batch Enabled",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ObservedCapability"
+      },
+      "ObservedEstimate": {
+        "properties": {
+          "side": {
+            "type": "string",
+            "enum": [
+              "heat",
+              "cool",
+              "total"
+            ],
+            "title": "Side",
+            "default": "heat"
+          },
+          "value_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Percent"
+          },
+          "low_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Percent"
+          },
+          "high_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Percent"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ratio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thin_data": {
+            "type": "boolean",
+            "title": "Thin Data"
+          },
+          "counties": {
+            "type": "integer",
+            "title": "Counties"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value_percent",
+          "low_percent",
+          "high_percent",
+          "thin_data",
+          "counties"
+        ],
+        "title": "ObservedEstimate"
+      },
+      "ObservedInput": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "era5_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Era5 C"
+          },
+          "model_scale_c": {
+            "type": "number",
+            "title": "Model Scale C"
+          },
+          "counted": {
+            "type": "boolean",
+            "title": "Counted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "era5_c",
+          "model_scale_c",
+          "counted"
+        ],
+        "title": "ObservedInput",
+        "description": "One temperature behind an observed estimate, before and after calibration."
+      },
+      "ObservedMonth": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "value_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "value_percent"
+        ],
+        "title": "ObservedMonth"
+      },
+      "ObservedResponse": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "place": {
+            "type": "string",
+            "title": "Place"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "release": {
+            "type": "string",
+            "title": "Release"
+          },
+          "selectors": {
+            "items": {
+              "$ref": "#/components/schemas/Option"
+            },
+            "type": "array",
+            "title": "Selectors"
+          },
+          "selector": {
+            "type": "string",
+            "title": "Selector"
+          },
+          "selector_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selector Note"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "available_months": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Months"
+          },
+          "estimate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObservedEstimate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/ObservedInput"
+            },
+            "type": "array",
+            "title": "Inputs"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ObservedMonth"
+            },
+            "type": "array",
+            "title": "History"
+          },
+          "reference_note": {
+            "type": "string",
+            "title": "Reference Note"
+          },
+          "calibration_note": {
+            "type": "string",
+            "title": "Calibration Note"
+          },
+          "data_modes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Data Modes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "place",
+          "level",
+          "outcome",
+          "release",
+          "selectors",
+          "selector",
+          "selector_note",
+          "month",
+          "available_months",
+          "estimate",
+          "inputs",
+          "history",
+          "reference_note",
+          "calibration_note",
+          "data_modes"
+        ],
+        "title": "ObservedResponse"
+      },
       "OddsRatio": {
         "properties": {
           "value": {
@@ -6242,6 +9714,43 @@
         ],
         "title": "OddsRatio"
       },
+      "OfficialHeatSeason": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "months": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Months"
+          },
+          "peak_month": {
+            "type": "integer",
+            "title": "Peak Month"
+          },
+          "source_name": {
+            "type": "string",
+            "title": "Source Name"
+          },
+          "source_uri": {
+            "type": "string",
+            "title": "Source Uri"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "months",
+          "peak_month",
+          "source_name",
+          "source_uri"
+        ],
+        "title": "OfficialHeatSeason",
+        "description": "The country's heat season as its meteorological department defines it."
+      },
       "Option": {
         "properties": {
           "code": {
@@ -6264,6 +9773,53 @@
           "label"
         ],
         "title": "Option"
+      },
+      "OutlookCapabilities": {
+        "properties": {
+          "published": {
+            "type": "boolean",
+            "title": "Published"
+          },
+          "data_modes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Data Modes"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "projection_release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projection Release"
+          },
+          "observed": {
+            "$ref": "#/components/schemas/ObservedCapability"
+          }
+        },
+        "type": "object",
+        "required": [
+          "published",
+          "data_modes",
+          "observed"
+        ],
+        "title": "OutlookCapabilities"
       },
       "OutlookMonth": {
         "properties": {
@@ -6339,13 +9895,64 @@
         ],
         "title": "OutlookPeriod"
       },
+      "PeakSeason": {
+        "properties": {
+          "months": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Months"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "part": {
+            "$ref": "#/components/schemas/MonthPart"
+          },
+          "gcm_min_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gcm Min Percent"
+          },
+          "gcm_max_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gcm Max Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "months",
+          "label",
+          "part",
+          "gcm_min_percent",
+          "gcm_max_percent"
+        ],
+        "title": "PeakSeason",
+        "description": "The three consecutive months of the period with the highest heat share.\n\nRanked by health share, not temperature, so it is not the weather heat\nseason: for LBW the months are birth months, whose pregnancies were\nexposed to the heat of earlier months. The share is the mean of the three\nmonths' typical-month shares; the range is the spread of the climate\nmodels, not a confidence interval."
+      },
       "PeriodPart": {
         "properties": {
           "side": {
             "type": "string",
             "enum": [
               "heat",
-              "cool"
+              "cool",
+              "total"
             ],
             "title": "Side"
           },
@@ -6569,6 +10176,34 @@
         ],
         "title": "PlaceListResponse"
       },
+      "PlacePopulation": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "under5": {
+            "type": "integer",
+            "title": "Under5"
+          },
+          "women_15_49": {
+            "type": "integer",
+            "title": "Women 15 49"
+          },
+          "area_km2": {
+            "type": "number",
+            "title": "Area Km2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "under5",
+          "women_15_49",
+          "area_km2"
+        ],
+        "title": "PlacePopulation"
+      },
       "PlaceResponse": {
         "properties": {
           "geography_id": {
@@ -6628,6 +10263,263 @@
           "supports_prediction"
         ],
         "title": "PlaceResponse"
+      },
+      "PlanChoices": {
+        "properties": {
+          "view": {
+            "type": "string",
+            "enum": [
+              "observed",
+              "projection"
+            ],
+            "title": "View"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "scenario": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "pattern": "^[A-Za-z0-9_.-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "pattern": "^[A-Za-z0-9_.-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "selector": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "pattern": "^[A-Za-z0-9_.-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selector"
+          },
+          "observed_selector": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "pattern": "^[A-Za-z0-9_.-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Selector"
+          },
+          "reference": {
+            "type": "string",
+            "enum": [
+              "annual",
+              "season",
+              "peak"
+            ],
+            "title": "Reference",
+            "default": "annual"
+          }
+        },
+        "type": "object",
+        "required": [
+          "view"
+        ],
+        "title": "PlanChoices",
+        "description": "The dashboard selections that reopen a saved view."
+      },
+      "PlanFigure": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "captured",
+              "unavailable"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Place"
+          },
+          "release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release"
+          },
+          "when": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "When"
+          },
+          "selector_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selector Label"
+          },
+          "percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent"
+          },
+          "low_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Percent"
+          },
+          "high_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Percent"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ratio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "heat_season_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heat Season Label"
+          },
+          "heat_season_months": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Heat Season Months",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "PlanFigure",
+        "description": "The published estimate for a plan's choices when it was saved."
+      },
+      "PlanSignals": {
+        "properties": {
+          "risk_level": {
+            "type": "string",
+            "enum": [
+              "elevated",
+              "possible",
+              "not_detected",
+              "unknown"
+            ],
+            "title": "Risk Level"
+          },
+          "timing": {
+            "type": "string",
+            "enum": [
+              "before",
+              "during",
+              "after"
+            ],
+            "title": "Timing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "risk_level",
+          "timing"
+        ],
+        "title": "PlanSignals",
+        "description": "Deterministic reading of the figure that recommendations are keyed on.\n\n``risk_level``: ``elevated`` when the ratio's 95% CI lies above 1,\n``possible`` when only the central estimate does (or a share is reported\nwithout a ratio), ``not_detected`` when the central ratio is at or below 1,\n``unknown`` without a figure. ``timing``: a projection plans ahead of the\nheat season; an observed month inside the official season is ``during``,\nup to two months after it ``after``, otherwise ``before``."
       },
       "PlanningOptionsResponse": {
         "properties": {
@@ -6705,6 +10597,117 @@
           "next_three_months"
         ],
         "title": "PlanningOptionsResponse"
+      },
+      "PopulationMap": {
+        "properties": {
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric",
+            "default": "attributable_fraction"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": "percent"
+          },
+          "bounds": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Bounds"
+          },
+          "simplify_tolerance_degrees": {
+            "type": "number",
+            "title": "Simplify Tolerance Degrees",
+            "default": 0.0
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/MapArea"
+            },
+            "type": "array",
+            "title": "Areas"
+          },
+          "measure": {
+            "type": "string",
+            "title": "Measure"
+          },
+          "measure_label": {
+            "type": "string",
+            "title": "Measure Label"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlacePopulation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "counts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PlacePopulation"
+            },
+            "type": "object",
+            "title": "Counts",
+            "default": {}
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_uri": {
+            "type": "string",
+            "title": "Source Uri"
+          },
+          "license": {
+            "type": "string",
+            "title": "License"
+          },
+          "citation": {
+            "type": "string",
+            "title": "Citation"
+          },
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography_id",
+          "outcome",
+          "measure",
+          "measure_label",
+          "source",
+          "source_uri",
+          "license",
+          "citation",
+          "year"
+        ],
+        "title": "PopulationMap"
       },
       "PredictRequest": {
         "properties": {
@@ -7524,6 +11527,92 @@
         ],
         "title": "ProjectionScenarioOptionResponse"
       },
+      "ProviderModels": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "provider",
+              "configured",
+              "none"
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "models",
+          "source"
+        ],
+        "title": "ProviderModels"
+      },
+      "ProviderOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "available"
+        ],
+        "title": "ProviderOption"
+      },
+      "RankedAction": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "reasons"
+        ],
+        "title": "RankedAction"
+      },
       "Ratio": {
         "properties": {
           "kind": {
@@ -7584,6 +11673,191 @@
         ],
         "title": "Recommendation",
         "description": "A ranked suggestion plus the human-readable reason it was picked."
+      },
+      "RecommendationRequest": {
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 3
+          }
+        },
+        "type": "object",
+        "title": "RecommendationRequest"
+      },
+      "RecommendationResponse": {
+        "properties": {
+          "ranker": {
+            "type": "string",
+            "title": "Ranker"
+          },
+          "ranker_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranker Model"
+          },
+          "ranker_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranker Note"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RankedAction"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "insight": {
+            "$ref": "#/components/schemas/Insight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ranker",
+          "items",
+          "insight"
+        ],
+        "title": "RecommendationResponse"
+      },
+      "RecommendationSettings": {
+        "properties": {
+          "ranker": {
+            "type": "string",
+            "maxLength": 32,
+            "title": "Ranker",
+            "default": "rules"
+          },
+          "insight_provider": {
+            "type": "string",
+            "maxLength": 32,
+            "title": "Insight Provider",
+            "default": "template"
+          },
+          "insight_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insight Model"
+          }
+        },
+        "type": "object",
+        "title": "RecommendationSettings"
+      },
+      "RecommendationSettingsResponse": {
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/RecommendationSettings"
+          },
+          "rankers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderOption"
+            },
+            "type": "array",
+            "title": "Rankers"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderOption"
+            },
+            "type": "array",
+            "title": "Providers"
+          },
+          "updated_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By User Id"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "settings",
+          "rankers",
+          "providers"
+        ],
+        "title": "RecommendationSettingsResponse"
+      },
+      "Reference": {
+        "properties": {
+          "citation": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Citation"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "citation"
+        ],
+        "title": "Reference"
+      },
+      "Rejection": {
+        "properties": {
+          "row": {
+            "type": "integer",
+            "title": "Row"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "reason"
+        ],
+        "title": "Rejection"
       },
       "ReleaseInfo": {
         "properties": {
@@ -7969,6 +12243,181 @@
         ],
         "title": "ResourceListResponse"
       },
+      "RunSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "weights": {
+            "type": "string",
+            "title": "Weights",
+            "default": "equal"
+          },
+          "area_count": {
+            "type": "integer",
+            "title": "Area Count"
+          },
+          "indicator_count": {
+            "type": "integer",
+            "title": "Indicator Count"
+          },
+          "class_breaks": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Class Breaks"
+          },
+          "input_hash": {
+            "type": "string",
+            "title": "Input Hash"
+          },
+          "output_hash": {
+            "type": "string",
+            "title": "Output Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "method_version",
+          "area_count",
+          "indicator_count",
+          "class_breaks",
+          "input_hash",
+          "output_hash"
+        ],
+        "title": "RunSummary"
+      },
+      "SavedPlanCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "geography_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Geography Id"
+          },
+          "admin_unit_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admin Unit Id"
+          },
+          "outcome": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{1,64}$",
+            "title": "Outcome"
+          },
+          "choices": {
+            "$ref": "#/components/schemas/PlanChoices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "geography_id",
+          "outcome",
+          "choices"
+        ],
+        "title": "SavedPlanCreate"
+      },
+      "SavedPlanList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SavedPlanResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "SavedPlanList"
+      },
+      "SavedPlanResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "admin_unit_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admin Unit Id"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "choices": {
+            "$ref": "#/components/schemas/PlanChoices"
+          },
+          "figure": {
+            "$ref": "#/components/schemas/PlanFigure"
+          },
+          "signals": {
+            "$ref": "#/components/schemas/PlanSignals"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "geography_id",
+          "admin_unit_id",
+          "outcome",
+          "choices",
+          "figure",
+          "signals",
+          "created_at"
+        ],
+        "title": "SavedPlanResponse"
+      },
       "SectorOption": {
         "properties": {
           "id": {
@@ -7987,6 +12436,36 @@
         ],
         "title": "SectorOption"
       },
+      "SettingOption": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "views": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "outlook",
+                "live"
+              ]
+            },
+            "type": "array",
+            "title": "Views"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "label",
+          "views"
+        ],
+        "title": "SettingOption"
+      },
       "SetupAdminInput": {
         "properties": {
           "name": {
@@ -8003,19 +12482,13 @@
             "type": "string",
             "minLength": 2,
             "title": "Username"
-          },
-          "password": {
-            "type": "string",
-            "minLength": 8,
-            "title": "Password"
           }
         },
         "type": "object",
         "required": [
           "name",
           "email",
-          "username",
-          "password"
+          "username"
         ],
         "title": "SetupAdminInput"
       },
@@ -8579,6 +13052,21 @@
             },
             "type": "array",
             "title": "Geographyscopes"
+          },
+          "invitation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "sent",
+                  "failed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invitation"
           }
         },
         "type": "object",
@@ -8631,6 +13119,56 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ValueSchema": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "number",
+              "integer",
+              "binary"
+            ],
+            "title": "Type"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "example": {
+            "type": "number",
+            "title": "Example"
+          },
+          "expected_values": {
+            "type": "string",
+            "title": "Expected Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "example",
+          "expected_values"
+        ],
+        "title": "ValueSchema"
       },
       "WhatIfRequest": {
         "properties": {

@@ -1,6 +1,7 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
-import { installFakeApi } from "./support/fakeApi";
+import { installFakeApi, json, mapFor } from "./support/fakeApi";
+import { actionList } from "./support/actions";
 
 const actionsUrl =
   "/dashboard/geo-in-mp/actions?outcome=lbw&admin_unit=geo-in-mp-bhopal";
@@ -17,11 +18,23 @@ const cards = (page: Page) =>
   page.getByRole("list", { name: /actions$/ }).getByRole("button");
 const panel = (page: Page) => page.getByRole("dialog");
 
-test("see all opens the library for the same place and outcome", async ({ page }) => {
+test("see all opens the action repository for the same place and outcome", async ({
+  page,
+}) => {
   await installFakeApi(page);
   await page.goto("/dashboard/geo-in-mp?admin_unit=geo-in-mp-bhopal&outcome=lbw");
 
-  await page.getByRole("link", { name: "See all recommended actions" }).click();
+  const panel = page.getByRole("region", { name: "Recommended actions" });
+  // The call to action is the secondary button: nexus blue text and border
+  // on white; no hazard chip.
+  const seeAll = panel.getByRole("link", { name: "See all recommended actions" });
+  await expect(seeAll).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(seeAll).toHaveCSS("color", "rgb(56, 62, 233)");
+  await expect(seeAll).toHaveCSS("border-top-color", "rgb(56, 62, 233)");
+  await expect(seeAll).toHaveCSS("height", "40px");
+  await expect(seeAll).toHaveCSS("font-family", /Fira Sans/);
+  await expect(panel.getByText(/^For extreme heat$/i)).toHaveCount(0);
+  await seeAll.click();
   await page.waitForURL(/\/dashboard\/geo-in-mp\/actions\?/);
   const url = new URL(page.url());
   expect(url.searchParams.get("admin_unit")).toBe("geo-in-mp-bhopal");
@@ -29,36 +42,39 @@ test("see all opens the library for the same place and outcome", async ({ page }
   await expect(
     page.getByRole("heading", { name: "Recommended actions" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("tab", { name: "Before heat season (2)" }),
-  ).toHaveAttribute("aria-selected", "true");
-  await expect(cards(page)).toHaveCount(2);
+  // The list view opens on every timeframe.
+  await expect(page.getByRole("button", { name: "List", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("list", { name: "All actions" })).toBeVisible();
+  await expect(cards(page)).toHaveCount(4);
 });
 
-test("season tabs and filters narrow the list", async ({ page }) => {
+test("the timeframe and other filters narrow the list", async ({ page }) => {
   await installFakeApi(page);
   await page.goto(actionsUrl);
 
-  await page.getByRole("tab", { name: /During heat season/ }).click();
-  await expect(page).toHaveURL(/season=During/);
+  await choose(page, "Timeframe", "During heat season");
+  await expect(page).toHaveURL(/season=during/);
+  await expect(
+    page.getByRole("list", { name: "During heat season actions" }),
+  ).toBeVisible();
   await expect(cards(page)).toHaveCount(3);
 
-  await choose(page, "Department", "Labour");
+  await choose(page, "Department", "Labour and occupational safety");
   await expect(cards(page)).toHaveCount(1);
-  await expect(cards(page).first()).toContainText("safe heat protocols");
-  // Counts follow the filters, so an empty season is visible before it is opened.
-  await expect(page.getByRole("tab", { name: "Before heat season (0)" })).toBeVisible();
+  await expect(cards(page).first()).toContainText("Safe heat protocols");
 
   await choose(page, "Cost level", "Low");
-  await expect(page.getByRole("status")).toHaveText(
-    "No during heat season actions match these filters.",
-  );
+  await expect(page.getByRole("status")).toHaveText("No actions match these filters.");
 
   await page.getByRole("button", { name: "Clear filters" }).click();
-  await expect(cards(page)).toHaveCount(3);
+  await expect(cards(page)).toHaveCount(4);
+  await expect(page).not.toHaveURL(/season=/);
 
   await page.screenshot({
-    path: "../outputs/e2e/web/actions-library.png",
+    path: "../outputs/e2e/web/action-repository.png",
     fullPage: true,
   });
 });
@@ -70,9 +86,9 @@ test("the detail panel jumps between sections and walks the filtered list", asyn
   await page.goto(actionsUrl);
 
   await cards(page).first().click();
-  await expect(page).toHaveURL(/action=recCounselling/);
+  await expect(page).toHaveURL(/action=recCounsel/);
   await expect(panel(page).getByRole("heading", { level: 2 })).toHaveText(
-    "Provide pregnancy-specific health counselling to pregnant women",
+    "Provide pregnancy-specific heat health counselling to pregnant women",
   );
 
   const sections = panel(page).getByRole("navigation", { name: "Action sections" });
@@ -84,11 +100,18 @@ test("the detail panel jumps between sections and walks the filtered list", asyn
   await expect(
     panel(page).getByRole("link", { name: /NRDC \(2024\)/ }),
   ).toBeInViewport();
+  // A reference without a link is listed as plain text.
+  await expect(panel(page).getByText("A citation without a link")).toBeVisible();
   await expect(panel(page).getByText("Case studies")).toBeVisible();
 
-  // Stakeholders written "Role — Example" show the example under the role.
+  // Curators' "1." lines render as a list.
+  const steps = panel(page).getByRole("region", { name: "Steps" });
+  await expect(steps.getByRole("listitem")).toHaveText([
+    "Drink water often",
+    "Rest in a shaded place",
+  ]);
   await sections.getByRole("button", { name: "Stakeholders" }).click();
-  await expect(panel(page).getByText("India: ASHAs")).toBeVisible();
+  await expect(panel(page).getByText("ASHA", { exact: true })).toBeVisible();
 
   // A reload keeps the panel open on the same action.
   await page.reload();
@@ -100,8 +123,8 @@ test("the detail panel jumps between sections and walks the filtered list", asyn
   await expect(panel(page).getByRole("heading", { level: 2 })).toContainText(
     "basic equipment and medicines",
   );
-  await expect(page).toHaveURL(/action=recHospitalEquipment/);
-  await panel(page).getByRole("button", { name: "Next action" }).click();
+  await expect(page).toHaveURL(/action=recEquipment/);
+  await panel(page).getByRole("button", { name: "Previous action" }).click();
   await expect(panel(page).getByRole("heading", { level: 2 })).toContainText(
     "pregnancy-specific",
   );
@@ -113,59 +136,328 @@ test("the detail panel jumps between sections and walks the filtered list", asyn
   await expect(panel(page)).toBeHidden();
 });
 
-test("status and district assignments persist and show on the cards", async ({
-  page,
-}) => {
+test("status persists and shows on the cards and the dashboard", async ({ page }) => {
   await installFakeApi(page);
-  await page.goto(`${actionsUrl}&action=recCounselling`);
+  await page.goto(`${actionsUrl}&action=recCounsel`);
 
   await panel(page).getByRole("combobox", { name: "Action status" }).click();
   await page.getByRole("option", { name: "In progress", exact: true }).click();
-
-  // District chips explain their share of cases on demand.
-  await panel(page).getByRole("button", { name: "Sheopur" }).click();
-  await expect(panel(page).getByRole("status")).toContainText(
-    "24.1% of low birth weight cases in Sheopur",
-  );
-
-  await panel(page).getByRole("button", { name: "Assign to districts →" }).click();
-  const form = panel(page).getByRole("form", { name: "Assign to districts" });
-  // Districts above 10% start ticked: Sheopur, Satna, Betul, Khargone, Panna, Damoh.
-  await expect(form.getByRole("checkbox", { checked: true })).toHaveCount(6);
-  await form.getByRole("checkbox", { name: /Damoh/ }).uncheck();
-  await form.getByLabel("Assign to").selectOption("RCH Officer");
-  await form.getByLabel("Due date").fill("2027-03-01");
-  await form.getByRole("button", { name: "Assign to selected districts" }).click();
-
-  await expect(
-    panel(page).getByText(/Assigned to 5 districts · RCH Officer · Due 1 Mar 2027/),
-  ).toBeVisible();
   await page.keyboard.press("Escape");
 
   const card = cards(page).first();
   await expect(card).toContainText("In progress");
-  await expect(card).toContainText("assigned to 5");
 
   await choose(page, "Status", "Not started");
-  await expect(cards(page)).toHaveCount(1);
+  await expect(cards(page)).toHaveCount(3);
   await expect(cards(page).first()).toContainText("basic equipment");
 
   // The same place's dashboard list reads the same record.
   await page.goto("/dashboard/geo-in-mp?admin_unit=geo-in-mp-bhopal&outcome=lbw");
   await expect(
-    page.getByRole("button", { name: /Open Provide pregnancy-specific/ }),
+    page.getByRole("button", { name: /Open Provide pregnancy-specific/ }).first(),
   ).toContainText("In progress");
 });
 
-test("a form with no districts ticked cannot be submitted", async ({ page }) => {
-  await installFakeApi(page);
-  await page.goto(`${actionsUrl}&action=recHospitalEquipment`);
+test("actions that fail to load say so and can be retried", async ({ page }) => {
+  const api = await installFakeApi(page);
+  let calls = 0;
+  api.on(/^\/api\/chart\/actions$/, (route) => {
+    calls += 1;
+    return calls === 1
+      ? json(route, { error: "INTERNAL_ERROR" }, 500)
+      : json(route, actionList);
+  });
+  await page.goto(actionsUrl);
 
-  await panel(page).getByRole("button", { name: "Assign to districts →" }).click();
-  const form = panel(page).getByRole("form", { name: "Assign to districts" });
-  for (const box of await form.getByRole("checkbox").all()) await box.uncheck();
-  await expect(form.getByText("Select at least one district to assign.")).toBeVisible();
+  const alert = page.getByRole("main").getByRole("alert");
+  await expect(alert).toContainText("Recommended actions could not be loaded.");
+  await expect(cards(page)).toHaveCount(0);
+  await alert.getByRole("button", { name: "Try again" }).click();
+  await expect(alert).toBeHidden();
+  await expect(cards(page)).toHaveCount(4);
+});
+
+/** The heat-season calendar in effect for Bhopal (Settings > Heat seasons):
+ * twelve letters from January, b before, d during, a after, o off. */
+const heatSeason = (
+  months: string,
+  inheritedFrom: string | null = "Madhya Pradesh",
+) => ({
+  geography_id: "geo-in-mp-bhopal",
+  name: "Bhopal",
+  level_label: "Division",
+  parent_id: "geo-in-mp",
+  depth: 2,
+  own: inheritedFrom ? null : months,
+  months,
+  state: inheritedFrom ? "inherited" : "custom",
+  inherited_from: inheritedFrom,
+  source: "IMD",
+});
+const seasonRoute = /^\/api\/chart\/heat-seasons\/geo-in-mp-bhopal$/;
+
+const ganttCards = (page: Page) =>
+  page.getByRole("list", { name: "Actions on the planning cycle" }).getByRole("button");
+
+test("the Gantt chart lays actions on the place's planning cycle", async ({
+  page,
+}, testInfo) => {
+  await page.clock.setFixedTime(new Date("2026-11-09T10:00:00"));
+  const api = await installFakeApi(page);
+  // India's March–June season with four months of preparation.
+  api.on(seasonRoute, (route) => json(route, heatSeason("bbddddaaaabb")));
+  await page.goto(actionsUrl);
+  await page.getByRole("button", { name: "Gantt chart", exact: true }).click();
+  await expect(page).toHaveURL(/view=gantt/);
+  const chart = page.getByRole("region", { name: "Gantt chart" });
   await expect(
-    form.getByRole("button", { name: "Assign to selected districts" }),
-  ).toBeDisabled();
+    chart.getByRole("list", { name: "Months" }).getByRole("listitem"),
+  ).toHaveText([
+    "Nov 2026",
+    "Dec",
+    "Jan 2027",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+  ]);
+  await expect(chart.getByTestId("gantt-today")).toHaveText("9 Nov 2026");
+  // The phases come from the place's calendar, editable in Settings.
+  await expect(chart).toContainText(
+    "4 months before the heat season, the heat season (March–June), and 4 months after.",
+  );
+  await expect(chart).toContainText(
+    "Phases follow the Madhya Pradesh heat-season calendar",
+  );
+  await expect(
+    chart.getByRole("link", { name: "Edit in Settings › Heat seasons" }),
+  ).toHaveAttribute("href", "/settings?tab=seasons");
+  for (const phase of [
+    "Before heat season",
+    "During heat season",
+    "After heat season",
+  ]) {
+    await expect(chart.getByText(phase, { exact: true })).toBeVisible();
+  }
+  // Each card spans its seasons, earliest first.
+  await expect(ganttCards(page)).toHaveCount(4);
+  const names = await ganttCards(page).evaluateAll((buttons) =>
+    buttons.map((button) => button.getAttribute("aria-label")),
+  );
+  expect(names).toEqual([
+    "Ensure basic equipment and medicines for the heat season, Nov to Feb",
+    "Provide pregnancy-specific heat health counselling to pregnant women, Nov to Jun",
+    "Set up cool shelters in markets, Mar to Jun",
+    "Safe heat protocols for pregnant workers, Mar to Oct",
+  ]);
+  const rows = page.getByRole("list", { name: "Actions on the planning cycle" });
+  const track = (await rows.boundingBox())!;
+  const shelter = (await ganttCards(page).nth(2).boundingBox())!;
+  // Mar–Jun is columns 5–8 of 12 (cards keep a 10px gutter each side).
+  expect((shelter.x - track.x - 10) / track.width).toBeCloseTo(4 / 12, 1);
+  expect((shelter.width + 20) / track.width).toBeCloseTo(4 / 12, 1);
+  await page.screenshot({ path: testInfo.outputPath("gantt.png"), fullPage: true });
+  await page.screenshot({
+    path: "../outputs/e2e/web/actions-gantt.png",
+    fullPage: true,
+  });
+
+  // Filters apply to the chart too.
+  await choose(page, "Department", "Labour and occupational safety");
+  await expect(ganttCards(page)).toHaveCount(1);
+  await page.getByRole("button", { name: "Clear filters" }).click();
+
+  // A card opens the detail panel, and a reload keeps the chart and panel.
+  await ganttCards(page).nth(2).click();
+  await expect(page).toHaveURL(/action=/);
+  await expect(panel(page).getByRole("heading", { level: 2 })).toHaveText(
+    "Set up cool shelters in markets",
+  );
+  await page.reload();
+  await expect(panel(page)).toBeVisible();
+  await expect(chart).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "List", exact: true }).click();
+  await expect(page).not.toHaveURL(/view=/);
+  await expect(cards(page)).toHaveCount(4);
+  expect(api.unhandled).toEqual([]);
+});
+
+for (const [label, respond, first, shelterSpan] of [
+  [
+    "a season that wraps the year",
+    (route: Route) => json(route, heatSeason("dddaaaaabbbb", null)),
+    "Sep 2026",
+    "Jan to Mar",
+  ],
+  [
+    "a calendar that cannot load",
+    (route: Route) => json(route, { error: "UPSTREAM_UNAVAILABLE" }, 503),
+    "Nov 2026",
+    "Mar to Jun",
+  ],
+] as const) {
+  test(`the Gantt chart handles ${label}`, async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-11-09T10:00:00"));
+    const api = await installFakeApi(page);
+    api.on(seasonRoute, respond);
+    await page.goto(`${actionsUrl}&view=gantt`);
+    const months = page
+      .getByRole("region", { name: "Gantt chart" })
+      .getByRole("list", { name: "Months" })
+      .getByRole("listitem");
+    await expect(months.first()).toHaveText(first);
+    await expect(
+      ganttCards(page).filter({ hasText: "Set up cool shelters in markets" }),
+    ).toHaveAttribute("aria-label", `Set up cool shelters in markets, ${shelterSpan}`);
+    expect(api.unhandled).toEqual([]);
+  });
+}
+
+test("the dashboard groups recommended actions by heat season", async ({ page }) => {
+  await installFakeApi(page);
+  await page.goto("/dashboard/geo-in-mp?admin_unit=geo-in-mp-bhopal&outcome=lbw");
+  const panel = page.getByRole("region", { name: "Recommended actions" });
+  for (const [season, titles] of [
+    [
+      "Before heat season",
+      [
+        "Provide pregnancy-specific heat health counselling to pregnant women",
+        "Ensure basic equipment and medicines for the heat season",
+      ],
+    ],
+    [
+      "During heat season",
+      [
+        "Provide pregnancy-specific heat health counselling to pregnant women",
+        "Safe heat protocols for pregnant workers",
+        "Set up cool shelters in markets",
+      ],
+    ],
+    ["After heat season", ["Safe heat protocols for pregnant workers"]],
+  ] as const) {
+    const column = panel.getByRole("region", { name: season });
+    await expect(column.getByRole("heading", { level: 3 })).toHaveText(season);
+    await expect(column.getByRole("button")).toHaveText(
+      titles.map((title) => new RegExp(title)),
+    );
+  }
+  await panel
+    .getByRole("region", { name: "After heat season" })
+    .getByRole("button")
+    .click();
+  await expect(page.getByRole("dialog").getByRole("heading", { level: 2 })).toHaveText(
+    "Safe heat protocols for pregnant workers",
+  );
+  await page.keyboard.press("Escape");
+  await panel.screenshot({
+    path: "../outputs/e2e/web/dashboard-actions-by-season.png",
+  });
+});
+
+test("each action names the place's areas at elevated risk, highest first", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-11-09T10:00:00"));
+  const api = await installFakeApi(page);
+  api.on(seasonRoute, (route) => json(route, heatSeason("bbddddaaaabb")));
+  // The state's divisions as the dashboard map shows them: no outlook map,
+  // so the observed risk map is read.
+  api.on(/^\/api\/chart\/risk\/geo-in-mp\/map$/, (route, url) => {
+    const base = mapFor(url);
+    const values: [string, number | null][] = [
+      ["sagar", 9],
+      ["rewa", 18],
+      ["bhopal", 12],
+      ["indore", 3],
+      ["ujjain", 6],
+      ["gwalior", null],
+    ];
+    return json(route, {
+      ...base,
+      areas: values.map(([code, value], index) => ({
+        ...base.areas[0],
+        geography_id: `geo-in-mp-${code}`,
+        admin_unit_id: index + 1,
+        code,
+        name: `${code[0].toUpperCase()}${code.slice(1)} Division`,
+        value_percent: value,
+        missing_reason: value === null ? "no_prediction" : null,
+      })),
+    });
+  });
+  await page.goto(actionsUrl);
+
+  // List (09a): dots by risk band, two names, the rest counted; 3% and the
+  // division without a result are left out.
+  const first = cards(page).first();
+  await expect(first).toContainText("Rewa, Bhopal +2 more divisions at elevated risk");
+  const dots = first.locator("[title]");
+  await expect(dots).toHaveCount(4);
+  await expect(dots.first()).toHaveAttribute("title", "Rewa: 18.0%");
+  await expect(dots.first()).toHaveCSS("background-color", "rgb(163, 21, 79)");
+  // The breadcrumb's place leads back to its dashboard, as in the design.
+  await expect(
+    page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", {
+      name: "Bhopal Division",
+    }),
+  ).toHaveAttribute(
+    "href",
+    "/dashboard/geo-in-mp?outcome=lbw&admin_unit=geo-in-mp-bhopal",
+  );
+  await expect(page.getByRole("link", { name: /Back to dashboard/ })).toHaveCount(0);
+  await expect(cards(page)).toHaveCount(4);
+  for (const card of await cards(page).all())
+    await expect(card).toContainText("Rewa, Bhopal +2 more");
+
+  // Gantt (09b): the same places under a "Priority divisions" heading.
+  await page.getByRole("button", { name: "Gantt chart", exact: true }).click();
+  const gantt = page
+    .getByRole("list", { name: "Actions on the planning cycle" })
+    .getByRole("button")
+    .first();
+  await expect(gantt).toContainText("Priority divisions");
+  await expect(gantt).toContainText("Rewa, Bhopal +2 more");
+  await page.screenshot({
+    path: "../outputs/e2e/web/actions-gantt-priority.png",
+    fullPage: true,
+  });
+  expect(
+    api.requests.some((request) => request.includes("/heat-outlook/geo-in-mp/map")),
+  ).toBe(true);
+  expect(api.unhandled).toEqual([]);
+});
+
+test("list cards show an emoji for the action type and the list keeps to 80% of the page", async ({
+  page,
+}) => {
+  await installFakeApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(actionsUrl);
+  const list = page.getByRole("list", { name: "All actions" });
+  await expect(cards(page)).toHaveCount(4);
+
+  const counselling = cards(page).filter({ hasText: "pregnancy-specific" });
+  const thumb = counselling.locator("span[aria-hidden]").first();
+  await expect(thumb).toHaveText("🗣️");
+  await expect(thumb).toHaveCSS("font-size", "26px");
+  await expect(
+    cards(page)
+      .filter({ hasText: "cool shelters" })
+      .locator("span[aria-hidden]")
+      .first(),
+  ).toHaveText("🏗️");
+
+  const widthRatio = () =>
+    list.evaluate((el) => el.clientWidth / el.parentElement!.clientWidth);
+  expect(await widthRatio()).toBeCloseTo(0.8, 2);
+
+  // A phone uses the full width.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(widthRatio).toBeCloseTo(1, 2);
 });

@@ -7,6 +7,8 @@
  * and a pull must not be held open anyway, since it takes minutes.
  */
 
+import { authFetch } from "./authFetch";
+
 export type AreaCoverage = {
   geography_id: string | null;
   admin_unit_id: number;
@@ -44,10 +46,6 @@ export type IngestionJob = {
   completed_at: string | null;
 };
 
-function authHeaders(accessToken?: string): Record<string, string> {
-  return accessToken ? { authorization: `Bearer ${accessToken}` } : {};
-}
-
 async function readError(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { error?: string; detail?: string };
@@ -58,26 +56,24 @@ async function readError(response: Response): Promise<string> {
 }
 
 export async function fetchClimateCoverage(
-  accessToken: string,
+  accessToken: string | null | undefined,
   signal?: AbortSignal,
 ): Promise<CountryCoverage[]> {
-  const response = await fetch("/api/chart/climate/coverage", {
-    cache: "no-store",
-    headers: authHeaders(accessToken),
-    signal: AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(30_000)]),
+  const response = await authFetch("/api/chart/climate/coverage", {
+    accessToken,
+    signal,
   });
   if (!response.ok) throw new Error(await readError(response));
   return (await response.json()) as CountryCoverage[];
 }
 
 export async function fetchIngestionJobs(
-  accessToken: string,
+  accessToken: string | null | undefined,
   signal?: AbortSignal,
 ): Promise<IngestionJob[]> {
-  const response = await fetch("/api/chart/climate/ingestion-jobs?limit=20", {
-    cache: "no-store",
-    headers: authHeaders(accessToken),
-    signal: AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(30_000)]),
+  const response = await authFetch("/api/chart/climate/ingestion-jobs?limit=20", {
+    accessToken,
+    signal,
   });
   if (!response.ok) throw new Error(await readError(response));
   return (await response.json()) as IngestionJob[];
@@ -89,13 +85,14 @@ export async function fetchIngestionJobs(
  * comes back rather than a second download of the same grid.
  */
 export async function startClimatePull(
-  accessToken: string,
+  accessToken: string | null | undefined,
   countryCode: string,
   months?: string[],
 ): Promise<IngestionJob> {
-  const response = await fetch("/api/chart/climate/ingestion-jobs", {
+  const response = await authFetch("/api/chart/climate/ingestion-jobs", {
     method: "POST",
-    headers: { "content-type": "application/json", ...authHeaders(accessToken) },
+    accessToken,
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({ country_code: countryCode, months: months ?? [] }),
   });
   if (!response.ok) throw new Error(await readError(response));

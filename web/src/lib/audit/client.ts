@@ -1,3 +1,5 @@
+import { authFetch, readErrorCode } from "@/lib/authFetch";
+
 import type { AuditEvent, AuditListResponse } from "./types";
 
 const ENDPOINT = "/api/chart/audit/events";
@@ -13,40 +15,40 @@ export async function postAuditBatch(
   accessToken: string,
   init: { keepalive?: boolean; signal?: AbortSignal } = {},
 ): Promise<{ inserted: number }> {
-  const response = await fetch(ENDPOINT, {
+  const response = await authFetch(ENDPOINT, {
     method: "POST",
-    cache: "no-store",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${accessToken}`,
-    },
+    accessToken,
+    headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
     keepalive: init.keepalive ?? false,
     signal: init.signal,
+    timeoutMs: 15_000,
   });
   if (!response.ok) {
-    const err = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new AuditFlushError(response.status, err?.error ?? "AUDIT_FLUSH_FAILED");
+    throw new AuditFlushError(
+      response.status,
+      (await readErrorCode(response)) ?? "AUDIT_FLUSH_FAILED",
+    );
   }
   return (await response.json()) as { inserted: number };
 }
 
 export async function getAuditEvents(
-  accessToken: string,
+  accessToken: string | null | undefined,
   params: { limit?: number; before?: string } = {},
 ): Promise<AuditListResponse> {
   const query = new URLSearchParams();
   if (params.limit) query.set("limit", String(params.limit));
   if (params.before) query.set("before", params.before);
   const suffix = query.toString();
-  const response = await fetch(`${ENDPOINT}${suffix ? `?${suffix}` : ""}`, {
-    method: "GET",
-    cache: "no-store",
-    headers: { authorization: `Bearer ${accessToken}` },
+  const response = await authFetch(`${ENDPOINT}${suffix ? `?${suffix}` : ""}`, {
+    accessToken,
   });
   if (!response.ok) {
-    const err = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new AuditFlushError(response.status, err?.error ?? "AUDIT_FETCH_FAILED");
+    throw new AuditFlushError(
+      response.status,
+      (await readErrorCode(response)) ?? "AUDIT_FETCH_FAILED",
+    );
   }
   return (await response.json()) as AuditListResponse;
 }

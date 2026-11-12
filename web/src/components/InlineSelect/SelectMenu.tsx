@@ -20,7 +20,11 @@ type Props = {
   groups?: readonly (InlineSelectGroup | null)[];
   label: string;
   disabled?: boolean;
+  /** `md` (default) is the plan page's sentence pill; `sm` is for dense rows. */
+  size?: SelectSize;
 };
+
+export type SelectSize = "md" | "sm";
 
 /** One small, keyboard-operated menu for the dashboard's context and inline controls. */
 export function SelectMenu({
@@ -31,6 +35,7 @@ export function SelectMenu({
   groups,
   label,
   disabled,
+  size = "md",
 }: Props) {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -157,7 +162,7 @@ export function SelectMenu({
         id={triggerId}
         ref={trigger}
         type="button"
-        className={styles.trigger}
+        className={size === "sm" ? `${styles.trigger} ${styles.sm}` : styles.trigger}
         role="combobox"
         aria-label={label}
         aria-expanded={open}
@@ -175,9 +180,23 @@ export function SelectMenu({
         <span>
           {items.find((item) => item.value === value)?.label ?? "Choose an option"}
         </span>
-        <span className={styles.chevron} aria-hidden>
-          ⌄
-        </span>
+        {/* Drawn rather than the "⌄" glyph, which sits on the text baseline
+            and so hangs below the label's centre at every size. */}
+        <svg
+          className={styles.chevron}
+          viewBox="0 0 12 12"
+          aria-hidden
+          focusable="false"
+        >
+          <path
+            d="M3 4.5 6 7.5l3-3"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </button>
       {open &&
         createPortal(

@@ -97,7 +97,6 @@ class SetupAdminInput(BaseModel):
     name: str = Field(min_length=2)
     email: str = Field(min_length=3)
     username: str = Field(min_length=2)
-    password: str = Field(min_length=8)
 
 
 class BootstrapSetupInput(CompleteSetupInput):

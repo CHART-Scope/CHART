@@ -58,6 +58,7 @@ from .service import (
     ClimateServiceError,
     climate_for_request,
     score_prepared_prediction,
+    require_enabled_by_settings,
     validate_prediction_request,
 )
 
@@ -85,8 +86,13 @@ def submit_prediction(
     requested_by_user_id: str | None = None,
     session_factory=None,
     now: datetime | None = None,
+    inline: bool = True,
 ) -> PredictResponse | PredictionAcceptedResponse:
-    """Create one versioned request; data preparation happens in Dagster."""
+    """Create one versioned request and score it now when its inputs are stored.
+
+    Otherwise (observations still to be pulled) Dagster prepares and scores
+    it, and the caller polls the returned request.
+    """
 
     place = validate_prediction_request(request, session_factory=session_factory)
     assert place.model is not None
@@ -104,6 +110,7 @@ def submit_prediction(
             409,
             ",".join(str(window) for window in unsupported_windows),
         )
+    require_enabled_by_settings(request, session_factory=session_factory, now=now)
     session_factory = session_factory or get_session_factory()
     current_time = now or _now()
     source_as_of = current_time.date()
@@ -130,12 +137,17 @@ def submit_prediction(
     # stored result is keyed on place, outcome, release, month, scenario and
     # horizon - not on who asked - so a colleague's computed month answers
     # instantly instead of queueing a fresh ERA5 pull.
+    windows: set[int] = {
+        window or 0
+        for window in scoring_windows(request, place.model.validated_pregnancy_windows)
+    }
     stored = _stored_result_for(
         session_factory,
         admin_unit_id=place.admin_unit.id,
         outcome=request.outcome,
         model_release_id=place.model.release_id,
         request=request,
+        windows=windows,
     )
     if stored is not None:
         return stored
@@ -154,8 +166,13 @@ def submit_prediction(
         admin_unit_id=place.admin_unit.id,
         model_release_id=place.model.release_id,
         request=request,
+        windows=windows,
     )
     if live is not None:
+        if isinstance(live, PredictResponse):
+            # A completed run computed these windows; make sure each one is
+            # stored too (earlier versions stored only the primary window).
+            _store_completed_result(session_factory, live)
         return live
 
     record = _get_or_create_request(
@@ -173,6 +190,10 @@ def submit_prediction(
     )
     if record.status == "completed" and record.result_payload is not None:
         return PredictResponse.model_validate(record.result_payload)
+    if record.status == "queued" and inline:
+        scored = score_inline_if_ready(record.id, session_factory=session_factory)
+        if scored is not None:
+            return scored
     return _accepted(record)
 
 
@@ -282,6 +303,98 @@ def list_queued_prediction_requests(
             for record in records
             for request in [PredictRequest.model_validate(record.request_payload)]
         ]
+
+
+#: Lease owner of a request scored inside the API call that created it.
+INLINE_OWNER = "api-inline"
+
+
+def score_inline_if_ready(
+    request_id: int, *, session_factory=None
+) -> PredictResponse | None:
+    """Score a fresh request now when its climate inputs are already stored.
+
+    Scoring itself takes about two seconds (selecting the stored months and
+    one call to the model service). Through Dagster the same request waited
+    a minute or more on run and process start-up, so a planner opening a
+    month whose observations CHART already holds waited for nothing.
+
+    The request is reserved and claimed under the same lease rules as the
+    Dagster sensor, so exactly one of the two can own it. Anything that is not
+    an immediate success - observations still to be pulled, the model service
+    unavailable - hands the request back to the queue unchanged, and Dagster
+    runs it exactly as before. This path only ever saves time.
+    """
+
+    session_factory = session_factory or get_session_factory()
+    token = _reserve_one(request_id, session_factory=session_factory)
+    if token is None:
+        return None
+    if not claim_prediction_request(
+        request_id,
+        dagster_run_id=f"{INLINE_OWNER}-{token[:12]}",
+        lease_token=token,
+        session_factory=session_factory,
+    ):
+        _return_to_queue(request_id, token, session_factory=session_factory)
+        return None
+    try:
+        prepare_prediction_input(
+            request_id,
+            live=os.getenv("CLIMATE_USE_FIXTURE", os.getenv("ERA5_USE_FIXTURE", "0"))
+            != "1",
+            lease_token=token,
+            session_factory=session_factory,
+        )
+        return complete_prediction_request(
+            request_id, lease_token=token, session_factory=session_factory
+        )
+    except Exception:  # noqa: BLE001 - every failure falls back to Dagster
+        logger.info("prediction %s not scored inline; queued for Dagster", request_id)
+        _return_to_queue(request_id, token, session_factory=session_factory)
+        return None
+
+
+def _reserve_one(request_id: int, *, session_factory) -> str | None:
+    """Lease one queued request, as ``reserve_queued_prediction_requests`` does."""
+
+    current_time = _now()
+    with session_factory() as session:
+        record = session.get(PredictionRequestRecord, request_id, with_for_update=True)
+        if (
+            record is None
+            or record.status != "queued"
+            or record.lease_token is not None
+        ):
+            return None
+        token = secrets.token_hex(24)
+        record.lease_token = token
+        record.lease_owner = INLINE_OWNER
+        record.lease_expires_at = current_time + _lease_duration()
+        record.heartbeat_at = current_time
+        record.updated_at = current_time
+        session.commit()
+        return token
+
+
+def _return_to_queue(request_id: int, token: str, *, session_factory) -> None:
+    """Give an inline attempt back to the queue, keeping any stored inputs."""
+
+    with session_factory() as session:
+        record = session.get(PredictionRequestRecord, request_id, with_for_update=True)
+        if record is None or record.status == "completed":
+            return
+        if record.lease_token is None or not secrets.compare_digest(
+            record.lease_token, token
+        ):
+            return
+        record.status = "queued"
+        record.stage = "queued"
+        record.dagster_run_id = None
+        record.error_code = None
+        _clear_lease(record)
+        record.updated_at = _now()
+        session.commit()
 
 
 def reserve_queued_prediction_requests(
@@ -656,6 +769,16 @@ def complete_prediction_request(
     )
 
 
+def _store_completed_result(session_factory, result: PredictResponse) -> None:
+    """Write any window of a completed request's result that is not stored."""
+    with session_factory() as session:
+        record = session.get(PredictionRequestRecord, result.request_id)
+        if record is None:
+            return
+        _store_prediction_result(session, record, result)
+        session.commit()
+
+
 def _store_prediction_result(
     session: Session,
     record: PredictionRequestRecord,
@@ -706,18 +829,22 @@ def _store_prediction_result(
                 "prediction_result refused for request %s: %s", record.id, problem
             )
             return
-        upsert_prediction_result(
-            session,
-            result=result,
-            admin_unit_id=record.admin_unit_id,
-            outcome=_outcome_from_record(record),
-            model_release_id=release_id,
-            valid_month=record.planning_date,
-            model_artifact_sha256=record.model_artifact_sha256,
-            reference_kind=reference_kind,
-            climate_input_window_id=record.climate_input_window_id,
-            prediction_request_id=record.id,
-        )
+        # Every scored pregnancy window is its own row, so each window the
+        # dashboard offers reads its own result.
+        for prediction in result.predictions or [result.prediction]:
+            upsert_prediction_result(
+                session,
+                result=result,
+                prediction=prediction,
+                admin_unit_id=record.admin_unit_id,
+                outcome=_outcome_from_record(record),
+                model_release_id=release_id,
+                valid_month=record.planning_date,
+                model_artifact_sha256=record.model_artifact_sha256,
+                reference_kind=reference_kind,
+                climate_input_window_id=record.climate_input_window_id,
+                prediction_request_id=record.id,
+            )
     except Exception:  # noqa: BLE001 - must not fail an otherwise good run
         logger.exception(
             "prediction_result write failed for request %s; the prediction is "
@@ -732,8 +859,12 @@ def _live_request_for(
     admin_unit_id: int,
     model_release_id: str,
     request: PredictRequest,
+    windows: set[int],
 ) -> PredictResponse | PredictionAcceptedResponse | None:
     """An existing request for this grain that still counts, if there is one.
+
+    It must also cover every requested pregnancy window: a request for window
+    1 does not answer one for windows 1-3.
 
     "Counts" means waiting, queued or running - work that will produce the
     answer - or completed with a payload. A failed request is deliberately not
@@ -779,13 +910,24 @@ def _live_request_for(
                 continue
             if record.status == "completed" and record.result_payload is not None:
                 try:
-                    return PredictResponse.model_validate(record.result_payload)
+                    done = PredictResponse.model_validate(record.result_payload)
                 except ValidationError:
                     # A payload whose shape has drifted is not a usable
                     # answer; queue the work again rather than reaching
                     # further back for an even older one.
                     return None
-            return _accepted(record)
+                covered = {
+                    item.pregnancy_window or 0
+                    for item in done.predictions or [done.prediction]
+                }
+                if windows <= covered:
+                    return done
+                continue
+            asked = set(
+                PredictRequest.model_validate(payload).selected_pregnancy_windows()
+            )
+            if set(request.selected_pregnancy_windows()) <= asked:
+                return _accepted(record)
         return None
 
 
@@ -796,16 +938,19 @@ def _stored_result_for(
     outcome: str,
     model_release_id: str,
     request: PredictRequest,
+    windows: set[int],
 ) -> PredictResponse | None:
     """The completed request behind an existing result for this grain, if any.
 
     Returns the original ``PredictResponse`` rather than rebuilding one from
     the stored columns, so a repeat caller gets byte-identical climate
-    provenance and availability detail to the first.
+    provenance and availability detail to the first. Every requested
+    pregnancy window must be stored: a month held for window 1 does not
+    answer a request for windows 1-3.
     """
 
     with session_factory() as session:
-        row = session.scalar(
+        rows = session.scalars(
             select(PredictionResult).where(
                 PredictionResult.admin_unit_id == admin_unit_id,
                 PredictionResult.outcome == outcome,
@@ -815,6 +960,11 @@ def _stored_result_for(
                 == _resolve_scenario_label(request.projection_scenario),
                 PredictionResult.horizon == resolve_horizon(request.planning_target),
             )
+        ).all()
+        if not windows <= {stored.pregnancy_window for stored in rows}:
+            return None
+        row = next(
+            (stored for stored in rows if stored.pregnancy_window in windows), None
         )
         if row is None or row.prediction_request_id is None:
             return None

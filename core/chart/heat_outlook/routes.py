@@ -6,39 +6,128 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from chart.heat_seasons.service import season_months
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import require_current_user
+from chart.auth.service import can_read_geography_path, require_reader
+from chart.model_settings.service import live_restriction, outlook_restriction
 from chart.risk.routes import _require_read_access as require_read_access
 from chart.risk.schemas import MapResponse
 from chart.risk.service import NoAdminUnitForGeography
 from chart.shared.db.session import get_session_factory
+from chart.shared.db.models import AppGeography
+from sqlalchemy import select
 
-from .schemas import HeatOutlookResponse
+from .observed import (
+    ObservedNotCalibrated,
+    load_observed,
+    load_observed_map,
+)
+from chart.population.service import (
+    PopulationMap,
+    PopulationNotAvailable,
+    load_population_map,
+)
+
+from .forecast import (
+    ForecastMap,
+    ForecastResponse,
+    load_forecast,
+    load_forecast_map,
+)
+from .climate_layer import ClimateLayerResponse, load_climate_layer
+from .observed_stored import (
+    live_model_release,
+    load_stored_observed,
+    load_stored_observed_map,
+)
+from .schemas import HeatOutlookResponse, ObservedResponse, OutlookCapabilities
 from .service import (
     LBW_OUTCOME,
+    published_index,
     OutlookNotAvailable,
     OutlookSelectionInvalid,
+    ViewTurnedOff,
     load_outlook,
     load_outlook_map,
+    load_capabilities,
+    legacy_observed_geography,
 )
 
 router = APIRouter(prefix="/heat-outlook", tags=["heat-outlook"])
 
 
+def _restriction(geography_id: str, outcome: str):
+    item = published_index().get(geography_id)
+    if item is not None:
+        return outlook_restriction(outcome, country_code=item["country_code"])
+    return outlook_restriction(outcome)
+
+
+@router.get("/{geography_id}/capabilities", response_model=OutlookCapabilities)
+def capabilities(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
+    outcome: str = LBW_OUTCOME,
+) -> OutlookCapabilities:
+    require_read_access(user, geography_id)
+    with get_session_factory()() as session:
+        geography = session.get(AppGeography, geography_id)
+        country_code = geography.country_code if geography else "KE"
+        monthly = live_restriction(session, country_code, outcome)
+        try:
+            return load_capabilities(
+                session,
+                geography_id,
+                outcome,
+                restriction=outlook_restriction(outcome, country_code=country_code),
+                monthly_observed_enabled=(
+                    monthly is not None and "observed" in monthly.data_modes
+                ),
+            )
+        except OutlookNotAvailable as exc:
+            raise HTTPException(
+                status_code=404, detail="OUTLOOK_NOT_PUBLISHED"
+            ) from exc
+
+
+def _live_observed(session, geography_id: str, outcome: str):
+    """The country's live-model settings, when they leave observed months on."""
+    geography = session.get(AppGeography, geography_id)
+    monthly = live_restriction(
+        session, geography.country_code if geography else "IN", outcome
+    )
+    if monthly is None or "observed" not in monthly.data_modes:
+        raise ViewTurnedOff("observed")
+    return monthly
+
+
+def _scoped_map(session, frame, user):
+    paths = dict(session.execute(select(AppGeography.id, AppGeography.path)).all())
+    frame.areas = [
+        area
+        for area in frame.areas
+        if area.geography_id in paths
+        and can_read_geography_path(user, paths[area.geography_id])
+    ]
+    return frame
+
+
 @router.get(
     "/{geography_id}",
     response_model=HeatOutlookResponse,
-    summary="Read the pre-computed heat outlook for a Kenyan place",
+    summary="Read a published geography heat outlook",
 )
 def read_heat_outlook(
     geography_id: str,
-    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
     outcome: str = LBW_OUTCOME,
     scenario: Annotated[str | None, Query(max_length=16)] = None,
     period: Annotated[str | None, Query(max_length=16)] = None,
     selector: Annotated[str | None, Query(max_length=32)] = None,
 ) -> HeatOutlookResponse:
     require_read_access(user, geography_id)
+    with get_session_factory()() as session:
+        months = season_months(session, geography_id)
     try:
         return load_outlook(
             geography_id,
@@ -46,7 +135,11 @@ def read_heat_outlook(
             scenario=scenario,
             period=period,
             selector=selector,
+            restriction=_restriction(geography_id, outcome),
+            season_months=months,
         )
+    except ViewTurnedOff as exc:
+        raise HTTPException(status_code=404, detail="VIEW_TURNED_OFF") from exc
     except OutlookNotAvailable as exc:
         raise HTTPException(status_code=404, detail="OUTLOOK_NOT_PUBLISHED") from exc
     except OutlookSelectionInvalid as exc:
@@ -58,29 +151,251 @@ def read_heat_outlook(
 @router.get(
     "/{geography_id}/map",
     response_model=MapResponse,
-    summary="Read Kenyan counties shaded by annual-average heat share",
+    summary="Read administrative areas shaded by annual-average heat share",
 )
 def read_heat_outlook_map(
     geography_id: str,
-    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
     outcome: str = LBW_OUTCOME,
     scenario: Annotated[str | None, Query(max_length=16)] = None,
     period: Annotated[str | None, Query(max_length=16)] = None,
     selector: Annotated[str | None, Query(max_length=32)] = None,
+    reference: Annotated[str, Query(pattern="^(annual|peak|season)$")] = "annual",
 ) -> MapResponse:
     require_read_access(user, geography_id)
+    restriction = _restriction(geography_id, outcome)
     try:
         with get_session_factory()() as session:
-            return load_outlook_map(
+            frame = load_outlook_map(
                 session,
                 geography_id,
                 outcome,
                 scenario=scenario,
                 period=period,
                 selector=selector,
+                restriction=restriction,
+                reference=reference,
             )
+            return _scoped_map(session, frame, user)
+    except ViewTurnedOff as exc:
+        raise HTTPException(status_code=404, detail="VIEW_TURNED_OFF") from exc
     except (OutlookNotAvailable, NoAdminUnitForGeography) as exc:
         raise HTTPException(status_code=404, detail="OUTLOOK_NOT_PUBLISHED") from exc
+    except OutlookSelectionInvalid as exc:
+        raise HTTPException(
+            status_code=422, detail="OUTLOOK_SELECTION_INVALID"
+        ) from exc
+
+
+@router.get(
+    "/{geography_id}/observed",
+    response_model=ObservedResponse,
+    summary="Score an observed month for a Kenyan place from ERA5",
+)
+def read_observed(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
+    outcome: str = LBW_OUTCOME,
+    month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+    selector: Annotated[str | None, Query(max_length=32)] = None,
+) -> ObservedResponse:
+    require_read_access(user, geography_id)
+    restriction = _restriction(geography_id, outcome)
+    try:
+        with get_session_factory()() as session:
+            if not legacy_observed_geography(session, geography_id, outcome):
+                if live_model_release(session, geography_id, outcome) is None:
+                    raise OutlookNotAvailable(geography_id)
+                return load_stored_observed(
+                    session,
+                    geography_id,
+                    outcome,
+                    month=month,
+                    selector=selector,
+                    restriction=_live_observed(session, geography_id, outcome),
+                )
+            return load_observed(
+                session,
+                geography_id,
+                outcome,
+                month=month,
+                selector=selector,
+                restriction=restriction,
+            )
+    except ViewTurnedOff as exc:
+        raise HTTPException(status_code=404, detail="VIEW_TURNED_OFF") from exc
+    except (OutlookNotAvailable, ObservedNotCalibrated, FileNotFoundError) as exc:
+        raise HTTPException(status_code=404, detail="OBSERVED_NOT_AVAILABLE") from exc
+    except OutlookSelectionInvalid as exc:
+        raise HTTPException(
+            status_code=422, detail="OUTLOOK_SELECTION_INVALID"
+        ) from exc
+
+
+@router.get(
+    "/{geography_id}/observed/map",
+    response_model=MapResponse,
+    summary="Read an observed map at the selected geography level",
+)
+def read_observed_map(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
+    outcome: str = LBW_OUTCOME,
+    month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+    selector: Annotated[str | None, Query(max_length=32)] = None,
+) -> MapResponse:
+    """Map the selected hierarchy, leaving uncalibrated areas explicitly empty.
+
+    County estimates never become constituency values. Places without an
+    observed scorer return outlines only, with null values and `no_model`;
+    their estimate endpoint remains unavailable. Country view settings and
+    geography permissions still apply.
+    """
+    require_read_access(user, geography_id)
+    restriction = _restriction(geography_id, outcome)
+    try:
+        with get_session_factory()() as session:
+            if legacy_observed_geography(session, geography_id, outcome):
+                frame = load_observed_map(
+                    session,
+                    geography_id,
+                    outcome,
+                    month=month,
+                    selector=selector,
+                    restriction=restriction,
+                )
+            else:
+                geography = session.get(AppGeography, geography_id)
+                country_code = geography.country_code if geography else "KE"
+                monthly = live_restriction(session, country_code, outcome)
+                if not restriction.allows("observed") and (
+                    monthly is None or "observed" not in monthly.data_modes
+                ):
+                    raise ViewTurnedOff("observed")
+                frame = load_stored_observed_map(
+                    session,
+                    geography_id,
+                    outcome,
+                    month,
+                    selector=selector,
+                    restriction=monthly,
+                )
+            return _scoped_map(session, frame, user)
+    except ViewTurnedOff as exc:
+        raise HTTPException(status_code=404, detail="VIEW_TURNED_OFF") from exc
+    except (
+        OutlookNotAvailable,
+        ObservedNotCalibrated,
+        NoAdminUnitForGeography,
+        FileNotFoundError,
+    ) as exc:
+        raise HTTPException(status_code=404, detail="OBSERVED_NOT_AVAILABLE") from exc
+    except OutlookSelectionInvalid as exc:
+        raise HTTPException(
+            status_code=422, detail="OUTLOOK_SELECTION_INVALID"
+        ) from exc
+
+
+@router.get(
+    "/{geography_id}/climate",
+    response_model=ClimateLayerResponse,
+    summary="Read ERA5-Land temperature or heatwave days for the frame's areas",
+)
+def read_climate_layer(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
+    layer: Annotated[str, Query(pattern=r"^(tmax|heat_days)$")] = "tmax",
+    month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+) -> ClimateLayerResponse:
+    """A context layer for the map: the monthly mean of daily maximum
+    temperature, or heatwave days at each country's official threshold, from
+    ERA5-Land. Not an input to any health estimate; `available_months` lists
+    the months held."""
+    require_read_access(user, geography_id)
+    try:
+        with get_session_factory()() as session:
+            frame = load_climate_layer(session, geography_id, layer, month)
+            return _scoped_map(session, frame, user)
+    except NoAdminUnitForGeography as exc:
+        raise HTTPException(
+            status_code=404, detail="CLIMATE_LAYER_NOT_AVAILABLE"
+        ) from exc
+    except OutlookSelectionInvalid as exc:
+        raise HTTPException(
+            status_code=422, detail="OUTLOOK_SELECTION_INVALID"
+        ) from exc
+
+
+@router.get(
+    "/{geography_id}/population",
+    response_model=PopulationMap,
+    summary="Read WorldPop population for a frame's areas",
+)
+def read_population(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
+    measure: Annotated[str, Query(pattern=r"^(total|under5|women_15_49)$")] = "total",
+) -> PopulationMap:
+    """People, children under five or women 15-49 per area, from WorldPop.
+
+    Areas are shaded by people per km2; each area's counts are in `counts`.
+    Context for the heat estimates, not an input to them."""
+    require_read_access(user, geography_id)
+    try:
+        with get_session_factory()() as session:
+            frame = load_population_map(session, geography_id, measure)
+            return _scoped_map(session, frame, user)
+    except (NoAdminUnitForGeography, PopulationNotAvailable) as exc:
+        raise HTTPException(status_code=404, detail="POPULATION_NOT_AVAILABLE") from exc
+
+
+@router.get(
+    "/{geography_id}/forecast",
+    response_model=ForecastResponse,
+    summary="Read a place's six-month seasonal forecast and estimates",
+)
+def read_forecast(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
+    outcome: str = LBW_OUTCOME,
+    selector: Annotated[str | None, Query(max_length=32)] = None,
+) -> ForecastResponse:
+    """The next six months from the C3S multi-system forecast: the place's
+    forecast temperature and heat share for each month, with the coolest and
+    warmest system as the range."""
+    require_read_access(user, geography_id)
+    try:
+        with get_session_factory()() as session:
+            return load_forecast(session, geography_id, outcome, selector)
+    except OutlookNotAvailable as exc:
+        raise HTTPException(status_code=404, detail="FORECAST_NOT_AVAILABLE") from exc
+    except OutlookSelectionInvalid as exc:
+        raise HTTPException(
+            status_code=422, detail="OUTLOOK_SELECTION_INVALID"
+        ) from exc
+
+
+@router.get(
+    "/{geography_id}/forecast/map",
+    response_model=ForecastMap,
+    summary="Read a frame's areas shaded by a forecast month's heat share",
+)
+def read_forecast_map(
+    geography_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_reader)],
+    outcome: str = LBW_OUTCOME,
+    month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+    selector: Annotated[str | None, Query(max_length=32)] = None,
+) -> ForecastMap:
+    """Each area's forecast heat share for one month (default the first), with
+    its range across forecast systems and its forecast temperature."""
+    require_read_access(user, geography_id)
+    try:
+        with get_session_factory()() as session:
+            frame = load_forecast_map(session, geography_id, outcome, month, selector)
+            return _scoped_map(session, frame, user)
+    except (OutlookNotAvailable, NoAdminUnitForGeography) as exc:
+        raise HTTPException(status_code=404, detail="FORECAST_NOT_AVAILABLE") from exc
     except OutlookSelectionInvalid as exc:
         raise HTTPException(
             status_code=422, detail="OUTLOOK_SELECTION_INVALID"

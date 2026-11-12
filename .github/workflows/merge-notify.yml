@@ -1,0 +1,76 @@
+name: Merge notify
+
+# Posts to Slack when a pull request is merged into dev or main. The message
+# goes to the channel the SLACK_WEBHOOK_URL incoming webhook was created for
+# (docs/aws-sandbox.md); without the secret the job does nothing.
+on:
+  pull_request:
+    types: [closed]
+    branches: [dev, main]
+
+permissions: {}
+
+jobs:
+  notify:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Post to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          # Event fields go through the environment, never into the script,
+          # so a PR title cannot change the command.
+          TITLE: ${{ github.event.pull_request.title }}
+          URL: ${{ github.event.pull_request.html_url }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          MERGER: ${{ github.event.pull_request.merged_by.login }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          BODY: ${{ github.event.pull_request.body }}
+          FILES: ${{ github.event.pull_request.changed_files }}
+          ADDED: ${{ github.event.pull_request.additions }}
+          REMOVED: ${{ github.event.pull_request.deletions }}
+          DEPLOYS: ${{ github.server_url }}/${{ github.repository }}/actions/workflows/app-deploy.yml
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "SLACK_WEBHOOK_URL is not set; skipping the Slack message."
+            exit 0
+          fi
+          # The summary is the description's "## Summary" section (or the
+          # older "## What this adds"), else its first paragraph, cut at 500
+          # characters and put in Slack's markup. & < > are escaped first so
+          # a description cannot ping @channel.
+          jq -n --arg title "$TITLE" --arg url "$URL" --arg number "$NUMBER" \
+            --arg author "$AUTHOR" --arg merger "$MERGER" --arg base "$BASE" \
+            --arg body "$BODY" --arg files "$FILES" --arg added "$ADDED" \
+            --arg removed "$REMOVED" --arg deploys "$DEPLOYS" '
+            def esc: gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
+            def section:
+              gsub("\r"; "") | gsub("<!--[\\s\\S]*?-->"; "")
+              | (capture("(?m)^## +(Summary|What this adds) *\n(?<s>[\\s\\S]*?)(?=^## |\\z)").s
+                 // (split("\n\n") | map(select(test("\\S") and (test("^#") | not))) | .[0] // ""))
+              | sub("^\\s+"; "") | sub("\\s+$"; "")
+              | select(test("^[-*\\s]*$") | not) // "";
+            def markup:
+              (if length > 500 then .[0:500] + "…" else . end)
+              | esc
+              | gsub("(?m)^&gt; ?"; "> ")
+              | gsub("\\*\\*(?<b>[^*\n]+)\\*\\*"; "*\(.b)*")
+              | gsub("\\[(?<t>[^\\]\n]+)\\]\\((?<u>https?://[^)\\s]+)\\)"; "<\(.u)|\(.t)>")
+              | gsub("(?m)^(?<i> *)[-*] +"; "\(.i)• ");
+            def plural($n; $word): "\($n) \($word)\(if $n == "1" then "" else "s" end)";
+            ($body | section | markup) as $summary
+            | "*<\($url)|#\($number) \($title | esc)>*" as $head
+            | "→ `\($base)` · by \($author)\(if $merger != $author then ", merged by \($merger)" else "" end) · \(plural($files; "file")), +\($added) −\($removed)" as $meta
+            | "<\($url)|View PR>\(if $base == "dev" then " · <\($deploys)|Deploys>" else "" end)" as $links
+            | {
+                text: ":rocket: #\($number) \($title | esc) merged into \($base)",
+                blocks: (
+                  [{type: "section", text: {type: "mrkdwn", text: ":rocket: \($head)"}},
+                   {type: "context", elements: [{type: "mrkdwn", text: $meta}]}]
+                  + (if $summary == "" then [] else [{type: "section", text: {type: "mrkdwn", text: $summary}}] end)
+                  + [{type: "context", elements: [{type: "mrkdwn", text: $links}]}]
+                )
+              }' \
+            | curl -fsS --retry 3 -X POST -H 'Content-type: application/json' --data @- "$SLACK_WEBHOOK_URL"

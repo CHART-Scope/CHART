@@ -65,8 +65,9 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Installation setup: installation-setup.md
+  - Sign-in and email: sign-in.md
   - Architecture:
-      - System requirements and capacity: system-architecture-and-requirements.md
+      - Observed climate data: observed-climate.md
   - Infrastructure:
       - AWS sandbox deployment: aws-sandbox.md
   - Python core:
@@ -75,14 +76,18 @@ nav:
       - Climate API: climate-api.md
       - API explorer: api-reference.md
   - Modeling:
+      - How the estimates are made: methodology.md
       - Overview: modeling.md
       - Model releases: model-updates.md
-      - Health input contract: health-input-contract.md
-      - Survey exploration guide: health-survey-exploration-guide.md
   - Model integration:
       - From R output to the dashboard: model-integration.md
   - Data pipeline: data-pipeline.md
+  - Data loading and storage: data-loading.md
+  - Design system: design-system.md
+  - Explore (public map): explore.md
   - Dashboard: dashboard.md
+  - Action repository: actions.md
+  - Recommendations and AI: recommendations.md
   - Project:
       - Digital public good and licensing: licensing.md
 

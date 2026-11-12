@@ -12,6 +12,13 @@
   min-width: 0;
 }
 
+.embedded {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
 .eyebrow {
   margin: 0;
   font-family: var(--font-display);
@@ -23,8 +30,8 @@
 
 .question {
   margin: 0;
-  font-family: var(--font-body);
-  font-size: var(--fs-body-lg);
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
   font-weight: 400;
   color: var(--color-charcoal);
   line-height: 1.7;

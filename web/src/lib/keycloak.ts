@@ -2,7 +2,19 @@ import type { NextRequest } from "next/server";
 
 import { getRequestOrigin, isLocalOrigin, trimTrailingSlash } from "./httpRequest";
 
-export const pkceCookieName = "chart.auth.pkce";
+// One PKCE cookie per sign-in attempt, keyed by its state, so two tabs signing
+// in at once do not overwrite each other's verifier.
+const pkceCookiePrefix = "chart.auth.pkce.";
+const pkceStatePattern = /^[A-Za-z0-9_-]{16,128}$/;
+
+export function pkceCookieName(state: string) {
+  return `${pkceCookiePrefix}${state}`;
+}
+
+/** Whether a state could have come from /auth/signin (and names a cookie). */
+export function isPkceState(state: string) {
+  return pkceStatePattern.test(state);
+}
 
 export function buildKeycloakAuthorizeUrl(input: {
   challenge: string;

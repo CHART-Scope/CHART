@@ -17,6 +17,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import text
 
+from chart.actions.routes import router as actions_router
 from chart.api.openapi import build_openapi_schema
 from chart.audit.routes import router as audit_router
 from chart.auth.routes import router as auth_router
@@ -25,18 +26,23 @@ from chart.climate.schemas import ErrorResponse, HealthResponse
 from chart.erf_registry.routes import router as erf_registry_router
 from chart.setup.bootstrap_routes import router as bootstrap_router
 from chart.geographies.routes import router as geographies_router
+from chart.api.read_cache import ReadCacheMiddleware
+from chart.heat_outlook.observed import start_observed_cache_warmer
 from chart.heat_outlook.routes import router as heat_outlook_router
 from chart.model_registry.routes import (
     releases_router as model_releases_router,
     router as model_catalog_router,
 )
 from chart.learning.routes import router as learning_router
+from chart.heat_seasons.routes import router as heat_seasons_router
+from chart.model_settings.routes import router as model_settings_router
 from chart.risk.routes import router as risk_router
+from chart.recommendations.routes import router as recommendations_router
+from chart.saved_plans.routes import router as saved_plans_router
 from chart.setup.routes import router as setup_router
-from chart.solution_repository.hazards import router as hazards_router
-from chart.solution_repository.routes import router as solutions_router
 from chart.shared.db.session import dispose_engines, get_session_factory
 from chart.users.routes import router as users_router
+from chart.vra.routes import router as vra_router
 from chart.workspaces.routes import router as workspaces_router
 
 API_DESCRIPTION = """
@@ -90,6 +96,10 @@ async def lifespan(_app: FastAPI):
     # error rather than a stale or wrong result. Trading a whole-app outage
     # for a precise error on one endpoint is the better bargain.
     restore_task = asyncio.create_task(_restore_models_after_startup())
+    # Kenya's observed months are scored from stored ERA5; keep them scored
+    # in the background so no request waits on a full rescoring.
+    if os.getenv("DATABASE_URL"):
+        start_observed_cache_warmer(get_session_factory)
     try:
         yield
     finally:
@@ -118,12 +128,18 @@ app.include_router(auth_router)
 app.include_router(geographies_router)
 app.include_router(climate_router)
 app.include_router(setup_router)
-app.include_router(hazards_router)
-app.include_router(solutions_router)
+app.include_router(actions_router)
 app.include_router(users_router)
 app.include_router(workspaces_router)
 app.include_router(risk_router)
 app.include_router(heat_outlook_router)
+# Published reads are built once per data version and revalidated by ETag.
+app.add_middleware(ReadCacheMiddleware)
+app.include_router(vra_router)
+app.include_router(model_settings_router)
+app.include_router(heat_seasons_router)
+app.include_router(saved_plans_router)
+app.include_router(recommendations_router)
 app.include_router(learning_router)
 app.include_router(erf_registry_router)
 app.include_router(model_catalog_router)

@@ -9,7 +9,7 @@ make identity
 make identity-sync
 ```
 
-`make identity-sync` re-applies seed groups and users to an existing realm. Run it after changing `chart-realm.json` or after a volume reset.
+`make identity-sync` re-applies the realm settings, email-code sign-in, seed groups and users to an existing realm. Run it after changing `chart-realm.json` or `sync-realm.js`, or after a volume reset.
 
 Use `make identity-restart` after changing local theme files.
 
@@ -19,6 +19,36 @@ connects with its own `chart_keycloak` database role; it does not write to CHART
 application tables.
 
 Admin console: `http://localhost:8080` — `admin` / `admin` — realm `chart`
+
+## Sign-in
+
+People sign in with their email address and a code Keycloak emails to them;
+there are no passwords. `sync-realm.js` sets up the browser flow, the code
+limits and the realm's SMTP server from `SMTP_*` settings, and stops before
+changing anything when they are missing. The code step is the jar in
+`providers/`, mounted into every Keycloak container. See
+[sign-in and email](../../docs/sign-in.md) for the settings, providers, DNS and
+upgrades.
+
+Local codes land in Mailpit at `http://127.0.0.1:8025`.
+
+The `chart` login theme (`themes/chart/login/`) styles both screens and
+overrides two templates: `login-username.ftl` (the email step) and
+`login-email-otp.ftl` (the provider's code step).
+
+## Deployment images
+
+`Dockerfile` builds what deployments run, so the server holds no Keycloak
+files:
+
+```bash
+docker build -t chart-keycloak infra/keycloak                          # Keycloak + plugin, theme, realm seed
+docker build --target config -t chart-keycloak-config infra/keycloak   # sync-realm.js
+```
+
+`chart-keycloak` is pre-built for PostgreSQL under `/identity` and starts with
+`start --optimized --import-realm`. Local development keeps mounting these
+files into stock Keycloak, so theme edits show on reload.
 
 ## Upstream SSO
 
@@ -51,17 +81,29 @@ Google hosted-domain claim against `scopeimpact.fi`. Microsoft Entra can be adde
 later as a tenant-specific OpenID Connect provider. Cognito is not needed while
 Keycloak remains the broker.
 
-An SSO login proves identity but does not grant CHART data access. New brokered users
-must receive an approved CHART client role and geography group before protected
-prediction routes allow them.
+An SSO login proves identity but does not grant CHART data access. A brokered user
+sees the public map until an administrator gives them a CHART client role and
+geography group.
 
 `CHART_WEB_ORIGIN` is also the source of truth for the `chart-web` callback, web
 origins, and post-logout redirects. Use the canonical HTTPS origin in production;
 do not use the EC2 IP address when users browse CHART through a domain.
 
+`sync-realm.js` also applies each seeded client's flow switches
+(`standardFlowEnabled`, `implicitFlowEnabled`, `directAccessGrantsEnabled`,
+`serviceAccountsEnabled`) to an existing realm. `chart-web` is a public client
+and only allows the authorization-code flow with PKCE; the password grant
+(`directAccessGrantsEnabled`) is off, so nothing can trade a username and
+password for a `chart-web` token directly.
+
 ## Seed users
 
-None. The realm ships without any pre-seeded users. Create the first administrator by completing the CHART installation setup wizard at `/onboarding`.
+One: the default administrator `admin`, created by `sync-realm.js` when the
+realm has no `admin` (first password `CHART_ADMIN_INITIAL_PASSWORD`, default
+`admin`, which must be changed at the first sign-in). It has the
+`chart_admin` and `content_editor` roles, runs setup at `/onboarding` and
+invites everyone else. An existing `admin` is never modified. It signs in
+with a password; every other account signs in with an emailed code.
 
 ## Roles
 

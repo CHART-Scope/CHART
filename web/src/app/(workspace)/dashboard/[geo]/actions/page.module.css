@@ -1,0 +1,29 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #dddbd7;
+}
+.intro > div:first-child {
+  max-width: 600px;
+}
+.title {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+}
+.lede {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.8;
+  color: #5a5853;
+}

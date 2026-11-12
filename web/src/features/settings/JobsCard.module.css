@@ -1,0 +1,16 @@
+.summary {
+  margin: 0;
+  font-size: var(--fs-micro);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.summary:empty {
+  display: none;
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+}

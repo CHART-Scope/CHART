@@ -7,7 +7,6 @@ import { Chip } from "@/components/Chip";
 import { Pill } from "@/components/Pill";
 import { Select } from "@/components/Select";
 import { Stepper, type Step } from "@/components/Stepper";
-import { TextInput } from "@/components/TextInput";
 import {
   buildGeoData,
   geoLabelForLevel,
@@ -62,7 +61,6 @@ export function OnboardingWizard({
     setSubgeo,
     selectPrimarySector,
     toggleCollaboratingSector,
-    setAdminField,
     setStep,
     hydrate,
     reset,
@@ -82,7 +80,6 @@ export function OnboardingWizard({
 
   const [isLaunching, setIsLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
-  const [showAdminDialog, setShowAdminDialog] = useState(false);
 
   const geoData = useMemo(() => buildGeoData(geographyCatalog), [geographyCatalog]);
   const countries = useMemo(() => Object.keys(geoData), [geoData]);
@@ -105,11 +102,6 @@ export function OnboardingWizard({
     (place) =>
       place.levelLabel === state.level && (place.modelMappings?.length ?? 0) > 0,
   );
-  const adminReady =
-    state.adminName.trim().length >= 2 &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.adminEmail) &&
-    state.adminPassword.length >= 8;
-
   const canContinue = (() => {
     if (idx === 0) return !!state.country;
     if (idx === 1) {
@@ -124,10 +116,6 @@ export function OnboardingWizard({
     if (idx < STEPS.length - 1) {
       setLaunchError(null);
       setStep(idx + 1);
-      return;
-    }
-    if (!adminReady) {
-      setShowAdminDialog(true);
       return;
     }
     await launch();
@@ -390,82 +378,6 @@ export function OnboardingWizard({
           </div>
         </div>
       </div>
-      {showAdminDialog ? (
-        <div className={styles.dialogBackdrop}>
-          <section
-            className={styles.adminDialog}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="setup-admin-title"
-          >
-            <span className={styles.dialogEyebrow}>First administrator</span>
-            <h2 id="setup-admin-title">Create the account that will own CHART</h2>
-            <p>
-              This administrator can invite people and assign their roles and planning
-              areas after launch.
-            </p>
-            <div className={styles.adminGrid}>
-              <TextInput
-                id="setup-admin-name"
-                label="Full name"
-                value={state.adminName}
-                onChange={(event) =>
-                  setAdminField("adminName", event.currentTarget.value)
-                }
-                autoComplete="name"
-              />
-              <TextInput
-                id="setup-admin-email"
-                label="Email address"
-                type="email"
-                value={state.adminEmail}
-                onChange={(event) =>
-                  setAdminField("adminEmail", event.currentTarget.value)
-                }
-                autoComplete="email"
-              />
-              <TextInput
-                id="setup-admin-password"
-                label="Administrator password"
-                type="password"
-                minLength={8}
-                value={state.adminPassword}
-                onChange={(event) =>
-                  setAdminField("adminPassword", event.currentTarget.value)
-                }
-                autoComplete="new-password"
-              />
-            </div>
-            <p className={styles.adminNote}>
-              Use at least eight characters. After setup, sign in with the email address
-              above.
-            </p>
-            {launchError ? (
-              <p className={styles.dialogError} role="alert">
-                {launchError}
-              </p>
-            ) : null}
-            <div className={styles.dialogActions}>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setLaunchError(null);
-                  setShowAdminDialog(false);
-                }}
-                disabled={isLaunching}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => void launch()}
-                disabled={!adminReady || isLaunching}
-              >
-                {isLaunching ? "Launching CHART…" : "Create account & launch"}
-              </Button>
-            </div>
-          </section>
-        </div>
-      ) : null}
     </>
   );
 }
@@ -553,9 +465,6 @@ function snapshot(state: OnboardingState): OnboardingState {
     subgeo: state.subgeo,
     primarySectorId: state.primarySectorId,
     collaboratingSectorIds: [...state.collaboratingSectorIds],
-    adminName: state.adminName,
-    adminEmail: state.adminEmail,
-    adminPassword: state.adminPassword,
     currentStep: state.currentStep,
   };
 }

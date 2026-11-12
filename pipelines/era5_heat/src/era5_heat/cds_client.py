@@ -7,15 +7,24 @@ import json
 import logging
 import os
 import secrets
+import shutil
+import urllib.error
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 
 import xarray as xr
 
 DATASET = "reanalysis-era5-single-levels"
+#: ERA5-Land: the same reanalysis re-run over land at 0.1 deg (about 9 km).
+#: Sharper for small areas, but not what the health models were fitted on.
+LAND_DATASET = "reanalysis-era5-land"
+DATASETS = {DATASET: 0.25, LAND_DATASET: 0.1}
 VARIABLE = "2m_temperature"
+_NETCDF_VALIDATION_LOCK = Lock()
 
 log = logging.getLogger(__name__)
 
@@ -46,12 +55,15 @@ def build_request(
     year: int,
     bbox: BBox,
     months: tuple[int, ...] | None = None,
+    dataset: str = DATASET,
 ) -> dict:
     validate_bbox(bbox)
     n, w, s, e = bbox
     selected_months = _normalize_months(months)
+    # ERA5-Land has a single product, so it takes no product type.
+    product = {"product_type": "reanalysis"} if dataset == DATASET else {}
     return {
-        "product_type": "reanalysis",
+        **product,
         "variable": VARIABLE,
         "year": str(year),
         "month": [f"{month:02d}" for month in selected_months],
@@ -67,9 +79,10 @@ def cache_key(
     year: int,
     bbox: BBox,
     months: tuple[int, ...] | None = None,
+    dataset: str = DATASET,
 ) -> str:
     payload = {
-        "dataset": DATASET,
+        "dataset": dataset,
         "variable": VARIABLE,
         "year": year,
         "months": list(_normalize_months(months)),
@@ -88,6 +101,8 @@ class DownloadResult:
 
 
 def _default_cache_dir() -> Path:
+    if configured := os.environ.get("ERA5_CACHE_DIR"):
+        return Path(configured).expanduser()
     return Path(__file__).resolve().parent.parent.parent / ".cache"
 
 
@@ -116,12 +131,106 @@ def _cached_path_ok(path: Path) -> bool:
     if not path.exists() or path.stat().st_size == 0:
         return False
     try:
-        with xr.open_dataset(path) as _:
-            pass
+        # NetCDF/HDF5 native open/close calls are not thread-safe. Downloads
+        # remain concurrent, but their cache validation must not overlap.
+        with _NETCDF_VALIDATION_LOCK:
+            with xr.open_dataset(path):
+                pass
         return True
     except Exception as exc:  # corrupt cache file; ignore and re-download
         log.warning("cache file %s unreadable (%s); will re-download", path, exc)
         return False
+
+
+def _covering_cache(
+    cache_dir: Path,
+    year: int,
+    bbox: BBox,
+    months: tuple[int, ...],
+    dataset: str = DATASET,
+) -> Path | None:
+    """Find a retained acquisition covering the complete requested extent/time."""
+    candidates = []
+    north, west, south, east = bbox
+    for metadata in cache_dir.glob("*.json"):
+        try:
+            document = json.loads(metadata.read_text())
+            request = document["request"]
+            n, w, s, e = map(float, request["area"])
+            if (
+                document.get("dataset") != dataset
+                or request.get("variable") != VARIABLE
+                or int(request["year"]) != year
+                or not set(months).issubset({int(m) for m in request["month"]})
+                or not (n >= north and w <= west and s <= south and e >= east)
+            ):
+                continue
+            path = metadata.with_suffix(".nc")
+            if path.is_file():
+                candidates.append((path.stat().st_size, str(path), path))
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            continue
+    for _, _, path in sorted(candidates):
+        if _cached_path_ok(path):
+            return path
+    return None
+
+
+#: A public copy of retained acquisitions, laid out like the cache directory
+#: (``<key>.nc`` beside ``<key>.json``). An identical request is read from it
+#: instead of waiting in the Copernicus queue. ``ERA5_MIRROR_URL=`` disables it.
+#: The bucket is in eu-north-1: another region's endpoint answers 301 with no
+#: redirect to follow, so every lookup would miss.
+DEFAULT_MIRROR_URL = (
+    "https://chart-predictive-models.s3.eu-north-1.amazonaws.com/era5-cache"
+)
+
+
+def _fetch_mirror(key: str, nc_path: Path, meta_path: Path) -> bool:
+    """Copy ``key`` from the mirror into the cache; False when it is not there."""
+    base = os.environ.get("ERA5_MIRROR_URL", DEFAULT_MIRROR_URL).rstrip("/")
+    if not base:
+        return False
+    partial = nc_path.with_name(f".{nc_path.name}.{secrets.token_hex(8)}.partial")
+    try:
+        with urllib.request.urlopen(f"{base}/{key}.json", timeout=30) as response:
+            sidecar = response.read()
+        with urllib.request.urlopen(f"{base}/{key}.nc", timeout=60) as response:
+            with partial.open("wb") as stream:
+                shutil.copyfileobj(response, stream)
+        if not _cached_path_ok(partial):
+            return False
+        os.replace(partial, nc_path)
+        _atomic_write_text(meta_path, sidecar.decode())
+        return True
+    except (urllib.error.URLError, OSError, ValueError) as error:
+        log.debug("mirror miss for %s: %s", key, error)
+        return False
+    finally:
+        partial.unlink(missing_ok=True)
+
+
+def download_metadata(result: DownloadResult) -> dict:
+    """Keep the actual raw acquisition identity when a smaller request reuses it."""
+    path = result.path
+    with path.open("rb") as stream:
+        sha256 = hashlib.file_digest(stream, "sha256").hexdigest()
+    metadata = {
+        "year": result.year,
+        "months": list(result.months),
+        "cache_hit": result.cache_hit,
+        "path": str(path),
+        "sha256": sha256,
+    }
+    sidecar = path.with_suffix(".json")
+    if sidecar.is_file():
+        try:
+            document = json.loads(sidecar.read_text())
+            metadata["source_request"] = document.get("request")
+            metadata["downloaded_at"] = document.get("downloaded_at")
+        except (OSError, ValueError, AttributeError):
+            log.warning("unreadable cache metadata: %s", sidecar)
+    return metadata
 
 
 def download_year(
@@ -132,12 +241,13 @@ def download_year(
     months: tuple[int, ...] | None = None,
     no_cache: bool = False,
     refresh: bool = False,
+    dataset: str = DATASET,
 ) -> DownloadResult:
     cache_dir = cache_dir or _default_cache_dir()
     cache_dir.mkdir(parents=True, exist_ok=True)
 
     selected_months = _normalize_months(months)
-    key = cache_key(year, bbox, selected_months)
+    key = cache_key(year, bbox, selected_months, dataset)
     nc_path = cache_dir / f"{key}.nc"
     meta_path = cache_dir / f"{key}.json"
 
@@ -149,8 +259,22 @@ def download_year(
             path=nc_path,
             cache_hit=True,
         )
+    if not no_cache and not refresh:
+        covering = _covering_cache(cache_dir, year, bbox, selected_months, dataset)
+        if covering is not None:
+            log.info(
+                "reusing covering cache: year=%d months=%s path=%s",
+                year,
+                selected_months,
+                covering,
+            )
+            return DownloadResult(year, selected_months, covering, True)
 
-    request = build_request(year, bbox, selected_months)
+    if not no_cache and not refresh and _fetch_mirror(key, nc_path, meta_path):
+        log.info("mirror hit: year=%d months=%s key=%s", year, selected_months, key)
+        return DownloadResult(year, selected_months, nc_path, True)
+
+    request = build_request(year, bbox, selected_months, dataset)
     client = _make_client()
 
     partial = nc_path.with_name(f".{nc_path.name}.{secrets.token_hex(8)}.partial")
@@ -162,7 +286,7 @@ def download_year(
         request["area"],
     )
     try:
-        client.retrieve(DATASET, request, str(partial))
+        client.retrieve(dataset, request, str(partial))
         if not _cached_path_ok(partial):
             raise RuntimeError("CDS_DOWNLOAD_INVALID")
         os.replace(partial, nc_path)
@@ -176,7 +300,7 @@ def download_year(
             meta_path,
             json.dumps(
                 {
-                    "dataset": DATASET,
+                    "dataset": dataset,
                     "request": request,
                     "downloaded_at": datetime.now(timezone.utc).isoformat(),
                     "cdsapi_version": getattr(cdsapi, "__version__", "unknown"),
@@ -203,26 +327,39 @@ def download_years(
     no_cache: bool = False,
     refresh: bool = False,
     max_workers: int = 3,
+    dataset: str = DATASET,
 ) -> list[DownloadResult]:
-    """Download many years concurrently. Order in result matches input order."""
-    by_year: dict[int, DownloadResult] = {}
+    """Download many years concurrently, in input order.
+
+    ERA5 takes a whole year per request. ERA5-Land, at 0.1 deg, exceeds the
+    Copernicus cost limit for a year of hourly data over a country, so it is
+    requested one month at a time; each month is its own cache entry.
+    """
+    jobs: list[tuple[int, tuple[int, ...] | None]] = []
+    for year in years:
+        months = (months_by_year or {}).get(year)
+        if dataset == LAND_DATASET:
+            jobs.extend((year, (month,)) for month in _normalize_months(months))
+        else:
+            jobs.append((year, months))
+    results: dict[int, DownloadResult] = {}
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         futures = {
             ex.submit(
                 download_year,
-                y,
+                year,
                 bbox,
                 cache_dir,
-                months=(months_by_year or {}).get(y),
+                months=months,
                 no_cache=no_cache,
                 refresh=refresh,
-            ): y
-            for y in years
+                dataset=dataset,
+            ): index
+            for index, (year, months) in enumerate(jobs)
         }
         for fut in as_completed(futures):
-            res = fut.result()
-            by_year[res.year] = res
-    return [by_year[y] for y in years]
+            results[futures[fut]] = fut.result()
+    return [results[index] for index in range(len(jobs))]
 
 
 def _atomic_write_text(path: Path, value: str) -> None:

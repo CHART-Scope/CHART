@@ -38,11 +38,11 @@
 
 .topbar {
   flex-shrink: 0;
-  min-height: 42px;
+  min-height: 63px;
   background: var(--surface-inverse);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   padding: 0 20px;
 }
 
@@ -51,9 +51,9 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  margin-left: -6px;
+  width: 34px;
+  height: 34px;
+  margin-left: -8px;
   border: none;
   border-radius: var(--radius-sm);
   background: none;
@@ -68,8 +68,9 @@
 
 .logo {
   font-family: var(--font-display);
-  font-weight: 500;
-  font-size: var(--fs-body-lg);
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 1;
   color: var(--color-lime);
   letter-spacing: var(--ls-mono);
   background: none;
@@ -85,11 +86,11 @@ span.logo {
 
 .sep {
   color: rgba(255, 255, 255, 0.25);
-  font-size: 13px;
+  font-size: 18px;
 }
 
 .tagline {
-  font-size: var(--fs-caption);
+  font-size: var(--fs-body);
   color: rgba(255, 255, 255, 0.55);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -99,7 +100,7 @@ span.logo {
 .account {
   margin-left: auto;
   color: rgba(255, 255, 255, 0.72);
-  font-size: var(--fs-caption);
+  font-size: var(--fs-body);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -112,8 +113,8 @@ span.logo {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 6px;
   background: none;
   border: none;

@@ -16,6 +16,8 @@ import { PreparationProgress } from "./PreparationProgress";
 import { useMonthlyRisk } from "./useMonthlyRisk";
 
 type Props = {
+  /** Reuse the existing month view inside the outlook's shared heading and tabs. */
+  embedded?: boolean;
   /** Label for the currently-viewed place (e.g. "Bhopal Division",
    * "Madhya Pradesh (State)"). Rendered as static text in the question
    * header — the actual switching lives in DashboardContextBar. */
@@ -57,6 +59,7 @@ type Props = {
 };
 
 export function HeatLbwLinkPanel({
+  embedded = false,
   placeLabel,
   children,
   onPredictionReady,
@@ -80,14 +83,14 @@ export function HeatLbwLinkPanel({
   // Falls back to the newest complete month rather than "". An empty month
   // was still handed to the prepare path, which submitted a planning_date of
   // "-01" and was rejected as an invalid date.
-  const requested = monthProp || internalMonth || selectableMonths.at(-1) || "";
   // One month drives the fetch and the sentence alike. A shared link can carry
   // a month outside the selectable window; resolving that separately for the
   // hook and for the card meant queueing a prediction for one month while
   // displaying another, with no sign that the two had parted.
-  const selectedMonth = selectableMonths.includes(requested)
-    ? requested
-    : (selectableMonths.at(-1) ?? "");
+  const selectedMonth = resolveMonthlyRiskMonth(
+    monthProp || internalMonth,
+    selectableMonths.at(-1),
+  );
   const setMonth = onMonthChange ?? setInternalMonth;
   const [precisionModalOpen, setPrecisionModalOpen] = useState(false);
 
@@ -233,22 +236,40 @@ export function HeatLbwLinkPanel({
     activePrediction.ci95High !== null
       ? precisionFromCi(activePrediction.ci95Low, activePrediction.ci95High)
       : null;
+  const Container = embedded ? "div" : "section";
 
   return (
-    <section className={styles.panel} aria-labelledby="heat-lbw-heading">
-      <p className={styles.eyebrow}>Climate attributable health risk</p>
+    <Container
+      className={embedded ? styles.embedded : styles.panel}
+      aria-labelledby={embedded ? undefined : "heat-lbw-heading"}
+      data-testid="monthly-risk"
+    >
+      {!embedded && (
+        <>
+          <p className={styles.eyebrow}>Climate attributable health risk</p>
 
-      <h2 id="heat-lbw-heading" className={styles.question}>
-        What share of{" "}
-        <strong className={styles.inlineStatic}>{outcomeLabel.toLowerCase()}</strong>{" "}
-        cases in <strong className={styles.inlineStatic}>{placeLabel}</strong> may be
-        attributable to heat exposure?
-      </h2>
+          <h2 id="heat-lbw-heading" className={styles.question}>
+            What share of{" "}
+            <strong className={styles.inlineStatic}>
+              {outcomeLabel.toLowerCase()}
+            </strong>{" "}
+            cases in <strong className={styles.inlineStatic}>{placeLabel}</strong> may
+            be attributable to heat exposure?
+          </h2>
+        </>
+      )}
+
+      {embedded && (
+        <p className={styles.windowNote} data-testid="outlook-source">
+          {monthPrediction
+            ? `Observed · ERA5 with model release ${monthPrediction.model_release_id}`
+            : "Observed · ERA5; the model release will be shown with the prepared estimate."}
+        </p>
+      )}
 
       {modelAreaName ? (
         <p className={styles.modelScopeNote}>
-          Health response calculated with the <strong>{modelAreaName}</strong> fitted
-          model area.
+          Assigned fitted model area: <strong>{modelAreaName}</strong>.
         </p>
       ) : null}
 
@@ -426,7 +447,7 @@ export function HeatLbwLinkPanel({
         onClose={() => setPrecisionModalOpen(false)}
         activeLevel={precisionLevel ?? undefined}
       />
-    </section>
+    </Container>
   );
 }
 
@@ -513,6 +534,16 @@ export function lastCompleteMonth(now = new Date()): string {
   const back = now.getUTCDate() <= ERA5_PUBLICATION_LAG_DAYS ? 2 : 1;
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - back, 1));
   return d.toISOString().slice(0, 7);
+}
+
+/** Keep the month picker, estimate and map on the same supported month. */
+export function resolveMonthlyRiskMonth(
+  requested?: string | null,
+  newest = lastCompleteMonth(),
+): string {
+  return requested && monthsBackFrom(newest, SELECTABLE_MONTHS_BACK).includes(requested)
+    ? requested
+    : newest;
 }
 
 function monthsBackFrom(newest: string, count: number): string[] {

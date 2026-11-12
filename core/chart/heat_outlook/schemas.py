@@ -13,6 +13,22 @@ class Option(BaseModel):
     exploratory: bool = False
 
 
+class ObservedCapability(BaseModel):
+    source: Literal["outlook", "monthly"] | None = None
+    release: str | None = None
+    reason: str | None = None
+    model_area_name: str | None = None
+    batch_enabled: bool = False
+
+
+class OutlookCapabilities(BaseModel):
+    published: bool
+    data_modes: list[str]
+    level: str | None = None
+    projection_release: str | None = None
+    observed: ObservedCapability
+
+
 class OddsRatio(BaseModel):
     value: float
     low: float
@@ -21,7 +37,7 @@ class OddsRatio(BaseModel):
 
 
 class MonthPart(BaseModel):
-    side: Literal["heat", "cool"]
+    side: Literal["heat", "cool", "total"]
     value_percent: float | None
     low_percent: float | None
     high_percent: float | None
@@ -68,13 +84,41 @@ class OutlookPeriod(BaseModel):
     parts: list[PeriodPart]
 
 
+class OfficialHeatSeason(BaseModel):
+    """The country's heat season as its meteorological department defines it."""
+
+    label: str
+    months: list[int]
+    peak_month: int
+    source_name: str
+    source_uri: str
+
+
+class PeakSeason(BaseModel):
+    """The three consecutive months of the period with the highest heat share.
+
+    Ranked by health share, not temperature, so it is not the weather heat
+    season: for LBW the months are birth months, whose pregnancies were
+    exposed to the heat of earlier months. The share is the mean of the three
+    months' typical-month shares; the range is the spread of the climate
+    models, not a confidence interval.
+    """
+
+    months: list[int]
+    label: str
+    part: MonthPart
+    gcm_min_percent: float | None
+    gcm_max_percent: float | None
+
+
 class HeatOutlookResponse(BaseModel):
     geography_id: str
     place: str
-    level: Literal["county", "country"]
+    level: str
     outcome: str
     release: str
     source_uri: str
+    metadata_note: str | None = None
     baseline_period: str
     reference_note: str
     scenarios: list[Option]
@@ -86,3 +130,49 @@ class HeatOutlookResponse(BaseModel):
     selector_note: str | None
     months: list[OutlookMonth]
     period_summary: list[OutlookPeriod]
+    peak_season: PeakSeason | None = None
+    #: The heat share over the place's heat season as configured in Settings
+    #: (its own, an ancestor's or the official season), not ranked by share.
+    heat_season_share: PeakSeason | None = None
+    heat_season: OfficialHeatSeason | None = None
+    data_modes: list[str] = ["observed", "projection"]
+
+
+class ObservedInput(BaseModel):
+    """One temperature behind an observed estimate, before and after calibration."""
+
+    label: str
+    era5_c: float | None
+    model_scale_c: float
+    counted: bool
+
+
+class ObservedEstimate(MonthPart):
+    side: Literal["heat", "cool", "total"] = "heat"
+    ratio: Ratio | None = None
+    thin_data: bool
+    counties: int
+
+
+class ObservedMonth(BaseModel):
+    month: str
+    value_percent: float | None
+
+
+class ObservedResponse(BaseModel):
+    geography_id: str
+    place: str
+    level: str
+    outcome: str
+    release: str
+    selectors: list[Option]
+    selector: str
+    selector_note: str | None
+    month: str | None
+    available_months: list[str]
+    estimate: ObservedEstimate | None
+    inputs: list[ObservedInput]
+    history: list[ObservedMonth]
+    reference_note: str
+    calibration_note: str
+    data_modes: list[str]

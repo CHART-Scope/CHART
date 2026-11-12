@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 
+from chart.auth.schemas import CurrentUserContext
+from chart.auth.service import require_any_role, require_current_user
 from chart.model_registry.runtime import prepare_model_release
 from chart.model_registry.schemas import ModelReleaseSpec
 from chart.model_registry.service import ModelRegistryError, release_base_uri
@@ -19,6 +22,7 @@ from chart.shared.db.models import (
     ModelRelease,
 )
 from chart.shared.db.session import get_session_factory
+from chart.heat_outlook.service import published_index
 
 router = APIRouter(prefix="/model-catalog", tags=["model-catalog"])
 releases_router = APIRouter(prefix="/model-releases", tags=["model-releases"])
@@ -38,7 +42,17 @@ _HAZARD_LABELS: dict[str, str] = {
 }
 _DOMAIN_LABELS: dict[str, str] = {
     "maternal_newborn_child_health": "Maternal, newborn and child health",
-    "child_health": "Child health",
+}
+# Child health is planned under maternal, newborn and child health: low birth
+# weight and under-five mortality are two outcomes of one domain, chosen on the
+# dashboard. Releases registered before the change still store child_health.
+_DOMAIN_ALIASES: dict[str, str] = {"child_health": "maternal_newborn_child_health"}
+# Published hand-over outcomes carry no manifest, so their domain is recorded
+# here; the values match the outcomes' model-release manifests in
+# pipelines/models/*/model-release.*.json.
+_PUBLISHED_DOMAINS: dict[str, str] = {
+    "lbw": "maternal_newborn_child_health",
+    "under_5_mortality": "maternal_newborn_child_health",
 }
 # Fallbacks only. A release's presentation block is the source of truth for
 # how its outcome is named, and _release_label prefers it; these are used when
@@ -112,8 +126,6 @@ def list_catalog(
                     AppGeography.id == selected_geography.id
                 )
         active_release_ids = session.execute(assignment_query).scalars().all()
-        if not active_release_ids:
-            return CatalogResponse(items=[])
         rows = (
             session.execute(
                 select(ModelRelease).where(ModelRelease.id.in_(active_release_ids))
@@ -128,9 +140,9 @@ def list_catalog(
         # health_domain is optional in the spec; when a release omits it,
         # bucket every entry under the outcome-derived domain so the UI
         # still shows a coherent pair.
-        domain = (
+        domain = _canonical_domain(
             release.health_domain or _domain_from_outcome(release.outcome)
-        ).strip()
+        )
         outcome = release.outcome.strip()
         key = (hazard, domain, outcome)
         grouped.setdefault(key, []).append(release)
@@ -142,9 +154,7 @@ def list_catalog(
                 releases[0], "climate_hazard_label", hazard, _HAZARD_LABELS
             ),
             health_domain=domain,
-            health_domain_label=_release_label(
-                releases[0], "health_domain_label", domain, _DOMAIN_LABELS
-            ),
+            health_domain_label=_domain_label(releases[0], domain),
             outcome=outcome,
             outcome_label=_release_label(
                 releases[0], "outcome_label", outcome, _OUTCOME_LABELS
@@ -164,7 +174,65 @@ def list_catalog(
         )
         for (hazard, domain, outcome), releases in sorted(grouped.items())
     ]
+    published = published_index()
+    selected_ids = {geography_id} if geography_id else set(published)
+    if include_descendants and geography_id:
+        pending = [geography_id]
+        while pending:
+            parent = pending.pop()
+            children = {
+                geo
+                for geo, item in published.items()
+                if item.get("parent_id") == parent
+            } - selected_ids
+            selected_ids.update(children)
+            pending.extend(children)
+    outcomes = {
+        outcome
+        for geo in selected_ids
+        for outcome in published.get(geo, {}).get("outcomes", [])
+    }
+    for outcome in sorted(outcomes):
+        replaced = next((item for item in items if item.outcome == outcome), None)
+        items = [item for item in items if item.outcome != outcome]
+        # A live release's manifest names the domain; keep it. Otherwise use
+        # the published outcome's known domain instead of "unspecified".
+        domain = _canonical_domain(
+            replaced.health_domain
+            if replaced and replaced.health_domain != "unspecified"
+            else _PUBLISHED_DOMAINS.get(outcome) or _domain_from_outcome(outcome)
+        )
+        items.append(
+            CatalogEntry(
+                climate_hazard="extreme_heat",
+                climate_hazard_label="Extreme heat",
+                health_domain=domain,
+                health_domain_label=(
+                    replaced.health_domain_label
+                    if replaced and replaced.health_domain == domain
+                    else _label(domain, _DOMAIN_LABELS)
+                ),
+                outcome=outcome,
+                outcome_label=_OUTCOME_LABELS.get(outcome, outcome),
+                visualization_type="odds_ratio_icon_array",
+                model_scope_label="Published climate scenario",
+                batch_status="projection_only",
+                release_ids=sorted(
+                    {
+                        published[geo].get("release", "handover-2026-10-22")
+                        for geo in selected_ids
+                        if outcome in published.get(geo, {}).get("outcomes", [])
+                    }
+                ),
+            )
+        )
     return CatalogResponse(items=items)
+
+
+def outcome_label(code: str) -> str:
+    """Display name of an outcome code when no release presentation is at hand."""
+
+    return _label(code, _OUTCOME_LABELS)
 
 
 def _label(code: str, overrides: dict[str, str]) -> str:
@@ -213,6 +281,19 @@ def _input_contract_value(release: ModelRelease, field: str) -> str | None:
     contract = (release.input_spec or {}).get("input_contract") or {}
     value = contract.get(field)
     return str(value) if isinstance(value, str) and value.strip() else None
+
+
+def _canonical_domain(code: str) -> str:
+    code = code.strip()
+    return _DOMAIN_ALIASES.get(code, code)
+
+
+def _domain_label(release: ModelRelease, domain: str) -> str:
+    """The release's own label, unless its domain was folded into another."""
+
+    if (release.health_domain or "").strip() != domain:
+        return _label(domain, _DOMAIN_LABELS)
+    return _release_label(release, "health_domain_label", domain, _DOMAIN_LABELS)
 
 
 def _domain_from_outcome(outcome: str) -> str:
@@ -266,8 +347,14 @@ class CircuitResetResponse(BaseModel):
 
 
 @releases_router.get("", response_model=ReleasesResponse)
-def list_releases() -> ReleasesResponse:
-    """Every registered model release, active-first."""
+def list_releases(
+    _user: Annotated[CurrentUserContext, Depends(require_current_user)],
+) -> ReleasesResponse:
+    """Every registered model release, active-first.
+
+    Requires a signed-in user: the listing exposes artifact checksums, storage
+    URIs and manifest paths that are internal to the deployment.
+    """
 
     source_paths: dict[str, str] = {}
     for config in deployed_configs():
@@ -326,14 +413,13 @@ def list_releases() -> ReleasesResponse:
                     if release.climate_hazard
                     else None
                 ),
-                health_domain=release.health_domain,
+                health_domain=(
+                    _canonical_domain(release.health_domain)
+                    if release.health_domain
+                    else None
+                ),
                 health_domain_label=(
-                    _release_label(
-                        release,
-                        "health_domain_label",
-                        release.health_domain or "",
-                        _DOMAIN_LABELS,
-                    )
+                    _domain_label(release, _canonical_domain(release.health_domain))
                     if release.health_domain
                     else None
                 ),
@@ -354,12 +440,18 @@ def list_releases() -> ReleasesResponse:
 
 
 @releases_router.post("/{release_id}/reload", response_model=ReloadResponse)
-def reload_release(release_id: str) -> ReloadResponse:
+def reload_release(
+    release_id: str,
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+) -> ReloadResponse:
     """Re-verify + re-warm one release into the R runtime.
 
     Useful after the R container restarts, or after a manifest edit that
     swaps the SHA-256 of an existing artifact. Does not touch the database.
+    Requires the chart_admin role.
     """
+
+    require_any_role(user, {"chart_admin"})
 
     matched_path = None
     for config in deployed_configs():
@@ -383,7 +475,9 @@ def reload_release(release_id: str) -> ReloadResponse:
 
 
 @releases_router.post("/circuit/reset", response_model=CircuitResetResponse)
-def reset_inference_circuit() -> CircuitResetResponse:
+def reset_inference_circuit(
+    user: Annotated[CurrentUserContext, Depends(require_current_user)],
+) -> CircuitResetResponse:
     """Clear the LBW inference circuit breaker in this API process.
 
     The R adapter's circuit breaker opens after ``INFERENCE_LBW_CIRCUIT_FAILURES``
@@ -393,9 +487,10 @@ def reset_inference_circuit() -> CircuitResetResponse:
     operator investigating after an outage can call this endpoint to
     skip the wait entirely instead of restarting the API container.
     Only clears state in this process; other API replicas would need
-    their own reset.
+    their own reset. Requires the chart_admin role.
     """
 
+    require_any_role(user, {"chart_admin"})
     from chart.inference.providers.lbw_r import reset_circuit
 
     reset_circuit()

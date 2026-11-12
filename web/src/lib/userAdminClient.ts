@@ -1,3 +1,5 @@
+import { authFetch } from "./authFetch";
+
 export type ChartRole =
   | "chart_admin"
   | "content_editor"
@@ -6,17 +8,6 @@ export type ChartRole =
   | "health_implementation_officer"
   | "cross_sector_implementation_officer"
   | "public_viewer";
-
-export type AdminGeography = {
-  id: string;
-  countryCode: string;
-  level: "country" | "geo_level_1" | "geo_level_2" | "geo_level_3";
-  levelLabel: string;
-  name: string;
-  parentId: string | null;
-  path: string;
-  supportsPrediction: boolean;
-};
 
 export type ManagedUser = {
   userId: string;
@@ -31,12 +22,13 @@ export type ManagedUser = {
     name: string;
     levelLabel: string;
   }[];
+  /** Set right after an invitation was attempted. */
+  invitation?: "sent" | "failed" | null;
 };
 
-export type InviteUserInput = {
+export type Invitation = {
   name: string;
   email: string;
-  password: string;
   role: ChartRole;
   geographyId: string;
 };
@@ -46,38 +38,38 @@ export async function listManagedUsers(accessToken: string) {
   return (await response.json()) as ManagedUser[];
 }
 
-export async function listAdminGeographies(accessToken: string) {
-  const response = await adminFetch("/api/admin/geographies", accessToken);
-  return (await response.json()) as AdminGeography[];
-}
-
-export async function inviteUser(input: InviteUserInput, accessToken: string) {
-  const email = input.email.trim().toLowerCase();
+/** Adds the person (no password) and has Keycloak email their invitation. */
+export async function invitePerson(invitation: Invitation, accessToken: string) {
+  const email = invitation.email.trim().toLowerCase();
   const response = await adminFetch("/api/admin/users", accessToken, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      name: input.name.trim(),
+      name: invitation.name.trim(),
       email,
       username: email,
-      password: input.password,
-      roles: [input.role],
-      geographyIds: [input.geographyId],
+      roles: [invitation.role],
+      geographyIds: [invitation.geographyId],
     }),
   });
   return (await response.json()) as ManagedUser;
 }
 
-async function adminFetch(url: string, accessToken: string, init: RequestInit = {}) {
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      authorization: `Bearer ${accessToken}`,
-      ...init.headers,
-    },
-    cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
-  });
+export async function resendInvitation(userId: string, accessToken: string) {
+  const response = await adminFetch(
+    `/api/admin/users/${encodeURIComponent(userId)}/invitation`,
+    accessToken,
+    { method: "POST" },
+  );
+  return (await response.json()) as ManagedUser;
+}
+
+async function adminFetch(
+  url: string,
+  accessToken: string | null | undefined,
+  init: RequestInit = {},
+) {
+  const response = await authFetch(url, { ...init, accessToken, timeoutMs: 20_000 });
 
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {
@@ -95,17 +87,16 @@ function adminErrorMessage(code?: string) {
     case "USER_IDENTITY_USER_CONFLICT":
       return "An account already uses that email address.";
     case "USER_GEOGRAPHY_INVALID":
-      return "That planning area is no longer available.";
-    case "USER_PASSWORD_REQUIRED":
-      return "Use a temporary password with at least eight characters.";
-    case "USER_IDENTITY_ADMIN_AUTH_FAILED":
-    case "USER_IDENTITY_CONFIG_INVALID":
-    case "USER_IDENTITY_CLIENT_MISSING":
-    case "USER_IDENTITY_ROLE_MISSING":
-      return "Keycloak administrator settings are incomplete.";
+      return "That planning area is no longer available. Choose another.";
+    case "USER_ROLE_INVALID":
+      return "Choose one of the listed roles.";
+    case "USER_INVITE_FAILED":
+      return "The invitation email could not be sent. Check CHART's email settings, then try again.";
+    case "USER_DISABLED":
+      return "This account is turned off, so it cannot be invited.";
     case "ADMIN_SERVICE_UNAVAILABLE":
       return "The CHART people service is unavailable.";
     default:
-      return "CHART could not create this account. Please try again.";
+      return "CHART could not complete that. Please try again.";
   }
 }

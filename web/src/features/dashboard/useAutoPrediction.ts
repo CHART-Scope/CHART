@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { recordAuditEvent } from "@/lib/audit";
+import { startPolling } from "@/lib/polling";
 import {
   getPredictionRequest,
   submitPrediction,
@@ -41,6 +42,8 @@ type Options = {
 };
 
 const POLL_INTERVAL_MS = 5_000;
+/** About ten minutes of checks, so a stuck request cannot poll forever. */
+const MAX_POLLS = 120;
 
 /**
  * Submit one LBW prediction for today's planning date on mount and poll
@@ -64,11 +67,12 @@ export function useAutoPrediction({
     error: null,
     completedAt: null,
   });
-  const cancelled = useRef(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The token is read, not depended on: a rotation must not resubmit the
+  // prediction or record another prediction_submitted audit event.
+  const tokenRef = useRef(accessToken);
+  tokenRef.current = accessToken;
 
   useEffect(() => {
-    cancelled.current = false;
     if (disabled) {
       setState({
         phase: "not_configured",
@@ -77,28 +81,23 @@ export function useAutoPrediction({
         error: null,
         completedAt: null,
       });
-      return () => {
-        cancelled.current = true;
-        if (timer.current) clearTimeout(timer.current);
-      };
+      return;
     }
-    if (!geographyId) {
-      return () => {
-        cancelled.current = true;
-        if (timer.current) clearTimeout(timer.current);
-      };
-    }
+    if (!geographyId) return;
 
+    const controller = new AbortController();
+    const active = () => !controller.signal.aborted;
     const planningMonth = todayPlanningMonth();
 
     async function start() {
       setState((prev) => ({ ...prev, phase: "submitting", error: null }));
       try {
-        const submitted = await submitPrediction(accessToken, {
+        const submitted = await submitPrediction(tokenRef.current ?? null, {
           geographyId: effectiveGeographyId,
           planningMonth,
           target: "month",
         });
+        if (!active()) return;
 
         recordAuditEvent({
           event_type: "prediction_submitted",
@@ -108,33 +107,30 @@ export function useAutoPrediction({
         });
 
         if (isCompletedResult(submitted)) {
-          if (!cancelled.current) {
-            setState({
-              phase: "completed",
-              requestId: submitted.request_id,
-              stage: "completed",
-              error: null,
-              completedAt: new Date().toISOString(),
-            });
-            recordAuditEvent({
-              event_type: "prediction_completed",
-              geography_id: effectiveGeographyId,
-              prediction_request_id: submitted.request_id,
-            });
-          }
+          setState({
+            phase: "completed",
+            requestId: submitted.request_id,
+            stage: "completed",
+            error: null,
+            completedAt: new Date().toISOString(),
+          });
+          recordAuditEvent({
+            event_type: "prediction_completed",
+            geography_id: effectiveGeographyId,
+            prediction_request_id: submitted.request_id,
+          });
           return;
         }
 
-        const accepted = submitted;
         setState((prev) => ({
           ...prev,
-          phase: accepted.status === "queued" ? "queued" : "running",
-          requestId: accepted.request_id,
-          stage: accepted.stage,
+          phase: submitted.status === "queued" ? "queued" : "running",
+          requestId: submitted.request_id,
+          stage: submitted.stage,
         }));
-        pollUntilDone(accepted.request_id);
+        pollUntilDone(submitted.request_id);
       } catch (error) {
-        if (cancelled.current) return;
+        if (!active()) return;
         const message =
           error instanceof Error
             ? error.message
@@ -155,61 +151,62 @@ export function useAutoPrediction({
     }
 
     function pollUntilDone(requestId: number) {
-      const tick = async () => {
-        if (cancelled.current) return;
-        try {
-          const current: PredictionRequest = await getPredictionRequest(
-            requestId,
-            accessToken,
-          );
-          if (cancelled.current) return;
-          const phase = mapStatusToPhase(current.status);
-          setState({
-            phase,
-            requestId,
-            stage: current.stage,
-            error: current.error_code ?? null,
-            completedAt: current.status === "completed" ? current.updated_at : null,
-          });
-          if (current.status === "completed") {
-            recordAuditEvent({
-              event_type: "prediction_completed",
-              geography_id: effectiveGeographyId,
-              prediction_request_id: requestId,
-            });
-            return;
-          }
-          if (current.status === "failed") {
-            recordAuditEvent({
-              event_type: "prediction_failed",
-              geography_id: effectiveGeographyId,
-              prediction_request_id: requestId,
-              payload: { error_code: current.error_code ?? null },
-            });
-            return;
-          }
-        } catch (error) {
-          if (cancelled.current) return;
+      startPolling({
+        signal: controller.signal,
+        intervalMs: POLL_INTERVAL_MS,
+        maxAttempts: MAX_POLLS,
+        onExhausted: () =>
           setState((prev) => ({
             ...prev,
-            error: error instanceof Error ? error.message : "Polling failed.",
-          }));
-        }
-        timer.current = setTimeout(tick, POLL_INTERVAL_MS);
-      };
-      timer.current = setTimeout(tick, POLL_INTERVAL_MS);
+            error:
+              "This request has not finished after 10 minutes. Automatic checking has paused.",
+          })),
+        tick: async () => {
+          try {
+            const current: PredictionRequest = await getPredictionRequest(
+              requestId,
+              tokenRef.current ?? null,
+            );
+            if (!active()) return "stop";
+            setState({
+              phase: mapStatusToPhase(current.status),
+              requestId,
+              stage: current.stage,
+              error: current.error_code ?? null,
+              completedAt: current.status === "completed" ? current.updated_at : null,
+            });
+            if (current.status === "completed") {
+              recordAuditEvent({
+                event_type: "prediction_completed",
+                geography_id: effectiveGeographyId,
+                prediction_request_id: requestId,
+              });
+              return "stop";
+            }
+            if (current.status === "failed") {
+              recordAuditEvent({
+                event_type: "prediction_failed",
+                geography_id: effectiveGeographyId,
+                prediction_request_id: requestId,
+                payload: { error_code: current.error_code ?? null },
+              });
+              return "stop";
+            }
+          } catch (error) {
+            if (!active()) return "stop";
+            setState((prev) => ({
+              ...prev,
+              error: error instanceof Error ? error.message : "Polling failed.",
+            }));
+          }
+          return "continue";
+        },
+      });
     }
 
     void start();
-
-    return () => {
-      cancelled.current = true;
-      if (timer.current) {
-        clearTimeout(timer.current);
-        timer.current = null;
-      }
-    };
-  }, [accessToken, disabled, effectiveGeographyId]);
+    return () => controller.abort();
+  }, [disabled, effectiveGeographyId, geographyId]);
 
   return state;
 }

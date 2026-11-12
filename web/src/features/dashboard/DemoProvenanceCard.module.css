@@ -18,7 +18,8 @@
 
 .title {
   margin: 0;
-  font-size: var(--fs-caption);
+  font-family: var(--font-display);
+  font-size: var(--fs-eyebrow);
   text-transform: uppercase;
   letter-spacing: var(--ls-eyebrow);
   color: var(--color-text-muted);
@@ -45,7 +46,7 @@
 
 .rows code {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 0.72rem;
+  font-size: var(--fs-caption);
 }
 
 .rows a {
@@ -62,5 +63,5 @@
 
 .hint {
   color: var(--color-slate, #5c6660);
-  font-size: 0.75rem;
+  font-size: var(--fs-caption);
 }

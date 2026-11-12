@@ -23,6 +23,7 @@ import subprocess
 from collections import defaultdict
 from pathlib import Path
 
+from .dlnm import release_dir
 from .service import (
     LBW_OUTCOME,
     U5_OUTCOME,
@@ -262,6 +263,74 @@ def _round(value: str) -> float | None:
     return None if value in ("", "NA") else round(float(value), 5)
 
 
+CLIMATOLOGY_PERIOD = "2011-2020"
+
+
+def write_calibration(
+    lbw_dir: Path, u5_dir: Path, era5_climatology: Path, release: str
+) -> Path:
+    """The offsets ``observed.py`` adds to ERA5, per county and calendar month.
+
+    ``era5_climatology`` holds ERA5's monthly mean Tmax per county for
+    2011-2020 (``geography_id,year,month,tmax_mean_c``), made with the same
+    pipeline and county averaging as the live pulls. The model scale for the
+    same years is the modeller's county typical-month table, averaged over its
+    scenarios. The under-five reference is the mean of the county's
+    constituency references (``ref_tmax_1991_2020``), on the model scale.
+    """
+
+    era5: dict[tuple[str, int], list[float]] = defaultdict(list)
+    for row in _read(era5_climatology):
+        if CLIMATOLOGY_PERIOD[:4] <= row["year"] <= CLIMATOLOGY_PERIOD[-4:]:
+            era5[(row["geography_id"], int(row["month"]))].append(
+                float(row["tmax_mean_c"])
+            )
+    model_scale: dict[tuple[str, int], list[float]] = defaultdict(list)
+    for row in _read(lbw_dir / "typical_month_heat_LBW_dlnm_county.csv"):
+        if row["period"] == CLIMATOLOGY_PERIOD:
+            key = (f"geo-ke-{county_slug(row['county'])}", int(row["month"]))
+            model_scale[key].append(float(row["tmax"]))
+    references: dict[str, list[float]] = defaultdict(list)
+    for row in _read(u5_dir / "area_lookup_constituency.csv"):
+        references[f"geo-ke-{county_slug(row['county'])}"].append(
+            float(row["ref_tmax_1991_2020"])
+        )
+
+    counties = {}
+    for geography_id in sorted(references):
+        keys = [(geography_id, month) for month in range(1, 13)]
+        if not all(key in era5 and key in model_scale for key in keys):
+            continue
+        counties[geography_id] = {
+            "offset_c": [
+                round(_mean(model_scale[key]) - _mean(era5[key]), 3) for key in keys
+            ],
+            "u5_reference_tmax_c": round(_mean(references[geography_id]), 3),
+        }
+    path = release_dir(release) / "calibration.json"
+    path.write_text(
+        json.dumps(
+            {
+                "release": release,
+                "method": "monthly_offset_vs_era5_2011_2020",
+                "note": (
+                    "ERA5 moved onto the scale the model was fitted on: each "
+                    "value is shifted by the county's 2011–2020 difference "
+                    "between the model's temperatures and ERA5 for that month."
+                ),
+                "counties": counties,
+            },
+            indent=1,
+        )
+        + "\n"
+    )
+    return path
+
+
+def _mean(values: list[float]) -> float:
+    return sum(values) / len(values)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--lbw-dir", type=Path, required=True)
@@ -270,7 +339,22 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--bucket", default="chart-predictive-models")
     parser.add_argument("--upload", action="store_true")
+    parser.add_argument(
+        "--era5-climatology",
+        type=Path,
+        help="ERA5 2011-2020 county monthly Tmax; writes calibration.json only",
+    )
     args = parser.parse_args(argv)
+
+    if args.era5_climatology:
+        path = write_calibration(
+            args.lbw_dir.expanduser(),
+            args.u5_dir.expanduser(),
+            args.era5_climatology.expanduser(),
+            args.release,
+        )
+        print(f"wrote {path}")
+        return
 
     out_dir = args.out or outlook_dir(args.release)
     written = publish(

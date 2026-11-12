@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { InvitationEmail } from "./InvitationEmail";
-import { Login } from "./Login";
+import { Landing } from "@/features/landing";
 
 type Screen = "email" | "login";
 
@@ -18,5 +18,5 @@ export function OnboardingFlow({ initial = "email", onLaunch }: Props) {
   if (screen === "email") {
     return <InvitationEmail onActivate={() => setScreen("login")} />;
   }
-  return <Login setupMode="configured" onSignIn={onLaunch} />;
+  return <Landing setupMode="configured" onSignIn={onLaunch} />;
 }

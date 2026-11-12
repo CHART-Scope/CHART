@@ -9,6 +9,8 @@
  * of the usual `no-store` default and let the browser cache them.
  */
 
+import { authFetch } from "./authFetch";
+
 export type LearningKind =
   "video" | "course" | "article" | "report" | "toolkit" | string;
 
@@ -101,9 +103,8 @@ export type LearningFilters = {
   limit?: number;
 };
 
-function authHeaders(accessToken?: string): Record<string, string> {
-  return accessToken ? { authorization: `Bearer ${accessToken}` } : {};
-}
+/** Catalogue reads: public, and left to the browser's HTTP cache. */
+const publicRead = { auth: false, cache: "default" as const };
 
 async function readLearningError(response: Response): Promise<string> {
   try {
@@ -133,7 +134,8 @@ export async function listLearningResources(
   filters: LearningFilters = {},
   signal?: AbortSignal,
 ): Promise<{ items: LearningResource[]; total: number }> {
-  const response = await fetch(`/api/chart/learning/resources${toQuery(filters)}`, {
+  const response = await authFetch(`/api/chart/learning/resources${toQuery(filters)}`, {
+    ...publicRead,
     signal,
   });
   if (!response.ok) throw new Error(await readLearningError(response));
@@ -143,7 +145,10 @@ export async function listLearningResources(
 export async function listLearningTracks(
   signal?: AbortSignal,
 ): Promise<LearningTrack[]> {
-  const response = await fetch("/api/chart/learning/tracks", { signal });
+  const response = await authFetch("/api/chart/learning/tracks", {
+    ...publicRead,
+    signal,
+  });
   if (!response.ok) throw new Error(await readLearningError(response));
   const body = (await response.json()) as { tracks: LearningTrack[] };
   return body.tracks;
@@ -152,33 +157,32 @@ export async function listLearningTracks(
 export async function listLearningTaxonomies(
   signal?: AbortSignal,
 ): Promise<TaxonomyTerm[]> {
-  const response = await fetch("/api/chart/learning/taxonomies", { signal });
+  const response = await authFetch("/api/chart/learning/taxonomies", {
+    ...publicRead,
+    signal,
+  });
   if (!response.ok) throw new Error(await readLearningError(response));
   const body = (await response.json()) as { terms: TaxonomyTerm[] };
   return body.terms;
 }
 
 export async function fetchLearningPersonalView(
-  accessToken: string,
+  accessToken: string | null | undefined,
   signal?: AbortSignal,
 ): Promise<LearningPersonalView> {
-  const response = await fetch("/api/chart/learning/me", {
-    cache: "no-store",
-    headers: authHeaders(accessToken),
-    signal,
-  });
+  const response = await authFetch("/api/chart/learning/me", { accessToken, signal });
   if (!response.ok) throw new Error(await readLearningError(response));
   return (await response.json()) as LearningPersonalView;
 }
 
 export async function saveLearningPreferences(
-  accessToken: string,
+  accessToken: string | null | undefined,
   preferences: { audienceId: string | null; interestedTrackSlugs: string[] },
 ): Promise<LearningPersonalView> {
-  const response = await fetch("/api/chart/learning/me/preferences", {
+  const response = await authFetch("/api/chart/learning/me/preferences", {
     method: "PUT",
-    cache: "no-store",
-    headers: { "content-type": "application/json", ...authHeaders(accessToken) },
+    accessToken,
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({
       audience_id: preferences.audienceId,
       interested_track_slugs: preferences.interestedTrackSlugs,
@@ -189,13 +193,13 @@ export async function saveLearningPreferences(
 }
 
 export async function saveLearningProgress(
-  accessToken: string,
+  accessToken: string | null | undefined,
   progress: { slug: string; secondsWatched: number; completed?: boolean },
 ): Promise<LearningProgress> {
-  const response = await fetch("/api/chart/learning/me/progress", {
+  const response = await authFetch("/api/chart/learning/me/progress", {
     method: "PUT",
-    cache: "no-store",
-    headers: { "content-type": "application/json", ...authHeaders(accessToken) },
+    accessToken,
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({
       slug: progress.slug,
       seconds_watched: progress.secondsWatched,

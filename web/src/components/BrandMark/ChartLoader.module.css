@@ -1,0 +1,68 @@
+.page {
+  display: grid;
+  min-height: 100vh;
+  padding: var(--space-6);
+  place-items: center;
+  background:
+    radial-gradient(60rem 30rem at 50% 38%, rgb(190 242 116 / 10%), transparent 70%),
+    radial-gradient(40rem 24rem at 50% 70%, rgb(85 17 31 / 6%), transparent 70%),
+    var(--surface-app);
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+  animation: rise 0.5s ease-out both;
+}
+
+.word {
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.32em;
+  /* Optical centring: tracking adds space after the last letter. */
+  padding-left: 0.32em;
+  color: var(--color-charcoal);
+}
+
+.status {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: var(--fs-body);
+  color: var(--color-text-dim);
+}
+
+.warning {
+  color: var(--color-maroon);
+  font-weight: 500;
+}
+
+.detail {
+  margin: 0;
+  max-width: 34ch;
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage {
+    animation: none;
+  }
+}

@@ -12,6 +12,7 @@ export function POST(
     proxyPythonApiRequest(request, {
       path: `model-releases/${encodeURIComponent(id)}/reload`,
       method: "POST",
+      authorization: request.headers.get("authorization"),
     }),
   );
 }

@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import argparse
-import os
 
 from chart.identity.service import IdentityError, recover_admin
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Recover an existing CHART administrator in Keycloak.",
+        description=(
+            "Recover an existing CHART administrator in Keycloak. They then sign "
+            "in with a code sent to the email address."
+        ),
     )
     parser.add_argument("--username", required=True)
     parser.add_argument("--email", required=True)
@@ -21,18 +23,11 @@ def main() -> None:
 
     username = args.username.strip()
     email = args.email.strip().lower()
-    password = os.getenv("CHART_ADMIN_RECOVERY_PASSWORD", "")
     if args.confirm != username:
         parser.error("--confirm must exactly match --username")
-    if not password:
-        parser.error("CHART_ADMIN_RECOVERY_PASSWORD is required")
 
     try:
-        recovered = recover_admin(
-            username=username,
-            email=email,
-            password=password,
-        )
+        recovered = recover_admin(username=username, email=email)
     except IdentityError as error:
         parser.error(error.code)
 

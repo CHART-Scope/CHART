@@ -1,0 +1,118 @@
+{
+  "Generic actions": [
+    {
+      "id": "recE2ECounsel0001",
+      "fields": {
+        "Title": "Counsel pregnant women on heat",
+        "Summary": "Community health workers counsel pregnant women before the heat season.",
+        "Description and key steps": "Counsel during routine visits.\n\nCore messages:\n1. Drink water often\n2. Rest in the shade",
+        "Kenya - Description and key steps": "Community health promoters counsel during household visits.",
+        "Climate hazard": ["Extreme heat"],
+        "Health outcome": ["Low birth weight", "Preterm birth"],
+        "Target population": ["Pregnant women"],
+        "Action type": ["Behaviour change and communication"],
+        "Level": ["Community"],
+        "Timing": ["Before season"],
+        "Responsible department": ["Health"],
+        "Kenya - Responsible department": [
+          "Ministry of Health; county health departments"
+        ],
+        "Responsible stakeholders": ["Community health worker"],
+        "Kenya - Responsible stakeholders": ["CHP", "CHA"],
+        "India - Responsible stakeholders": ["ASHA"],
+        "Cost level": "Low",
+        "Rationale": "Heat in pregnancy raises the risk of low birth weight.",
+        "References": "WHO heat guide: https://www.who.int/e2e-heat\nA citation without a link",
+        "Image": [
+          {
+            "id": "attE2EImage00001",
+            "url": "{stub}/attachments/attE2EImage00001",
+            "filename": "counselling.png",
+            "type": "image/png"
+          }
+        ],
+        "Status": "Published",
+        "Contact email": "curator@example.org",
+        "Submitted by": "Jane Curator",
+        "Organisation": "Curators Ltd",
+        "Note to reviewers": "internal reviewer note"
+      }
+    },
+    {
+      "id": "recE2EShelter0001",
+      "fields": {
+        "Title": "Cool shelters in markets",
+        "Climate hazard": ["Extreme heat"],
+        "Health outcome": ["Heatstroke and heat-related illness"],
+        "Action type": ["Infrastructure: new construction"],
+        "Timing": ["During season"],
+        "Responsible department": ["Local government"],
+        "Cost level": "Medium",
+        "Status": "Published"
+      }
+    },
+    {
+      "id": "recE2EDraft000001",
+      "fields": {
+        "Title": "Unreviewed draft action",
+        "Climate hazard": ["Extreme heat"],
+        "Health outcome": ["Low birth weight"],
+        "Timing": ["Before season"],
+        "Cost level": "Low",
+        "Status": "Draft"
+      }
+    },
+    {
+      "id": "recE2EFlood000001",
+      "fields": {
+        "Title": "Flood barriers",
+        "Climate hazard": ["Floods"],
+        "Health outcome": ["Low birth weight"],
+        "Timing": ["Before season"],
+        "Cost level": "Low",
+        "Status": "Published"
+      }
+    },
+    {
+      "id": "recE2EWatch000001",
+      "fields": {
+        "Title": "Year-round heat surveillance",
+        "Climate hazard": ["Extreme heat"],
+        "Health outcome": ["Low birth weight"],
+        "Action type": ["Early warning and surveillance"],
+        "Timing": ["Year-round"],
+        "Responsible department": ["Health"],
+        "Cost level": "High",
+        "Status": "Published"
+      }
+    }
+  ],
+  "India-only actions": [
+    {
+      "id": "recE2EIndia000001",
+      "fields": {
+        "Title": "Act on IMD heat alerts",
+        "Climate hazard": ["Extreme heat"],
+        "Health outcome": ["Low birth weight"],
+        "Timing": ["Before season"],
+        "Cost level": "Low",
+        "Status": "Published"
+      }
+    }
+  ],
+  "Kenya-only actions": [
+    {
+      "id": "recE2EKenya000001",
+      "fields": {
+        "Title": "County heat early warning",
+        "Climate hazard": ["Extreme heat"],
+        "Health outcome": ["Under-5 mortality"],
+        "Action type": ["Early warning and surveillance"],
+        "Timing": ["Before season"],
+        "Responsible department": ["Disaster management"],
+        "Cost level": "No additional cost",
+        "Status": "Published"
+      }
+    }
+  ]
+}

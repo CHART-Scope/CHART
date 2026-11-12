@@ -50,7 +50,7 @@ function Swatch({ spec }: { spec: SwatchSpec }) {
         <div
           style={{
             fontFamily: "var(--font-display)",
-            fontSize: 11,
+            fontSize: "var(--fs-eyebrow)",
             fontWeight: 500,
             color: "var(--color-charcoal)",
           }}
@@ -60,7 +60,7 @@ function Swatch({ spec }: { spec: SwatchSpec }) {
         <div
           style={{
             fontFamily: "var(--font-display)",
-            fontSize: 10,
+            fontSize: "var(--fs-micro)",
             color: "var(--color-text-light)",
           }}
         >
@@ -92,7 +92,7 @@ export function TokenTable({ children }: { children: ReactNode }) {
         width: "100%",
         borderCollapse: "collapse",
         fontFamily: "var(--font-body)",
-        fontSize: 13,
+        fontSize: "var(--fs-body)",
       }}
     >
       <thead>
@@ -112,7 +112,7 @@ const headerCell: CSSProperties = {
   padding: "8px 10px",
   borderBottom: "1px solid var(--border-subtle)",
   fontFamily: "var(--font-display)",
-  fontSize: 11,
+  fontSize: "var(--fs-eyebrow)",
   textTransform: "uppercase",
   letterSpacing: "0.06em",
   color: "var(--color-text-light)",
@@ -121,14 +121,14 @@ const cellCode: CSSProperties = {
   padding: "8px 10px",
   borderBottom: "1px solid var(--color-grey-light)",
   fontFamily: "var(--font-display)",
-  fontSize: 12,
+  fontSize: "var(--fs-caption)",
   color: "var(--color-charcoal)",
 };
 const cellValue: CSSProperties = {
   padding: "8px 10px",
   borderBottom: "1px solid var(--color-grey-light)",
   fontFamily: "var(--font-display)",
-  fontSize: 12,
+  fontSize: "var(--fs-caption)",
   color: "var(--color-text-muted)",
 };
 const cellNote: CSSProperties = {

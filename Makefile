@@ -2,14 +2,12 @@ NPM := $(shell command -v npm || command -v /opt/homebrew/bin/npm || command -v 
 DOCKER := $(shell command -v docker || command -v /Applications/Docker.app/Contents/Resources/bin/docker)
 export PATH := $(dir $(NPM)):$(PATH)
 
-CHART_REPOSITORY_DIR := chart-repository
-CHART_REPOSITORY_COMPOSE := $(DOCKER) compose -f $(CHART_REPOSITORY_DIR)/docker-compose.yml
 CHART_SERVICES ?= $(if $(wildcard .local/remote-dev.enabled),remote,local)
 ifeq ($(filter $(CHART_SERVICES),local remote),)
 $(error CHART_SERVICES must be local or remote)
 endif
 
-.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build e2e e2e-orchestration e2e-web identity-sync identity-test identity-restart identity-reset identity-down chart-repo chart-repo-install chart-repo-db chart-repo-db-wait chart-repo-seed chart-repo-stop chart-repo-typecheck chart-repo-build chart-repo-verify solution-repo solution-repo-install solution-repo-db solution-repo-db-wait solution-repo-seed solution-repo-stop solution-repo-typecheck solution-repo-build solution-repo-verify format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run wait-for-lbw bootstrap-token install-hooks
+.PHONY: all help install run verify python-check local-setup check-docker postgres services mail postgres-wait migrate dev climate-venv climate-materialize climate-api climate-api-run climate-openapi docs-install docs-prepare docs-serve docs-build docs-stop identity identity-db identity-wait web web-build web-start web-typecheck web-storybook web-storybook-build e2e e2e-orchestration e2e-core e2e-web identity-sync identity-test identity-restart identity-reset identity-down actions-publish actions-snapshot format format-check era5-fixture climate-install climate-migrate climate-db-migrate dagster-dev dagster-run dagster-run-fixture lbw-check lbw-run wait-for-lbw bootstrap-token install-hooks
 
 help:
 	@printf "\nQuick start (climate pipeline)\n"
@@ -32,7 +30,7 @@ help:
 	@printf "  make remote-check   Verify tunneled development dependencies\n"
 	@printf "  make remote-disconnect Close only the development SSH tunnel\n"
 	@printf "  make mail           Start local Mailpit (SMTP :1025, inbox :8025)\n"
-	@printf "  make bootstrap-token  Ensure CHART_BOOTSTRAP_TOKEN exists in web/.env.local\n"
+	@printf "  make bootstrap-token  Ensure CHART_BOOTSTRAP_TOKEN exists in web/.env.local (enter it in the setup wizard)\n"
 	@printf "  make install-hooks    Enable local pre-commit hooks (OpenAPI regen)\n"
 	@printf "  make identity-sync  Re-apply local Keycloak seed users and groups\n"
 	@printf "  make identity-test  Test Keycloak SSO and redirect configuration\n"
@@ -43,13 +41,12 @@ help:
 	@printf "Climate / orchestration\n"
 	@printf "  make lbw-run            Run the R prediction model on :8000\n"
 	@printf "  make era5-fixture       Write MVP fixture CSV to data/climate (no Dagster)\n"
-	@printf "  make climate-migrate    Run Alembic for climate spine tables\n\n"
-	@printf "Chart repository commands\n"
-	@printf "  make chart-repo         Start repository Postgres, then run Payload on :3300\n"
-	@printf "  make chart-repo-db      Start repository Postgres only\n"
-	@printf "  make chart-repo-seed    Seed repository Payload content\n"
-	@printf "  make chart-repo-stop    Stop repository Postgres\n"
-	@printf "  make chart-repo-verify  Typecheck and build repository service\n\n"
+	@printf "  make climate-migrate    Run Alembic for climate spine tables\n"
+	@printf "  make climate-backfill COUNTRY=IN YEARS=2  Load observed climate history\n"
+	@printf "  make climate-verify COUNTRY=IN YEARS=2    List places missing months\n\n"
+	@printf "Action repository commands (docs/actions.md; need AIRTABLE_TOKEN)\n"
+	@printf "  make actions-publish    Publish Published Airtable actions to the public feed\n"
+	@printf "  make actions-snapshot   Refresh the copy bundled with the API\n\n"
 
 all: local-setup verify
 
@@ -163,13 +160,30 @@ web-start:
 web-typecheck:
 	$(NPM) run typecheck:web
 
-# E2E suites. Each run leaves its evidence under outputs/e2e/: JUnit for both,
-# plus Playwright's HTML report and per-test trace, screenshot and video.
-e2e: e2e-orchestration e2e-web
+# E2E suites. Each run leaves its evidence under outputs/e2e/: JUnit for the
+# Python suites, plus Playwright's HTML report and per-test trace, screenshot
+# and video.
+e2e: e2e-orchestration e2e-core e2e-web e2e-era5 e2e-outlook
+
+# The Kenya API through HTTP and a database: the observed scorer against the
+# modeller's R validation cases, and the published outlook. The VRA suite
+# uploads, scores and reads assessments through the API.
+e2e-core:
+	mkdir -p outputs/e2e/core
+	$(VENV_PYTHON) -m pytest core/tests/test_kenya_observed_api.py core/tests/test_heat_outlook_api.py core/tests/test_prediction_requests.py core/tests/test_vra_api.py core/tests/test_india_observed_stored_api.py core/tests/test_seasonal_forecast_api.py core/tests/test_heat_seasons_api.py core/tests/test_read_cache.py e2e/test_core_package_data.py -q --junitxml=outputs/e2e/core/junit.xml
 
 e2e-orchestration:
 	mkdir -p outputs/e2e/orchestration
-	$(VENV_PYTHON) -m pytest orchestration/tests/test_climate_pull_failures.py orchestration/tests/test_dagster_postgres_driver.py -q --junitxml=outputs/e2e/orchestration/junit.xml
+	$(VENV_PYTHON) -m pytest orchestration/tests/test_climate_pull_failures.py orchestration/tests/test_dagster_postgres_driver.py orchestration/tests/test_prediction_job_executor.py orchestration/tests/test_recent_climate_top_up.py -q --junitxml=outputs/e2e/orchestration/junit.xml
+
+.PHONY: e2e-outlook
+e2e-outlook:
+	$(VENV_PYTHON) e2e/run_outlook.py
+
+.PHONY: e2e-era5
+e2e-era5:
+	mkdir -p outputs/e2e/sandbox-climate-recovery/era5-cache
+	$(VENV_PYTHON) -m pytest e2e/test_era5_cache_live.py -q --junitxml=outputs/e2e/sandbox-climate-recovery/era5-cache/junit.xml
 
 e2e-web:
 	$(NPM) run e2e:web
@@ -193,8 +207,12 @@ identity-wait: services
 	printf "\nTimed out waiting for local Keycloak on http://127.0.0.1:8080\n"; \
 	exit 1
 
+# Development Keycloak sends sign-in codes to Mailpit (http://127.0.0.1:8025);
+# the host is Mailpit's name on Keycloak's Docker network.
 identity-sync: identity-wait
-	$(NPM) run identity:sync
+	SMTP_HOST=$${SMTP_HOST:-$(if $(filter remote,$(CHART_SERVICES)),mailpit,chart-mailpit)} \
+	SMTP_PORT=$${SMTP_PORT:-1025} SMTP_SECURITY=$${SMTP_SECURITY:-none} \
+	SMTP_FROM=$${SMTP_FROM:-no-reply@chart.local} $(NPM) run identity:sync
 
 identity-test:
 	$(NPM) run identity:test
@@ -240,51 +258,15 @@ identity-down: check-docker
 	@if docker inspect chart-keycloak >/dev/null 2>&1; then docker stop chart-keycloak; fi
 endif
 
-chart-repo: chart-repo-install chart-repo-db chart-repo-db-wait
-	cd $(CHART_REPOSITORY_DIR) && $(NPM) run dev
 
-chart-repo-install:
-	cd $(CHART_REPOSITORY_DIR) && $(NPM) install
+# The action repository: Airtable (curation) -> public S3 feed -> API.
+# Publishing normally runs in .github/workflows/publish-actions.yml.
+actions-publish:
+	$(VENV_PYTHON) -m chart.actions.publish --out build/actions --upload
 
-chart-repo-db: check-docker
-	$(CHART_REPOSITORY_COMPOSE) up -d chart-repository-postgres
-
-chart-repo-db-wait:
-	@printf "Waiting for chart repository Postgres"
-	@for attempt in $$(seq 1 60); do \
-		if $(CHART_REPOSITORY_COMPOSE) exec -T chart-repository-postgres pg_isready -U chart_repository -d chart_repository >/dev/null 2>&1; then \
-			printf " ready\n"; \
-			exit 0; \
-		fi; \
-		printf "."; \
-		sleep 1; \
-	done; \
-	printf "\nTimed out waiting for chart repository Postgres on 127.0.0.1:5433\n"; \
-	exit 1
-
-chart-repo-seed: chart-repo-db chart-repo-db-wait
-	cd $(CHART_REPOSITORY_DIR) && $(NPM) run seed
-
-chart-repo-stop: check-docker
-	$(CHART_REPOSITORY_COMPOSE) stop
-
-chart-repo-typecheck:
-	cd $(CHART_REPOSITORY_DIR) && $(NPM) run typecheck
-
-chart-repo-build:
-	cd $(CHART_REPOSITORY_DIR) && $(NPM) run build
-
-chart-repo-verify: chart-repo-typecheck chart-repo-build
-
-solution-repo: chart-repo
-solution-repo-install: chart-repo-install
-solution-repo-db: chart-repo-db
-solution-repo-db-wait: chart-repo-db-wait
-solution-repo-seed: chart-repo-seed
-solution-repo-stop: chart-repo-stop
-solution-repo-typecheck: chart-repo-typecheck
-solution-repo-build: chart-repo-build
-solution-repo-verify: chart-repo-verify
+actions-snapshot:
+	$(VENV_PYTHON) -m chart.actions.publish --out build/actions
+	cp build/actions/actions.json core/chart/actions/actions.json
 
 format:
 	$(NPM) run format
@@ -466,6 +448,27 @@ docs-build: docs-prepare
 	else \
 		$(MAKE) docs-install && $(VENV_PYTHON) -m mkdocs build --strict; \
 	fi
+
+# Observed climate history for every place the model configuration lists.
+# Reads the public ERA5 mirror first, then Copernicus (needs ~/.cdsapirc).
+# India's observed estimates are scored too, so `make lbw-run` must be up.
+COUNTRY ?= IN
+YEARS ?= 2
+# era5 feeds the health models; era5-land is the sharper map layer only.
+PRODUCT ?= era5
+.PHONY: climate-backfill climate-verify climate-mirror-publish
+CLIMATE_HISTORY_ENV = DATABASE_URL="$(CHART_DATABASE_URL)" \
+	MODEL_CACHE_DIR="$(CHART_MODEL_CACHE_DIR)" \
+	INFERENCE_LBW_BASE_URL="$${INFERENCE_LBW_BASE_URL:-http://127.0.0.1:8000}"
+climate-backfill: climate-migrate
+	$(CLIMATE_HISTORY_ENV) $(VENV_PYTHON) -m chart.climate.history backfill --country $(COUNTRY) --years $(YEARS) --product $(PRODUCT)
+
+climate-verify:
+	$(CLIMATE_HISTORY_ENV) $(VENV_PYTHON) -m chart.climate.history verify --country $(COUNTRY) --years $(YEARS) --product $(PRODUCT)
+
+# Maintainers only: share retained ERA5 grids so other installs skip the queue.
+climate-mirror-publish:
+	aws s3 sync $${ERA5_CACHE_DIR:-$(ERA5_DIR)/.cache} s3://chart-predictive-models/era5-cache/ --exclude "*.partial" --exclude ".*" --region eu-north-1
 
 climate-migrate: climate-install postgres-wait
 	PYTHON_BIN="$(VENV_PYTHON)" DATABASE_URL="$(CHART_DATABASE_URL)" \

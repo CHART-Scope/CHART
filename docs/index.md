@@ -61,7 +61,7 @@ flowchart LR
 |---|---|
 | [Getting started](getting-started.md) | Install and run CHART locally |
 | [Installation setup](installation-setup.md) | Complete the first-run onboarding wizard, reset an installation, or recover from a stuck bootstrap |
-| [System architecture and requirements](system-architecture-and-requirements.md) | Review users, end-to-end boundaries, functional requirements, capacity targets, and production quality goals |
+| [Sign-in and email](sign-in.md) | How people sign in with emailed codes, and the SMTP settings (SES, Resend, Mailpit) that deliver them |
 | [Python core overview](python-core.md) | Build FastAPI modules |
 | [Modeling](modeling.md) | Understand the LBW model, inputs, outputs, and limitations |
 | [Climate API](climate-api.md) | Understand preview and prediction parameters |
@@ -69,6 +69,4 @@ flowchart LR
 | [Data pipeline](data-pipeline.md) | Run Dagster assets and materialisation |
 | [Add a geography and model](add-geography-and-model.md) | Extend the supported analytical areas |
 | [Where model updates happen](model-updates.md) | Register, version, or replace a health model — for CHART devs and external adopters |
-| [Health survey exploration](health-survey-exploration-guide.md) | Survey-to-model flow and safe outputs |
-| [Health input contract](health-input-contract.md) | Model-preparation schema and runtime boundary |
 | [Digital public good and licensing](licensing.md) | Understand CHART's AGPL licence, source availability, and third-party boundaries |

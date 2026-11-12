@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from datetime import date, timedelta
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 from chart.shared.db.models import AppGeography
 from chart.shared.db.session import get_session_factory
+from chart.shared.outcomes import DEFAULT_OUTCOME
 
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import (
@@ -50,6 +51,7 @@ from .ingestion_jobs import (
     CountryCoverage,
     IngestionJobView,
     create_job,
+    recent_complete_months,
     list_jobs,
     load_coverage,
 )
@@ -86,10 +88,11 @@ def get_locations() -> PlaceListResponse:
 def get_place_planning_options(
     geography_id: str,
     user: Annotated[CurrentUserContext, Depends(require_current_user)],
+    outcome: Annotated[str, Query(min_length=1, max_length=64)] = DEFAULT_OUTCOME,
 ) -> PlanningOptionsResponse:
     try:
         _require_place_access(user, geography_id)
-        return get_planning_options(geography_id)
+        return get_planning_options(geography_id, outcome=outcome)
     except ClimateServiceError as error:
         raise _http_error(error) from error
 
@@ -317,21 +320,6 @@ def read_ingestion_jobs(
         )
 
 
-#: ERA5 monthly fields appear in the first days of the month after the one
-#: they cover. "A few days in arrears" therefore rules out the month in
-#: progress *and*, early in a month, the one that has just ended: asking for
-#: it in the first week returns nothing and fails the job.
-ERA5_PUBLICATION_LAG_DAYS = 6
-
-
-def newest_complete_month(today: date) -> date:
-    """The newest month ERA5 can actually be expected to have published."""
-    previous = (date(today.year, today.month, 1) - timedelta(days=1)).replace(day=1)
-    if today.day <= ERA5_PUBLICATION_LAG_DAYS:
-        return (previous - timedelta(days=1)).replace(day=1)
-    return previous
-
-
 def _requested_months(raw: list[str]) -> list[date]:
     """Parse "YYYY-MM" strings, or default to the last twelve complete months.
 
@@ -350,13 +338,7 @@ def _requested_months(raw: list[str]) -> list[date]:
                 ) from error
         return sorted(set(months))
 
-    newest = newest_complete_month(date.today())
-    months = []
-    cursor = newest
-    for _ in range(12):
-        months.append(cursor)
-        cursor = (cursor - timedelta(days=1)).replace(day=1)
-    return sorted(months)
+    return recent_complete_months(date.today(), count=12)
 
 
 def _http_error(error: ClimateServiceError) -> HTTPException:

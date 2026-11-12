@@ -1,0 +1,122 @@
+.status {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+  white-space: pre-line;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.status:empty {
+  display: none;
+}
+
+.status[data-error] {
+  color: var(--color-maroon);
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.release {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+  min-width: 0;
+}
+
+.release:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.releaseHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.releaseId {
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  color: var(--color-charcoal);
+  overflow-wrap: anywhere;
+}
+
+.badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--fs-micro);
+  font-weight: 500;
+}
+
+.badge[data-active] {
+  background: var(--color-success-tint);
+  border-color: transparent;
+  color: #1f6b2b;
+}
+
+.more summary {
+  cursor: pointer;
+  width: fit-content;
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+}
+
+.detail {
+  display: grid;
+  gap: 4px;
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+}
+
+.detail div {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.detail dt {
+  font-weight: 500;
+  color: var(--color-charcoal);
+}
+
+.detail dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+}
+
+.files {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}

@@ -1,3 +1,5 @@
+import { authFetch, readErrorCode } from "./authFetch";
+
 export type GeographyRecord = {
   id: string;
   name: string;
@@ -178,14 +180,20 @@ export async function listModelCatalog(
   return response.items;
 }
 
-export async function getPlanningOptions(geographyId: string, accessToken: string) {
+export async function getPlanningOptions(
+  geographyId: string,
+  accessToken: string | null,
+) {
   return request<PlanningOptions>(
     `/api/chart/climate/planning-options/${encodeURIComponent(geographyId)}`,
     accessToken,
   );
 }
 
-export async function listPredictionRequests(geographyId: string, accessToken: string) {
+export async function listPredictionRequests(
+  geographyId: string,
+  accessToken: string | null,
+) {
   const query = new URLSearchParams({ geography_id: geographyId, limit: "10" });
   const response = await request<{ items: PredictionSummary[] }>(
     `/api/chart/climate/prediction-requests?${query}`,
@@ -194,129 +202,18 @@ export async function listPredictionRequests(geographyId: string, accessToken: s
   return response.items;
 }
 
-export async function getPredictionRequest(requestId: number, accessToken: string) {
+export async function getPredictionRequest(
+  requestId: number,
+  accessToken: string | null,
+) {
   return request<PredictionRequest>(
     `/api/chart/climate/prediction-requests/${requestId}`,
     accessToken,
   );
 }
 
-export type RecommendedActionAsset = {
-  filename: string;
-  type?: string;
-  size?: number;
-  url?: string;
-};
-
-export type RecommendedActionLink = {
-  url: string;
-  label: string;
-};
-
-export type RecommendedAction = {
-  slug: string;
-  title: string;
-  description: string;
-  categories: string[];
-  hazards: string[];
-  cost: "low" | "medium" | "high" | null;
-  links: RecommendedActionLink[];
-  caseStudies: RecommendedActionAsset[];
-};
-
-type SolutionsPayload = {
-  items?: {
-    slug: string;
-    name?: string;
-    title?: string;
-    description?: string;
-    taxonomies?: { type: string; label: string }[];
-    solutionTypes?: string[];
-    climateHazards?: string[];
-    costOfImplementation?: string;
-    links?: { url: string; label?: string }[];
-    usefulLinks?: string[];
-    assets?: { filename?: string; type?: string; size?: number; url?: string }[];
-    caseStudies?: { filename?: string; type?: string; size?: number }[];
-  }[];
-};
-
-export async function listRecommendedActions(
-  options: { limit?: number; hazard?: string } = {},
-) {
-  const { limit = 7, hazard } = options;
-  const params = new URLSearchParams({
-    limit: String(limit),
-    status: "published",
-  });
-  if (hazard) params.set("hazard", hazard);
-  const payload = await request<SolutionsPayload>(
-    `/api/chart/recommended-actions?${params}`,
-  );
-  return (payload.items ?? []).map(toRecommendedAction);
-}
-
-function toRecommendedAction(
-  item: NonNullable<SolutionsPayload["items"]>[number],
-): RecommendedAction {
-  const categoriesFromTax = (item.taxonomies ?? [])
-    .filter((tax) => tax.type === "solution_type")
-    .map((tax) => tax.label);
-  const hazardsFromTax = (item.taxonomies ?? [])
-    .filter((tax) => tax.type === "hazard")
-    .map((tax) => tax.label);
-  const links: RecommendedActionLink[] = (item.links ?? []).map((link) => ({
-    url: link.url,
-    label: link.label ?? hostnameOf(link.url),
-  }));
-  if (links.length === 0) {
-    for (const url of item.usefulLinks ?? []) {
-      links.push({ url, label: hostnameOf(url) });
-    }
-  }
-  const caseStudies: RecommendedActionAsset[] = (item.assets ?? item.caseStudies ?? [])
-    .filter(
-      (
-        asset,
-      ): asset is { filename?: string; type?: string; size?: number; url?: string } =>
-        Boolean(asset),
-    )
-    .map((asset) => ({
-      filename: asset.filename ?? "Attachment",
-      type: asset.type,
-      size: asset.size,
-      url: "url" in asset ? asset.url : undefined,
-    }));
-
-  return {
-    slug: item.slug,
-    title: item.name ?? item.title ?? item.slug,
-    description: item.description ?? "",
-    categories:
-      categoriesFromTax.length > 0 ? categoriesFromTax : (item.solutionTypes ?? []),
-    hazards: hazardsFromTax.length > 0 ? hazardsFromTax : (item.climateHazards ?? []),
-    cost: normalizeCost(item.costOfImplementation),
-    links,
-    caseStudies,
-  };
-}
-
-function normalizeCost(value?: string): RecommendedAction["cost"] {
-  const key = value?.toLowerCase();
-  if (key === "low" || key === "medium" || key === "high") return key;
-  return null;
-}
-
-function hostnameOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
-
 export async function submitPrediction(
-  accessToken: string,
+  accessToken: string | null,
   input: {
     geographyId: string;
     planningMonth: string;
@@ -370,28 +267,24 @@ export function predictionErrorMessage(code?: string | null) {
   }
 }
 
-async function request<T>(url: string, accessToken?: string, init: RequestInit = {}) {
-  const headers = new Headers(init.headers);
-  if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
-  const response = await fetch(url, {
-    // ``cache: "no-store"`` is the safe default for this client — most
-    // endpoints (prediction status polling, what-if scoring, live
-    // catalogs after a manifest change) must never come from a stale
-    // browser cache. Callers that hit near-static reference endpoints
-    // can override ``init.cache`` explicitly to opt into normal HTTP
-    // caching. Note: process-level caches (see ``useGeographies``)
-    // already dedupe within a session, so browser caching is mainly
-    // useful across hard refreshes.
-    cache: "no-store",
+async function request<T>(
+  url: string,
+  accessToken?: string | null,
+  init: RequestInit = {},
+) {
+  // ``cache: "no-store"`` (authFetch's default) is the safe default for this
+  // client: prediction status polling, what-if scoring and live catalogs
+  // after a manifest change must never come from a stale browser cache.
+  // Process-level caches (see ``useGeographies``) dedupe within a session.
+  // Only calls that name a token are authenticated; the public catalogue
+  // reads never carried one.
+  const response = await authFetch(url, {
     ...init,
-    headers,
-    signal: init.signal ?? AbortSignal.timeout(30_000),
+    accessToken,
+    auth: accessToken !== undefined,
   });
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      error?: string;
-    } | null;
-    throw new Error(predictionErrorMessage(body?.error));
+    throw new Error(predictionErrorMessage(await readErrorCode(response)));
   }
   return (await response.json()) as T;
 }

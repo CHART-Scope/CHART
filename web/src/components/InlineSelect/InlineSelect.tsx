@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from "react";
 
-import { SelectMenu } from "./SelectMenu";
+import { SelectMenu, type SelectSize } from "./SelectMenu";
 
 import { Icon } from "@/components/Icon";
 
@@ -34,6 +34,8 @@ type Props = {
    * it matches the dashboard context bar's uniform layout. Omit for
    * fully-inline usage (a select embedded mid-sentence). */
   label?: string;
+  /** Trigger size for the menu variant; see `SelectMenu`. */
+  size?: SelectSize;
 };
 
 /**
@@ -54,6 +56,7 @@ export function InlineSelect({
   style,
   disabled,
   label,
+  size,
 }: Props) {
   const renderOption = (option: InlineSelectOption) => (
     <option key={option.value} value={option.value} disabled={option.disabled}>
@@ -75,6 +78,7 @@ export function InlineSelect({
           groups={groups}
           label={ariaLabel}
           disabled={disabled}
+          size={size}
         />
       ) : (
         <>

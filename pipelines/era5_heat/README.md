@@ -19,7 +19,7 @@ exposure record.
 | `month` | first day of month (date) |
 | `tmax_monthly_max_c` | absolute maximum daily Tmax in the month |
 | `tmax_monthly_mean_c` | mean of daily Tmax in the month |
-| `heatwave_days` | days that belong to a run of >=3 consecutive days with Tmax >= 35 C |
+| `heatwave_days` | days that belong to a run of >= `min_run` consecutive days with Tmax >= `threshold_c` (35 C and 3 days by default; CHART's country pulls pass each area's official threshold, see `core/chart/climate/heat_seasons.json`) |
 | `observed_days` | daily observations available in the month |
 | `expected_days` | expected number of days in the month |
 | `completeness_pct` | `observed_days / expected_days` |
@@ -142,10 +142,20 @@ jupyter lab pipelines/era5_heat/notebooks/mvp_data_explorer.ipynb
 
 ## Caching
 
-NetCDF downloads are keyed by `sha256({dataset, variable, year, area})`
-and stored in `pipelines/era5_heat/.cache/`. Re-runs hit the cache and
-finish in seconds. Override the location with `cache_dir=` or
-`--cache-dir`.
+NetCDF downloads are keyed by dataset, variable, year, selected months and area,
+and stored in `pipelines/era5_heat/.cache/`. Valid saved acquisitions covering a
+larger area and all requested months are also reusable. Only requested months
+are aggregated. Metadata retains the actual raw-file SHA-256 and original
+request, including when a larger acquisition is reused. `--refresh` or
+`--no-cache` bypasses reuse. Override the location with `cache_dir=`,
+`--cache-dir`, or `ERA5_CACHE_DIR`; the deployed worker uses the persistent
+climate volume.
+
+Country pulls use polygon-cell overlap areas for districts/constituencies,
+including small polygons without a grid-cell centre. Existing county/division
+inputs retain their established centre-based weighting. This does not downscale
+ERA5 or establish that a health model is calibrated for a new area. See
+[`docs/modeling.md`](../../docs/modeling.md#era5-inputs-for-finer-areas).
 
 ## Tests
 

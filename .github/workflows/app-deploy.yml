@@ -117,6 +117,8 @@ jobs:
           KEYCLOAK_ADMIN_PASSWORD: test-password
           CHART_BOOTSTRAP_TOKEN: test-token
           MODEL_CONTROL_TOKEN: test-token
+          SMTP_HOST: smtp.example.test
+          SMTP_FROM: no-reply@example.test
         run: |
           IMAGE_PREFIX=ghcr.io/chart-scope/chart IMAGE_TAG=test docker compose -f infra/aws/docker-compose.yml config -q
           docker run --rm -e PUBLIC_ORIGIN -v "$PWD/infra/aws/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10-alpine caddy validate --config /etc/caddy/Caddyfile
@@ -127,6 +129,8 @@ jobs:
           docker build -f core/Dockerfile -t chart-core:ci .
           docker build --build-arg "CHART_BUILD_ID=$GITHUB_SHA" -f web/Dockerfile -t chart-web:ci .
           docker build --target test -f pipelines/models/Dockerfile -t chart-lbw:ci pipelines/models
+          docker build -t chart-keycloak:ci infra/keycloak
+          docker build --target config -t chart-keycloak-config:ci infra/keycloak
           docker run --rm chart-core:ci python -c 'from chart.api.app import app; assert "/climate/predict" in app.openapi()["paths"]'
 
   publish:
@@ -192,6 +196,29 @@ jobs:
           cache-from: type=gha,scope=lbw
           cache-to: type=gha,mode=max,scope=lbw
 
+      - name: Build and push Keycloak image
+        uses: docker/build-push-action@v7
+        with:
+          context: infra/keycloak
+          push: true
+          tags: |
+            ${{ steps.image.outputs.prefix }}-keycloak:${{ github.sha }}
+            ${{ steps.image.outputs.prefix }}-keycloak:dev
+          cache-from: type=gha,scope=keycloak
+          cache-to: type=gha,mode=max,scope=keycloak
+
+      - name: Build and push Keycloak realm sync image
+        uses: docker/build-push-action@v7
+        with:
+          context: infra/keycloak
+          target: config
+          push: true
+          tags: |
+            ${{ steps.image.outputs.prefix }}-keycloak-config:${{ github.sha }}
+            ${{ steps.image.outputs.prefix }}-keycloak-config:dev
+          cache-from: type=gha,scope=keycloak-config
+          cache-to: type=gha,mode=max,scope=keycloak-config
+
   deploy:
     name: Deploy to EC2
     needs: publish
@@ -203,13 +230,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Everything else ships in the images; the host keeps only these two
+      # files, .env.prod and the pre-migration database backups.
       - name: Copy Compose configuration
         uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.AWS_APP_HOST }}
           username: ${{ secrets.AWS_APP_USER }}
           key: ${{ secrets.AWS_APP_SSH_KEY }}
-          source: "infra/aws,infra/keycloak"
+          source: "infra/aws/docker-compose.yml,infra/aws/Caddyfile"
           target: chart-deploy
           strip_components: 1
           overwrite: true
@@ -230,6 +259,10 @@ jobs:
             cd "$HOME/chart-deploy/aws"
             mkdir -p backups
             chmod 700 backups
+            # Remove what earlier releases copied and no longer use.
+            rm -rf "$HOME/chart-deploy/keycloak"
+            find . -mindepth 1 -maxdepth 1 ! -name docker-compose.yml ! -name Caddyfile \
+              ! -name '.env.prod*' ! -name backups -print -exec rm -rf {} +
             runtime_env="$PWD/.env.prod"
             if [ ! -r "$runtime_env" ]; then
               echo "Create $runtime_env before deploying; see infra/aws/README.md." >&2

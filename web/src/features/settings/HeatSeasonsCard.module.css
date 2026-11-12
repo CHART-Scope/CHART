@@ -1,0 +1,465 @@
+/* Frame 17b · Settings · Heat seasons. Phase colours match the Gantt chart. */
+
+.layout [data-phase="b"] {
+  --phase: #4a6133;
+  --phase-fg: var(--color-white);
+  --phase-hatch: #4a6133;
+}
+.layout [data-phase="d"] {
+  --phase: #cc3d5c;
+  --phase-fg: var(--color-white);
+  --phase-hatch: #e2738b;
+}
+.layout [data-phase="a"] {
+  --phase: #7a7873;
+  --phase-fg: var(--color-white);
+  --phase-hatch: #b5b3ae;
+}
+.layout [data-phase="o"] {
+  --phase: var(--color-white);
+  --phase-fg: var(--color-text-muted);
+  --phase-hatch: transparent;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.placesPane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.placesTools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.search {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--color-white);
+  color: var(--color-text-muted);
+}
+
+.search:focus-within {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--color-charcoal);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.toggleAll {
+  flex: 0 0 auto;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--color-white);
+  color: var(--color-nexus);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.toggleAll:disabled {
+  color: var(--color-text-faint);
+  cursor: default;
+}
+
+.places {
+  max-height: 560px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  list-style: none;
+}
+
+.placeRow {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #f0eeeb;
+  border-left: 3px solid transparent;
+  background: var(--color-white);
+}
+
+.placeRow[aria-current="true"] {
+  border-left-color: var(--color-nexus);
+  background: #f3f3fd;
+}
+
+.fold,
+.foldSpace {
+  flex: 0 0 28px;
+  height: 28px;
+}
+
+.fold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.fold svg {
+  transition: transform 0.15s var(--ease-out-soft);
+}
+
+.fold[aria-expanded="false"] svg {
+  transform: rotate(-90deg);
+}
+
+.fold:hover:not(:disabled) {
+  background: var(--color-grey-light);
+}
+
+.fold:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.place {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px 12px 4px;
+  border: none;
+  background: transparent;
+  color: var(--color-charcoal);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.place:focus-visible,
+.fold:focus-visible,
+.toggleAll:focus-visible,
+.brushes button:focus-visible,
+.calendar button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fold svg {
+    transition: none;
+  }
+}
+
+.placeText {
+  flex: 1;
+  min-width: 0;
+}
+
+.placeName {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: var(--fs-body);
+}
+
+.placeName[data-root] {
+  font-weight: 600;
+}
+
+.placeNote {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.level {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #eeeefc;
+  color: var(--color-nexus);
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.mini {
+  display: grid;
+  grid-template-columns: repeat(12, 6px);
+  gap: 2px;
+}
+
+.mini span {
+  height: 12px;
+  border-radius: 2px;
+  background: var(--phase);
+}
+
+.mini span[data-phase="o"] {
+  background: var(--color-grey-light);
+}
+
+.editor {
+  min-width: 0;
+}
+
+.title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.title h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.state {
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+}
+
+.state[data-edited] {
+  color: #b4521c;
+}
+
+.source {
+  margin: 6px 0 20px;
+  color: var(--color-text-muted);
+  font-size: 14.5px;
+}
+
+.brushes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #f2f1ee;
+}
+
+.brushes button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-charcoal);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.brushes button[aria-checked="true"] {
+  background: var(--color-white);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+}
+
+.brushes span,
+.counts span span {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--phase-edge, var(--phase));
+  border-radius: 3px;
+  background: var(--phase);
+}
+
+.brushes span[data-phase="o"],
+.counts span span[data-phase="o"] {
+  --phase-edge: var(--border-subtle);
+}
+
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendar button {
+  height: 64px;
+  border: 1px solid var(--phase);
+  border-radius: 8px;
+  background: var(--phase);
+  color: var(--phase-fg);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.calendar button[data-phase="o"] {
+  border-color: var(--border-subtle);
+}
+
+.calendar button:disabled {
+  cursor: default;
+}
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  color: #5a5853;
+  font-size: 14px;
+}
+
+.counts > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.links {
+  display: flex;
+  gap: 16px;
+}
+
+.links button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-nexus);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.links button:disabled {
+  color: var(--color-text-faint);
+  cursor: default;
+}
+
+.note,
+.error {
+  margin: 12px 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-caption);
+}
+
+.error {
+  color: var(--color-maroon);
+}
+
+.preview {
+  margin-top: 26px;
+}
+
+.previewTitle {
+  margin: 0 0 8px;
+  color: var(--color-text-muted);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.previewStrip {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #eceae7;
+  border-radius: 8px;
+  list-style: none;
+}
+
+.previewStrip li {
+  border-left: 1px solid #eceae7;
+}
+
+.previewMonth {
+  display: block;
+  padding: 6px 8px;
+  color: #5a5853;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.previewBar {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding-left: 6px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--phase-hatch) 0 2px,
+    transparent 2px 9px
+  );
+}
+
+.previewBar span {
+  padding: 2px 5px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  background: var(--color-white);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .places {
+    max-height: 280px;
+  }
+  .calendar {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .previewStrip {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}

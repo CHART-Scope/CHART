@@ -24,11 +24,14 @@ for (const width of [1440, 390]) {
     await expect(page).toHaveTitle(
       "CHART — Climate & health adaptation and resilience Toolkit",
     );
-    await expect(page.getByRole("heading", { level: 1 })).toContainText(
-      "Climate & health adaptation and resilience Toolkit",
-    );
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("CHART");
     await expect(
-      page.getByRole("button", { name: "Sign in", exact: true }),
+      page.getByText("Climate x Health Adaptation and Resilience Tool", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Log in", exact: true }),
     ).toBeEnabled();
     await expect(page.locator("header")).toHaveCSS(
       "background-color",
@@ -38,84 +41,155 @@ for (const width of [1440, 390]) {
       page.locator("header").getByRole("link", { name: "CHART home" }),
     ).toHaveCSS("color", "rgb(190, 242, 116)");
     const navigation = page.getByRole("navigation", { name: "Main navigation" });
+    // Anyone can open the published estimates; signing in is for planning.
     await expect(
-      navigation.getByRole("link", { name: "Learning Hub", exact: true }),
-    ).toHaveAttribute("href", "/learning");
-    await expect(
-      navigation.getByRole("button", { name: /Solutions Repository/ }),
-    ).toBeDisabled();
-    await expect(
-      page.locator("main").getByRole("link", { name: "Request access" }),
-    ).toHaveAttribute("href", "mailto:info@scopeimpact.fi");
-    await expect(
-      page.getByRole("button", { name: "Explore solutions" }),
-    ).toBeDisabled();
-    const preview = page.getByRole("figure", { name: "CHART dashboard previews" });
-    const choices = page.getByRole("group", { name: "Choose dashboard preview" });
-    await expect(preview.getByRole("img")).toHaveCount(3);
-    for (const label of ["Dashboard", "Health risks", "Precision"]) {
-      const choice = choices.getByRole("button", { name: label, exact: true });
-      await choice.click();
-      await expect(choice).toHaveAttribute("aria-pressed", "true");
-      const enlarge = preview.getByRole("button", {
-        name: `Enlarge ${label.toLowerCase()} screenshot`,
-        exact: true,
-      });
-      await enlarge.click();
-      const dialog = page.getByRole("dialog", { name: label, exact: true });
-      await expect(dialog).toBeVisible();
-      await expect(dialog.getByRole("img")).toBeVisible();
-      expect(
-        await dialog
-          .getByRole("img")
-          .evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
-      ).toBe(true);
-      if (label === "Health risks")
-        await dialog.getByRole("button", { name: "Close dashboard preview" }).click();
-      else await page.keyboard.press("Escape");
-      await expect(dialog).not.toBeVisible();
-      await expect(enlarge).toBeFocused();
+      navigation.getByRole("link", { name: "Climate x health risks", exact: true }),
+    ).toHaveAttribute("href", "/explore");
+    for (const name of ["VRAs", "Actions repository"]) {
+      await expect(navigation.getByRole("link", { name, exact: true })).toHaveAttribute(
+        "href",
+        "#toolkit",
+      );
     }
-    await choices.getByRole("button", { name: "Dashboard", exact: true }).click();
-    await expect(page.getByText("Inside CHART · Madhya Pradesh, India")).toHaveCount(0);
+    for (const title of [
+      "Plan for climate-health risk, together",
+      "Explore CHART toolkit",
+      "CHART co-design government partners",
+      "A Digital Public Good, stewarded together",
+    ]) {
+      await expect(page.getByRole("heading", { level: 2, name: title })).toBeVisible();
+    }
+    // The partners' quotes, side by side on desktop and stacked on a phone.
+    const quotes = page.locator("figure").filter({ has: page.locator("blockquote") });
+    await expect(quotes).toHaveCount(2);
+    await expect(quotes.nth(0)).toContainText(
+      "We should show it to others in the state.",
+    );
+    await expect(quotes.nth(0).locator("figcaption")).toContainText(
+      "Madhya Pradesh State Nodal Officer",
+    );
+    await expect(quotes.nth(1)).toContainText(
+      "We would like to use CHART in the next planning cycle.",
+    );
+    await expect(quotes.nth(1).locator("figcaption")).toContainText(
+      "Kajiado TWG member",
+    );
+    await expect(quotes.nth(0).locator("blockquote")).toHaveCSS("font-size", "20px");
+    await expect(quotes.nth(0).locator("blockquote")).toHaveCSS("font-style", "italic");
+    await expect(quotes.nth(0).locator("figcaption > span").first()).toHaveCSS(
+      "height",
+      "44px",
+    );
+    const [first, second] = [
+      await quotes.nth(0).boundingBox(),
+      await quotes.nth(1).boundingBox(),
+    ];
+    if (width >= 1440) expect(second!.y).toBeCloseTo(first!.y, 0);
+    else expect(second!.y).toBeGreaterThan(first!.y + first!.height - 1);
+    for (const step of [
+      "1. Understand the risk",
+      "2. Get recommended actions",
+      "3. Coordinate, track, and report",
+    ]) {
+      await expect(page.getByRole("heading", { level: 3, name: step })).toBeVisible();
+    }
+    // The hero call to action scrolls to the toolkit, whose live card opens the map.
+    await page.getByRole("link", { name: "Explore the toolkit" }).click();
+    await expect(page).toHaveURL(/#toolkit$/);
+    const toolkit = page.locator("#toolkit");
+    await expect(toolkit).toBeInViewport();
+    await expect(
+      toolkit.getByRole("link", { name: "Explore", exact: true }),
+    ).toHaveAttribute("href", "/explore");
+    await expect(toolkit.getByText("Coming soon")).toHaveCount(2);
+    // No placeholder copy from the design reaches the public page.
+    await expect(page.getByText(/placeholder/i)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Request access" })).toHaveCount(0);
+
+    // Contact: each entry point preselects its reason, and Send opens the
+    // visitor's email app addressed to the coalition (there is no backend).
+    for (const [opener, reason] of [
+      [
+        page.getByRole("button", { name: "Request a demo" }).first(),
+        "Requesting a demo",
+      ],
+      [
+        page.getByRole("button", { name: "Notify me about Action repository" }),
+        "Hearing when VRAs and the Action repository launch",
+      ],
+      [
+        page.locator("main").getByRole("button", { name: "Contact us" }),
+        "Becoming a co-creator partner",
+      ],
+    ] as const) {
+      await opener.click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog.getByRole("radio", { name: reason })).toBeChecked();
+      await page.keyboard.press("Escape");
+      await expect(dialog).toHaveCount(0);
+    }
+    await page.getByRole("button", { name: "Contact us" }).first().click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("radio", { name: "Something else" })).toBeChecked();
+    // Required fields block an empty submission.
+    await dialog.getByRole("button", { name: "Send" }).click();
+    await expect(page.getByRole("dialog", { name: "Contact us" })).toBeVisible();
+    await page.evaluate(() => {
+      // Record the mailto navigation instead of leaving the page.
+      const opened: string[] = [];
+      Object.assign(window, { __mailto: opened });
+      window.open = (url?: string | URL) => {
+        opened.push(String(url));
+        return null;
+      };
+    });
+    await dialog.getByLabel("Name").fill("Asha Rao");
+    await dialog.getByLabel("Work email").fill("asha@health.gov.in");
+    await dialog.getByLabel("Organisation / department").fill("Health department");
+    await dialog.getByRole("radio", { name: "Requesting a demo" }).check();
+    await dialog.getByLabel("Message (optional)").fill("Bhopal division");
+    await dialog.getByRole("button", { name: "Send" }).click();
+    await expect(page.getByRole("dialog", { name: "Almost there" })).toBeVisible();
+    const mailto = await page.evaluate(
+      () => (window as unknown as { __mailto: string[] }).__mailto,
+    );
+    expect(mailto).toHaveLength(1);
+    const url = new URL(mailto[0]);
+    expect(url.protocol).toBe("mailto:");
+    expect(url.pathname).toBe("info@scopeimpact.fi");
+    expect(url.searchParams.get("subject")).toBe("CHART: Requesting a demo");
+    expect(url.searchParams.get("body")).toContain("Work email: asha@health.gov.in");
+    expect(url.searchParams.get("body")).toContain("Bhopal division");
+    await dialog.getByRole("button", { name: "Done" }).click();
+    await expect(dialog).toHaveCount(0);
+
     const partners = page.getByRole("list", { name: "Partners" });
     await expect(partners.getByRole("link")).toHaveCount(5);
-    await expect(partners.getByRole("link").nth(1)).toHaveAccessibleName(
-      "UBS Optimus Foundation",
-    );
     for (const [name, href] of [
+      ["Amref Health Africa", "https://amref.org/"],
+      ["AMP Health", "https://amphealth.org/"],
       ["SCOPE Impact", "https://scopeimpact.fi/"],
-      ["CEEW", "https://www.ceew.in/"],
       ["PATH", "https://www.path.org/"],
-      [
-        "UBS Optimus Foundation",
-        "https://www.ubs.com/global/en/sustainability-impact/social-impact-and-philanthropy/optimus-foundation.html",
-      ],
-      [
-        "Global Development Incubator South Asia",
-        "https://globaldevincubator.org/south-asia/",
-      ],
+      ["CEEW", "https://www.ceew.in/"],
     ]) {
       const link = partners.getByRole("link", { name, exact: true });
       await expect(link).toBeVisible();
       await expect(link).toHaveAttribute("href", href);
       await expect(link).toHaveAttribute("target", "_blank");
       await expect(link).toHaveAttribute("rel", "noreferrer");
+      const logo = link.getByRole("img", { name, exact: true });
+      await expect
+        .poll(() =>
+          logo.evaluate(
+            (img: HTMLImageElement) => img.complete && img.naturalWidth > 0,
+          ),
+        )
+        .toBe(true);
     }
-    await expect(
-      page.locator("section[aria-labelledby='chart-landing-title']"),
-    ).toHaveCSS("background-image", "none");
-    for (const logo of await page
-      .getByRole("list", { name: "Partners" })
-      .getByRole("img")
-      .all()) {
-      await expect(logo).toBeVisible();
-      expect(
-        await logo.evaluate(
-          (img: HTMLImageElement) => img.complete && img.naturalWidth > 0,
-        ),
-      ).toBe(true);
-    }
+    await page.screenshot({
+      path: `../outputs/e2e/web/landing-${width}.png`,
+      fullPage: true,
+    });
     const resources = page.getByRole("navigation", { name: "Resources" });
     for (const [name, href] of [
       ["Documentation", "https://chart-scope.github.io/CHART/docs/"],
@@ -139,8 +213,14 @@ for (const width of [1440, 390]) {
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     ).toBe(true);
     await page.screenshot({ path: testInfo.outputPath("landing.png"), fullPage: true });
-    await navigation.getByRole("link", { name: "Learning Hub", exact: true }).click();
-    await expect(page).toHaveURL(/\/learning$/);
+    await page.goto("/learning");
+    const publicNav = page.getByRole("navigation", { name: "Main navigation" });
+    await expect(
+      publicNav.getByRole("link", { name: "Explore the map", exact: true }),
+    ).toHaveAttribute("href", "/explore");
+    await expect(
+      publicNav.getByRole("link", { name: "Learning Hub", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
     await expect(page.locator("header").first()).toHaveCSS(
       "background-color",
       "rgb(43, 45, 49)",
@@ -171,7 +251,14 @@ for (const width of [1440, 390]) {
 }
 
 test("direct public Learning Hub survives unavailable services", async ({ page }) => {
-  await page.route("**/api/**", (route) => json(route, {}, 503));
+  await page.route("**/api/**", (route) =>
+    // A visitor has no refresh cookie, which the refresh route answers with
+    // 401 however the services behind it are doing. (A 503 there means the
+    // provider is down mid-session, which waits rather than signing in.)
+    route.request().url().endsWith("/api/auth/keycloak-refresh")
+      ? json(route, { error: "AUTH_SESSION_REQUIRED" }, 401)
+      : json(route, {}, 503),
+  );
   await page.goto("/learning");
   await expect(page.getByRole("searchbox")).toBeVisible();
   await expect(
@@ -194,7 +281,7 @@ test("signed-in Learning Hub keeps workspace navigation", async ({ page }) => {
   );
   await page.goto("/learning");
   await expect(
-    page.getByRole("link", { name: "Start planning", exact: true }),
+    page.getByRole("link", { name: "Planning center", exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("searchbox")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in", exact: true })).toHaveCount(
@@ -215,10 +302,62 @@ for (const requiresOnboarding of [false, true]) {
     await page.goto("/");
     await page
       .getByRole("button", {
-        name: requiresOnboarding ? "Set up CHART" : "Sign in",
+        name: requiresOnboarding ? "Set up CHART" : "Log in",
         exact: true,
       })
       .click();
     await expect(page).toHaveURL(new RegExp(`${destination}$`));
+  });
+}
+
+// Regression: a fixed 24px gutter ran the content to the window's edge on a
+// laptop. The gutter grows with the window (6vw, 24–120px) and every block
+// (header, hero, sections, footer) starts on the same line.
+for (const [width, gutter] of [
+  [390, 24],
+  [1440, 86.4],
+  [2560, 120],
+] as const) {
+  test(`landing content keeps the design's side gutter at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const api = await installFakeApi(page);
+    api.on(/^\/api\/setup$/, (route) => json(route, { requiresOnboarding: false }));
+    await page.goto("/");
+    const left = (locator: ReturnType<typeof page.locator>) =>
+      locator.evaluate((element) => element.getBoundingClientRect().left);
+    const brand = page.locator("header").getByRole("link", { name: "CHART home" });
+    const start = await left(brand);
+    // Content is centred within 1592px once the window is wide enough.
+    const expected = Math.max(gutter, (width - 1592) / 2);
+    expect(start).toBeCloseTo(expected, 0);
+    for (const block of [
+      page.getByRole("heading", { level: 1 }),
+      page.getByRole("heading", {
+        level: 2,
+        name: "Plan for climate-health risk, together",
+      }),
+      page.getByRole("heading", { level: 2, name: "Explore CHART toolkit" }),
+      page.getByRole("heading", {
+        level: 2,
+        name: "A Digital Public Good, stewarded together",
+      }),
+      page.locator("footer").getByRole("link", { name: "CHART home" }),
+    ]) {
+      expect(await left(block)).toBeCloseTo(start, 0);
+    }
+    const strip = page.getByText("Interested in seeing how it all comes together");
+    const right = await strip
+      .locator("xpath=..")
+      .evaluate((element) => innerWidth - element.getBoundingClientRect().right);
+    expect(right).toBeCloseTo(expected, 0);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    ).toBe(true);
+    await page.screenshot({
+      path: `../outputs/e2e/web/landing-gutter-${width}.png`,
+      fullPage: true,
+    });
   });
 }

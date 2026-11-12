@@ -13,7 +13,7 @@ core/
     climate/              # Source-neutral monthly data and requests
     model_registry/       # Versioned model files and place mapping
     inference/            # Deterministic scorer and optional explanation
-    solution_repository/  # Public repository adapter
+    actions/              # Action repository: public feed reader and publisher
     shared/db/            # SQLAlchemy models; Alembic owns the schema
     vra/                  # Future module placeholder only
   alembic/

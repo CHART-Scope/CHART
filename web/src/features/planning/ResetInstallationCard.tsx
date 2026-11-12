@@ -40,25 +40,29 @@ export function ResetInstallationCard({ accessToken }: { accessToken: string }) 
 
   return (
     <>
-      <div className={styles.dangerZone}>
-        <div>
-          <strong>Reset this CHART installation</strong>
-          <p>
-            Deletes all workspaces and their members, and returns CHART to the first-run
-            setup wizard. Sign-in identities in Keycloak are not touched.
-          </p>
+      {/* Folded away at the foot of the Users tab: reachable, never prominent. */}
+      <details className={styles.danger}>
+        <summary>Danger zone</summary>
+        <div className={styles.dangerZone}>
+          <div>
+            <strong>Reset this CHART installation</strong>
+            <p>
+              Deletes all workspaces and their members, and returns CHART to the
+              first-run setup wizard. Sign-in identities in Keycloak are not touched.
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setResetError(null);
+              setResetConfirmText("");
+              setShowResetDialog(true);
+            }}
+          >
+            Reset installation
+          </Button>
         </div>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setResetError(null);
-            setResetConfirmText("");
-            setShowResetDialog(true);
-          }}
-        >
-          Reset installation
-        </Button>
-      </div>
+      </details>
 
       <Modal
         size="lg"

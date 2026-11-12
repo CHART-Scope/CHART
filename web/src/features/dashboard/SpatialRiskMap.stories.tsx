@@ -4,12 +4,12 @@ import type { Meta, StoryObj } from "@storybook/react";
 
 import { type MapResponse } from "@/lib/dashboardClient";
 
-import { ScienceVideoPlaceholder } from "./ScienceVideoPlaceholder";
+import { ScienceVideo } from "./ScienceVideo";
 import { SpatialRiskMap } from "./SpatialRiskMap";
 import { HeatLbwLinkPanel } from "./HeatLbwLinkPanel";
 import { RiskProtectionPanel } from "./RiskProtectionPanel";
 import { IconSprite } from "@/components/Icon";
-import layout from "@/app/dashboard/[geo]/page.module.css";
+import layout from "@/app/(workspace)/dashboard/[geo]/page.module.css";
 
 /**
  * The third dashboard card: where the risk sits.
@@ -98,7 +98,7 @@ function withFixture(response: MapResponse, combined = false) {
         <IconSprite />
         <div className={layout.grid}>
           <aside className={layout.learning}>
-            <ScienceVideoPlaceholder />
+            <ScienceVideo />
             <RiskProtectionPanel outcomeLabel="low birth weight" />
           </aside>
           <HeatLbwLinkPanel

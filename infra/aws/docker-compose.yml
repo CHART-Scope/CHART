@@ -24,6 +24,20 @@ x-python-environment: &python-environment
   # The default hour read as "stuck" on the dashboard; a running job renews
   # its lease every minute, so ten minutes only shortens the dead wait.
   PREDICTION_LEASE_SECONDS: "600"
+  # Published estimates readable without signing in (docs/explore.md).
+  CHART_PUBLIC_READ: ${CHART_PUBLIC_READ:-false}
+  # Published reads built once per data version (core/chart/api/read_cache.py).
+  CHART_READ_CACHE: "1"
+  # Recommendation providers (docs/recommendations.md). Bedrock uses the
+  # instance role; keys stay in .env.prod. Unset means rules and template only.
+  AWS_REGION: ${AWS_REGION:-eu-west-2}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+  CHART_INSIGHT_MODELS: ${CHART_INSIGHT_MODELS:-}
+  CHART_RECOMMENDER_URL: ${CHART_RECOMMENDER_URL:-}
+  # Published actions (docs/actions.md). Empty uses the bundled copy only.
+  CHART_ACTIONS_URL: ${CHART_ACTIONS_URL-https://chart-actions-repository.s3.eu-north-1.amazonaws.com/v1/actions.json}
 
 x-dagster-environment: &dagster-environment
   <<: *python-environment
@@ -34,6 +48,9 @@ x-dagster-environment: &dagster-environment
   DAGSTER_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
   DAGSTER_POSTGRES_DB: chart_dagster
   CLIMATE_OUTPUT_DIR: /opt/chart/data/climate
+  # Retain raw grids across code-container replacements so new areas can be
+  # derived without downloading the same country and months again.
+  ERA5_CACHE_DIR: /opt/chart/data/climate/era5-cache
   ERA5_USE_FIXTURE: "0"
   CDSAPI_URL: ${CDSAPI_URL:-https://cds.climate.copernicus.eu/api}
   CDSAPI_KEY: ${CDSAPI_KEY:-}
@@ -127,7 +144,7 @@ services:
         else
           public_flag="";
         fi;
-        aws s3 sync "s3://$$MODEL_BUCKET/" /models/ --exclude "archive/*" $$public_flag
+        aws s3 sync "s3://$$MODEL_BUCKET/" /models/ --exclude "archive/*" --exclude "media/*" --exclude "era5-cache/*" $$public_flag
 
   chart-lbw:
     image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-lbw:${IMAGE_TAG:-dev}
@@ -169,8 +186,9 @@ services:
       - /app/pipelines/models/lbw/model-release.mp.compact.review.json
       - --activate-model
 
+  # Plugin, theme and realm seed are built into the image (infra/keycloak/Dockerfile).
   chart-keycloak:
-    image: quay.io/keycloak/keycloak:26.6.1
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-keycloak:${IMAGE_TAG:-dev}
     container_name: chart-keycloak
     restart: unless-stopped
     depends_on:
@@ -179,19 +197,14 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-      KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://chart-postgres:5432/chart_keycloak
       KC_DB_USERNAME: chart_keycloak
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
       KC_HTTP_ENABLED: "true"
-      KC_HTTP_RELATIVE_PATH: /identity
       KC_HOSTNAME: ${PUBLIC_ORIGIN}/identity
       KC_HOSTNAME_STRICT: "true"
       KC_PROXY_HEADERS: xforwarded
-    volumes:
-      - ../keycloak/chart-realm.json:/opt/keycloak/data/import/chart-realm.json:ro
-      - ../keycloak/themes/chart:/opt/keycloak/themes/chart:ro
-    command: ["start", "--import-realm"]
+    command: ["start", "--optimized", "--import-realm"]
     healthcheck:
       test: ["CMD-SHELL", "timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
       interval: 5s
@@ -199,7 +212,7 @@ services:
       retries: 30
 
   chart-keycloak-config:
-    image: node:22-alpine
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-keycloak-config:${IMAGE_TAG:-dev}
     restart: "no"
     labels:
       chart.release: ${IMAGE_TAG:-dev}
@@ -211,14 +224,24 @@ services:
       KEYCLOAK_ADMIN_USERNAME: admin
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KEYCLOAK_REALM: chart
-      KEYCLOAK_REALM_FILE: /keycloak/chart-realm.json
       CHART_WEB_ORIGIN: ${PUBLIC_ORIGIN}
       KEYCLOAK_GOOGLE_CLIENT_ID: ${KEYCLOAK_GOOGLE_CLIENT_ID:-}
       KEYCLOAK_GOOGLE_CLIENT_SECRET: ${KEYCLOAK_GOOGLE_CLIENT_SECRET:-}
       KEYCLOAK_GOOGLE_HOSTED_DOMAIN: ${KEYCLOAK_GOOGLE_HOSTED_DOMAIN:-}
-    volumes:
-      - ../keycloak:/keycloak:ro
-    command: ["node", "/keycloak/sync-realm.js"]
+      # Sign-in codes are emailed (docs/sign-in.md); without mail nobody can
+      # sign in, so the deploy stops at `compose config` until these are set.
+      SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST in .env.prod}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:?set SMTP_FROM in .env.prod}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-CHART}
+      SMTP_REPLY_TO: ${SMTP_REPLY_TO:-}
+      SIGN_IN_CODE_LIMIT: ${SIGN_IN_CODE_LIMIT:-5}
+      # First password of the default `admin`, changed at first sign-in
+      # (docs/sign-in.md). Set it so a public server never starts on "admin".
+      CHART_ADMIN_INITIAL_PASSWORD: ${CHART_ADMIN_INITIAL_PASSWORD:-}
 
   chart-core:
     image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}
@@ -258,7 +281,6 @@ services:
       CHART_API_INTERNAL_URL: http://chart-core:3210
       CHART_PYTHON_API_INTERNAL_URL: http://chart-core:3210
       CHART_WEB_ORIGIN: ${PUBLIC_ORIGIN}
-      CHART_BOOTSTRAP_TOKEN: ${CHART_BOOTSTRAP_TOKEN}
       KEYCLOAK_BROWSER_URL: ${PUBLIC_ORIGIN}/identity
       KEYCLOAK_SERVER_URL: http://chart-keycloak:8080/identity
       KEYCLOAK_REALM: chart
@@ -289,15 +311,56 @@ services:
       <<: *dagster-environment
     command: ["dagster", "instance", "migrate"]
 
-  chart-dagster-webserver:
+  # One long-lived code server for the daemon and the webserver. Given `-m`,
+  # each of them spawned its own and the daemon replaced its copy every one to
+  # two minutes, re-importing the pipeline each time: 90-180% of the server's
+  # two CPUs with nothing queued (measured 2026-10-16). Runs are launched from
+  # here, so it carries the daemon's environment and volumes.
+  chart-dagster-code:
     image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}
-    container_name: chart-dagster-webserver
+    container_name: chart-dagster-code
     restart: unless-stopped
     depends_on:
       chart-dagster-migrate:
         condition: service_completed_successfully
       chart-migrate:
         condition: service_completed_successfully
+    environment:
+      <<: *dagster-environment
+    volumes:
+      - chart-dagster-storage:/opt/dagster/storage
+      - chart-climate-data:/opt/chart/data/climate
+      # The model configuration (outlooks/index.json) decides which places a
+      # climate pull derives; the seasonal forecast job saves its scores under
+      # /models/forecasts, so the mount is writable.
+      - chart-lbw-model:/models
+    command:
+      [
+        "dagster",
+        "code-server",
+        "start",
+        "-h",
+        "0.0.0.0",
+        "-p",
+        "4000",
+        "-m",
+        "chart_pipeline.definitions",
+        "--location-name",
+        "chart_pipeline",
+      ]
+    healthcheck:
+      test: ["CMD", "dagster", "api", "grpc-health-check", "-p", "4000"]
+      interval: 10s
+      timeout: 10s
+      retries: 18
+
+  chart-dagster-webserver:
+    image: ${IMAGE_PREFIX:-ghcr.io/chart-scope/chart}-core:${IMAGE_TAG:-dev}
+    container_name: chart-dagster-webserver
+    restart: unless-stopped
+    depends_on:
+      chart-dagster-code:
+        condition: service_healthy
     environment:
       <<: *dagster-environment
     volumes:
@@ -312,8 +375,10 @@ services:
         "0.0.0.0",
         "-p",
         "3000",
-        "-m",
-        "chart_pipeline.definitions",
+        "--grpc-host",
+        "chart-dagster-code",
+        "--grpc-port",
+        "4000",
       ]
     healthcheck:
       test:
@@ -332,16 +397,22 @@ services:
     container_name: chart-dagster-daemon
     restart: unless-stopped
     depends_on:
-      chart-dagster-migrate:
-        condition: service_completed_successfully
-      chart-migrate:
-        condition: service_completed_successfully
+      chart-dagster-code:
+        condition: service_healthy
     environment:
       <<: *dagster-environment
     volumes:
       - chart-dagster-storage:/opt/dagster/storage
       - chart-climate-data:/opt/chart/data/climate
-    command: ["dagster-daemon", "run", "-m", "chart_pipeline.definitions"]
+    command:
+      [
+        "dagster-daemon",
+        "run",
+        "--grpc-host",
+        "chart-dagster-code",
+        "--grpc-port",
+        "4000",
+      ]
     healthcheck:
       test: ["CMD", "dagster-daemon", "liveness-check"]
       interval: 10s

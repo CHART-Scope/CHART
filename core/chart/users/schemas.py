@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -19,6 +21,9 @@ class UserResponse(BaseModel):
     status: str
     roles: list[str]
     geographyScopes: list[UserGeographyScope]
+    # Set when an invitation was just attempted (create or resend). The
+    # account stands either way; a failed email can be sent again.
+    invitation: Literal["sent", "failed"] | None = None
 
 
 class CreateUserInput(BaseModel):
@@ -26,6 +31,5 @@ class CreateUserInput(BaseModel):
     email: str = Field(min_length=3)
     phone: str | None = None
     username: str = Field(min_length=2)
-    password: str = Field(min_length=8)
     roles: list[str] = Field(min_length=1)
     geographyIds: list[str] = Field(min_length=1)

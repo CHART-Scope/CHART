@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Literal, cast
@@ -26,12 +26,17 @@ from chart.shared.db.models import (
     Provenance,
 )
 from chart.shared.db.session import get_session_factory
+from chart.model_settings.service import LiveRestriction, live_restriction
 
 from .input_windows import (
     read_input_values,
     select_input_months,
 )
-from .planning_targets import planning_options_for_place
+from .planning_targets import (
+    HeatSeasonOption,
+    PlanningOptions,
+    planning_options_for_place,
+)
 from .schemas import (
     Availability,
     AvailabilityStatus,
@@ -61,6 +66,9 @@ from .daily_windows import (
 )
 from .model_scoring import score_association_model, score_lbw_model
 from .source_policy import resolve_month_source
+
+
+DATA_MODE_DISABLED = "MODEL_DATA_MODE_DISABLED"
 
 
 class ClimateServiceError(Exception):
@@ -128,21 +136,28 @@ def get_place_path(geography_id: str, *, session_factory=None) -> str:
 def get_planning_options(
     geography_id: str,
     *,
+    outcome: str = DEFAULT_OUTCOME,
     session_factory=None,
     now: datetime | None = None,
 ) -> PlanningOptionsResponse:
     session_factory = session_factory or get_session_factory()
     with session_factory() as session:
-        place = _resolve_place(session, geography_id)
+        place = _resolve_place(session, geography_id, outcome=outcome)
         options = planning_options_for_place(
             place.admin_unit.code,
             geography_path=place.geography.path,
             now=now,
         )
+        restriction = live_restriction(session, place.geography.country_code, outcome)
         validated_windows = cast(
             list[Literal[1, 2, 3]],
-            list(place.model.validated_pregnancy_windows) if place.model else [],
+            (
+                _enabled_windows(place.model.validated_pregnancy_windows, restriction)
+                if place.model
+                else []
+            ),
         )
+        options = _apply_live_settings(options, restriction)
         return PlanningOptionsResponse(
             geography_id=geography_id,
             source_as_of=options.source_as_of,
@@ -199,6 +214,102 @@ def get_planning_options(
                 else None
             ),
         )
+
+
+def _enabled_windows(
+    validated: tuple[int, ...] | list[int], restriction: LiveRestriction | None
+) -> list[int]:
+    """The model's validated windows that the country's settings leave on."""
+
+    if restriction is None:
+        return list(validated)
+    return [window for window in validated if window in restriction.windows]
+
+
+def _apply_live_settings(
+    options: PlanningOptions, restriction: LiveRestriction | None
+) -> PlanningOptions:
+    """Withdraw the planning choices a country's model settings switched off."""
+
+    if restriction is None:
+        return options
+    next_three_months = options.next_three_months
+    next_heat_season = options.next_heat_season
+    if "seasonal" not in restriction.data_modes:
+        next_three_months = _disabled(next_three_months)
+        if next_heat_season is not None:
+            next_heat_season = _disabled(next_heat_season)
+    projection = options.long_term_projection
+    if projection is not None:
+        scenarios = tuple(
+            scenario
+            for scenario in projection.scenarios
+            if scenario.value in restriction.scenarios
+        )
+        projection = (
+            replace(projection, scenarios=scenarios)
+            if scenarios and "projection" in restriction.data_modes
+            else None
+        )
+    return replace(
+        options,
+        next_three_months=next_three_months,
+        next_heat_season=next_heat_season,
+        long_term_projection=projection,
+    )
+
+
+def _disabled(option: HeatSeasonOption) -> HeatSeasonOption:
+    return replace(
+        option,
+        available=False,
+        available_from=None,
+        unavailable_reason=DATA_MODE_DISABLED,
+    )
+
+
+def require_enabled_by_settings(
+    request: PredictRequest,
+    *,
+    session_factory=None,
+    now: datetime | None = None,
+) -> None:
+    """Refuse a request for a window, scenario or data mode switched off."""
+
+    session_factory = session_factory or get_session_factory()
+    with session_factory() as session:
+        geography = session.get(AppGeography, request.geography_id)
+        if geography is None:
+            return
+        restriction = live_restriction(session, geography.country_code, request.outcome)
+    if restriction is None:
+        return
+    mode: str | None = (
+        "projection"
+        if request.planning_target == "long_term_hot_season"
+        else resolve_month_source(request.planning_date, now=now).source_class
+    )
+    # The 0-15 day feed counts as a forecast; a month no source covers is
+    # refused later with its own reason.
+    mode = "seasonal" if mode == "near_term" else mode
+    if mode is not None and mode not in restriction.data_modes:
+        raise ClimateServiceError(DATA_MODE_DISABLED, 409, mode)
+    if (
+        request.projection_scenario is not None
+        and request.projection_scenario not in restriction.scenarios
+    ):
+        raise ClimateServiceError("MODEL_SCENARIO_DISABLED", 409)
+    if restriction.windows:
+        disabled = sorted(
+            {int(window) for window in request.selected_pregnancy_windows()}
+            - restriction.windows
+        )
+        if disabled:
+            raise ClimateServiceError(
+                "MODEL_PREGNANCY_WINDOW_DISABLED",
+                409,
+                ",".join(str(window) for window in disabled),
+            )
 
 
 def preview(

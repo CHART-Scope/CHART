@@ -13,22 +13,39 @@ country rather than an area.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from chart.climate.country_pull import configured_areas
 from chart.shared.db.models import (
     AdminUnit,
     AppGeography,
     ClimateIngestionJob,
+    ClimateRun,
+    DataLabel,
     DistrictClimate,
 )
 
 #: Statuses that mean work is still expected to produce a result. A country
 #: with one of these must not be queued again.
 LIVE_STATUSES = ("queued", "running")
+
+#: ERA5 monthly fields appear in the first days of the month after the one
+#: they cover. "A few days in arrears" therefore rules out the month in
+#: progress *and*, early in a month, the one that has just ended: asking for
+#: it in the first week returns nothing and fails the job.
+ERA5_PUBLICATION_LAG_DAYS = 6
+
+#: How far back the automatic top-up looks for a missing month.
+TOP_UP_MONTHS = 2
+
+#: An automatic pull is not repeated sooner than this after the last one.
+TOP_UP_RETRY_AFTER = timedelta(hours=24)
+
+TOP_UP_REQUESTER = "chart-auto-top-up"
 
 
 class AreaCoverage(BaseModel):
@@ -168,49 +185,6 @@ def _country_name(session: Session, country_code: str) -> str:
     return root or country_code
 
 
-def areas_for_country(session: Session, country_code: str) -> list[AdminUnit]:
-    """Deployed areas with a boundary, which is what a pull can derive."""
-    return list(
-        session.scalars(
-            select(AdminUnit)
-            .join(AppGeography, AppGeography.id == AdminUnit.app_geography_id)
-            .where(
-                AppGeography.country_code == country_code,
-                AdminUnit.boundary.is_not(None),
-            )
-            .order_by(AdminUnit.name)
-        )
-    )
-
-
-def country_envelope(units: list[AdminUnit]) -> tuple[float, float, float, float]:
-    """The one bounding box a country's download must cover.
-
-    Returned north, west, south, east - the order CDS takes, which is the
-    reverse of the ``[west, south, east, north]`` the map endpoint returns.
-    Folded over the *deployed* areas, so India's box is Madhya Pradesh's
-    rather than the subcontinent's, and no territory is downloaded that no
-    area sits in.
-    """
-    # Unpacked rather than filtered in a comprehension so each corner is a
-    # local the type checker can narrow to a float.
-    boxes: list[tuple[float, float, float, float]] = []
-    for unit in units:
-        north, west = unit.bbox_north, unit.bbox_west
-        south, east = unit.bbox_south, unit.bbox_east
-        if north is None or west is None or south is None or east is None:
-            continue
-        boxes.append((north, west, south, east))
-    if not boxes:
-        raise ValueError("no area in this country has a bounding box")
-    return (
-        max(b[0] for b in boxes),
-        min(b[1] for b in boxes),
-        min(b[2] for b in boxes),
-        max(b[3] for b in boxes),
-    )
-
-
 def live_job_for(session: Session, country_code: str) -> ClimateIngestionJob | None:
     """A pull already under way for this country, if there is one."""
     return session.scalar(
@@ -240,7 +214,7 @@ def create_job(
     if existing is not None:
         return existing, False
 
-    units = areas_for_country(session, country_code)
+    units = configured_areas(session, country_code)
     job = ClimateIngestionJob(
         country_code=country_code,
         months=[month.strftime("%Y-%m") for month in sorted(months)],
@@ -296,14 +270,35 @@ def complete_job(
     job.updated_at = _now()
 
 
-def fail_job(session: Session, job_id: int, *, error_code: str) -> None:
-    job = session.get(ClimateIngestionJob, job_id)
+def fail_job(
+    session: Session,
+    job_id: int,
+    *,
+    error_code: str,
+    dagster_run_id: str | None = None,
+) -> None:
+    job = session.get(ClimateIngestionJob, job_id, with_for_update=True)
     if job is None:
+        return
+    # Recovery must not overwrite a result committed since the sensor read
+    # this job, or a job now owned by another run.
+    if dagster_run_id is not None and (
+        job.status != "running" or job.dagster_run_id != dagster_run_id
+    ):
         return
     job.status = "failed"
     job.stage = "failed"
     job.error_code = error_code
     job.updated_at = _now()
+
+
+def running_jobs(session: Session) -> list[ClimateIngestionJob]:
+    """Started pulls whose worker may have stopped without updating this row."""
+    return list(
+        session.scalars(
+            select(ClimateIngestionJob).where(ClimateIngestionJob.status == "running")
+        )
+    )
 
 
 def list_jobs(
@@ -328,3 +323,102 @@ def reserve_queued_jobs(session: Session, limit: int = 1) -> list[ClimateIngesti
             .limit(limit)
         )
     )
+
+
+def newest_complete_month(today: date) -> date:
+    """The newest month ERA5 can actually be expected to have published."""
+    previous = (date(today.year, today.month, 1) - timedelta(days=1)).replace(day=1)
+    if today.day <= ERA5_PUBLICATION_LAG_DAYS:
+        return (previous - timedelta(days=1)).replace(day=1)
+    return previous
+
+
+def recent_complete_months(today: date, *, count: int) -> list[date]:
+    """The ``count`` newest published months, oldest first."""
+    months = [newest_complete_month(today)]
+    while len(months) < count:
+        months.append((months[-1] - timedelta(days=1)).replace(day=1))
+    return sorted(months)
+
+
+def queue_recent_month_top_ups(
+    session: Session, *, today: date, now: datetime | None = None
+) -> list[ClimateIngestionJob]:
+    """Queue a country pull wherever a deployed area lacks a recent month.
+
+    This keeps recent observations in the database before anyone asks, so a
+    planner opening last month reads stored data instead of waiting on a
+    Copernicus download. A country with a pull in flight, or whose last
+    automatic pull failed within ``TOP_UP_RETRY_AFTER``, is left alone.
+    """
+    current = now or _now()
+    wanted = recent_complete_months(today, count=TOP_UP_MONTHS)
+    queued: list[ClimateIngestionJob] = []
+    countries = session.scalars(
+        select(AppGeography.country_code)
+        .join(AdminUnit, AdminUnit.app_geography_id == AppGeography.id)
+        .where(AdminUnit.boundary.is_not(None))
+        .distinct()
+        .order_by(AppGeography.country_code)
+    )
+    for country_code in list(countries):
+        missing = _missing_months(session, country_code, wanted)
+        if not missing or live_job_for(session, country_code) is not None:
+            continue
+        if _recent_top_up(session, country_code, current):
+            continue
+        job, created = create_job(
+            session,
+            country_code=country_code,
+            months=missing,
+            requested_by_user_id=TOP_UP_REQUESTER,
+        )
+        if created:
+            queued.append(job)
+    return queued
+
+
+def _missing_months(
+    session: Session, country_code: str, wanted: list[date]
+) -> list[date]:
+    """Months some deployed area of the country holds no observation for."""
+    units = [unit.id for unit in configured_areas(session, country_code)]
+    held = session.execute(
+        select(
+            DistrictClimate.period_month,
+            func.count(DistrictClimate.admin_unit_id.distinct()),
+        )
+        .join(ClimateRun, ClimateRun.id == DistrictClimate.climate_run_id)
+        .where(
+            DistrictClimate.admin_unit_id.in_(units),
+            DistrictClimate.period_month.in_(wanted),
+            # The models' own ERA5 input; ERA5-Land rows do not count.
+            DistrictClimate.variable == "tmax_monthly_mean_c",
+            ClimateRun.data_label.in_((DataLabel.observed, DataLabel.reanalysis)),
+        )
+        .group_by(DistrictClimate.period_month)
+    ).all()
+    complete = {month for month, count in held if count >= len(units)}
+    return [month for month in wanted if month not in complete]
+
+
+def _recent_top_up(session: Session, country_code: str, now: datetime) -> bool:
+    """An automatic pull finished, either way, within ``TOP_UP_RETRY_AFTER``.
+
+    A completed pull can still leave a place without the month (the grid does
+    not cover it); waiting keeps that from re-pulling every evaluation.
+    """
+    last = session.scalar(
+        select(ClimateIngestionJob)
+        .where(
+            ClimateIngestionJob.country_code == country_code,
+            ClimateIngestionJob.requested_by_user_id == TOP_UP_REQUESTER,
+        )
+        .order_by(ClimateIngestionJob.id.desc())
+    )
+    if last is None or last.status not in ("completed", "failed"):
+        return False
+    finished = last.completed_at or last.updated_at
+    if finished.tzinfo is None:
+        finished = finished.replace(tzinfo=timezone.utc)
+    return now - finished < TOP_UP_RETRY_AFTER

@@ -56,7 +56,9 @@ def test_parent_catalog_can_include_descendant_model_outcomes(monkeypatch) -> No
     assert tree.status_code == 200
     items = {item["outcome"]: item for item in tree.json()["items"]}
     assert set(items) == {"lbw", "under_5_mortality"}
-    assert items["under_5_mortality"]["health_domain_label"] == "Child health"
+    assert items["under_5_mortality"]["health_domain_label"] == (
+        "Maternal, newborn and child health"
+    )
     assert items["under_5_mortality"]["outcome_label"] == "Under-five mortality"
     assert items["under_5_mortality"]["effect_measure"] == "odds_ratio"
     assert items["under_5_mortality"]["visualization_type"] == ("odds_ratio_icon_array")
@@ -146,3 +148,53 @@ def test_manifest_can_add_presentation_fields_without_changing_model_contract() 
         assert presentation["visualization"]["kind"] == "odds_ratio_icon_array"
         assert presentation["visualization"]["figure"] == "mother-baby"
         assert presentation["risk_description"]
+
+
+def test_child_health_releases_are_planned_under_one_domain(monkeypatch) -> None:
+    """Releases registered before child health was folded into maternal,
+    newborn and child health still store child_health; the catalog lists
+    one domain, so the planning and dashboard dropdowns show one choice."""
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    with factory() as session:
+        for path in (
+            "pipelines/models/lbw/model-release.mp.compact.review.json",
+            "pipelines/models/under_five_mortality/model-release.mp.review.json",
+        ):
+            bootstrap_place_from_release(
+                session, model_release_path=Path(path), activate=True
+            )
+        # As an older registration stored it.
+        release = (
+            session.query(ModelRelease)
+            .filter(ModelRelease.outcome == "under_5_mortality")
+            .one()
+        )
+        release.health_domain = "child_health"
+        spec = dict(release.input_spec)
+        spec["presentation"] = {
+            **(spec.get("presentation") or {}),
+            "health_domain_label": "Child health",
+        }
+        release.input_spec = spec
+        session.commit()
+
+    monkeypatch.setattr(model_catalog_routes, "get_session_factory", lambda: factory)
+    tree = TestClient(app).get(
+        "/model-catalog",
+        params={"geography_id": "geo-in-madhya-pradesh", "include_descendants": "true"},
+    )
+    assert tree.status_code == 200
+    domains = {
+        (item["health_domain"], item["health_domain_label"])
+        for item in tree.json()["items"]
+    }
+    assert domains == {
+        ("maternal_newborn_child_health", "Maternal, newborn and child health")
+    }

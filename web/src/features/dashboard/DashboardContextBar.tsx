@@ -1,14 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
 
+import { buttonClassName } from "@/components/Button";
+import { Icon } from "@/components/Icon";
 import { InlineSelect } from "@/components/InlineSelect";
 import { rememberActiveGeography } from "@/lib/authClient";
 import { type ModelCatalogEntry } from "@/lib/planningClient";
 import { useGeographies } from "@/lib/useGeographies";
 import {
   computeFamilies,
-  defaultAreaForFamily,
+  familyFrame,
   familyContains,
   familyLabel,
   type Family,
@@ -30,11 +33,16 @@ type Props = {
    * is viewing the whole top-level area (e.g. "Madhya Pradesh" state). */
   adminUnit: string | null;
   /** Active outcome from the dashboard URL query. */
-  outcome: string;
+  outcome?: string;
   /** Model catalog for the current geography (with descendants). The
    * dashboard page already fetches this to render its panels, so we
    * accept it as a prop rather than duplicating the request. */
-  catalog: ModelCatalogEntry[];
+  catalog?: ModelCatalogEntry[];
+  /** Only the place selectors: for pages that share the dashboard's place
+   * but not its models (the vulnerability assessment). */
+  placeOnly?: boolean;
+  /** Ends the bar with "Configure plan", opening the recommended actions. */
+  configureHref?: string;
   /** Fires when the user picks a different family, area, sub-area,
    * hazard, or outcome. Dashboard `router.push` uses this to navigate
    * the whole page in one click. */
@@ -54,8 +62,10 @@ export function DashboardContextBar({
   geographyScopes,
   geographyId,
   adminUnit,
-  outcome,
-  catalog,
+  outcome = "",
+  catalog = NO_CATALOG,
+  placeOnly = false,
+  configureHref,
   onNavigate,
 }: Props) {
   const { geographies } = useGeographies();
@@ -76,86 +86,52 @@ export function DashboardContextBar({
     );
   }, [families, geographies, geographyId]);
 
-  // Top-level areas visible under the current family — i.e. the ones
-  // whose parent is the family root. For India that's just Madhya
-  // Pradesh; for Kenya it's each county. Everything shown here has at
-  // least one active model (uncovered leaves like Turkana are already
-  // filtered by the API).
-  const topLevelAreas = useMemo(() => {
+  // Walk the selected ancestry, then offer children at every level. Geography
+  // metadata supplies labels, so adding a level never needs another UI branch.
+  const geographyPickers = useMemo(() => {
     if (!geographies || !activeFamily) return [];
-    return geographies
-      .filter((geo) => geo.parentId === activeFamily.root.id)
-      .filter((geo) => (geo.models?.length ?? 0) > 0)
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [geographies, activeFamily]);
-
-  // Walk from the URL's geographyId up to whichever ancestor is a
-  // direct child of the family root — that's the option the top-level
-  // dropdown actually renders. Without this, a URL pointing at a
-  // division (parentId=state, grandparent=family root) would render a
-  // controlled <select value=divisionId> whose value matches no option.
-  const topLevelValue = useMemo(() => {
-    if (!geographies || !activeFamily) return topLevelAreas[0]?.id ?? "";
     const byId = new Map(geographies.map((geo) => [geo.id, geo]));
+    const ancestors = new Set<string>();
     let cursor = byId.get(adminUnit ?? geographyId);
-    while (cursor && cursor.parentId && cursor.parentId !== activeFamily.root.id) {
-      cursor = byId.get(cursor.parentId);
+    while (cursor && !ancestors.has(cursor.id)) {
+      ancestors.add(cursor.id);
+      cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
     }
-    return cursor?.id ?? topLevelAreas[0]?.id ?? "";
-  }, [geographies, activeFamily, geographyId, adminUnit, topLevelAreas]);
-
-  // Sub-level areas of the resolved top-level area (state / county).
-  // Only rendered when the top-level place has model-backed children —
-  // MP has 10 divisions, Kenya counties have none, so the sub-dropdown
-  // disappears for Kenya entirely. Uses topLevelValue (the walked
-  // ancestor) rather than geographyId, so a URL that points directly
-  // at a division still shows all sibling divisions in the picker.
-  const subAreas = useMemo(() => {
-    if (!geographies || !topLevelValue) return [];
-    // Never when the top-level selection is the family root itself. The root's
-    // children *are* the top-level list, so computing sub-areas here rendered
-    // the same 47 counties a second time under an identical "County" label -
-    // which is what a country-level Kenya dashboard showed.
-    if (topLevelValue === activeFamily?.root.id) return [];
-    return geographies
-      .filter((geo) => geo.parentId === topLevelValue)
-      .filter((geo) => (geo.models?.length ?? 0) > 0)
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [geographies, topLevelValue, activeFamily]);
-
-  // Sub-level select value: prefer the explicit ?admin_unit= override,
-  // fall back to the URL's geographyId when the URL itself points at
-  // a sub-level (division). Empty string == "Whole state".
-  // A state shown in its country frame arrives as ?admin_unit=<state>, which
-  // is the "Whole state" option here, not one of its divisions.
-  const subLevelValue =
-    adminUnit === topLevelValue
-      ? ""
-      : (adminUnit ?? (geographyId !== topLevelValue ? geographyId : ""));
-
-  const subLevelLabel = subAreas[0]?.levelLabel ?? "";
-  const topLevelLabel =
-    topLevelAreas[0]?.levelLabel ?? activeFamily?.root.levelLabel ?? "Area";
-
-  // A country-level dashboard has no top-level area selected, so the select
-  // needs an option that says so. Without one its value matched no option and
-  // the browser displayed the first county, claiming a selection the page was
-  // not actually showing.
-  const topLevelOptions = useMemo(() => {
-    const areas = topLevelAreas.map((area) => ({
-      value: area.id,
-      label: area.name,
-    }));
-    return activeFamily
-      ? [
-          {
-            value: activeFamily.root.id,
-            label: `All ${pluralLabel(topLevelLabel)}`,
-          },
-          ...areas,
-        ]
-      : areas;
-  }, [topLevelAreas, activeFamily, topLevelLabel]);
+    const pickers = [];
+    let parent = activeFamily.root;
+    const defaultArea = familyFrame(activeFamily, geographies);
+    const visited = new Set<string>();
+    while (!visited.has(parent.id)) {
+      visited.add(parent.id);
+      const children = geographies
+        .filter(
+          (geo) =>
+            geo.parentId === parent.id &&
+            ((geo.models?.length ?? 0) > 0 ||
+              geographies.some(
+                (child) =>
+                  child.path.startsWith(`${geo.path}/`) &&
+                  (child.models?.length ?? 0) > 0,
+              )),
+        )
+        .sort((a, b) => a.name.localeCompare(b.name));
+      if (children.length === 0) break;
+      const selected = children.find((geo) => ancestors.has(geo.id));
+      pickers.push({
+        parent,
+        children,
+        selected: selected?.id ?? "",
+        label: children[0].levelLabel,
+        // A routing-only root (India) opens its supported state; it has no
+        // aggregate view to return to through an "All states" option.
+        canSelectAll:
+          parent.id !== activeFamily.root.id || defaultArea?.id === parent.id,
+      });
+      if (!selected) break;
+      parent = selected;
+    }
+    return pickers;
+  }, [geographies, activeFamily, geographyId, adminUnit]);
 
   const hazards = useMemo(
     () =>
@@ -178,11 +154,36 @@ export function DashboardContextBar({
       "",
     [catalog, outcome, hazards],
   );
+  const domains = useMemo(
+    () => [
+      ...dedupe(
+        catalog
+          .filter((entry) => entry.climate_hazard === activeHazard)
+          .map((entry) => ({
+            value: entry.health_domain,
+            label: entry.health_domain_label,
+          })),
+        (item) => item.value,
+      ),
+      ...COMING_SOON_DOMAINS.filter(
+        (soon) => !catalog.some((entry) => entry.health_domain === soon.value),
+      ),
+    ],
+    [catalog, activeHazard],
+  );
+  const activeDomain =
+    catalog.find((entry) => entry.outcome === outcome)?.health_domain ??
+    domains[0]?.value ??
+    "";
   const outcomes = useMemo(
     () =>
       dedupe(
         catalog
-          .filter((entry) => entry.climate_hazard === activeHazard)
+          .filter(
+            (entry) =>
+              entry.climate_hazard === activeHazard &&
+              entry.health_domain === activeDomain,
+          )
           .map((entry) => ({
             value: entry.outcome,
             label:
@@ -192,14 +193,14 @@ export function DashboardContextBar({
           })),
         (item) => item.value,
       ),
-    [catalog, activeHazard],
+    [catalog, activeHazard, activeDomain],
   );
 
   function handleFamilyChange(nextFamilyPath: string) {
     if (!families || !geographies) return;
     const nextFamily = families.find((family) => family.root.path === nextFamilyPath);
     if (!nextFamily) return;
-    const target = defaultAreaForFamily(nextFamily, geographies);
+    const target = familyFrame(nextFamily, geographies);
     if (!target) return;
     rememberActiveGeography(nextFamily.root.path);
     // Outcome may not exist in the new family's catalog — clear it so
@@ -208,45 +209,13 @@ export function DashboardContextBar({
     onNavigate({ geographyId: target.id, adminUnit: null, outcome: "" });
   }
 
-  function handleTopLevelChange(nextGeographyId: string) {
-    const selected = geographies?.find((geo) => geo.id === nextGeographyId);
-    const hasChildren = geographies?.some((geo) => geo.parentId === nextGeographyId);
-    const countryRoot = activeFamily?.root.id;
-    // The page only keeps ?admin_unit= for a place with a model for this
-    // outcome. A state without one (MP under-five has only division models)
-    // opens as its own frame so the page can fall through to a division.
-    if (selected?.parentId && hasChildren && !hasOutcomeModel(selected, outcome)) {
-      onNavigate({ geographyId: nextGeographyId, adminUnit: null, outcome });
-      return;
-    }
+  function handlePlaceChange(nextId: string, parentId: string) {
+    const selected = geographies?.find((geo) => geo.id === (nextId || parentId));
+    if (!selected) return;
+    const hasChildren = geographies?.some((geo) => geo.parentId === selected.id);
     onNavigate({
-      geographyId:
-        selected?.parentId && countryRoot
-          ? countryRoot
-          : !hasChildren && selected?.parentId
-            ? selected.parentId
-            : nextGeographyId,
-      // A top-level state/county is shown in its country frame. Places with a
-      // deeper level reveal that next selector; choosing one of those children
-      // moves the frame down by exactly one step.
-      adminUnit: selected?.parentId ? nextGeographyId : null,
-      outcome,
-    });
-  }
-
-  function handleSubLevelChange(nextAdminUnit: string) {
-    if (nextAdminUnit === "") {
-      handleTopLevelChange(topLevelValue);
-      return;
-    }
-    // Always anchor the URL geographyId on the resolved top-level so
-    // the ?admin_unit override remains the source of truth for the
-    // sub-level. Otherwise a URL that lands directly on a division
-    // would keep the division as geographyId AND set admin_unit,
-    // double-selecting the same place.
-    onNavigate({
-      geographyId: topLevelValue || geographyId,
-      adminUnit: nextAdminUnit,
+      geographyId: hasChildren || !selected.parentId ? selected.id : selected.parentId,
+      adminUnit: hasChildren || !selected.parentId ? null : selected.id,
       outcome,
     });
   }
@@ -257,6 +226,14 @@ export function DashboardContextBar({
     onNavigate({ geographyId, adminUnit, outcome: nextOutcome });
   }
 
+  function handleDomainChange(nextDomain: string) {
+    const nextOutcome = catalog.find(
+      (entry) =>
+        entry.climate_hazard === activeHazard && entry.health_domain === nextDomain,
+    )?.outcome;
+    if (nextOutcome) onNavigate({ geographyId, adminUnit, outcome: nextOutcome });
+  }
+
   function handleOutcomeChange(nextOutcome: string) {
     onNavigate({ geographyId, adminUnit, outcome: nextOutcome });
   }
@@ -265,7 +242,11 @@ export function DashboardContextBar({
   const showCountryDropdown = (families?.length ?? 0) > 1;
 
   return (
-    <div className={styles.bar} role="group" aria-label="Dashboard context">
+    <div
+      className={styles.bar}
+      role="group"
+      aria-label={placeOnly ? "Place" : "Dashboard context"}
+    >
       {showCountryDropdown && families ? (
         <InlineSelect
           menu
@@ -285,58 +266,86 @@ export function DashboardContextBar({
         </label>
       )}
 
-      <InlineSelect
-        menu
-        label={topLevelLabel}
-        aria-label={topLevelLabel}
-        value={topLevelValue}
-        onChange={handleTopLevelChange}
-        options={topLevelOptions}
-        disabled={topLevelAreas.length === 0}
-      />
-
-      {subAreas.length > 0 ? (
+      {geographyPickers.map(({ parent, children, selected, label, canSelectAll }) => (
         <InlineSelect
+          key={parent.id}
           menu
-          label={subLevelLabel}
-          aria-label={subLevelLabel}
-          value={subLevelValue}
-          onChange={handleSubLevelChange}
+          label={label}
+          aria-label={label}
+          value={selected}
+          onChange={(next) => handlePlaceChange(next, parent.id)}
           options={[
-            { value: "", label: `Whole ${topLevelLabel.toLowerCase()}` },
-            ...subAreas.map((sub) => ({ value: sub.id, label: sub.name })),
+            ...(canSelectAll ? [{ value: "", label: allAreasLabel(label) }] : []),
+            ...children.map((child) => ({ value: child.id, label: child.name })),
           ]}
         />
+      ))}
+
+      {placeOnly ? null : (
+        <>
+          <InlineSelect
+            menu
+            label="Climate hazard"
+            aria-label="Climate hazard"
+            value={activeHazard}
+            onChange={handleHazardChange}
+            options={hazards}
+            disabled={hazards.length === 0}
+          />
+
+          <InlineSelect
+            menu
+            label="Health domain"
+            aria-label="Health domain"
+            value={activeDomain}
+            onChange={handleDomainChange}
+            options={domains}
+            disabled={catalog.length === 0}
+          />
+
+          <InlineSelect
+            menu
+            label="Health outcome"
+            aria-label="Health outcome"
+            value={outcome}
+            onChange={handleOutcomeChange}
+            options={outcomes}
+            disabled={outcomes.length === 0}
+          />
+        </>
+      )}
+      {configureHref ? (
+        <Link href={configureHref} className={buttonClassName()}>
+          <Icon name="edit" size={16} />
+          Configure plan
+        </Link>
       ) : null}
-
-      <InlineSelect
-        menu
-        label="Climate hazard"
-        aria-label="Climate hazard"
-        value={activeHazard}
-        onChange={handleHazardChange}
-        options={hazards}
-        disabled={hazards.length === 0}
-      />
-
-      <InlineSelect
-        menu
-        label="Health outcome"
-        aria-label="Health outcome"
-        value={outcome}
-        onChange={handleOutcomeChange}
-        options={outcomes}
-        disabled={outcomes.length === 0}
-      />
     </div>
   );
 }
 
-function hasOutcomeModel(
-  geography: { models?: { outcome: string }[] },
-  outcome: string,
-) {
-  return geography.models?.some((model) => model.outcome === outcome) ?? false;
+const NO_CATALOG: ModelCatalogEntry[] = [];
+
+/** Domains the design lists before any model covers them; never selectable. */
+const COMING_SOON_DOMAINS = [
+  {
+    value: "vector_borne",
+    label: "Vector borne diseases (coming soon)",
+    disabled: true,
+  },
+  {
+    value: "heat_illness",
+    label: "Heat-related illnesses (coming soon)",
+    disabled: true,
+  },
+  { value: "ncd", label: "Non-communicable diseases (coming soon)", disabled: true },
+];
+
+function allAreasLabel(levelLabel: string): string {
+  const level = levelLabel.trim().toLowerCase();
+  if (!level) return "All areas";
+  const plural = /[^aeiou]y$/.test(level) ? `${level.slice(0, -1)}ies` : `${level}s`;
+  return `All ${plural}`;
 }
 
 function dedupe<T>(items: T[], key: (item: T) => string): T[] {
@@ -359,15 +368,4 @@ function countryLabel(family: Family | null): string {
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-/** "County" -> "counties", "State" -> "states", "Division" -> "divisions". */
-function pluralLabel(label: string): string {
-  const lower = label.toLowerCase();
-  if (!lower) return "areas";
-  return lower.endsWith("y")
-    ? `${lower.slice(0, -1)}ies`
-    : lower.endsWith("s")
-      ? lower
-      : `${lower}s`;
 }

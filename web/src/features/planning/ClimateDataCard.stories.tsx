@@ -2,20 +2,26 @@ import type { Meta, StoryObj } from "@storybook/react";
 
 import type { CountryCoverage, IngestionJob } from "@/lib/climateDataClient";
 
-import { ClimateDataCard } from "./ClimateDataCard";
+import { ClimateDataTable } from "./ClimateDataCard";
+import { SettingsCard } from "./SettingsCard";
 
 /**
- * The Settings section for climate data.
+ * Settings > Data: one row per country with what is held and its latest pull.
  *
  * Rendered from fixtures so every state is reachable without a database —
  * including the two that are hard to catch by hand: a pull in progress, and a
- * pull that failed.
+ * pull that failed (whose reason and retry live in the Jobs tab).
  */
 const meta = {
   title: "Planning/ClimateDataCard",
-  component: ClimateDataCard,
+  component: ClimateDataTable,
   parameters: { layout: "padded" },
-} satisfies Meta<typeof ClimateDataCard>;
+  render: (args) => (
+    <SettingsCard eyebrow="Climate data" title="Observations held per country">
+      <ClimateDataTable {...args} />
+    </SettingsCard>
+  ),
+} satisfies Meta<typeof ClimateDataTable>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -100,53 +106,36 @@ function job(overrides: Partial<IngestionJob> = {}): IngestionJob {
   };
 }
 
-/** Stubs both endpoints so the card renders from fixtures, not the network. */
-function withData(countries: CountryCoverage[], jobs: IngestionJob[]) {
-  return function Wrapped(args: React.ComponentProps<typeof ClimateDataCard>) {
-    const original = globalThis.fetch;
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
-      const url = String(input);
-      const body = url.includes("ingestion-jobs") ? jobs : countries;
-      return new Response(JSON.stringify(body), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }) as typeof fetch;
-    queueMicrotask(() => {
-      globalThis.fetch = original;
-    });
-    return <ClimateDataCard {...args} />;
-  };
-}
-
-const args = { accessToken: "story-token" };
+const onPull = () => {};
 
 /** The ordinary case: both countries covered, nothing running. */
-export const Covered: Story = { args, render: withData(coverage(), []) };
+export const Covered: Story = { args: { coverage: coverage(), jobs: [], onPull } };
 
 /**
  * A pull in progress. Areas rather than a percentage, because a country of 47
  * needs to look like it is moving and the denominator is recognisable.
  */
-export const Pulling: Story = { args, render: withData(coverage(), [job()]) };
+export const Pulling: Story = { args: { coverage: coverage(), jobs: [job()], onPull } };
 
-/** A failure has to reach the row rather than disappearing into a log. */
+/** A failure reaches the row, with a retry and a link to its reason in Jobs. */
 export const LastPullFailed: Story = {
-  args,
-  render: withData(coverage(), [
-    job({
-      status: "failed",
-      stage: "failed",
-      error_code: "CLIMATE_INGEST_NOT_CONFIGURED",
-    }),
-  ]),
+  args: {
+    coverage: coverage(),
+    jobs: [
+      job({
+        status: "failed",
+        stage: "failed",
+        error_code: "CLIMATE_INGEST_NOT_CONFIGURED",
+      }),
+    ],
+    onPull,
+  },
 };
 
 /** A fresh install: nothing held anywhere, everything pullable. */
 export const NothingPulledYet: Story = {
-  args,
-  render: withData(
-    coverage().map((country) => ({
+  args: {
+    coverage: coverage().map((country) => ({
       ...country,
       areas_with_data: 0,
       months: 0,
@@ -159,6 +148,7 @@ export const NothingPulledYet: Story = {
         latest: null,
       })),
     })),
-    [],
-  ),
+    jobs: [],
+    onPull,
+  },
 };

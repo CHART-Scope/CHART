@@ -9,5 +9,4 @@ export { SpatialRiskMap } from "./SpatialRiskMap";
 export { DashboardSkeleton } from "./DashboardSkeleton";
 export { lastCompleteMonth } from "./HeatLbwLinkPanel";
 export { RunDetail } from "./RunDetail";
-export { RunsStrip } from "./RunsStrip";
 export { TodayStrip } from "./TodayStrip";

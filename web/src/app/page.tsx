@@ -1,5 +1,5 @@
-import { Login } from "@/features/onboarding";
+import { Landing } from "@/features/landing";
 
 export default function HomePage() {
-  return <Login />;
+  return <Landing />;
 }

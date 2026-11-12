@@ -1,0 +1,48 @@
+{
+  "_note": "Official heat seasons and heatwave thresholds per country, as provided by the CHART partners on 2026-10-15. Months are 1-12; a season may wrap the year end. Thresholds are daily maximum temperature in deg C.",
+  "IN": {
+    "season": {
+      "label": "Summer heat season",
+      "months": [3, 4, 5, 6],
+      "peak_month": 5,
+      "source_name": "India Meteorological Department",
+      "source_uri": "https://internal.imd.gov.in/section/nhac/dynamic/FAQ_heat_wave.pdf"
+    },
+    "planning_window": {
+      "label": "Hot-weather season",
+      "months": [3, 4, 5],
+      "note": "The live LBW model scores a three-month window, so planning uses March-May, the core of the March-June season."
+    },
+    "heatwave": {
+      "threshold_c": 40.0,
+      "min_run_days": 1,
+      "terrain_thresholds_c": { "plains": 40.0, "hills": 30.0 },
+      "source_name": "India Meteorological Department",
+      "source_uri": "https://internal.imd.gov.in/section/nhac/dynamic/FAQ_heat_wave.pdf"
+    }
+  },
+  "KE": {
+    "season": {
+      "label": "Hot season",
+      "months": [12, 1, 2, 3],
+      "peak_month": 2,
+      "source_name": "Kenya Meteorological Department",
+      "source_uri": "https://eastleighvoice.co.ke/national/284379/weatherman-sets-local-heat-wave-thresholds-to-protect-public-health-in-major-cities"
+    },
+    "heatwave": {
+      "threshold_c": 35.0,
+      "min_run_days": 3,
+      "default_is_official": false,
+      "area_thresholds_c": {
+        "geo-ke-nairobi": 32.0,
+        "geo-ke-mombasa": 36.0,
+        "geo-ke-kisumu": 37.0,
+        "geo-ke-turkana": 38.0,
+        "geo-ke-marsabit": 38.0,
+        "geo-ke-mandera": 38.0
+      },
+      "source_name": "Kenya Meteorological Department",
+      "source_uri": "https://eastleighvoice.co.ke/national/284379/weatherman-sets-local-heat-wave-thresholds-to-protect-public-health-in-major-cities"
+    }
+  }
+}

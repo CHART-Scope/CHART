@@ -40,7 +40,6 @@ def upsert_user(
     name: str,
     email: str,
     username: str,
-    password: str,
     roles: list[str],
     group_paths: list[str],
     operation_id: str | None = None,
@@ -83,9 +82,9 @@ def upsert_user(
         if not created and not _matches_operation(user, operation_id):
             raise IdentityError("USER_IDENTITY_USER_CONFLICT", 409)
     elif not _matches_operation(user, operation_id):
-        # User creation must not silently become password reset and privilege
-        # escalation. Only an explicit retry of the same provisioning saga may
-        # resume an existing identity.
+        # User creation must not silently take over an existing account and
+        # escalate its privileges. Only an explicit retry of the same
+        # provisioning saga may resume an existing identity.
         raise IdentityError("USER_IDENTITY_USER_CONFLICT", 409)
     else:
         _request(
@@ -99,15 +98,6 @@ def upsert_user(
         )
 
     user_id = str(user["id"])
-    if created:
-        _request(
-            config,
-            token,
-            "PUT",
-            f"/users/{urllib.parse.quote(user_id)}/reset-password",
-            body={"type": "password", "value": password, "temporary": False},
-            expected={204},
-        )
     for group in groups:
         _request(
             config,
@@ -122,6 +112,52 @@ def upsert_user(
         username=username,
         email=email,
         created=created,
+    )
+
+
+def add_to_groups(user_id: str, group_paths: list[str]) -> None:
+    """Give an existing account geography groups (its planning areas)."""
+    config = _config()
+    token = _admin_token(config)
+    for path in group_paths:
+        group = _ensure_group_path(config, token, path)
+        _request(
+            config,
+            token,
+            "PUT",
+            f"/users/{urllib.parse.quote(user_id)}/groups/{urllib.parse.quote(group['id'])}",
+            expected={204},
+        )
+
+
+INVITATION_LIFESPAN_SECONDS = 7 * 24 * 3600
+
+
+def send_invitation(user_id: str) -> None:
+    """Have Keycloak email an invitation (docs/sign-in.md).
+
+    The link confirms the address and then opens CHART's sign-in, where the
+    person signs in with an emailed code; there is no password to set.
+    """
+    origin = os.getenv("CHART_WEB_ORIGIN", "").rstrip("/")
+    if not origin:
+        raise IdentityError("USER_INVITE_ORIGIN_MISSING", 500)
+    config = _config()
+    token = _admin_token(config)
+    query = urllib.parse.urlencode(
+        {
+            "client_id": "chart-web",
+            "redirect_uri": f"{origin}/auth/signin",
+            "lifespan": INVITATION_LIFESPAN_SECONDS,
+        }
+    )
+    _request(
+        config,
+        token,
+        "PUT",
+        f"/users/{urllib.parse.quote(user_id)}/execute-actions-email?{query}",
+        body=["VERIFY_EMAIL"],
+        expected={204},
     )
 
 
@@ -150,8 +186,8 @@ def delete_user(user_id: str) -> None:
     )
 
 
-def recover_admin(*, username: str, email: str, password: str) -> IdentityUser:
-    """Recover an existing administrator through an explicit operator action."""
+def recover_admin(*, username: str, email: str) -> IdentityUser:
+    """Re-enable an administrator; they sign in with a code sent to ``email``."""
     config = _config()
     token = _admin_token(config)
     user = _find_user(config, token, username, email)
@@ -170,14 +206,6 @@ def recover_admin(*, username: str, email: str, password: str) -> IdentityUser:
             "enabled": True,
             "emailVerified": True,
         },
-        expected={204},
-    )
-    _request(
-        config,
-        token,
-        "PUT",
-        f"/users/{urllib.parse.quote(user_id)}/reset-password",
-        body={"type": "password", "value": password, "temporary": False},
         expected={204},
     )
     _add_client_roles(

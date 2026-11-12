@@ -41,6 +41,99 @@ Dagster owns execution, retries, logs, and run history. FastAPI owns request
 validation and HTTP responses. Postgres owns durable state. Redis is not part
 of this path.
 
+### Country climate pulls
+
+Settings → Data queues a separate country-wide ERA5 pull. Its saved
+`climate_ingestion_job` records progress, and the climate sensor starts the
+Dagster run. The sensor also reconciles running jobs whose exact Dagster run
+has failed or been canceled. This covers native crashes and killed workers
+that cannot execute Python's error handler: the app shows
+`CLIMATE_PULL_INTERRUPTED` and permits a new request through **Retry**.
+Reconciliation preserves completed results and another run's ownership. An
+old timestamp alone never fails a pull, because Copernicus can queue a valid
+request for a long time. A stopped sensor must be restored before it can
+reconcile anything.
+
+ERA5 year downloads can run concurrently. Their NetCDF cache validation
+serializes native file opening and closing within each worker process;
+overlapping validation could otherwise reject valid files or crash in the
+native library. The real cached-download CLI regression is part of `make e2e`
+and verifies saved monthly outputs without contacting Copernicus.
+
+The download cache also reuses a valid saved grid when its recorded request
+covers the requested country bounds and months. `ERA5_CACHE_DIR` overrides the
+local cache directory; deployed workers keep it at
+`/opt/chart/data/climate/era5-cache` on the persistent climate volume. Refresh
+explicitly bypasses reuse. A cache hit retains the original raw-file hash and
+request provenance, and only the requested months are processed.
+
+Observed history is loaded once per country with
+`python -m chart.climate.history backfill --country IN --years N`
+(`make climate-backfill`). The places are the published model configuration
+(`MODEL_CACHE_DIR/outlooks/index.json`), the list the dashboard's pickers
+offer, so every place at every level is filled and no territory without a
+place is downloaded. Whole calendar years are requested so each request, and
+its cache entry, stays the same whichever places were missing it; downloads
+are padded by one grid cell and snapped to the 0.25° grid for the same reason.
+An area too small to hold an ERA5 cell centre (Mombasa, Vihiga) uses the cells
+it overlaps instead, and its run records that method. India's observed
+estimates are then scored through the normal request path for every modelled
+area and month, skipping the first three months whose model inputs precede
+the history. `verify` lists any place-month still missing.
+
+The dashboard shows both countries' observed months in one view. Kenya's
+counties are scored on read by the calibrated DLNM. India's places with a live
+model are read from their stored results (`chart.heat_outlook.observed_stored`)
+through the same `/heat-outlook/{place}/observed` and `/observed/map`
+endpoints, so opening a division, changing the month or switching outcome
+never scores or downloads anything. Each month names the release that scored
+it. A place without a stored month shows it as not reported. For low birth
+weight every pregnancy window validated for the place and left on in Settings
+is offered (Settings' default window first), because the backfill stores all
+validated windows; `python -m chart.climate.history score --country IN
+--years N` re-scores stored months after a model or window change.
+
+Before asking Copernicus, the downloader looks in the local cache and then in
+the public mirror `ERA5_MIRROR_URL` (default
+`https://chart-predictive-models.s3.eu-north-1.amazonaws.com/era5-cache`; set it
+empty to disable). Mirrored files keep their cache keys and request sidecars,
+so provenance is unchanged. The server's model sync skips that prefix.
+
+Recent months are pulled before anyone asks. Every six hours the Dagster
+sensor `recent_climate_months_sensor` checks the two newest months ERA5 has
+published (it lands about six days after a month ends). When any configured
+place of a country lacks one, it queues a country pull for the missing months,
+which the ingestion sensor runs like an operator's pull from Settings > Jobs,
+and then scores the new months. A country with a pull in flight is skipped,
+and an automatic pull is not repeated within 24 hours of the last one, so a
+place the grid cannot cover does not trigger a pull every evaluation. A planner therefore reads last month from the database
+instead of waiting on a Copernicus download.
+
+Heatwave days follow each country's official definition in
+`core/chart/climate/heat_seasons.json`, provided by the CHART partners on
+2026-10-15. India uses the IMD plains threshold, Tmax of at least 40 °C. Kenya
+uses KMD's thresholds over three or more consecutive days: Nairobi 32 °C,
+Mombasa 36 °C, Kisumu 37 °C, and 38 °C for Turkana, Marsabit and Mandera.
+Other Kenyan counties keep CHART's 35 °C default, which is not an official
+threshold. IMD's 30 °C threshold for hilly regions is recorded but not yet
+applied, because no area is classified as hilly. Each run's metadata records
+the threshold it used. Months pulled before this change used 35 °C everywhere,
+so 12-month totals that mix old and new runs mix both definitions until those
+months are pulled again.
+
+After new district/constituency boundaries are registered, another country pull
+can derive their climate inputs from those grids. Fine areas use polygon-cell
+overlap weights; existing county/division methods stay unchanged. Acquisitions
+include one native grid-cell margin when fine areas are present. The actual
+grid footprint must cover each fine polygon completely; partial coverage is
+reported as missing rather than normalized into an estimate. Daily grid maxima
+are shared across areas. Derived runs are grouped by boundary version,
+aggregation method and downscaling method so existing model input checks still
+apply. Run identity includes the area set, geometry hashes, selected months and
+raw content: new areas are processed rather than being discarded as a duplicate
+download, and identical repeats do not duplicate persisted rows. This prepares
+climate inputs only; it does not enable unvalidated observed health models.
+
 ## Climate and model handoff
 
 ```mermaid

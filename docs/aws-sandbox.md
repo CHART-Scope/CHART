@@ -2,8 +2,9 @@
 
 The `App Deploy` workflow validates CHART, publishes commit-tagged images to
 GitHub Container Registry, and deploys those images to one EC2 host with Docker
-Compose. EC2 receives the small `infra/aws` and `infra/keycloak` deployment
-bundle; it does not clone or build the repository.
+Compose. EC2 receives only `docker-compose.yml` and `Caddyfile`, beside its
+own `.env.prod` and database backups; it does not clone or build the
+repository. Keycloak, its theme and the email-code plugin ship as images too.
 
 The operational setup is documented in
 [`infra/aws/README.md`](https://github.com/CHART-Scope/CHART/blob/dev/infra/aws/README.md).
@@ -18,10 +19,19 @@ Create a GitHub environment named `dev` with these connection secrets:
 | `AWS_APP_USER` | EC2 deployment user. |
 | `AWS_APP_SSH_KEY` | Private SSH key for that user. |
 
+To post merges to Slack, add a repository secret `SLACK_WEBHOOK_URL`: an
+incoming webhook from the Chart-MVP Slack app (api.slack.com/apps →
+Incoming Webhooks → Add New Webhook, then pick the channel). The
+`Merge notify` workflow then posts each pull request merged into `dev` or
+`main`: its title, a details line, the **Summary** section of the pull
+request template (or the description's first paragraph) and links to the
+pull request and deploys. Without the secret it skips the message.
+
 Application settings are written once in the gitignored
 `infra/aws/.env.prod`, then copied unchanged to
-`~/chart-deploy/aws/.env.prod` on EC2. The exact seven-line configuration and
-`vim` setup are documented once in `infra/aws/README.md`.
+`~/chart-deploy/aws/.env.prod` on EC2. The settings, including the email
+server that delivers sign-in codes ([sign-in](sign-in.md)), are listed once in
+`infra/aws/README.md`.
 
 ## Host setup
 
@@ -38,6 +48,28 @@ Create `~/chart-deploy/aws/.env.prod` before the first deployment. Preserve the
 existing `POSTGRES_PASSWORD` when retaining an existing database volume.
 
 ## Model artifacts on S3
+
+Load observed climate history once per country after the outlooks are
+installed and registered, from `~/chart-deploy/aws`. The Dagster code container
+holds the Copernicus key and the ERA5 cache volume:
+
+```bash
+docker compose --env-file .env.prod exec -T chart-dagster-code \
+  python -m chart.climate.history backfill --country IN --years 20
+docker compose --env-file .env.prod exec -T chart-dagster-code \
+  python -m chart.climate.history verify --country IN --years 20
+```
+
+Repeat for `KE`. The sandbox keeps 20 years; the command is safe to re-run and
+only downloads what is missing. Afterwards a maintainer with bucket write
+access can share the retained grids so other installations skip the
+Copernicus queue: copy `/opt/chart/data/climate/era5-cache` from the host and
+run `make climate-mirror-publish ERA5_CACHE_DIR=<copy>`.
+
+For the October 2026 India/Kenya projections, upload the generated `outlooks/`
+tree and register its geography hierarchy after the model sync. Follow the
+[outlook installation commands](model-integration.md#installing-the-generated-outlooks-on-the-server).
+These JSON publications are separate from the R scoring artifacts below.
 
 Each model release consists of a checked-in manifest under
 `pipelines/models/<family>/` and its `.rds` files under the manifest's S3
@@ -76,6 +108,12 @@ docker logs --tail 100 chart-core
 Database backups are created in `~/chart-deploy/aws/backups` before migrations
 and kept for 14 days. Postgres, models, climate outputs, Dagster state, and
 Caddy certificates use named Docker volumes.
+
+The climate worker sets `ERA5_CACHE_DIR=/opt/chart/data/climate/era5-cache` on
+the existing climate volume. Deploy the updated code and compose configuration
+to retain raw downloads across container replacements and reuse them for newly
+registered areas. This does not move caches from older ephemeral containers;
+missing acquisitions are downloaded on the next pull.
 
 ## Related
 

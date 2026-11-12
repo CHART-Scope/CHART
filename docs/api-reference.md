@@ -5,7 +5,7 @@ site. It uses the same Swagger interface as the running API while keeping the
 MkDocs navigation, colours, search, and dark mode around it.
 
 Every operation is expanded below. Use **Filter by tag** in the explorer to
-find a route by area, such as `auth`, `climate`, `solutions`, `system`, or
+find a route by area, such as `actions`, `auth`, `climate`, `system`, or
 `workspaces`.
 
 For each operation, the explorer shows:

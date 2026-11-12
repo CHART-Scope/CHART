@@ -1,1 +1,0 @@
-"""Public solution repository adapter."""

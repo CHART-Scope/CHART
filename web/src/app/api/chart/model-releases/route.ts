@@ -5,5 +5,8 @@ import { proxyPythonApiRequest } from "@/lib/pythonApiProxy";
 export const runtime = "nodejs";
 
 export function GET(request: NextRequest) {
-  return proxyPythonApiRequest(request, { path: "model-releases" });
+  return proxyPythonApiRequest(request, {
+    path: "model-releases",
+    authorization: request.headers.get("authorization"),
+  });
 }

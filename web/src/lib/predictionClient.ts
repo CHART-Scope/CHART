@@ -1,3 +1,5 @@
+import { authFetch } from "./authFetch";
+
 export type PredictionStatus =
   "waiting" | "queued" | "running" | "completed" | "failed";
 
@@ -163,12 +165,9 @@ export type PlanningOptions = {
 };
 
 export async function getPlanningOptions(geographyId: string, accessToken?: string) {
-  const response = await fetch(
+  const response = await authFetch(
     `/api/chart/climate/planning-options/${encodeURIComponent(geographyId)}`,
-    {
-      cache: "no-store",
-      headers: authHeaders(accessToken),
-    },
+    { accessToken },
   );
 
   if (!response.ok) {
@@ -179,10 +178,10 @@ export async function getPlanningOptions(geographyId: string, accessToken?: stri
 }
 
 export async function getPredictionRequest(requestId: number, accessToken?: string) {
-  const response = await fetch(`/api/chart/climate/prediction-requests/${requestId}`, {
-    cache: "no-store",
-    headers: authHeaders(accessToken),
-  });
+  const response = await authFetch(
+    `/api/chart/climate/prediction-requests/${requestId}`,
+    { accessToken },
+  );
 
   if (!response.ok) {
     throw new Error(await readPredictionError(response));
@@ -196,9 +195,8 @@ export async function listPredictionRequests(
   accessToken?: string,
 ) {
   const query = new URLSearchParams({ geography_id: geographyId, limit: "10" });
-  const response = await fetch(`/api/chart/climate/prediction-requests?${query}`, {
-    cache: "no-store",
-    headers: authHeaders(accessToken),
+  const response = await authFetch(`/api/chart/climate/prediction-requests?${query}`, {
+    accessToken,
   });
 
   if (!response.ok) {
@@ -206,10 +204,6 @@ export async function listPredictionRequests(
   }
 
   return (await response.json()) as PredictionRequestList;
-}
-
-function authHeaders(accessToken?: string): Record<string, string> {
-  return accessToken ? { authorization: `Bearer ${accessToken}` } : {};
 }
 
 async function readPredictionError(response: Response) {

@@ -75,7 +75,9 @@ OPERATION_DOCUMENTATION: dict[
             "Builds the date choices supported for the selected geography, including "
             "the next three months, the configured hot season, and available long-term "
             "scenario periods. The response reflects current climate and model "
-            "availability rather than a hard-coded calendar."
+            "availability rather than a hard-coded calendar, narrowed by the "
+            "country's model settings for the outcome (windows, scenarios and data "
+            "modes switched off are withdrawn or marked MODEL_DATA_MODE_DISABLED)."
         ),
         success_responses={
             "200": "Planning modes, dates, and scenarios currently supported for the place."
@@ -203,49 +205,16 @@ OPERATION_DOCUMENTATION: dict[
             "200": "The reset setup state ready for an authorized recovery workflow."
         },
     ),
-    ("get", "/hazards"): OperationDocumentation(
-        summary="List public climate-health hazards",
+    ("get", "/actions"): OperationDocumentation(
+        summary="List published recommended actions",
         description=(
-            "Returns the published hazard catalog from the configured solution "
-            "repository API or bundled public snapshot. Hazard identifiers connect "
-            "planning risks to the solution records returned by the repository routes."
+            "Returns the reviewed actions from the public action feed "
+            "(CHART_ACTIONS_URL), or the copy bundled with CHART when the feed "
+            "cannot be read. With a geography, only actions for its country are "
+            "returned, in that country's wording. Public; no sign-in required."
         ),
         success_responses={
-            "200": "The published public hazard catalog available to planning clients."
-        },
-    ),
-    ("get", "/hazards/{hazard_id}"): OperationDocumentation(
-        summary="Read one public hazard and its linked solutions",
-        description=(
-            "Looks up a published hazard by its stable identifier and includes the "
-            "public solution records associated with it. The route reads the configured "
-            "remote repository when available and otherwise uses the bundled snapshot."
-        ),
-        success_responses={
-            "200": "The requested hazard together with its currently published solutions."
-        },
-    ),
-    ("get", "/solutions"): OperationDocumentation(
-        summary="Search and filter the public solution repository",
-        description=(
-            "Returns published climate-health actions filtered by hazard, solution "
-            "type, cost, publication status, or free-text search. Results come from the "
-            "configured repository service or the bundled snapshot and remain public "
-            "without CHART sign-in."
-        ),
-        success_responses={
-            "200": "The public solutions matching the supplied filters and result limit."
-        },
-    ),
-    ("get", "/solutions/taxonomies"): OperationDocumentation(
-        summary="List public solution taxonomy values",
-        description=(
-            "Returns the controlled hazard, solution-type, cost, and status values used "
-            "to classify published actions. Clients can use this catalog to construct "
-            "valid solution filters without duplicating repository vocabularies."
-        ),
-        success_responses={
-            "200": "The current public taxonomy values used by solution filters."
+            "200": "The published actions, where they were read from and when they were published."
         },
     ),
     ("get", "/users"): OperationDocumentation(
@@ -264,12 +233,25 @@ OPERATION_DOCUMENTATION: dict[
         summary="Create or invite a user within administrative scope",
         description=(
             "Creates the CHART user assignment requested by an authorized administrator "
-            "after validating role and geography boundaries. The route coordinates the "
-            "application identity record without allowing the caller to delegate "
-            "permissions they do not hold."
+            "after validating role and geography boundaries, with no password, and "
+            "has Keycloak email the person an invitation to sign in with a code. The "
+            "account stands even if the email fails; `invitation` says which, and "
+            "`POST /users/{user_id}/invitation` sends it again."
         ),
         success_responses={
-            "200": "The created or invited user and their effective CHART access assignment."
+            "200": "The invited user, their CHART access and whether the invitation was sent."
+        },
+    ),
+    ("post", "/users/{user_id}/invitation"): OperationDocumentation(
+        summary="Email a person their CHART invitation again",
+        description=(
+            "Has Keycloak email the invitation again for an active account: a link "
+            "that confirms the address and opens CHART's sign-in, where the person "
+            "signs in with an emailed code. Administrators only. Answers 502 "
+            "USER_INVITE_FAILED when the email could not be sent."
+        ),
+        success_responses={
+            "200": "The person and their CHART access, with invitation set to sent once Keycloak accepted the email."
         },
     ),
     ("post", "/users/{user_id}/disable"): OperationDocumentation(
@@ -412,20 +394,41 @@ OPERATION_DOCUMENTATION: dict[
             )
         },
     ),
-    ("get", "/heat-outlook/{geography_id}"): OperationDocumentation(
-        summary="Read the pre-computed heat outlook for a Kenyan place",
+    ("get", "/heat-outlook/{geography_id}/capabilities"): OperationDocumentation(
+        summary="Read independent observed and projection availability",
         description=(
-            "Returns the modelling team's pre-computed heat outlook for a Kenyan "
-            "county (geo-ke-<county>) or for Kenya as a whole (geo-ke): a typical "
-            "month by calendar month, and a summary for each period with its 95% "
-            "CI, climate-model range and change from the baseline. The outcome "
+            "Resolves sources for the exact geography and outcome, subject to "
+            "risk-reader roles, geography scope and country model settings. "
+            "Published handover projections retain their own release. Observed "
+            "may use the existing calibrated Kenya outlook scorer or an exact "
+            "active monthly model assignment. The observed source identifies its "
+            "release and batch support; unavailable or disabled views include a "
+            "reason. No district or constituency inherits an ancestor's observed "
+            "model. The new handovers are not relabelled as calibrated. Missing "
+            "advertised projection files return OUTLOOK_NOT_PUBLISHED."
+        ),
+        success_responses={
+            "200": "Enabled views with independent source releases and availability reasons."
+        },
+    ),
+    ("get", "/heat-outlook/{geography_id}"): OperationDocumentation(
+        summary="Read a published geography heat outlook and its period options",
+        description=(
+            "Returns the modelling team's published heat outlook for a configured "
+            "geography: typical calendar months, period summaries, available "
+            "selections, provenance and baseline notes. Installed October 2026 "
+            "handovers cover Madhya Pradesh's state, divisions and districts and "
+            "Kenya's country, counties and supplied constituencies. The outcome "
             "selects low birth weight (lbw) or under-five mortality "
             "(under_5_mortality); scenario, period and selector (the pregnancy "
-            "window or the age group) filter the tables. Requires a risk reader "
-            "role and access to the geography path. No model is evaluated at run "
-            "time: the tables are read from the model bucket mirror. The guides' "
-            "display rules are applied here, so suppressed values arrive as null "
-            "with the message to show in their place."
+            "window or age group) filter the publication. Supplied periods retain "
+            "their coefficient confidence intervals; derived 5/10/20-year periods "
+            "offer climate-model ranges, not confidence intervals, and omit "
+            "unavailable temperature summaries. Requires a risk reader role and "
+            "access to the geography path. No health model is evaluated on request. "
+            "Installed handovers take precedence over legacy Kenya publications. "
+            "Release-specific display rules return suppressed values as null with "
+            "an explanatory message; country settings restrict offered selections."
         ),
         success_responses={
             "200": (
@@ -435,23 +438,478 @@ OPERATION_DOCUMENTATION: dict[
         },
     ),
     ("get", "/heat-outlook/{geography_id}/map"): OperationDocumentation(
-        summary="Read Kenyan counties shaded by annual-average heat share",
+        summary="Read administrative areas shaded by their published heat outlook",
         description=(
-            "Returns the counties of Kenya with their display geometry and the "
-            "modelling team's annual-average heat-attributable share for the "
+            "Returns administrative areas in the selected geography frame with "
+            "display geometry and the published annual-average attributable share "
+            "for the "
             "chosen outcome, scenario, period and selector, in the same shape as "
             "the risk map so the dashboard draws it identically. Requires a risk "
-            "reader role and access to the geography path. Counties whose share "
+            "reader role and access to the geography path, and filters returned "
+            "areas to the caller's allowed paths. Coverage follows the installed "
+            "geography hierarchy and publication, including India districts and "
+            "Kenya constituencies. Areas whose share "
             "is suppressed by the display rules carry missing_reason no_excess; "
-            "windows with no period summary carry not_reported; counties with no "
-            "published file carry no_model. Nothing is computed on request."
+            "windows with no period summary carry not_reported; areas with no "
+            "published file carry no_model. With reference=peak, each area is "
+            "shaded by its highest-risk months' share instead: the three "
+            "consecutive months with the highest heat share where available. With "
+            "reference=season, each area is shaded by its mean heat share over "
+            "its heat season as configured in Settings (its own calendar, an "
+            "ancestor's, or the official season). No health model is evaluated "
+            "on request."
         ),
         success_responses={
             "200": (
-                "Kenyan counties with display geometry and each county's published "
-                "annual-average share, or the reason it is absent."
+                "Permitted areas with display geometry and each area's published "
+                "annual-average (or peak-season) share, or the reason it is absent."
             )
         },
+    ),
+    ("get", "/heat-outlook/{geography_id}/observed"): OperationDocumentation(
+        summary="Score an observed month for a Kenyan place from ERA5",
+        description=(
+            "Scores one observed month for a Kenyan county (geo-ke-<county>), or "
+            "the mean over Kenya's counties (geo-ke), with the modelling team's "
+            "DLNM models, using the Copernicus ERA5 temperatures CHART has "
+            "ingested. ERA5 is first moved onto the scale the models were fitted "
+            "on by a fixed offset per county and calendar month. Low birth weight "
+            "reads the birth month and the eight before it; under-five scores each "
+            "day of the month on that day and the three before it and averages "
+            "them. month (YYYY-MM) defaults to the newest month with complete "
+            "inputs; selector is the pregnancy window or the age group. Requires a "
+            "risk reader role and access to the geography path. The guides' "
+            "display rules apply, so suppressed values arrive as null with the "
+            "message to show in their place. The legacy observed release is "
+            "selected independently of a newer projection publication. India "
+            "monthly models use /risk/{geography_id}/monthly instead; unsupported "
+            "finer geographies never inherit a county's calibrated estimate."
+        ),
+        success_responses={
+            "200": (
+                "The estimate with its 95% CI and ratio, the months that can be "
+                "scored, the share for each of them, the temperatures used on both "
+                "scales, and the notes the dashboard must display."
+            )
+        },
+    ),
+    ("get", "/heat-outlook/{geography_id}/observed/map"): OperationDocumentation(
+        summary="Read Kenyan counties shaded by an observed month's heat share",
+        description=(
+            "Returns the counties of Kenya with their display geometry and each "
+            "county's heat-attributable share for one observed month, scored as "
+            "in the observed estimate. Requires a risk reader role and access to "
+            "the geography path. Counties without complete ERA5 inputs carry "
+            "missing_reason not_reported; suppressed shares carry no_excess. "
+            "County requests retain the Kenya county frame even when their "
+            "projection frame contains constituencies. Returned areas remain "
+            "restricted to the caller's geography permissions."
+        ),
+        success_responses={
+            "200": (
+                "Kenyan counties with display geometry and each county's share for "
+                "the observed month, or the reason it is absent."
+            )
+        },
+    ),
+    ("get", "/heat-outlook/{geography_id}/climate"): OperationDocumentation(
+        summary="Read ERA5-Land temperature or heatwave days for a frame's areas",
+        description=(
+            "Returns the frame's areas with display geometry and, for one month, "
+            "either the monthly mean of daily maximum temperature (layer=tmax, "
+            "degrees C) or heatwave days at the country's official threshold "
+            "(layer=heat_days), from Copernicus ERA5-Land at 0.1 degrees. A map "
+            "context layer only: no health estimate reads these values. "
+            "available_months lists the months held. Readable without sign-in "
+            "when public read is enabled; areas stay restricted to the caller's "
+            "geography permissions."
+        ),
+        success_responses={
+            "200": (
+                "The frame's areas with each area's value for the month, or "
+                "not_reported, plus the months held."
+            )
+        },
+    ),
+    ("get", "/heat-outlook/{geography_id}/population"): OperationDocumentation(
+        summary="Read WorldPop population for a frame's areas",
+        description=(
+            "Returns the frame's areas with display geometry shaded by people per "
+            "km2 of the chosen group (measure=total, under5 or women_15_49), with "
+            "each area's counts in counts and the frame's own in place. From "
+            "WorldPop Global2 R2025A (1 km, census-based, UN adjusted, CC BY 4.0) "
+            "summed over CHART's boundaries. Context for the heat estimates, not "
+            "an input. Readable without sign-in when public read is enabled."
+        ),
+        success_responses={
+            "200": (
+                "The frame's areas with people per km2, each area's counts, and "
+                "the source, licence and citation."
+            )
+        },
+    ),
+    ("get", "/heat-outlook/{geography_id}/forecast"): OperationDocumentation(
+        summary="Read a place's six-month seasonal forecast and heat shares",
+        description=(
+            "Returns the next six months for one place from the Copernicus C3S "
+            "multi-system seasonal forecast: each month's forecast mean daily "
+            "maximum (the place's ERA5 normal plus the area-weighted anomaly) and "
+            "the heat-attributable share scored with the place's model, with the "
+            "coolest and warmest forecast system as the range. Built once per C3S "
+            "issue; readable without sign-in when public read is enabled."
+        ),
+        success_responses={
+            "200": (
+                "The issue, the forecast systems, and for each coming month the "
+                "temperature and share with their ranges."
+            )
+        },
+    ),
+    ("get", "/heat-outlook/{geography_id}/forecast/map"): OperationDocumentation(
+        summary="Read a frame's areas shaded by a forecast month's heat share",
+        description=(
+            "Returns the frame's areas with display geometry, each shaded by its "
+            "own forecast heat share for one of the next six months (default the "
+            "first), with its range across forecast systems and forecast "
+            "temperature. Areas without a forecast are marked, never zeroed."
+        ),
+        success_responses={
+            "200": (
+                "The frame's areas with the month's forecast share, ranges and "
+                "temperatures, and the issue's months."
+            )
+        },
+    ),
+    ("get", "/vra/indicators"): OperationDocumentation(
+        summary="List the vulnerability and resilience indicator catalogue",
+        description=(
+            "Returns every indicator in the VRA catalogue with its component "
+            "(hazard, exposure, sensitivity or adaptive capacity), unit, direction "
+            "relative to risk (+1 more is worse, -1 more is better), how values "
+            "arrive (computed, upload, manual or pull) and whether it is scored "
+            "(included), shown as context, or dropped. Requires a risk reader role."
+        ),
+        success_responses={
+            "200": (
+                "The catalogue of VRA indicators with component, unit, direction, "
+                "route, status and rationale."
+            )
+        },
+    ),
+    ("get", "/vra/{geography_id}/assessment"): OperationDocumentation(
+        summary="Read the latest vulnerability assessment of a frame's areas",
+        description=(
+            "Returns the latest VRA run for the child areas of the geography "
+            "(framed as the dashboard map frames them: a leaf is framed on its "
+            "siblings), with each area's risk, class, rank, component scores, "
+            "coverage and driving indicators. Scores are 0-1 and relative within "
+            "the frame; missing scores are null with a reason, never zero. run is "
+            "null until an administrator runs an assessment. Requires a risk "
+            "reader role and access to the geography path."
+        ),
+        success_responses={
+            "200": (
+                "The frame, its latest run summary (or null) and every child area "
+                "ranked by risk, unscored areas last."
+            )
+        },
+    ),
+    ("get", "/vra/{geography_id}/map"): OperationDocumentation(
+        summary="Read a frame's areas shaded by vulnerability assessment risk",
+        description=(
+            "Returns the frame's child areas with display geometry in the risk "
+            "map's shape, with value_percent set to the latest VRA risk score "
+            "times 100. Areas scored without enough evidence carry missing_reason "
+            "insufficient_data; areas no run has covered carry not_assessed. "
+            "Requires a risk reader role and access to the geography path."
+        ),
+        success_responses={
+            "200": (
+                "The frame's areas with display geometry and VRA risk, or the "
+                "reason the risk is absent."
+            )
+        },
+    ),
+    ("get", "/vra/{geography_id}/areas/{area_geography_id}"): OperationDocumentation(
+        summary="Read one area's vulnerability scores and indicator evidence",
+        description=(
+            "Returns one child area of the frame with its assessment and, for "
+            "every scored indicator in the catalogue, the raw value and vintage "
+            "used, the normalised score, weight and contribution, the source and "
+            "quality flags, and why it was excluded when it was (missing, "
+            "no_data, too_few_areas, no_spread). Requires a risk reader role and "
+            "access to the geography path."
+        ),
+        success_responses={
+            "200": (
+                "The area's assessment and the per-indicator raw values, scores "
+                "and sources behind it."
+            )
+        },
+    ),
+    ("get", "/vra/{geography_id}/coverage"): OperationDocumentation(
+        summary="Read VRA indicator coverage and upload history for a frame",
+        description=(
+            "For administrators: how many of the frame's child areas hold a value "
+            "for each catalogue indicator, the vintages held and when they were "
+            "last updated, plus the most recent uploads with their row-level "
+            "rejections. Requires the chart_admin role and access to the "
+            "geography path."
+        ),
+        success_responses={
+            "200": (
+                "Area count, per-indicator coverage and vintages, and recent "
+                "ingestions with their rejections."
+            )
+        },
+    ),
+    ("get", "/vra/{geography_id}/template.csv"): OperationDocumentation(
+        summary="Download the VRA value upload template for a frame",
+        description=(
+            "For administrators: a CSV with one blank row per child area and per "
+            "indicator entered by upload or by hand, in the columns the upload "
+            "accepts (area_code, area_name, indicator_code, value, vintage, "
+            "source_name, source_url, notes). Requires the chart_admin role and "
+            "access to the geography path."
+        ),
+        success_responses={
+            "200": (
+                "A text/csv template listing every child area and uploadable "
+                "indicator with blank values."
+            )
+        },
+    ),
+    ("post", "/vra/{geography_id}/values"): OperationDocumentation(
+        summary="Upload VRA indicator values for a frame's areas as CSV",
+        description=(
+            "For administrators: send the template columns as text/csv. Each row "
+            "is checked (the area must be a child of the frame, the indicator must "
+            "exist and be neither dropped nor computed, the value numeric and a "
+            "percentage within 0-100, the vintage present); blank values are "
+            "skipped. Valid rows are upserted on indicator, area and vintage. If "
+            "no row is valid the upload is recorded as failed and nothing is "
+            "written. Requires the chart_admin role and access to the geography."
+        ),
+        success_responses={
+            "200": (
+                "The ingestion id and status with accepted and rejected row counts "
+                "and a reason for each rejected row."
+            )
+        },
+    ),
+    ("post", "/vra/{geography_id}/runs"): OperationDocumentation(
+        summary="Run the vulnerability assessment for a frame's child areas",
+        description=(
+            "For administrators: recomputes the climate-derived hazard indicators "
+            "from stored ERA5 months, scores every child area with method vra-v1 "
+            "(5th-95th percentile min-max, equal weights, two-thirds coverage "
+            "rule, geometric mean of hazard, exposure and vulnerability, quartile "
+            "classes) and stores the run with its bounds and input and output "
+            "hashes. Synchronous. Requires the chart_admin role and access to the "
+            "geography path."
+        ),
+        success_responses={
+            "200": (
+                "The new assessment, in the same shape as the assessment read, "
+                "with the stored run summary."
+            )
+        },
+    ),
+    ("get", "/model-settings"): OperationDocumentation(
+        summary="Read model settings for the countries a user can see",
+        description=(
+            "Without parameters, lists the model settings of every country whose "
+            "path the signed-in user can read, one item per outcome. With country "
+            "(ISO code, e.g. KE) and outcome (e.g. lbw), returns that one item. "
+            "Each item carries the options the published outlook tables and active "
+            "model releases support, tagged by the view that uses them, and the "
+            "effective settings: the stored ones, or the defaults when none are "
+            "saved. Any signed-in user may read them; roles are not restricted yet."
+        ),
+        success_responses={
+            "200": (
+                "Available pregnancy windows or age groups, scenarios and data "
+                "modes, with the options switched on and the defaults in use."
+            )
+        },
+    ),
+    ("put", "/model-settings/{country_code}/{outcome}"): OperationDocumentation(
+        summary="Narrow the model options offered for a country and outcome",
+        description=(
+            "Stores which pregnancy windows or age groups, scenarios and data modes "
+            "a country offers for an outcome. Settings may only narrow what the "
+            "tables and releases support: unknown codes are refused "
+            "(MODEL_SETTINGS_OPTION_UNKNOWN), every view keeps at least one option "
+            "(MODEL_SETTINGS_OPTION_REQUIRED) and each default must be switched on "
+            "(MODEL_SETTINGS_DEFAULT_NOT_ENABLED). Requires access to the country "
+            "path; any signed-in role may write for now. Every change records a "
+            "model_settings_changed audit event with the values before and after."
+        ),
+        success_responses={
+            "200": (
+                "The saved settings as they now apply, with the available options "
+                "and who last changed them."
+            )
+        },
+    ),
+    ("get", "/heat-seasons"): OperationDocumentation(
+        summary="List heat-season calendars",
+        description=(
+            "Every place the caller can read, parents before children, with the "
+            "heat-season calendar in effect: twelve letters from January (b before, "
+            "d during, a after, o outside the cycle). state says whether the place "
+            "has its own calendar (custom), inherits an ancestor's (inherited, with "
+            "inherited_from), uses the country's official season (official) or has "
+            "none (unset). Requires a dashboard reader role."
+        ),
+        success_responses={
+            "200": "Each readable place with its calendar in effect, its own months and where they come from."
+        },
+    ),
+    ("get", "/heat-seasons/{geography_id}"): OperationDocumentation(
+        summary="Read the heat-season calendar in effect for a place",
+        description=(
+            "The place's own calendar, else its nearest ancestor's, else the "
+            "country's official season with the four months before it as "
+            "preparation. Lays out the recommended-actions Gantt chart. Requires "
+            "read access to the place (GEOGRAPHY_NOT_ALLOWED, "
+            "HEAT_SEASON_GEOGRAPHY_NOT_FOUND)."
+        ),
+        success_responses={
+            "200": "The twelve-month calendar in effect for the place and the place or season it comes from."
+        },
+    ),
+    ("put", "/heat-seasons/{geography_id}"): OperationDocumentation(
+        summary="Save a place's own heat-season calendar",
+        description=(
+            "Stores twelve months for the place; its children inherit them unless "
+            "they have their own. Read from the first preparation month the months "
+            "must run before, during, after, then off, with at least one during "
+            "month (HEAT_SEASON_INVALID). Administrators only "
+            "(ROLE_NOT_ALLOWED). Records a heat_season_changed audit event."
+        ),
+        success_responses={
+            "200": "The saved calendar as it now applies to the place, with its source and state."
+        },
+    ),
+    ("delete", "/heat-seasons/{geography_id}"): OperationDocumentation(
+        summary="Drop a place's own calendar so it inherits again",
+        description=(
+            "Removes the place's own calendar; it then inherits its parent's or "
+            "the official season. Administrators only. "
+            "Records a heat_season_changed audit event when a calendar was removed."
+        ),
+        success_responses={
+            "200": "The calendar that now applies: the parent's or the official season, with its origin."
+        },
+    ),
+    ("get", "/saved-plans"): OperationDocumentation(
+        summary="List the user's saved plans",
+        description=(
+            "Returns the caller's own saved plans, newest first, each with the "
+            "dashboard choices that reopen it, the published estimate captured "
+            "when it was saved and the deterministic risk_level/timing signals "
+            "recommendations are keyed on. Plans for places no longer in the "
+            "caller's geography scope are omitted. Requires a dashboard reader role."
+        ),
+        success_responses={
+            "200": "The caller's saved plans for places they can still read, newest first; empty when none."
+        },
+    ),
+    ("post", "/saved-plans"): OperationDocumentation(
+        summary="Save a dashboard view with its published estimate",
+        description=(
+            "Stores a named plan for a geography (and optional sub-area within it), "
+            "outcome and observed or projected selection. The API resolves the "
+            "selection and captures the estimate through the same outlook service "
+            "as the dashboard; a view with no published estimate is saved with "
+            "figure.status unavailable and a reason. Refuses places outside the "
+            "caller's scope (GEOGRAPHY_OUT_OF_SCOPE), a sub-area outside its frame "
+            "(PLAN_AREA_INVALID), a selection the publication does not contain "
+            "(OUTLOOK_SELECTION_INVALID) and more than 100 plans per user "
+            "(SAVED_PLAN_LIMIT)."
+        ),
+        success_responses={
+            "201": "The new saved plan with the published figure and risk reading captured for it."
+        },
+    ),
+    ("get", "/saved-plans/{plan_id}"): OperationDocumentation(
+        summary="Open one of the caller's saved plans",
+        description=(
+            "Returns one of the caller's plans. Another user's plan is reported as "
+            "SAVED_PLAN_NOT_FOUND; a plan whose place has left the caller's scope "
+            "is refused with GEOGRAPHY_OUT_OF_SCOPE."
+        ),
+        success_responses={
+            "200": "The requested saved plan with its captured figure, choices and risk reading."
+        },
+    ),
+    ("delete", "/saved-plans/{plan_id}"): OperationDocumentation(
+        summary="Remove one of the caller's saved plans",
+        description=(
+            "Deletes one of the caller's plans for good. Another user's plan is "
+            "reported as SAVED_PLAN_NOT_FOUND and left untouched, as is a plan that "
+            "was already removed."
+        ),
+        success_responses={
+            "204": "The plan was removed; removing it again answers 404 SAVED_PLAN_NOT_FOUND."
+        },
+    ),
+    ("post", "/saved-plans/{plan_id}/recommendations"): OperationDocumentation(
+        summary="Rank repository actions for a saved plan, with an insight",
+        description=(
+            "Ranks the candidate actions the browser sends for one of the "
+            "caller's plans. The rules ranking (season, then cost unless heat "
+            "risk is clearly raised, then health-led) is the default; a "
+            "configured classifier replaces only the order and, if it fails, "
+            "ranker falls back to rules with ranker_note set. The insight is a "
+            "template unless an administrator chose a language model; it falls "
+            "back to the template on any provider failure (insight.note) and a "
+            "generated insight is reused until the provider, model or ranking "
+            "changes. Ownership and scope follow GET /saved-plans/{plan_id}."
+        ),
+        success_responses={
+            "200": "The plan's top-ranked published actions with their reasons, and the insight beside them."
+        },
+    ),
+    ("get", "/recommendation-settings"): OperationDocumentation(
+        summary="Read how recommendations are ranked and explained",
+        description=(
+            "Returns the chosen ranker and insight provider/model with every "
+            "option and whether the server environment enables it (credentials "
+            "are never stored or returned). Administrators only (chart_admin)."
+        ),
+        success_responses={
+            "200": "The current ranker and insight settings, with which options this server can offer."
+        },
+    ),
+    ("put", "/recommendation-settings"): OperationDocumentation(
+        summary="Choose the ranker and the insight provider and model",
+        description=(
+            "Stores the installation's ranker and insight provider/model. "
+            "Refuses unknown options (RANKER_UNKNOWN, INSIGHT_PROVIDER_UNKNOWN), "
+            "options the environment does not enable (RANKER_NOT_CONFIGURED, "
+            "INSIGHT_PROVIDER_NOT_CONFIGURED) and a language model provider "
+            "without a model (INSIGHT_MODEL_REQUIRED). Administrators only; "
+            "every change records a recommendation_settings_changed audit event."
+        ),
+        success_responses={
+            "200": "The saved ranker and insight settings as they now apply, with the available options."
+        },
+    ),
+    ("get", "/recommendation-settings/providers/{provider}/models"): (
+        OperationDocumentation(
+            summary="List the models an insight provider offers",
+            description=(
+                "Fetches the model list from the provider's API when it offers "
+                "one (source provider), otherwise returns CHART_INSIGHT_MODELS "
+                "(source configured). Fails with INSIGHT_MODELS_UNAVAILABLE when "
+                "neither is available. Administrators only."
+            ),
+            success_responses={
+                "200": "The models the provider offers and whether the list came from the provider or configuration."
+            },
+        )
     ),
     ("get", "/risk/{geography_id}/monthly"): OperationDocumentation(
         summary="Read month-keyed ERA5 maximum temperature and attributable impacts",
@@ -605,8 +1063,10 @@ OPERATION_DOCUMENTATION: dict[
             "Returns every ModelRelease row (active-first) with identity, "
             "version, model_files (filename + SHA-256), area count, the "
             "manifest source path discovered on disk, S3 base URI, git ref, and "
-            "activation timestamp. Powers the admin Models page under /settings, "
-            "where operators inspect what is loaded and trigger reloads."
+            "activation timestamp. Requires a signed-in user because those "
+            "fields are internal to the deployment. Powers the admin Models "
+            "page under /settings, where operators inspect what is loaded and "
+            "trigger reloads."
         ),
         success_responses={
             "200": (
@@ -621,8 +1081,9 @@ OPERATION_DOCUMENTATION: dict[
             "Finds the manifest whose id matches the URL parameter, re-parses "
             "its ModelReleaseSpec, and calls prepare_model_release to re-POST "
             "/models/load to the R runtime. Does not touch the database or "
-            "reactivate the release. Useful after an R container restart or "
-            "after a manifest edit that swaps an artifact's SHA-256."
+            "reactivate the release. Requires the chart_admin role. Useful "
+            "after an R container restart or after a manifest edit that swaps "
+            "an artifact's SHA-256."
         ),
         success_responses={
             "200": (
@@ -639,7 +1100,8 @@ OPERATION_DOCUMENTATION: dict[
             "and stays open for INFERENCE_LBW_CIRCUIT_SECONDS (default 30). "
             "The half-open probe closes it automatically once R recovers, but "
             "an operator investigating after an outage can call this endpoint "
-            "to skip the wait instead of restarting the API container. Only "
+            "to skip the wait instead of restarting the API container. "
+            "Requires the chart_admin role. Only "
             "clears state in the calling process; other API replicas keep "
             "their own counter until reset individually or until their next "
             "half-open probe succeeds."

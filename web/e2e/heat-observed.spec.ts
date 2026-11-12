@@ -1,0 +1,316 @@
+import { expect, test, type Page } from "@playwright/test";
+
+import { installKenya, observedFixtures } from "./support/kenya";
+
+// The Observed tab: a month of ERA5 scored with the modeller's DLNM by the
+// Python API. The fake API serves responses captured from that API on the dev
+// database (fixtures/observed-kenya.json), so the expected numbers are read
+// from the same file rather than restated here.
+type Estimate = {
+  value_percent: number | null;
+  low_percent: number | null;
+  high_percent: number | null;
+  message: string | null;
+  ratio: { kind: string; value: number; low: number; high: number } | null;
+};
+type Observed = {
+  month: string;
+  available_months: string[];
+  estimate: Estimate;
+  inputs: { label: string }[];
+  selectors: { code: string; label: string }[];
+  calibration_note: string;
+};
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+const panel = (page: Page) => page.getByTestId("heat-outlook");
+const observed = (key: string) => observedFixtures.observed[key] as unknown as Observed;
+const label = (month: string) =>
+  `${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
+
+test("Kenya LBW opens on the newest observed month, scored from ERA5", async ({
+  page,
+}) => {
+  const latest = observed("geo-ke-kajiado|lbw|P|latest");
+  const api = await installKenya(page);
+  await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
+
+  const outlook = panel(page);
+  await expect(outlook.getByRole("tab", { name: "Observed" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  const estimate = outlook.getByTestId("outlook-estimate");
+  const value = latest.estimate.value_percent;
+  expect(value).not.toBeNull();
+  await expect(estimate).toContainText(
+    `in ${label(latest.month)}, ${value!.toFixed(1)}% of low birth weight cases in Kajiado County may be attributable to heat exposure.`,
+  );
+  await expect(estimate).toContainText(
+    `95% CI ${latest.estimate.low_percent!.toFixed(1)} to ${latest.estimate.high_percent!.toFixed(1)}%`,
+  );
+  await expect(outlook.getByTestId("outlook-ratio")).toContainText(
+    `Odds ratio ${latest.estimate.ratio!.value.toFixed(2)}`,
+  );
+  await expect(
+    estimate.getByRole("button", { name: /High|Moderate|Low/ }),
+  ).toBeVisible();
+  if (Math.round(value!) > 0)
+    await expect(
+      outlook.getByRole("img", {
+        name: `${Math.max(1, Math.round(value!))} of 100 newborn figures highlighted`,
+      }),
+    ).toBeVisible();
+
+  // Only scoreable months can be picked; the newest is selected.
+  const months = outlook.getByRole("group", { name: /Months in/ });
+  const monthKey = latest.month;
+  await expect(
+    months.getByRole("button", {
+      name: MONTHS[Number(monthKey.slice(5)) - 1],
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  // No source line or "Temperatures behind this estimate" details on the
+  // card; the release is kept out of sight for checks.
+  await expect(outlook.getByText("Temperatures behind this estimate")).toHaveCount(0);
+  await expect(outlook.getByText(/Observed · ERA5/)).toHaveCount(0);
+  await expect(outlook).toHaveAttribute(
+    "data-release",
+    String((latest as Record<string, unknown>).release),
+  );
+
+  // The map shades the same month.
+  expect(
+    api.requests.some(
+      (request) => request.includes("/observed/map") && request.includes("outcome=lbw"),
+    ),
+  ).toBe(true);
+  await page.waitForTimeout(400);
+  await page.screenshot({
+    path: "../outputs/e2e/web/heat-observed-lbw.png",
+    fullPage: true,
+  });
+  expect(api.unhandled).toEqual([]);
+});
+
+test("choosing another month moves the estimate and the map to it", async ({
+  page,
+}) => {
+  const months = Object.keys(observedFixtures.observed)
+    .filter((key) => key.startsWith("geo-ke-kajiado|lbw|P|") && !key.endsWith("latest"))
+    .map((key) => key.split("|")[3]);
+  const latest = observed("geo-ke-kajiado|lbw|P|latest");
+  const other = months.find((month) => month !== latest.month)!;
+  const body = observed(`geo-ke-kajiado|lbw|P|${other}`);
+  const api = await installKenya(page);
+  await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
+  const outlook = panel(page);
+  await expect(outlook.getByTestId("outlook-estimate")).toContainText(
+    label(latest.month),
+  );
+
+  if (other.slice(0, 4) !== latest.month.slice(0, 4)) {
+    await outlook.getByRole("combobox", { name: "Year" }).click();
+    await page.getByRole("option", { name: other.slice(0, 4), exact: true }).click();
+  }
+  await outlook
+    .getByRole("group", { name: /Months in/ })
+    .getByRole("button", { name: MONTHS[Number(other.slice(5)) - 1], exact: true })
+    .click();
+
+  await expect(outlook.getByTestId("outlook-estimate")).toContainText(label(other));
+  if (body.estimate.value_percent !== null)
+    await expect(outlook.getByTestId("outlook-estimate")).toContainText(
+      `${body.estimate.value_percent.toFixed(1)}%`,
+    );
+  await expect
+    .poll(() =>
+      api.requests.some(
+        (request) =>
+          request.includes("/observed/map") && request.includes(`month=${other}`),
+      ),
+    )
+    .toBe(true);
+  // The figures dim while the next month loads, and settle when it arrives.
+  await expect(outlook).toHaveAttribute("aria-busy", "false");
+  expect(api.unhandled).toEqual([]);
+});
+
+test("Kenya under-five observed: post-neonatal by default, newborn deaths carry no heat excess", async ({
+  page,
+}) => {
+  const latest = observed("geo-ke-kajiado|under_5_mortality|postneonatal|latest");
+  const neonatal = observed("geo-ke-kajiado|under_5_mortality|neonatal|latest");
+  await installKenya(page);
+  await page.goto(
+    "/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=under_5_mortality",
+  );
+  const outlook = panel(page);
+  await expect(outlook.getByRole("combobox", { name: "Age group" })).toContainText(
+    "Post-neonatal",
+  );
+  // The model's caveat card is gone: no "Approximate death dates." note.
+  await expect(outlook.getByText("Approximate death dates.")).toHaveCount(0);
+  const estimate = outlook.getByTestId("outlook-estimate");
+  if (latest.estimate.value_percent !== null)
+    await expect(estimate).toContainText(
+      `${latest.estimate.value_percent.toFixed(1)}% of under-five mortality cases in Kajiado County`,
+    );
+  else await expect(estimate).toContainText(latest.estimate.message!);
+  await expect(outlook.getByTestId("outlook-ratio")).toContainText("Risk ratio");
+
+  await outlook.getByRole("combobox", { name: "Age group" }).click();
+  await page.getByRole("option", { name: /^Neonatal/ }).click();
+  await expect(estimate).toContainText(neonatal.estimate.message!);
+  await expect(outlook.getByRole("img", { name: /of 100/ })).toHaveCount(0);
+  await page.screenshot({
+    path: "../outputs/e2e/web/heat-observed-u5.png",
+    fullPage: true,
+  });
+});
+
+test("switching the observed view off opens the dashboard on the projection", async ({
+  page,
+}) => {
+  await installKenya(page, true, ["/kenya"], {
+    settings: { lbw: { data_modes: ["projection"] } },
+  });
+  await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
+  const outlook = panel(page);
+  await expect(outlook.getByRole("tab", { name: "Observed" })).toBeEnabled();
+  await expect(outlook.getByRole("tab", { name: "Projected" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(outlook.getByTestId("outlook-estimate")).toContainText(
+    "11.1% of low birth weight cases in Kajiado",
+  );
+  await outlook.getByRole("tab", { name: "Observed" }).click();
+  await expect(outlook.getByRole("tab", { name: "Observed" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(
+    outlook
+      .getByRole("status")
+      .filter({ hasText: "Observed estimates are not available" }),
+  ).toBeVisible();
+  await expect(outlook.getByTestId("outlook-estimate")).toHaveCount(0);
+  await outlook.getByRole("tab", { name: "Projected" }).click();
+  await expect(outlook.getByTestId("outlook-estimate")).toContainText("11.1%");
+});
+
+test("a failing observed request says so and leaves the projection usable", async ({
+  page,
+}) => {
+  await installKenya(page, true, ["/kenya"], { observedStatus: 500 });
+  await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
+  const outlook = panel(page);
+  await expect(outlook.getByRole("tab", { name: "Observed" })).toBeEnabled();
+  await expect(outlook.getByTestId("outlook-estimate")).toContainText("11.1%");
+  await expect(outlook.getByRole("alert")).toHaveText(
+    "Observed months could not load, so the projection is shown.",
+  );
+  await outlook.getByRole("tab", { name: "Observed" }).click();
+  await expect(
+    outlook
+      .getByRole("alert")
+      .filter({ hasText: "The observed estimate could not load." }),
+  ).toBeVisible();
+  await expect(outlook.getByTestId("outlook-estimate")).toHaveCount(0);
+  await outlook.getByRole("tab", { name: "Projected" }).click();
+  await expect(outlook.getByTestId("outlook-estimate")).toContainText("11.1%");
+});
+
+test("projected reference periods: the configured heat season and the highest-risk months", async ({
+  page,
+}) => {
+  const api = await installKenya(page);
+  await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
+  const outlook = panel(page);
+  await outlook.getByRole("tab", { name: "Projected" }).click();
+
+  const reference = outlook.getByRole("group", { name: "Reference period" });
+  // No seasonal tables; a "See more" link beside the panel label opens the
+  // published methodology.
+  await expect(outlook.getByText("Seasonal pattern and all periods")).toHaveCount(0);
+  await expect(outlook.locator("table")).toHaveCount(0);
+  const seeMore = outlook
+    .getByText("Climate attributable health risk")
+    .getByRole("link", { name: /See more/ });
+  await expect(seeMore).toHaveText("See more");
+  await expect(seeMore).toHaveAttribute(
+    "href",
+    "https://chart-scope.github.io/CHART/docs/methodology/",
+  );
+  await expect(seeMore).toHaveCSS("color", "rgb(56, 62, 233)");
+  // The season and averaging note under the controls is gone.
+  await expect(outlook.getByText(/Meteorological Department\)/)).toHaveCount(0);
+  await expect(outlook.getByText(/Projections average the selected years/)).toHaveCount(
+    0,
+  );
+  await expect(reference.getByRole("button")).toHaveText([
+    "Annual average",
+    "Peak heat season",
+    "Highest-risk months (Jul–Sep)",
+  ]);
+  const estimate = outlook.getByTestId("outlook-estimate");
+
+  // The heat season set in Settings (Kenya's Dec–Mar), named without months.
+  // Births in those months carry no excess heat risk in Kajiado.
+  await reference
+    .getByRole("button", { name: "Peak heat season", exact: true })
+    .click();
+  await expect(estimate).toContainText("No excess heat risk estimated");
+  await expect(estimate).not.toContainText("Dec–Mar");
+  await expect
+    .poll(() => api.requests.some((request) => request.includes("reference=season")))
+    .toBe(true);
+
+  // The three months the model ranks highest, by share.
+  await reference
+    .getByRole("button", { name: /Highest-risk months \(Jul–Sep\)/ })
+    .click();
+  await expect(estimate).toContainText(
+    "in the highest-risk months (Jul–Sep) of 2041–2060",
+  );
+  await expect(estimate).toContainText("Climate-model range");
+  await expect
+    .poll(() => api.requests.some((request) => request.includes("reference=peak")))
+    .toBe(true);
+  await page.waitForTimeout(400);
+  await page.screenshot({
+    path: "../outputs/e2e/web/heat-projected-peak.png",
+    fullPage: true,
+  });
+});
+
+test("the observed controls fit a phone screen", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await installKenya(page);
+  await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
+  const outlook = panel(page);
+  await expect(outlook.getByRole("group", { name: /Months in/ })).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+  ).toBe(true);
+  await page.screenshot({
+    path: "../outputs/e2e/web/heat-observed-phone.png",
+    fullPage: true,
+  });
+});

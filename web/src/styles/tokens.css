@@ -44,6 +44,14 @@
   --color-sem-behaviour-tint: rgba(91, 42, 198, 0.1);
   --color-maroon-tint: rgba(85, 17, 31, 0.1);
 
+  /* Sequential classes for relative indices (the vulnerability map): one
+     warm ramp built from amber and maroon, lightness falling as risk rises,
+     so the order survives greyscale and colour-vision differences. */
+  --color-seq-1: color-mix(in srgb, var(--color-amber) 14%, var(--color-white));
+  --color-seq-2: color-mix(in srgb, var(--color-amber) 42%, var(--color-white));
+  --color-seq-3: var(--color-amber);
+  --color-seq-4: var(--color-maroon);
+
   /* --- Semantic surfaces --- */
   --surface-app: var(--color-ivory);
   --surface-card: var(--color-white);
@@ -70,8 +78,8 @@
     "Noto Sans Display", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
 
-  /* Type scale — hero/section sizes mirror the design-system reference doc;
-     component-level sizes match the three source prototypes. */
+  /* Shared type scale — see Foundations/Typography for roles and usage.
+     Use these tokens for UI text; brand lettering and icon glyphs are separate. */
   --fs-hero: 28px;
   --fs-h1: 20px;
   --fs-section: 19px;
@@ -114,7 +122,53 @@
 
   /* --- §1 Elevation — modal is the only elevated surface --- */
   --shadow-modal: 0 12px 32px rgba(0, 0, 0, 0.18);
+  /* Cards: one shape across the app and the landing page. */
+  --radius-card: 14px;
+  --shadow-card: 0 1px 2px rgb(30 31 33 / 5%), 0 8px 24px -12px rgb(30 31 33 / 12%);
+  --shadow-card-hover:
+    0 2px 4px rgb(30 31 33 / 6%), 0 16px 32px -14px rgb(30 31 33 / 18%);
+  --ease-out-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
   --shadow-thumb: 0 1px 4px rgba(0, 0, 0, 0.28);
+
+  /* --- Design system v1 (canvas "00 · Design system") ---
+     Values the frames use that had no token: one source for the landing
+     page, the workspace and the sign-in theme's mirror. */
+  --color-text-secondary: #5a5853;
+  --color-text-hint: #8a877f;
+  --color-text-eyebrow: #5e5c57;
+  --color-nexus-pill: #e6e6f5;
+  --color-nexus-disabled: #b9b8f2;
+  --color-coming-soon: #4a2fc2;
+  /* Amber text readable on the amber tint (4.5:1). */
+  --color-amber-text: #9a4a1c;
+  --color-tile-muted: #dddcd9;
+  --color-on-dark-muted: #d9d7d2;
+  --surface-sentence: #ecebe8;
+  --surface-page-alt: #f6f5f3;
+
+  /* Display type: landing hero, landing sections, page titles, cards. */
+  --fs-display-1: 64px;
+  --fs-display-2: 34px;
+  --fs-title: 28px;
+  --fs-title-card: 22px;
+  --fs-subhead: 19px;
+  --fs-lede: 17px;
+  --fs-emoji: 26px;
+  --lh-lede: 1.85;
+
+  /* Control heights: every control is a height plus side padding. */
+  --control-lg: 48px;
+  --control-md: 40px;
+  --control-sm: 32px;
+  --control-input: 44px;
+  --control-tag: 28px;
+
+  /* Wider steps and the page gutter (24px on phones to 120px). */
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-22: 88px;
+  --page-gutter: clamp(24px, 6vw, 120px);
+  --content-max: 1592px;
 
   /* --- Focus --- */
   --focus-ring: 2px solid var(--color-nexus);
