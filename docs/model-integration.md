@@ -257,8 +257,11 @@ is in the panel's `data-release` attribute and under Settings → Models.
 | Time horizon | The file's 20-year periods; the first is the baseline (1981–2010 for LBW, 1991–2020 for under-five) | 2041–2060 |
 | Reference period | **Annual average**: the period summary (PARP for LBW, PAF for under-five) with its 95% CI and the change from the baseline. **Highest-risk months**: the three consecutive months with the highest heat share in the typical-month table, with the climate-model range (the table has no CI per month) | Annual average |
 
-The highest-risk months are ranked by share, not by temperature, so they are
-not the weather heat season. The panel states that season beside them, from
+A third option, **Peak heat season**, is the mean heat share over the
+place's heat season as configured in Settings › Heat seasons (its own
+calendar, an ancestor's, or the official season), named without its months
+for now. The highest-risk months are ranked by share, not by temperature, so
+they are not the weather heat season. The panel states that season beside them, from
 `core/chart/climate/heat_seasons.json` (India: March–June, peaking in May;
 Kenya: December–March, peaking in February). An LBW month is the
 births of that month, exposed over the pregnancy before it, so the births heat

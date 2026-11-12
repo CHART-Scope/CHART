@@ -18,6 +18,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from chart.heat_seasons.service import season_months
 from chart.climate.heat_seasons import heat_season
 from chart.model_registry.runtime import model_cache_dir
 from chart.model_registry.service import get_active_model_mapping
@@ -430,7 +431,8 @@ def load_outlook_map(
     reference: str = "annual",
 ) -> MapResponse:
     """The county map for one selection: each county's annual-average share,
-    or with ``reference="peak"`` its peak-heat-season share.
+    with ``reference="peak"`` its highest-risk months' share, or with
+    ``reference="season"`` its share over its configured heat season.
 
     Shapes and framing come from the risk map, so this map draws exactly like
     the existing one; only the values are replaced with the published ones.
@@ -468,8 +470,17 @@ def load_outlook_map(
         area.value_percent = None
         area.odds_ratio = None
         area.on_training_support = None
-        if found is not None and reference == "peak":
-            peak = _peak_season(found[0], outcome, scenario, period, selector)
+        if found is not None and reference in ("peak", "season"):
+            months = (
+                season_months(session, area.geography_id or "")
+                if reference == "season"
+                else None
+            )
+            peak = (
+                None
+                if reference == "season" and not months
+                else _peak_season(found[0], outcome, scenario, period, selector, months)
+            )
             value = peak.part.value_percent if peak else None
             area.value_percent = value
             area.missing_reason = (
@@ -500,11 +511,10 @@ def load_outlook_map(
         area.on_training_support = (
             row["share_above_p99_pct"] or 0
         ) <= THIN_DATA_SHARE_PERCENT
-    frame.metric = (
-        "heat_attributable_share_peak_season"
-        if reference == "peak"
-        else "heat_attributable_share_annual_average"
-    )
+    frame.metric = {
+        "peak": "heat_attributable_share_peak_season",
+        "season": "heat_attributable_share_heat_season",
+    }.get(reference, "heat_attributable_share_annual_average")
     return frame
 
 
@@ -516,7 +526,10 @@ def load_outlook(
     period: str | None = None,
     selector: str | None = None,
     restriction: OutlookRestriction | None = None,
+    season_months: list[int] | None = None,
 ) -> HeatOutlookResponse:
+    """``season_months`` are the place's configured heat season, for
+    ``heat_season_share``."""
     if restriction is not None and not restriction.allows("projection"):
         raise ViewTurnedOff("projection")
     found = _document(geography_id, outcome)
@@ -556,6 +569,11 @@ def load_outlook(
         months=_months(document, outcome, scenario, period, selector),
         period_summary=_period_summary(document, outcome, scenario, selector, baseline),
         peak_season=_peak_season(document, outcome, scenario, period, selector),
+        heat_season_share=(
+            _peak_season(document, outcome, scenario, period, selector, season_months)
+            if season_months
+            else None
+        ),
         heat_season=_official_season(document.get("country_code", "KE")),
         data_modes=[
             v
@@ -661,13 +679,17 @@ MONTH_NAMES = (
 PEAK_SEASON_MONTHS = 3
 
 
-def _peak_season(document, outcome, scenario, period, selector) -> PeakSeason | None:
-    """The three consecutive months with the highest heat share.
+def _peak_season(
+    document, outcome, scenario, period, selector, months: list[int] | None = None
+) -> PeakSeason | None:
+    """The heat share over ``months``, by default the three consecutive months
+    with the highest heat share.
 
     Ranked by share, not temperature: an LBW month is the births of that
     month, exposed over the pregnancy before it, so the hottest calendar
     months are not the births heat affects most. For under-five (four-day
-    lags) the two orders agree.
+    lags) the two orders agree. Given ``months`` (the place's configured heat
+    season), the share is their mean instead.
     """
 
     rows = {
@@ -682,10 +704,9 @@ def _peak_season(document, outcome, scenario, period, selector) -> PeakSeason | 
     def block(start: int) -> list[int]:
         return [(start + offset - 1) % 12 + 1 for offset in range(PEAK_SEASON_MONTHS)]
 
-    hottest = max(
-        range(1, 13), key=lambda start: sum(rows[m]["mean"] for m in block(start))
+    chosen = months or block(
+        max(range(1, 13), key=lambda start: sum(rows[m]["mean"] for m in block(start)))
     )
-    chosen = block(hottest)
 
     def mean(key: str) -> float | None:
         values = [rows[month][key] for month in chosen]

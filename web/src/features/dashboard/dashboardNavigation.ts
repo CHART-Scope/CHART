@@ -29,7 +29,9 @@ export function readOutlookChoices(search: DashboardSearch): OutlookChoices {
     selector: search.selector,
     observedSelector: search.observed_selector,
     reference:
-      search.reference === "annual" || search.reference === "peak"
+      search.reference === "annual" ||
+      search.reference === "season" ||
+      search.reference === "peak"
         ? search.reference
         : undefined,
   };

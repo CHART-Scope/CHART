@@ -25,6 +25,7 @@ from chart.auth.service import require_current_user, require_reader
 from chart.heat_outlook import routes as outlook_routes
 from chart.risk import routes as risk_routes
 from chart.heat_outlook import service as outlook_service
+from chart.heat_seasons import routes as heat_season_routes
 from chart.heat_outlook.publish import publish
 from chart.risk.schemas import MapArea, MapResponse
 from chart.heat_outlook.service import NO_EXCESS_LBW, NO_EXCESS_NEONATAL, THIN_DATA
@@ -343,6 +344,54 @@ def test_outlook_carries_the_official_heat_season(client) -> None:
     assert season["months"] == [12, 1, 2, 3] and season["peak_month"] == 2
     assert season["source_name"] == "Kenya Meteorological Department"
     assert body["peak_season"]["months"] != season["months"][:3]
+
+
+def test_peak_heat_season_follows_the_configured_calendar(
+    client, monkeypatch, settings_db
+) -> None:
+    body = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw").json()
+    # No saved calendar: Kenya's official season, in season order.
+    season = body["heat_season_share"]
+    assert season["months"] == [12, 1, 2, 3] and season["label"] == "Dec–Mar"
+    assert season["part"]["value_percent"] == 10.0
+    # Distinct from the months the model ranks highest.
+    assert body["peak_season"]["months"] == [7, 8, 9]
+
+    # An administrator sets Kenya's season to Jul-Oct; Kajiado inherits it.
+    monkeypatch.setattr(heat_season_routes, "get_session_factory", lambda: settings_db)
+    app.dependency_overrides[require_current_user] = lambda: _user(
+        user_id="admin", username="admin", roles=["chart_admin"]
+    )
+    saved = client.put("/heat-seasons/geo-ke", json={"months": "oobbbbddddaa"})
+    assert saved.status_code == 200, saved.text
+    app.dependency_overrides[require_current_user] = lambda: _user()
+
+    season = client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw").json()[
+        "heat_season_share"
+    ]
+    assert season["months"] == [7, 8, 9, 10] and season["label"] == "Jul–Oct"
+    # (20 + 20 + 20 + 10) / 4 percent.
+    assert season["part"]["value_percent"] == 17.5
+
+    frame = MapResponse(
+        geography_id="geo-ke",
+        outcome="lbw",
+        areas=[
+            MapArea(
+                geography_id=KAJIADO,
+                admin_unit_id=1,
+                code="kajiado",
+                name="Kajiado",
+                level="county",
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        outlook_service, "load_map_view", lambda *_a, **_k: frame.model_copy(deep=True)
+    )
+    body = client.get("/heat-outlook/geo-ke/map?outcome=lbw&reference=season").json()
+    assert body["metric"] == "heat_attributable_share_heat_season"
+    assert body["areas"][0]["value_percent"] == 17.5
 
 
 def test_peak_season_map_and_suppressed_window(client, monkeypatch) -> None:

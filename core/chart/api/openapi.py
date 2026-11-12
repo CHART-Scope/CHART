@@ -452,9 +452,12 @@ OPERATION_DOCUMENTATION: dict[
             "is suppressed by the display rules carry missing_reason no_excess; "
             "windows with no period summary carry not_reported; areas with no "
             "published file carry no_model. With reference=peak, each area is "
-            "shaded by its peak-season share instead: the three consecutive "
-            "months with the highest heat share where available. No health model "
-            "is evaluated on request."
+            "shaded by its highest-risk months' share instead: the three "
+            "consecutive months with the highest heat share where available. With "
+            "reference=season, each area is shaded by its mean heat share over "
+            "its heat season as configured in Settings (its own calendar, an "
+            "ancestor's, or the official season). No health model is evaluated "
+            "on request."
         ),
         success_responses={
             "200": (

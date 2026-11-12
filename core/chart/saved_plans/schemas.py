@@ -21,7 +21,7 @@ class PlanChoices(BaseModel):
     period: str | None = Code
     selector: str | None = Code
     observed_selector: str | None = Code
-    reference: Literal["annual", "peak"] = "annual"
+    reference: Literal["annual", "season", "peak"] = "annual"
 
 
 class SavedPlanCreate(BaseModel):

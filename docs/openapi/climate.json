@@ -2083,7 +2083,7 @@
             "required": false,
             "schema": {
               "type": "string",
-              "pattern": "^(annual|peak)$",
+              "pattern": "^(annual|peak|season)$",
               "default": "annual",
               "title": "Reference"
             }
@@ -2111,7 +2111,7 @@
             }
           }
         },
-        "description": "Returns administrative areas in the selected geography frame with display geometry and the published annual-average attributable share for the chosen outcome, scenario, period and selector, in the same shape as the risk map so the dashboard draws it identically. Requires a risk reader role and access to the geography path, and filters returned areas to the caller's allowed paths. Coverage follows the installed geography hierarchy and publication, including India districts and Kenya constituencies. Areas whose share is suppressed by the display rules carry missing_reason no_excess; windows with no period summary carry not_reported; areas with no published file carry no_model. With reference=peak, each area is shaded by its peak-season share instead: the three consecutive months with the highest heat share where available. No health model is evaluated on request."
+        "description": "Returns administrative areas in the selected geography frame with display geometry and the published annual-average attributable share for the chosen outcome, scenario, period and selector, in the same shape as the risk map so the dashboard draws it identically. Requires a risk reader role and access to the geography path, and filters returned areas to the caller's allowed paths. Coverage follows the installed geography hierarchy and publication, including India districts and Kenya constituencies. Areas whose share is suppressed by the display rules carry missing_reason no_excess; windows with no period summary carry not_reported; areas with no published file carry no_model. With reference=peak, each area is shaded by its highest-risk months' share instead: the three consecutive months with the highest heat share where available. With reference=season, each area is shaded by its mean heat share over its heat season as configured in Settings (its own calendar, an ancestor's, or the official season). No health model is evaluated on request."
       }
     },
     "/heat-outlook/{geography_id}/observed": {
@@ -7570,6 +7570,16 @@
               }
             ]
           },
+          "heat_season_share": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeakSeason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "heat_season": {
             "anyOf": [
               {
@@ -10332,6 +10342,7 @@
             "type": "string",
             "enum": [
               "annual",
+              "season",
               "peak"
             ],
             "title": "Reference",

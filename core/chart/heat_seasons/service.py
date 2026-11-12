@@ -192,6 +192,36 @@ def _calendar(
     return calendar(official, "official", season.source_name if season else None)
 
 
+def season_months(session: Session, geography_id: str) -> list[int] | None:
+    """The place's heat-season months in season order (Dec, Jan, ...).
+
+    From its own calendar, else its nearest ancestor's, else the country's
+    official season; None when none is set. No access check: callers have
+    already checked read access to the place.
+    """
+
+    place = session.get(AppGeography, geography_id)
+    if place is None:
+        return None
+    by_id = {row.id: row for row in _lineage(session, place)}
+    saved = {
+        row.geography_id: row
+        for row in session.scalars(
+            select(HeatSeasonSetting).where(HeatSeasonSetting.geography_id.in_(by_id))
+        )
+    }
+    months = _calendar(place, by_id, saved).months
+    if not months or "d" not in months:
+        return None
+    # The calendar holds one unbroken season; start at its first month.
+    start = next(i for i in range(12) if months[i] == "d" and months[i - 1] != "d")
+    return [
+        (start + offset) % 12 + 1
+        for offset in range(12)
+        if months[(start + offset) % 12] == "d"
+    ]
+
+
 def _lineage(session: Session, place: AppGeography) -> list[AppGeography]:
     chain, seen = [place], {place.id}
     while chain[-1].parent_id and chain[-1].parent_id not in seen:
