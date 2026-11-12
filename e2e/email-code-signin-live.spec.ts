@@ -45,6 +45,18 @@ test("a wrong code is refused and the emailed code signs the planner in", async 
   await page.screenshot({ path: `${evidence}/email-code-signed-in.png` });
 });
 
+test("a code typed by hand in lowercase, with spaces, signs the planner in", async ({
+  page,
+}) => {
+  const code = await requestSignInCode(page, "kenya-planner");
+  const field = page.getByLabel("Your access code");
+  const typed = ` ${code.slice(0, 3)} ${code.slice(3)} `.toLowerCase();
+  await field.pressSequentially(typed);
+  await expect(field).toHaveValue(code);
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await page.waitForURL(/\/dashboard\/geo-ke/);
+});
+
 test("an account an administrator adds has no password, signs in by email and stops when disabled", async ({
   browser,
   request,
