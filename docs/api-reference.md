@@ -17,10 +17,10 @@ For each operation, the explorer shows:
 - reusable models in the **Schemas** section.
 
 !!! info "Explore here; run requests locally"
-    This embedded explorer is intentionally read-only so that browsing the
-    public documentation cannot send an accidental write to a live CHART
-    deployment. To execute requests, start the API and open the runnable local
-    Swagger interface.
+This embedded explorer is intentionally read-only so that browsing the
+public documentation cannot send an accidental write to a live CHART
+deployment. To execute requests, start the API and open the runnable local
+Swagger interface.
 
 After starting the API, open `http://127.0.0.1:3210/docs` for runnable Swagger.
 
@@ -42,13 +42,13 @@ make climate-api
 - `422` means a path, query, or request-body value did not satisfy the published
   schema. Endpoint-specific authorization, availability, and conflict responses
   remain listed under each operation.
-- Every map read (any `GET` path ending in `/map`) accepts `geometry=false`.
-  The answer is the same areas, values, reasons and bounds with every
-  `geometry` null, and the boundaries are neither simplified nor sent. A
-  frame's outlines do not change between months, views or settings, so the
-  dashboard keeps them from the first map and asks every later one for values
-  only. The flag is read by `chart/api/map_geometry.py` for all map routes, so
-  it is not repeated in each operation below.
+- Every read that returns map areas (the `/map`, `/climate` and `/population`
+  reads) accepts `geometry=false`. The answer is the same areas, values,
+  reasons and bounds with every `geometry` null, and the boundaries are neither
+  simplified nor sent. A frame's outlines do not change between months, views,
+  layers or settings, so the dashboard and Explore keep them from the first map
+  and ask every later one for values only. `chart/api/map_geometry.py` reads
+  the flag for every route, so it is not repeated in each operation below.
 - Public hazard and solution routes do not require sign-in. They read the
   configured public repository service and fall back to the bundled snapshot.
 
@@ -57,8 +57,8 @@ make climate-api
 Parameter semantics and availability statuses are explained in [Climate API](climate-api.md).
 
 ??? info "Regenerate the contract"
-    The embedded contract is generated from the single FastAPI application.
-    Contributors can refresh the checked-in snapshot with:
+The embedded contract is generated from the single FastAPI application.
+Contributors can refresh the checked-in snapshot with:
 
     ```bash
     make climate-openapi

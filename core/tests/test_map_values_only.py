@@ -81,3 +81,19 @@ def test_the_flag_does_not_outlive_its_request(client) -> None:
     assert client.get(MAP).json()["areas"][0]["geometry"] is not None
     # Anything but an explicit false keeps the outlines.
     assert client.get(f"{MAP}&geometry=true").json()["areas"][0]["geometry"] is not None
+
+
+def test_the_flag_reaches_reads_beyond_map_paths(client) -> None:
+    """Climate layers and population build their areas the same way; their
+    paths do not end in /map, so the flag is honoured on every path."""
+    from chart.risk.service import map_geometry_wanted
+
+    path = "/_probe/population"
+    app.add_api_route(path, lambda: {"geometry": map_geometry_wanted.get()})
+    try:
+        assert client.get(f"{path}?geometry=false").json() == {"geometry": False}
+        assert client.get(path).json() == {"geometry": True}
+    finally:
+        app.router.routes[:] = [
+            route for route in app.router.routes if getattr(route, "path", None) != path
+        ]

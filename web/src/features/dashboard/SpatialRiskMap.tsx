@@ -9,6 +9,7 @@ import {
   onAuthSessionCleared,
 } from "@/lib/authClient";
 import { fetchRiskMap, type MapArea, type MapResponse } from "@/lib/dashboardClient";
+import { clearMapOutlines, loadWithOutlines } from "@/lib/mapOutlines";
 import { submitPrediction } from "@/lib/planningClient";
 
 import styles from "./SpatialRiskMap.module.css";
@@ -100,37 +101,6 @@ const mapRequests = new Map<string, Promise<MapResponse>>();
 // The last map shown for each measure: a drill to a place not loaded yet
 // keeps it on screen, dimmed, instead of blanking to the skeleton.
 const lastPainted = new Map<string, MapResponse>();
-// Each frame's outlines, by area, from its first full map. They are the same
-// for every month, view and setting, so later maps of the frame are asked for
-// values only (`geometry=false`) and drawn with these: a few numbers per area
-// instead of every boundary again.
-type Outlines = Map<number, MapArea["geometry"]>;
-const outlines = new Map<string, Outlines>();
-// A full map in flight per frame: a second map asked for meanwhile (a tab
-// fetched ahead) waits for its outlines instead of fetching them again.
-const outlinesPending = new Map<string, Promise<unknown>>();
-
-function keepOutlines(key: string, response: MapResponse) {
-  outlines.set(
-    key,
-    new Map(response.areas.map((area) => [area.admin_unit_id, area.geometry])),
-  );
-}
-
-/** The values laid on the kept outlines, or null when an area is new to them. */
-function withOutlines(response: MapResponse, held: Outlines): MapResponse | null {
-  if (response.areas.some((area) => !area.geometry && !held.has(area.admin_unit_id)))
-    return null;
-  return {
-    ...response,
-    areas: response.areas.map((area) =>
-      area.geometry
-        ? area
-        : { ...area, geometry: held.get(area.admin_unit_id) ?? null },
-    ),
-  };
-}
-
 // Enough for a country's places at a few months and outcomes; each entry is
 // one frame's simplified shapes.
 const MAX_CACHED_MAPS = 60;
@@ -141,8 +111,7 @@ const PREFETCH_DELAY_MS = 150;
 /** Drop every kept map: on sign-out, and when saved model settings change
  * which values a map may show. */
 export function clearMapCaches() {
-  outlines.clear();
-  outlinesPending.clear();
+  clearMapOutlines();
   mapCache.clear();
   mapFrameCache.clear();
   mapRequests.clear();
@@ -209,41 +178,10 @@ function loadMap(
     if (pending) return pending;
   }
 
-  const outlineKey = `${getStoredAuthSession()?.user.userId ?? ""}:${geographyId}`;
-  const fetchMap = (geometry: boolean) =>
+  const request = loadWithOutlines(geographyId, (geometry) =>
     source
       ? source.load(getCurrentAccessToken() ?? accessToken, geometry)
-      : fetchRiskMap(geographyId, accessToken, { month, outcome, geometry });
-  const fetchFull = () => {
-    const full = fetchMap(true).then((response) => {
-      keepOutlines(outlineKey, response);
-      return response;
-    });
-    outlinesPending.set(outlineKey, full);
-    void full
-      .catch(() => undefined)
-      .finally(() => {
-        if (outlinesPending.get(outlineKey) === full)
-          outlinesPending.delete(outlineKey);
-      });
-    return full;
-  };
-  const valuesOnly = (held: Outlines) =>
-    fetchMap(false).then((values) => withOutlines(values, held) ?? fetchFull());
-  const held = outlines.get(outlineKey);
-  const pending = outlinesPending.get(outlineKey);
-  // Started synchronously, so a map asked for in the same tick sees it.
-  const request = (
-    held
-      ? valuesOnly(held)
-      : pending
-        ? pending
-            .catch(() => undefined)
-            .then(() => {
-              const kept = outlines.get(outlineKey);
-              return kept ? valuesOnly(kept) : fetchFull();
-            })
-        : fetchFull()
+      : fetchRiskMap(geographyId, accessToken, { month, outcome, geometry }),
   )
     .then((response) => {
       rememberMap(key, frameKey, response);
