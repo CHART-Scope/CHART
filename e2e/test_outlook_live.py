@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 import pytest
+from shapely.geometry import shape
 from sqlalchemy import create_engine, text
 
 
@@ -272,6 +273,26 @@ def test_fine_map_polygons_values_and_scope(client, tokens, geographies, place, 
         assert area["geometry"]["type"] in {"Polygon", "MultiPolygon"}
         assert area["geometry"]["coordinates"]
         assert area["value_percent"] is not None or area["missing_reason"] is not None
+    # Display shapes keep their outline at any scale: a fixed 1 km tolerance
+    # reduced Mombasa's constituencies to shards that no longer met.
+    west, south, east, north = result.json()["bounds"]
+    assert (
+        result.json()["simplify_tolerance_degrees"]
+        <= max(east - west, north - south) / 500
+    )
+    engine = create_engine(os.environ["DATABASE_URL"])
+    with engine.connect() as connection:
+        for area in areas:
+            stored = connection.execute(
+                text(
+                    "SELECT ST_Area(boundary) FROM admin_unit"
+                    " WHERE app_geography_id = :id"
+                ),
+                {"id": area["geography_id"]},
+            ).scalar_one()
+            drawn = shape(area["geometry"]).area
+            assert drawn == pytest.approx(stored, rel=0.02), area["name"]
+    engine.dispose()
 
 
 def test_leaf_scoped_user_never_receives_siblings(client, tokens):

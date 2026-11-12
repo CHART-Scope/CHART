@@ -347,20 +347,22 @@
   line-height: 1.6;
 }
 
+/* The 1px gap shows the border colour between quotes, side by side or
+   stacked. */
 .quotes {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1px;
+  overflow: hidden;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
-  background: var(--color-white);
+  background: var(--border-subtle);
 }
 
 .quotes figure {
+  margin: 0;
   padding: 32px 36px;
-}
-
-.quotes figure + figure {
-  border-left: 1px solid var(--border-subtle);
+  background: var(--color-white);
 }
 
 .quotes blockquote {
@@ -372,12 +374,33 @@
 
 .quotes figcaption {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
   font-size: var(--fs-body-lg);
   color: var(--color-text-eyebrow);
 }
 
+/* A placeholder until partners share photos. */
+.avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1.5px dashed var(--border-subtle);
+  border-radius: 50%;
+  background: var(--surface-page-alt);
+  color: var(--color-text-muted);
+}
+
+.avatar svg {
+  width: 16px;
+  height: 16px;
+}
+
 .quotes figcaption strong {
+  display: block;
   color: var(--color-charcoal);
   font-family: var(--font-display);
   font-size: 16px;

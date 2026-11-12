@@ -47,6 +47,12 @@ const PATHS = {
       <path d="m8.8 12.2 2.2 2.2 4.2-4.4" />
     </>
   ),
+  person: (
+    <>
+      <circle cx="12" cy="9" r="3.5" />
+      <path d="M5.5 19c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5" />
+    </>
+  ),
 } as const;
 
 type Name = keyof typeof PATHS;

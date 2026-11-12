@@ -59,6 +59,33 @@ for (const width of [1440, 390]) {
     ]) {
       await expect(page.getByRole("heading", { level: 2, name: title })).toBeVisible();
     }
+    // The partners' quotes, side by side on desktop and stacked on a phone.
+    const quotes = page.locator("figure").filter({ has: page.locator("blockquote") });
+    await expect(quotes).toHaveCount(2);
+    await expect(quotes.nth(0)).toContainText(
+      "We should show it to others in the state.",
+    );
+    await expect(quotes.nth(0).locator("figcaption")).toContainText(
+      "Madhya Pradesh State Nodal Officer",
+    );
+    await expect(quotes.nth(1)).toContainText(
+      "We would like to use CHART in the next planning cycle.",
+    );
+    await expect(quotes.nth(1).locator("figcaption")).toContainText(
+      "Kajiado TWG member",
+    );
+    await expect(quotes.nth(0).locator("blockquote")).toHaveCSS("font-size", "20px");
+    await expect(quotes.nth(0).locator("blockquote")).toHaveCSS("font-style", "italic");
+    await expect(quotes.nth(0).locator("figcaption > span").first()).toHaveCSS(
+      "height",
+      "44px",
+    );
+    const [first, second] = [
+      await quotes.nth(0).boundingBox(),
+      await quotes.nth(1).boundingBox(),
+    ];
+    if (width >= 1440) expect(second!.y).toBeCloseTo(first!.y, 0);
+    else expect(second!.y).toBeGreaterThan(first!.y + first!.height - 1);
     for (const step of [
       "1. Understand the risk",
       "2. Get recommended actions",

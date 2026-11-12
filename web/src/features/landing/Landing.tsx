@@ -43,9 +43,20 @@ const COMING_SOON = [
   },
 ] as const;
 
-/** Quotes from co-design partners. Empty until the partners approve wording;
- * the section shows its heading and call to action without them. */
-const QUOTES: readonly { text: string; role: string; place: string }[] = [];
+/** Quotes from co-design partners, by role; the section shows its heading
+ * and call to action without them. */
+const QUOTES: readonly { text: string; role: string; place: string }[] = [
+  {
+    text: "CHART minimum viable product now gives a real picture of how it will work in practice. We should show it to others in the state.",
+    role: "Madhya Pradesh State Nodal Officer",
+    place: "India",
+  },
+  {
+    text: "We would like to use CHART in the next planning cycle.",
+    role: "Kajiado TWG member",
+    place: "Kenya",
+  },
+];
 
 const COALITION = [
   {
@@ -322,8 +333,13 @@ export function Landing({
                   <figure key={quote.role}>
                     <blockquote>&ldquo;{quote.text}&rdquo;</blockquote>
                     <figcaption>
-                      <strong>{quote.role}</strong>
-                      <span>{quote.place}</span>
+                      <span className={styles.avatar}>
+                        <LineIcon name="person" />
+                      </span>
+                      <span>
+                        <strong>{quote.role}</strong>
+                        <span>{quote.place}</span>
+                      </span>
                     </figcaption>
                   </figure>
                 ))}
