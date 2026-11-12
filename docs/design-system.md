@@ -57,6 +57,7 @@ Button variants: `primary` (nexus), `secondary` (nexus outline on white),
 | Card title | 22 | `--fs-title-card` |
 | Subhead | 19 | `--fs-subhead` |
 | Lede | 17 / 1.85 | `--fs-lede`, `--lh-lede` |
+| Action card emoji | 26 | `--fs-emoji` |
 | Body | 14, 13 | `--fs-body-lg`, `--fs-body` |
 | Eyebrow | 12 caps, +0.12em | `--fs-caption` |
 

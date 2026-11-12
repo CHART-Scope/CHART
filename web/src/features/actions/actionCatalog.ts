@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-import { type IconName } from "@/components/Icon";
 import {
   type Action,
   type CostLevel,
@@ -24,21 +23,23 @@ export const costDots: Partial<Record<CostLevel, number>> = {
   High: 3,
 };
 
-const typeIcons: [prefix: string, icon: IconName][] = [
-  ["Infrastructure", "building"],
-  ["Supplies", "droplet"],
-  ["Clinical", "stethoscope"],
-  ["Capacity", "users"],
-  ["Behaviour", "users"],
-  ["Early warning", "alert-triangle"],
-  ["Policy", "policy"],
-  ["Technology", "settings"],
-  ["Financing", "heart-handshake"],
-  ["Environment", "leaf"],
+// An emoji per action type for the list cards, as on the design, until
+// the action repository carries its own images.
+const typeEmojis: [prefix: string, emoji: string][] = [
+  ["Infrastructure", "🏗️"],
+  ["Supplies", "🩹"],
+  ["Clinical", "🩺"],
+  ["Capacity", "🎓"],
+  ["Behaviour", "🗣️"],
+  ["Early warning", "📢"],
+  ["Policy", "📜"],
+  ["Technology", "📱"],
+  ["Financing", "💰"],
+  ["Environment", "🌳"],
 ];
 
-export function actionTypeIcon(actionType: string | undefined): IconName {
-  return typeIcons.find(([prefix]) => actionType?.startsWith(prefix))?.[1] ?? "dots";
+export function actionTypeEmoji(actionType: string | undefined): string {
+  return typeEmojis.find(([prefix]) => actionType?.startsWith(prefix))?.[1] ?? "📋";
 }
 
 /**

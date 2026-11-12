@@ -24,20 +24,6 @@
   color: var(--color-text-muted);
 }
 
-.filterChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px 3px 8px;
-  border-radius: 999px;
-  font-size: var(--fs-eyebrow);
-  font-weight: 500;
-  background: #fbeedd;
-  color: #8a5a1a;
-  border: 1px solid #eeddc0;
-  white-space: nowrap;
-}
-
 .seasons {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
