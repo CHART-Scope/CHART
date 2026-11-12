@@ -216,7 +216,8 @@ test("tabs are kept in the URL, survive a reload and work from the keyboard", as
   await expect(
     page.getByRole("heading", { name: "Observations held per country" }),
   ).toBeVisible();
-  await expect(page.getByText("Planning location")).toHaveCount(0);
+  // An opened tab stays mounted for a quick return, but out of sight.
+  await expect(page.getByText("Planning location")).toBeHidden();
 
   await page.reload();
   await expect(tab(page, "Data")).toHaveAttribute("aria-selected", "true");

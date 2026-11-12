@@ -26,6 +26,7 @@ from chart.climate.schemas import ErrorResponse, HealthResponse
 from chart.erf_registry.routes import router as erf_registry_router
 from chart.setup.bootstrap_routes import router as bootstrap_router
 from chart.geographies.routes import router as geographies_router
+from chart.api.map_geometry import MapGeometryMiddleware
 from chart.api.read_cache import ReadCacheMiddleware
 from chart.heat_outlook.observed import start_observed_cache_warmer
 from chart.heat_outlook.routes import router as heat_outlook_router
@@ -135,6 +136,8 @@ app.include_router(risk_router)
 app.include_router(heat_outlook_router)
 # Published reads are built once per data version and revalidated by ETag.
 app.add_middleware(ReadCacheMiddleware)
+# Outermost, so the flag is set before the read cache builds a response.
+app.add_middleware(MapGeometryMiddleware)
 app.include_router(vra_router)
 app.include_router(model_settings_router)
 app.include_router(heat_seasons_router)

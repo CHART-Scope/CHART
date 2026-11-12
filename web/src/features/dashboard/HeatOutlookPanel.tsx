@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/Button";
 import { Icon, type IconName } from "@/components/Icon";
@@ -30,7 +31,7 @@ import {
 import base from "./HeatLbwLinkPanel.module.css";
 import { MonthYearPicker } from "./MonthYearPicker";
 import styles from "./HeatOutlookPanel.module.css";
-import { SpatialRiskMap } from "./SpatialRiskMap";
+import { prefetchMapSource, SpatialRiskMap } from "./SpatialRiskMap";
 
 const MONTHS = [
   "Jan",
@@ -139,6 +140,7 @@ export function HeatOutlookPanel({
   const monthlyObserved = observedCapability?.source === "monthly";
   const outlookObserved = observedEnabled && !monthlyObserved;
   const observed = useLoaded<ObservedRisk>(
+    ["observed", geographyId, outcome, month, observedSelector, outlookObserved],
     (signal) =>
       outlookObserved
         ? fetchObservedRisk(
@@ -148,10 +150,10 @@ export function HeatOutlookPanel({
             signal,
           )
         : Promise.reject(new OutlookNotPublished(geographyId)),
-    [geographyId, accessToken, outcome, month, observedSelector, outlookObserved],
   );
   const projectionEnabled = dataModes.includes("projection");
   const projected = useLoaded<HeatOutlook>(
+    ["projection", geographyId, outcome, scenario, period, selector, projectionEnabled],
     (signal) =>
       projectionEnabled
         ? fetchHeatOutlook(
@@ -161,7 +163,6 @@ export function HeatOutlookPanel({
             signal,
           )
         : Promise.reject(new OutlookNotPublished(geographyId)),
-    [geographyId, accessToken, outcome, scenario, period, selector, projectionEnabled],
   );
 
   // Another outcome's figures are never shown. Another place's stay on
@@ -189,15 +190,11 @@ export function HeatOutlookPanel({
         : projectedOpen
           ? "projection"
           : "observed");
-  // The C3S seasonal forecast loads once its tab opens; a place without one
-  // shows the tab with a note rather than hiding it.
-  const forecastOpen = view === "forecast";
+  // All three views load together, so switching tab is instant. A place
+  // without a C3S forecast shows the tab with a note rather than hiding it.
   const forecast = useLoaded<PlaceForecast>(
-    (signal) =>
-      forecastOpen
-        ? fetchForecast(geographyId, outcome, { accessToken, signal })
-        : Promise.reject(new OutlookNotPublished(geographyId)),
-    [geographyId, accessToken, outcome, forecastOpen],
+    ["forecast", geographyId, outcome],
+    (signal) => fetchForecast(geographyId, outcome, { accessToken, signal }),
   );
   const forecastData = currentData(forecast, outcome);
   const resolvedChoices: Choices = {
@@ -249,20 +246,60 @@ export function HeatOutlookPanel({
         ? forecastFigure(forecastData, resolvedChoices.forecastMonth)
         : projectedFigure(projectedData, reference);
 
-  const mapSource = useMapSource({
-    view,
-    outcome,
-    mapGeographyId,
-    accessToken,
-    observed: observedData,
-    projected: projectedData,
-    forecastMonth: resolvedChoices.forecastMonth,
-    choice: {
-      ...choice,
-      selector: view === "observed" ? observedSelector : selector,
-      reference,
-    },
-  });
+  const sourceFor = (target: DashboardView) =>
+    mapSourceFor({
+      view: target,
+      outcome,
+      mapGeographyId,
+      accessToken,
+      observed: observedData,
+      projected: projectedData,
+      forecastMonth: forecastMonth ?? defaultForecastMonth(forecastData),
+      choice: {
+        ...choice,
+        selector: target === "observed" ? observedSelector : selector,
+        reference,
+      },
+    });
+  const currentSource = sourceFor(view);
+  const mapSource = useMemo(
+    () => currentSource,
+    // The key carries every input of the source.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mapGeographyId, currentSource.key],
+  );
+
+  // Once this tab is drawn, fetch the other tabs' maps too, so switching
+  // only recolours the shapes already on screen.
+  const otherSources = (["observed", "projection", "forecast"] as const)
+    .filter((target) => target !== view)
+    .filter((target) =>
+      target === "observed"
+        ? outlookObserved && observedData !== null
+        : target === "projection"
+          ? projectionEnabled && projectedData !== null
+          : forecastData !== null,
+    )
+    .map(sourceFor);
+  const otherKeys = otherSources.map((source) => source.key).join("|");
+  const settledReady = settled.state === "ready";
+  useEffect(() => {
+    if (!settledReady) return;
+    for (const source of otherSources)
+      prefetchMapSource(mapGeographyId, accessToken, source);
+    // otherKeys carries every source's inputs; the token rotates without
+    // changing what is asked for.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settledReady, mapGeographyId, otherKeys]);
+
+  // The icon array stays drawn while a view loads and shades over to the new
+  // share when it lands, rather than emptying in between.
+  const lastPercent = useRef<number | null>(null);
+  if (shown.percent !== null) lastPercent.current = shown.percent;
+  const arrayPercent = shown.percent ?? (busy ? lastPercent.current : null);
+  // The map, once drawn, stays mounted for every later tab and selection.
+  const mapDrawn = useRef(false);
+  if (viewData || settled.state !== "loading") mapDrawn.current = true;
 
   if (dataModes.length === 0) {
     return (
@@ -434,13 +471,13 @@ export function HeatOutlookPanel({
 
           {view === "observed" && viewData && <MonthLegend unavailable="No data yet" />}
 
-          <div className={styles.results} data-busy={busy || undefined}>
+          <div className={styles.results}>
             <div className={base.riskLayout}>
               <div className={base.estimate}>
-                {shown.percent !== null && shown.percent > 0 ? (
+                {arrayPercent !== null && arrayPercent > 0 ? (
                   <div className={base.iconArrayWrap}>
                     <IconArray
-                      value={Math.max(1, Math.round(shown.percent))}
+                      value={Math.max(1, Math.round(arrayPercent))}
                       figure={figure}
                     />
                   </div>
@@ -499,7 +536,7 @@ export function HeatOutlookPanel({
                 the first load asks for one map rather than one per guess. A
                 place with nothing to show keeps the map, so another place
                 can be picked from it. */}
-                {viewData || settled.state !== "loading" ? (
+                {mapDrawn.current ? (
                   <SpatialRiskMap
                     embedded
                     geographyId={mapGeographyId}
@@ -540,37 +577,37 @@ function currentData<T extends { outcome: string }>(
 }
 
 /**
- * Loads one view and keeps the last answer on screen while the next one
- * arrives, so switching a month or county dims the figures instead of
- * blanking them.
+ * Loads one view through the shared query cache. A place, month or setting
+ * seen before answers from memory; a new one keeps the last answer on screen
+ * (dimmed as loading) until it arrives, so a switch never blanks the card.
+ * The key leaves out the access token: a rotation is not a new question.
  */
 function useLoaded<T>(
+  key: readonly unknown[],
   load: (signal: AbortSignal) => Promise<T>,
-  deps: readonly unknown[],
 ): Load<T> {
-  const [result, setResult] = useState<Load<T>>({ data: null, state: "loading" });
-  useEffect(() => {
-    const controller = new AbortController();
-    setResult((current) => ({ data: current.data, state: "loading" }));
-    load(controller.signal)
-      .then((data) => {
-        if (!controller.signal.aborted) setResult({ data, state: "ready" });
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        setResult({
-          data: null,
-          state: error instanceof OutlookNotPublished ? "missing" : "error",
-        });
-      });
-    return () => controller.abort();
-    // The caller lists every input of load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-  return result;
+  const query = useQuery({
+    queryKey: ["outlook-view", ...key],
+    queryFn: ({ signal }) => load(signal),
+    placeholderData: keepPreviousData,
+    // Published views change on a release or a saved setting, not while a
+    // session reads them; ModelSettingsCard invalidates them on a save.
+    staleTime: Infinity,
+    retry: (failures, error) => !(error instanceof OutlookNotPublished) && failures < 1,
+  });
+  if (query.isError) {
+    return {
+      data: null,
+      state: query.error instanceof OutlookNotPublished ? "missing" : "error",
+    };
+  }
+  if (query.isPending || query.isPlaceholderData) {
+    return { data: query.data ?? null, state: "loading" };
+  }
+  return { data: query.data, state: "ready" };
 }
 
-function useMapSource({
+function mapSourceFor({
   view,
   outcome,
   mapGeographyId,
@@ -608,26 +645,22 @@ function useMapSource({
             reference: choice.reference,
           };
   const key = `${view}:${Object.values(selection).join(":")}`;
-  return useMemo(
-    () => ({
-      key,
-      cacheScope: view,
-      load: (token: string) =>
-        view === "observed"
-          ? fetchObservedRiskMap(mapGeographyId, token, selection)
-          : view === "forecast"
-            ? fetchForecastMap(
-                mapGeographyId,
-                outcome,
-                forecastMonth,
-                token || accessToken,
-              )
-            : fetchHeatOutlookMap(mapGeographyId, token, selection),
-    }),
-    // key carries every field of selection.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mapGeographyId, key],
-  );
+  return {
+    key,
+    cacheScope: view,
+    load: (token: string, geometry?: boolean) =>
+      view === "observed"
+        ? fetchObservedRiskMap(mapGeographyId, token, selection, geometry)
+        : view === "forecast"
+          ? fetchForecastMap(
+              mapGeographyId,
+              outcome,
+              forecastMonth,
+              token || accessToken,
+              geometry,
+            )
+          : fetchHeatOutlookMap(mapGeographyId, token, selection, geometry),
+  };
 }
 
 type Figure = {

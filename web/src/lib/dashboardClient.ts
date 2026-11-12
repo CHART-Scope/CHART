@@ -243,14 +243,30 @@ export type MapResponse = {
   areas: MapArea[];
 };
 
+/**
+ * Asks a map endpoint for values only (`geometry=false`) when the caller
+ * already holds the frame's outlines: every area comes back with a null
+ * geometry, and the boundaries are neither simplified nor sent.
+ */
+export function mapGeometryParam(params: URLSearchParams, geometry: boolean) {
+  if (!geometry) params.set("geometry", "false");
+  return params;
+}
+
 export async function fetchRiskMap(
   geographyId: string,
   accessToken: string | null | undefined,
-  options: { month?: string | null; outcome?: string; signal?: AbortSignal } = {},
+  options: {
+    month?: string | null;
+    outcome?: string;
+    signal?: AbortSignal;
+    geometry?: boolean;
+  } = {},
 ): Promise<MapResponse> {
   const params = new URLSearchParams();
   if (options.month) params.set("month", options.month);
   if (options.outcome) params.set("outcome", options.outcome);
+  mapGeometryParam(params, options.geometry ?? true);
   const query = params.toString() ? `?${params.toString()}` : "";
   const response = await authFetch(
     `/api/chart/risk/${encodeURIComponent(geographyId)}/map${query}`,

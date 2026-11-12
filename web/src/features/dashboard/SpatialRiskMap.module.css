@@ -36,10 +36,8 @@
     transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.map[data-transitioning] {
-  opacity: 0.46;
-  transform: scale(0.985);
-}
+/* No dimming while new values load: the shapes stay as they are and only
+   their fills shade over once the values arrive (see .area). */
 
 .area {
   stroke: var(--surface-card, #fff);
@@ -51,7 +49,7 @@
      muted, dimmed and hover rules below, so highlighting did nothing. */
   animation: areaEnter 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
   transition:
-    fill 200ms ease,
+    fill 360ms ease,
     opacity 160ms ease,
     stroke 160ms ease,
     stroke-width 160ms ease,

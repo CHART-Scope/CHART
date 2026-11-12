@@ -10,13 +10,14 @@ completed.
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import date
 
 import json
 from typing import cast
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, null, or_, select
 from sqlalchemy.orm import Session
 
 from chart.climate.scenarios import DASHBOARD_LONG_TERM_RCPS
@@ -477,6 +478,12 @@ MAP_SIMPLIFY_TOLERANCE_DEGREES = 0.01
 #: across, and its constituencies, a few km wide, lost their outlines and no
 #: longer met their neighbours.
 MAP_SIMPLIFY_FRAME_SHARE = 1 / 1000
+#: False while serving a map that asked for values only (``?geometry=false``,
+#: set by ``chart.api.map_geometry``). A frame's outlines never change between
+#: a month, view or setting and the next, so a client that already holds them
+#: asks for values alone: ``geometry`` comes back null and the boundaries are
+#: neither simplified nor sent.
+map_geometry_wanted: ContextVar[bool] = ContextVar("map_geometry_wanted", default=True)
 
 
 def map_simplify_tolerance(bounds: list[float]) -> float:
@@ -582,8 +589,12 @@ def load_map_view(
         [] if None in extent else [float(value) for value in extent]
     )
 
-    simplified = func.ST_AsGeoJSON(
-        func.ST_SimplifyPreserveTopology(AdminUnit.boundary, tolerance)
+    simplified = (
+        func.ST_AsGeoJSON(
+            func.ST_SimplifyPreserveTopology(AdminUnit.boundary, tolerance)
+        )
+        if map_geometry_wanted.get()
+        else null()
     )
     rows = cast(
         list[_MapRow],

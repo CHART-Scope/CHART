@@ -1,9 +1,11 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useState } from "react";
 
 import { Button } from "@/components/Button";
 import { InlineSelect } from "@/components/InlineSelect";
+import { clearMapCaches } from "@/features/dashboard/SpatialRiskMap";
 import { SettingsCard } from "@/features/planning/SettingsCard";
 import {
   fetchModelSettings,
@@ -123,6 +125,7 @@ function ModelSettingsForm({
   const [saved, setSaved] = useState(item);
   const [draft, setDraft] = useState<ModelSettingsValues>(item.settings);
   const [state, setState] = useState<SaveState>({ kind: "idle" });
+  const queryClient = useQueryClient();
   const title = OUTCOME_LABELS[saved.outcome] ?? saved.outcome;
   const { available } = saved;
 
@@ -143,6 +146,11 @@ function ModelSettingsForm({
       setSaved(result);
       setDraft(result.settings);
       setState({ kind: "saved" });
+      // The dashboard keeps its views for the session; saved settings are
+      // what can change them, so it reads them afresh next time.
+      clearMapCaches();
+      void queryClient.invalidateQueries({ queryKey: ["outlook-view"] });
+      void queryClient.invalidateQueries({ queryKey: ["outlook-capabilities"] });
     } catch (cause) {
       setState({
         kind: "error",

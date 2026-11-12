@@ -96,6 +96,9 @@ export async function installFakeApi(
     // No published outlook map unless a spec installs one (Kenya does).
     if (/^\/api\/chart\/heat-outlook\/[^/]+\/map$/.test(path))
       return json(route, { error: "OUTLOOK_NOT_PUBLISHED" }, 404);
+    // Nor a C3S forecast: the risk card asks for it with the other views.
+    if (/^\/api\/chart\/heat-outlook\/[^/]+\/forecast(\/map)?$/.test(path))
+      return json(route, { error: "OUTLOOK_NOT_PUBLISHED" }, 404);
     if (/^\/api\/chart\/heat-outlook\/[^/]+\/capabilities$/.test(path))
       return json(route, { published: false, data_modes: [] });
     if (path === "/api/chart/geographies") return json(route, geographies);
@@ -150,8 +153,22 @@ export function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({
     status,
     contentType: "application/json",
-    body: JSON.stringify(body),
+    body: JSON.stringify(valuesOnly(route, body)),
   });
+}
+
+/** Any map asked for `geometry=false` comes back without outlines, as the
+ * API's map middleware answers it. */
+function valuesOnly(route: Route, body: unknown) {
+  const url = new URL(route.request().url());
+  const map = body as { areas?: { geometry?: unknown }[] } | null;
+  if (
+    !url.pathname.endsWith("/map") ||
+    url.searchParams.get("geometry") !== "false" ||
+    !Array.isArray(map?.areas)
+  )
+    return body;
+  return { ...map, areas: map.areas.map((area) => ({ ...area, geometry: null })) };
 }
 
 /** Two division squares whose values depend on the outcome and month asked. */
