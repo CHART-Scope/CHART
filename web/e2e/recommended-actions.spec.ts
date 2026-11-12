@@ -422,3 +422,32 @@ test("each action names the place's areas at elevated risk, highest first", asyn
   ).toBe(true);
   expect(api.unhandled).toEqual([]);
 });
+
+test("list cards show an emoji for the action type and the list keeps to 80% of the page", async ({
+  page,
+}) => {
+  await installFakeApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(actionsUrl);
+  const list = page.getByRole("list", { name: "All actions" });
+  await expect(cards(page)).toHaveCount(4);
+
+  const counselling = cards(page).filter({ hasText: "pregnancy-specific" });
+  const thumb = counselling.locator("span[aria-hidden]").first();
+  await expect(thumb).toHaveText("🗣️");
+  await expect(thumb).toHaveCSS("font-size", "26px");
+  await expect(
+    cards(page)
+      .filter({ hasText: "cool shelters" })
+      .locator("span[aria-hidden]")
+      .first(),
+  ).toHaveText("🏗️");
+
+  const widthRatio = () =>
+    list.evaluate((el) => el.clientWidth / el.parentElement!.clientWidth);
+  expect(await widthRatio()).toBeCloseTo(0.8, 2);
+
+  // A phone uses the full width.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(widthRatio).toBeCloseTo(1, 2);
+});

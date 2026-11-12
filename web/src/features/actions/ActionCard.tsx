@@ -1,6 +1,4 @@
-import { Icon } from "@/components/Icon";
-
-import { actionTypeIcon, type Action } from "./actionCatalog";
+import { actionTypeEmoji, type Action } from "./actionCatalog";
 import styles from "./ActionCard.module.css";
 import { PriorityAreasLine, type PriorityAreas } from "./PriorityAreas";
 import { statusLabels, type ActionStatus } from "./useActionProgress";
@@ -22,7 +20,7 @@ export function ActionCard({ action, status, priority, selected, onOpen }: Props
       onClick={onOpen}
     >
       <span className={styles.thumb} aria-hidden>
-        <Icon name={actionTypeIcon(action.action_types[0])} size={30} />
+        {actionTypeEmoji(action.action_types[0])}
       </span>
       <span className={styles.body}>
         <span className={styles.title}>{action.title}</span>
