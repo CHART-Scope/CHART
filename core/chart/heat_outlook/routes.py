@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from chart.heat_seasons.service import season_months
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import can_read_geography_path, require_reader
+from chart.access.guards import can
+from chart.auth.service import require_reader
 from chart.model_settings.service import live_restriction, outlook_restriction
 from chart.risk.routes import _require_read_access as require_read_access
 from chart.risk.schemas import MapResponse
@@ -107,7 +108,7 @@ def _scoped_map(session, frame, user):
         area
         for area in frame.areas
         if area.geography_id in paths
-        and can_read_geography_path(user, paths[area.geography_id])
+        and can(user, "risk", "read", paths[area.geography_id])
     ]
     return frame
 

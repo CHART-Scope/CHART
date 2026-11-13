@@ -19,7 +19,7 @@ from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from chart.auth.service import CurrentUserContext
+from access_support import member, platform_admin
 from chart.setup import service as setup_service
 from chart.shared.db.models import (
     AdminUnit,
@@ -150,14 +150,7 @@ def test_reset_clears_the_newer_tables_instead_of_tripping_their_keys(
     monkeypatch.setattr(setup_service, "get_session_factory", lambda: session_factory)
     monkeypatch.setattr(setup_service, "get_status", lambda: None)
 
-    setup_service.reset(
-        CurrentUserContext(
-            user_id="admin-1",
-            username="admin",
-            roles=["chart_admin"],
-            geography_scopes=["/kenya"],
-        )
-    )
+    setup_service.reset(platform_admin("admin-1"))
 
     with session_factory() as session:
         for model in (
@@ -172,13 +165,6 @@ def test_reset_clears_the_newer_tables_instead_of_tripping_their_keys(
             assert remaining == [], f"{model.__tablename__} survived the reset"
 
 
-def test_reset_refuses_a_caller_without_the_admin_role(session_factory) -> None:
+def test_reset_refuses_anyone_but_a_platform_admin(session_factory) -> None:
     with pytest.raises(setup_service.SetupError):
-        setup_service.reset(
-            CurrentUserContext(
-                user_id="planner-1",
-                username="planner",
-                roles=["health_planning_lead"],
-                geography_scopes=["/kenya"],
-            )
-        )
+        setup_service.reset(member("planner-1", "workspace_admin", ["/kenya"]))

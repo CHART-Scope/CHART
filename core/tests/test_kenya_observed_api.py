@@ -27,6 +27,8 @@ from chart.api.app import app
 from chart.climate import seasonal_scoring
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import require_current_user, require_reader
+
+from access_support import member, nobody
 from chart.heat_outlook import dlnm, observed
 from chart.heat_outlook import routes as outlook_routes
 from chart.heat_outlook.service import NO_EXCESS_LBW, NO_EXCESS_NEONATAL
@@ -244,14 +246,14 @@ def _seed_months(factory, birth_month: date, lags: list[float], **options) -> No
         session.commit()
 
 
-def _user(**overrides) -> CurrentUserContext:
-    fields = dict(
-        user_id="planner",
-        username="planner",
-        roles=["health_planning_lead"],
-        geography_scopes=["/kenya"],
-    )
-    return CurrentUserContext(**(fields | overrides))
+def _user(
+    geography_scopes: list[str] | None = None,
+    role: str | None = "planning_lead",
+    user_id: str = "planner",
+) -> CurrentUserContext:
+    if role is None:
+        return nobody(user_id)
+    return member(user_id, role, geography_scopes or ["/kenya"])
 
 
 @pytest.fixture
@@ -273,6 +275,11 @@ def client(release, factory, monkeypatch) -> Iterator[TestClient]:
 
 
 def _enable(client: TestClient, outcome: str, selectors: list[str], default: str):
+    # Country-wide model settings need risk manage: the workspace's admin.
+    previous = app.dependency_overrides[require_current_user]
+    app.dependency_overrides[require_current_user] = lambda: _user(
+        user_id="admin", role="workspace_admin"
+    )
     response = client.put(
         f"/model-settings/KE/{outcome}",
         json={
@@ -283,6 +290,7 @@ def _enable(client: TestClient, outcome: str, selectors: list[str], default: str
             "data_modes": ["observed"],
         },
     )
+    app.dependency_overrides[require_current_user] = previous
     assert response.status_code == 200, response.text
 
 

@@ -13,7 +13,7 @@ import { filledTemplate, installVra } from "./support/vra";
 // refused); and the phone layout.
 
 const evidence = "../outputs/e2e/web/vra";
-const planner = { roles: ["health_planning_lead"], geographyScopes: ["/india"] };
+const planner = { who: { role: "planning_lead" as const, places: ["/india"] } };
 const MP = "geo-in-madhya-pradesh";
 
 const ranking = (page: Page) => page.getByRole("list", { name: /by risk$/ });

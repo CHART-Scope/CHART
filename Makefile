@@ -163,7 +163,7 @@ web-typecheck:
 # E2E suites. Each run leaves its evidence under outputs/e2e/: JUnit for the
 # Python suites, plus Playwright's HTML report and per-test trace, screenshot
 # and video.
-e2e: e2e-orchestration e2e-core e2e-web e2e-era5 e2e-outlook
+e2e: e2e-orchestration e2e-core e2e-access e2e-web e2e-era5 e2e-outlook
 
 # The Kenya API through HTTP and a database: the observed scorer against the
 # modeller's R validation cases, and the published outlook. The VRA suite
@@ -171,6 +171,14 @@ e2e: e2e-orchestration e2e-core e2e-web e2e-era5 e2e-outlook
 e2e-core:
 	mkdir -p outputs/e2e/core
 	$(VENV_PYTHON) -m pytest core/tests/test_kenya_observed_api.py core/tests/test_heat_outlook_api.py core/tests/test_prediction_requests.py core/tests/test_vra_api.py core/tests/test_india_observed_stored_api.py core/tests/test_seasonal_forecast_api.py core/tests/test_heat_seasons_api.py core/tests/test_read_cache.py core/tests/test_map_values_only.py e2e/test_core_package_data.py -q --junitxml=outputs/e2e/core/junit.xml
+
+# Access read from CHART's database: the rules, workspaces, people,
+# invitations and departments over HTTP, and migrations 035-036
+# on a throwaway database in the local PostgreSQL service (make postgres).
+.PHONY: e2e-access
+e2e-access:
+	mkdir -p outputs/e2e/access
+	$(VENV_PYTHON) -m pytest core/tests/test_access_api.py core/tests/test_workspaces_api.py core/tests/test_auth_api.py core/tests/test_access_migration.py core/tests/test_risk_context_reads.py -q --junitxml=outputs/e2e/access/junit.xml
 
 e2e-orchestration:
 	mkdir -p outputs/e2e/orchestration

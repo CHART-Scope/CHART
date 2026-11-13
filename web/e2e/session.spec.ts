@@ -2,6 +2,7 @@ import http from "node:http";
 
 import { expect, type Page, type Route, test } from "@playwright/test";
 
+import { meAs } from "./support/access";
 import {
   bearerOf,
   fakeJwt,
@@ -411,12 +412,16 @@ test("pulling model updates sends the administrator's token through the proxy", 
       json(route, { access_token: token }),
     );
     api.on(/^\/api\/chart\/auth\/me$/, (route) =>
-      json(route, {
-        userId: "e2e-admin",
-        username: "admin",
-        roles: ["chart_admin"],
-        geographyScopes: ["/india"],
-      }),
+      json(
+        route,
+        meAs({
+          userId: "e2e-admin",
+          username: "admin",
+          platformAdmin: true,
+          role: "workspace_admin",
+          places: ["/india"],
+        }),
+      ),
     );
     api.on(/^\/api\/chart\/model-releases$/, (route) => json(route, { items: [] }));
     // The sync itself goes to the real Next route, not the fake.

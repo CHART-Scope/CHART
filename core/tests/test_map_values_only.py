@@ -15,7 +15,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from chart.api.app import app
-from chart.auth.schemas import CurrentUserContext
+from access_support import member
 from chart.auth.service import require_current_user
 from chart.risk import routes as risk_routes
 from test_risk_map import session  # noqa: F401 - the PostGIS-shaped fixture
@@ -33,15 +33,8 @@ def client(session, monkeypatch) -> Iterator[TestClient]:  # noqa: F811
         "_resolve_place_path",
         lambda _geography_id: "/india/madhya-pradesh",
     )
-    app.dependency_overrides[require_current_user] = (
-        lambda: CurrentUserContext.model_validate(
-            {
-                "userId": "planner",
-                "username": "planner",
-                "roles": ["health_planning_lead"],
-                "geographyScopes": ["/india"],
-            }
-        )
+    app.dependency_overrides[require_current_user] = lambda: member(
+        "planner", "planning_lead", ["/india"]
     )
     try:
         yield TestClient(app)

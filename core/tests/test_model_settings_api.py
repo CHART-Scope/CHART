@@ -46,6 +46,34 @@ settings_db = outlook_tests.settings_db
 NOW = datetime(2026, 7, 22, 12, 0, tzinfo=timezone.utc)
 
 
+@pytest.fixture(autouse=True)
+def settings_admin(request):
+    """Country-wide model settings are changed with risk manage: these tests
+    act as Kenya's (and India's) Workspace admin unless they say otherwise."""
+
+    if "client" not in request.fixturenames:
+        yield
+        return
+    request.getfixturevalue("client")
+    app.dependency_overrides[require_current_user] = lambda: _user(
+        user_id="admin", role="workspace_admin", geography_scopes=["/kenya", "/india"]
+    )
+    app.dependency_overrides[require_reader] = app.dependency_overrides[
+        require_current_user
+    ]
+    yield
+
+
+def test_a_planning_lead_reads_settings_but_cannot_change_them(client) -> None:
+    app.dependency_overrides[require_current_user] = lambda: _user()
+    assert client.get("/model-settings?country=KE&outcome=lbw").status_code == 200
+    refused = client.put("/model-settings/ke/lbw", json=_lbw())
+    assert (refused.status_code, refused.json()["error"]) == (
+        403,
+        "CAPABILITY_NOT_ALLOWED",
+    )
+
+
 def _lbw(**overrides) -> dict:
     return {
         "selectors": ["P"],
@@ -105,7 +133,7 @@ def test_enabling_a_window_is_stored_audited_and_offered(
     saved = response.json()
     # Stored in the order the tables publish, whatever order was sent.
     assert saved["settings"]["selectors"] == ["P", "T1"]
-    assert (saved["is_default"], saved["updated_by_user_id"]) == (False, "planner")
+    assert (saved["is_default"], saved["updated_by_user_id"]) == (False, "admin")
 
     outlook = _outlook(client).json()
     assert [o["code"] for o in outlook["selectors"]] == ["P", "T1"]
@@ -115,7 +143,7 @@ def test_enabling_a_window_is_stored_audited_and_offered(
     with settings_db() as session:
         row = session.scalar(select(ModelDisplaySetting))
         assert (row.country_code, row.outcome) == ("KE", "lbw")
-        assert session.get(AppUser, "planner") is not None
+        assert session.get(AppUser, "admin") is not None
         event = session.scalar(select(AuditEventRecord))
         assert event.event_type == "model_settings_changed"
         assert event.geography_id == "geo-ke"
@@ -280,7 +308,7 @@ def india(client, settings_db):
         )
         session.commit()
     app.dependency_overrides[require_current_user] = lambda: _user(
-        geography_scopes=["/india"]
+        user_id="admin", role="workspace_admin", geography_scopes=["/india"]
     )
     app.dependency_overrides[require_reader] = app.dependency_overrides[
         require_current_user

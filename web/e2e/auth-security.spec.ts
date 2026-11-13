@@ -1,5 +1,6 @@
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
+import { meAs } from "./support/access";
 import { installFakeApi, json } from "./support/fakeApi";
 import { type FakeUpstream, startFakeUpstream } from "./support/fakeUpstream";
 
@@ -235,12 +236,16 @@ test("the signed-in administrator completes setup with their own token, then lan
   let completed = false;
   const api = await installFakeApi(page);
   api.on(/^\/api\/chart\/auth\/me$/, (route) =>
-    json(route, {
-      userId: "admin-1",
-      username: "admin",
-      roles: ["chart_admin", "content_editor"],
-      geographyScopes: completed ? ["/india"] : [],
-    }),
+    json(
+      route,
+      meAs({
+        userId: "admin-1",
+        username: "admin",
+        platformAdmin: true,
+        role: "workspace_admin",
+        places: completed ? ["/india"] : [],
+      }),
+    ),
   );
   api.on(/^\/api\/setup$/, (route) => json(route, setupStatus));
   api.on(/^\/api\/setup\/options$/, (route) =>
@@ -289,17 +294,20 @@ test("the signed-in administrator completes setup with their own token, then lan
 test("only an administrator may run setup", async ({ page }) => {
   const api = await installFakeApi(page);
   api.on(/^\/api\/chart\/auth\/me$/, (route) =>
-    json(route, {
-      userId: "planner-1",
-      username: "planner",
-      roles: ["health_planning_lead"],
-      geographyScopes: ["/india"],
-    }),
+    json(
+      route,
+      meAs({
+        userId: "planner-1",
+        username: "planner",
+        role: "planning_lead",
+        places: ["/india"],
+      }),
+    ),
   );
   api.on(/^\/api\/setup$/, (route) => json(route, setupStatus));
   await page.goto("/onboarding");
   await expect(
-    page.getByText("Only a CHART administrator can set up CHART. Sign in as admin."),
+    page.getByText("Only a CHART platform admin can set up CHART. Sign in as admin."),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Launch CHART" })).toHaveCount(0);
   expect(
@@ -312,12 +320,16 @@ test("the Models page sends the signed-in admin's token for list and reload", as
 }) => {
   const api = await installFakeApi(page);
   api.on(/^\/api\/chart\/auth\/me$/, (route) =>
-    json(route, {
-      userId: "e2e-admin",
-      username: "admin",
-      roles: ["chart_admin"],
-      geographyScopes: ["/india"],
-    }),
+    json(
+      route,
+      meAs({
+        userId: "e2e-admin",
+        username: "admin",
+        platformAdmin: true,
+        role: "workspace_admin",
+        places: ["/india"],
+      }),
+    ),
   );
   api.on(/^\/api\/chart\/model-releases(\/.*)?$/, (route) => route.continue());
   upstream.on("GET", "/model-releases", (request) =>

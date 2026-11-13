@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Collection
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Annotated
@@ -13,20 +12,18 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
 from jwt.exceptions import PyJWKClientError, PyJWTError
 
+from chart.access.guards import PUBLIC_VISITOR, can_read_place, context_for
+from chart.access.principal import load_principal
+from chart.access.signin import SignIn, link_sign_in
+from chart.shared.db.session import get_session_factory
+
 from .schemas import CurrentUserContext
 
 logger = logging.getLogger(__name__)
 
-chart_roles = (
-    "chart_admin",
-    "content_editor",
-    "health_planning_lead",
-    "cross_sector_planning_lead",
-    "health_implementation_officer",
-    "cross_sector_implementation_officer",
-    "public_viewer",
-)
-geography_levels = ("country", "geo_level_1", "geo_level_2", "geo_level_3")
+#: The one Keycloak role CHART still reads: it makes the seeded account the
+#: first platform admin when the installation has none (docs/access-control.md).
+BOOTSTRAP_ADMIN_ROLE = "chart_admin"
 
 
 @dataclass(frozen=True)
@@ -79,18 +76,9 @@ def require_current_user(
 ) -> CurrentUserContext:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise _auth_error("AUTH_TOKEN_REQUIRED", 401)
-    return verify_keycloak_token(credentials.credentials, get_auth_config())
-
-
-#: The read-only visitor an open installation serves without a sign-in.
-PUBLIC_VISITOR = CurrentUserContext.model_validate(
-    {
-        "userId": "public",
-        "username": "public",
-        "roles": ["public_viewer"],
-        "geographyScopes": ["/"],
-    }
-)
+    return resolve_user(
+        verify_keycloak_token(credentials.credentials, get_auth_config())
+    )
 
 
 def public_read_enabled() -> bool:
@@ -115,13 +103,17 @@ def require_reader(
     work or shows a person's own records keeps ``require_current_user``.
     """
     if credentials is not None and credentials.scheme.lower() == "bearer":
-        return verify_keycloak_token(credentials.credentials, get_auth_config())
+        return resolve_user(
+            verify_keycloak_token(credentials.credentials, get_auth_config())
+        )
     if public_read_enabled():
         return PUBLIC_VISITOR
     raise _auth_error("AUTH_TOKEN_REQUIRED", 401)
 
 
-def verify_keycloak_token(token: str, config: AuthConfig) -> CurrentUserContext:
+def verify_keycloak_token(token: str, config: AuthConfig) -> SignIn:
+    """Who the token says the person is; nothing about what they may do."""
+
     try:
         key = _get_signing_key(config.jwks_url, config.jwks_timeout_seconds, token)
         claims = jwt.decode(
@@ -134,7 +126,23 @@ def verify_keycloak_token(token: str, config: AuthConfig) -> CurrentUserContext:
         )
     except (OSError, PyJWKClientError, PyJWTError, ValueError) as error:
         raise _auth_error("AUTH_TOKEN_INVALID", 401) from error
-    return _map_claims(claims, config.client_id)
+    return _sign_in(claims, config.client_id)
+
+
+def resolve_user(sign_in: SignIn) -> CurrentUserContext:
+    """The person's access from CHART's database, linking the sign-in first
+    when it is not cached (invitations, the first admin, the visit)."""
+
+    with get_session_factory()() as session:
+        principal = load_principal(
+            session, sign_in.user_id, lambda s: link_sign_in(s, sign_in)
+        )
+    return context_for(
+        principal,
+        username=sign_in.username,
+        email=sign_in.email,
+        display_name=sign_in.display_name,
+    )
 
 
 def apply_active_geography(
@@ -142,43 +150,19 @@ def apply_active_geography(
 ) -> CurrentUserContext:
     if active_geography_id is None:
         return user
-    if not can_read_geography_path(user, active_geography_id):
+    if not can_read_place(user, active_geography_id):
         # The header is a stale client hint (sessionStorage remembered a
-        # geography that just left scope, e.g. the admin-union flag was
-        # flipped off). Silently snap back to the user's default landing area
-        # instead of 403ing — direct queries like /auth/geography-access
-        # still enforce, but a leftover header shouldn't lock the app out.
+        # geography that just left scope). Snap back to the default landing
+        # area instead of 403ing; direct reads still enforce.
         logger.info(
             "auth: dropping out-of-scope active_geography header %r for user %s",
             active_geography_id,
             user.user_id,
         )
         return user
-    normalized = _normalize_geography_path(active_geography_id)
     return user.model_copy(
-        update={
-            "active_geography_id": normalized,
-            "geography_level": _infer_geography_level(normalized),
-        }
+        update={"active_geography_id": _normalize_geography_path(active_geography_id)}
     )
-
-
-def can_read_geography_path(user: CurrentUserContext, requested_path: str) -> bool:
-    requested = _normalize_geography_path(requested_path)
-    return any(
-        scope == "/" or requested == scope or requested.startswith(f"{scope}/")
-        for scope in map(_normalize_geography_path, user.geography_scopes)
-    )
-
-
-def require_any_role(user: CurrentUserContext, allowed_roles: Collection[str]) -> None:
-    if not any(role in allowed_roles for role in user.roles):
-        raise _auth_error("ROLE_NOT_ALLOWED", 403)
-
-
-def require_geography_access(user: CurrentUserContext, requested_path: str) -> None:
-    if not can_read_geography_path(user, requested_path):
-        raise _auth_error("GEOGRAPHY_OUT_OF_SCOPE", 403)
 
 
 @lru_cache(maxsize=4)
@@ -190,66 +174,29 @@ def _get_signing_key(jwks_url: str, timeout_seconds: float, token: str):
     return _jwks_client(jwks_url, timeout_seconds).get_signing_key_from_jwt(token).key
 
 
-def _map_claims(claims: dict[str, Any], client_id: str) -> CurrentUserContext:
+def _sign_in(claims: dict[str, Any], client_id: str) -> SignIn:
     subject = claims.get("sub")
     if not isinstance(subject, str) or not subject:
         raise _auth_error("AUTH_TOKEN_INVALID", 401)
-
+    roles: list[str] = []
     realm_access = claims.get("realm_access")
-    resource_access = claims.get("resource_access")
-    raw_roles = []
     if isinstance(realm_access, dict):
-        raw_roles.extend(_strings(realm_access.get("roles")))
+        roles.extend(_strings(realm_access.get("roles")))
+    resource_access = claims.get("resource_access")
     if isinstance(resource_access, dict):
         client_access = resource_access.get(client_id)
         if isinstance(client_access, dict):
-            raw_roles.extend(_strings(client_access.get("roles")))
-    roles = [role for role in chart_roles if role in set(raw_roles)]
-    geography_scopes = list(
-        dict.fromkeys(
-            normalized
-            for group in _strings(claims.get("groups"))
-            if (normalized := _normalize_geography_path(group)) != "/"
-        )
-    )
-    default_active_geography = geography_scopes[0] if geography_scopes else None
-    if "chart_admin" in roles:
-        # Installation administrators manage the whole country represented by
-        # each assigned Keycloak group, while ordinary users remain at their
-        # explicitly assigned state/county/division scope. This enables context
-        # switching without granting access to another installed country.
-        geography_scopes = list(
-            dict.fromkeys(
-                country_scope
-                for scope in geography_scopes
-                if (country_scope := _country_scope(scope)) is not None
-            )
-        )
-        # An installation admin also owns every model registered in this
-        # deployment — the model list is a public endpoint, so widening the
-        # admin's context switcher to every family with an active release
-        # doesn't leak new information, just makes it usable. Toggle off with
-        # CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES=false for stricter setups.
-        if _admin_sees_all_model_geographies():
-            geography_scopes = list(
-                dict.fromkeys([*geography_scopes, *_active_model_family_roots()])
-            )
-        # Give an admin without a Keycloak group a landing area anyway, so a
-        # bare-bones self-hosted install still opens onto something usable.
-        if default_active_geography is None and geography_scopes:
-            default_active_geography = geography_scopes[0]
+            roles.extend(_strings(client_access.get("roles")))
     username = claims.get("preferred_username") or claims.get("email") or subject
     email = claims.get("email")
-    return CurrentUserContext.model_validate(
-        {
-            "user_id": subject,
-            "username": username if isinstance(username, str) else subject,
-            "email": email if isinstance(email, str) else None,
-            "roles": roles,
-            "geography_scopes": geography_scopes,
-            "active_geography_id": default_active_geography,
-            "geography_level": _infer_geography_level(default_active_geography),
-        }
+    name = claims.get("name")
+    return SignIn(
+        user_id=subject,
+        username=username if isinstance(username, str) else subject,
+        email=email if isinstance(email, str) else None,
+        email_verified=claims.get("email_verified") is True,
+        display_name=name if isinstance(name, str) and name.strip() else None,
+        bootstrap_admin=BOOTSTRAP_ADMIN_ROLE in roles,
     )
 
 
@@ -259,45 +206,9 @@ def _strings(value: Any) -> list[str]:
     return [item for item in value if isinstance(item, str)]
 
 
-def _country_scope(scope: str) -> str | None:
-    parts = [part for part in scope.split("/") if part]
-    return f"/{parts[0]}" if parts else None
-
-
 def _normalize_geography_path(path: str) -> str:
     normalized = "/".join(part for part in path.strip().split("/") if part)
     return f"/{normalized}" if normalized else "/"
-
-
-def _infer_geography_level(scope: str | None) -> str | None:
-    if scope is None:
-        return None
-    depth = len([part for part in scope.split("/") if part])
-    return geography_levels[min(depth - 1, len(geography_levels) - 1)]
-
-
-def _admin_sees_all_model_geographies() -> bool:
-    # Strict opt-in: only the exact string "true" enables the union. Anything
-    # else (unset, empty, "1", "yes", typo) leaves admins on their Keycloak
-    # scope, so a fresh install matches the country that was set up and no
-    # surprise geographies appear.
-    return os.getenv("CHART_ADMIN_SEES_ALL_MODEL_GEOGRAPHIES") == "true"
-
-
-def _active_model_family_roots() -> list[str]:
-    """DB-safe wrapper: an auth request must never 500 on a registry hiccup."""
-
-    try:
-        # Local imports avoid pulling the registry module (and its ORM
-        # dependencies) into auth import time, keeping this module usable in
-        # test contexts that never touch a database.
-        from chart.model_registry.service import list_family_roots_with_active_models
-        from chart.shared.db.session import get_session_factory
-
-        with get_session_factory()() as session:
-            return list_family_roots_with_active_models(session)
-    except Exception:
-        return []
 
 
 def _auth_error(code: str, status_code: int) -> HTTPException:

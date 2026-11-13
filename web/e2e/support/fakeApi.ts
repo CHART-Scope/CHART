@@ -1,6 +1,8 @@
 import { type Page, type Route } from "@playwright/test";
 
+import { meAs, planner, type Who } from "./access";
 import { actionList } from "./actions";
+import { answerWorkspaces, workspaceState, type WorkspaceState } from "./workspaces";
 
 /**
  * The CHART API as the browser sees it, answered at the network boundary.
@@ -59,17 +61,25 @@ export type FakeApi = {
     pattern: RegExp,
     handler: (route: Route, url: URL) => Promise<void> | void,
   ) => void;
+  /** The workspace service's state (Settings > People, Departments, ...). */
+  workspaces: WorkspaceState;
 };
 
 export async function installFakeApi(
   page: Page,
-  options: { monthly?: (url: URL) => unknown; map?: (url: URL) => unknown } = {},
+  options: {
+    monthly?: (url: URL) => unknown;
+    map?: (url: URL) => unknown;
+    /** Who is signed in; a planning lead for India by default. */
+    who?: Who;
+  } = {},
 ): Promise<FakeApi> {
   const overrides: [RegExp, (route: Route, url: URL) => Promise<void> | void][] = [];
   const api: FakeApi = {
     requests: [],
     unhandled: [],
     on: (pattern, handler) => overrides.push([pattern, handler]),
+    workspaces: workspaceState(),
   };
 
   await page.route("**/api/**", async (route) => {
@@ -82,14 +92,7 @@ export async function installFakeApi(
     const path = url.pathname;
     if (path === "/api/auth/keycloak-refresh")
       return json(route, { access_token: accessToken });
-    if (path === "/api/chart/auth/me") {
-      return json(route, {
-        userId: "e2e-user",
-        username: "planner",
-        roles: ["health_planning_lead"],
-        geographyScopes: ["/india"],
-      });
-    }
+    if (path === "/api/chart/auth/me") return json(route, meAs(options.who ?? planner));
     if (path === "/api/chart/audit/events" || path.startsWith("/api/chart/audit")) {
       return json(route, {}, 202);
     }
@@ -132,6 +135,10 @@ export async function installFakeApi(
     if (/^\/api\/chart\/vra\/[^/]+\/coverage$/.test(path)) {
       return json(route, { area_count: 0, indicators: [], ingestions: [] });
     }
+    if (await answerWorkspaces(route, url, api.workspaces)) return;
+    // Settings' Jobs badge and Data reads: nothing pulled unless a spec says so.
+    if (/^\/api\/chart\/climate\/(coverage|ingestion-jobs)$/.test(path))
+      return json(route, []);
     if (path === "/api/chart/climate/predict") {
       return json(route, { request_id: 1, status: "queued" }, 202);
     }

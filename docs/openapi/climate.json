@@ -54,7 +54,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The authenticated user's role and geography access context.",
+            "description": "The signed-in person, their workspaces, grants and departments.",
             "content": {
               "application/json": {
                 "schema": {
@@ -104,7 +104,7 @@
             }
           }
         },
-        "description": "Validates the Keycloak bearer token and returns the CHART user, roles, allowed geography paths, and active geography used to scope subsequent requests. Supply an active geography only when the user can access it."
+        "description": "Validates the Keycloak bearer token, then reads what the person may do from CHART's database: account status, platform admin, and per workspace their grants (a role at a place, with the role's level per module) and departments, plus the places they work from and the active one. The first sign-in of an invited email accepts its invitations. Supply an active geography only when the user can read it."
       }
     },
     "/auth/geography-access": {
@@ -199,7 +199,7 @@
             }
           }
         },
-        "description": "Normalizes the requested geography path and evaluates it against the signed-in user's role and assigned geography scope. Use this before showing geography-specific controls; protected endpoints still enforce the same authorization independently."
+        "description": "Normalizes the requested geography path and evaluates it against the signed-in person's grants (readable at or below a grant, or above it for context). Use this before showing geography-specific controls; protected endpoints still enforce the same authorization independently."
       }
     },
     "/geographies": {
@@ -541,7 +541,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "Validates role and geography scope, resolves the three-month input window, and creates or reuses an idempotent prediction request in Postgres. A 200 response contains an already completed result; a 202 response identifies queued work that Dagster will execute."
+        "description": "Requires risk write at the place, resolves the three-month input window, and creates or reuses an idempotent prediction request in Postgres. A 200 response contains an already completed result; a 202 response identifies queued work that Dagster will execute."
       }
     },
     "/climate/what-if": {
@@ -815,7 +815,7 @@
           "climate"
         ],
         "summary": "Read which places already hold climate data",
-        "description": "Returns every country and each of its administrative areas with the number of distinct months of observed climate data held, and the range those months span. Requires the chart_admin role. Months are counted distinctly rather than by row because each month holds several variables, which would otherwise read as several times more coverage than exists. A country's range is the union of its areas' ranges, not a sum. Used by the Settings data section to show what is present before anything is pulled.",
+        "description": "Returns every country and each of its administrative areas with the number of distinct months of observed climate data held, and the range those months span, for the countries where the caller reads data. Months are counted distinctly rather than by row because each month holds several variables, which would otherwise read as several times more coverage than exists. A country's range is the union of its areas' ranges, not a sum. Used by the Settings data section to show what is present before anything is pulled.",
         "operationId": "read_coverage_climate_coverage_get",
         "responses": {
           "200": {
@@ -846,7 +846,7 @@
           "climate"
         ],
         "summary": "Queue one country-wide climate pull",
-        "description": "Queues a single Copernicus download covering every deployed area in one country and returns immediately with the job to poll. Requires the chart_admin role. Accepted rather than performed because a pull takes minutes while the web proxy times out after fifteen seconds. Omitting months requests the last twelve complete ones; the month in progress is never requested because ERA5 lands a few days in arrears. A country that already has a pull in flight returns that job rather than starting a second download of the same grid.",
+        "description": "Queues a single Copernicus download covering every deployed area in one country and returns immediately with the job to poll. Requires data write over the country, and one of the ERA5 source's owning departments when it has any. Accepted rather than performed because a pull takes minutes while the web proxy times out after fifteen seconds. Omitting months requests the last twelve complete ones; the month in progress is never requested because ERA5 lands a few days in arrears. A country that already has a pull in flight returns that job rather than starting a second download of the same grid.",
         "operationId": "create_ingestion_job_climate_ingestion_jobs_post",
         "security": [
           {
@@ -891,7 +891,7 @@
           "climate"
         ],
         "summary": "Read recent climate pulls and their progress",
-        "description": "Returns recent country-wide climate pulls, newest first, with their status, stage, and how many of the country's areas have been written so far. Requires the chart_admin role. Progress is reported per area because one download feeds every area in the country, and a country of forty-seven would otherwise look stalled while it works.",
+        "description": "Returns recent country-wide climate pulls, newest first, with their status, stage, and how many of the country's areas have been written so far, for countries where the caller reads data. Progress is reported per area because one download feeds every area in the country, and a country of forty-seven would otherwise look stalled while it works.",
         "operationId": "read_ingestion_jobs_climate_ingestion_jobs_get",
         "security": [
           {
@@ -1158,7 +1158,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "Requires a CHART administrator. Discovers enabled model manifests, verifies and prepares their immutable artifacts, and activates their geography assignments while preserving users, workspaces, and saved planning data. Use this after deploying a new release to an existing installation."
+        "description": "Requires a platform admin. Discovers enabled model manifests, verifies and prepares their immutable artifacts, and activates their geography assignments while preserving users, workspaces, and saved planning data. Use this after deploying a new release to an existing installation."
       }
     },
     "/actions": {
@@ -1212,24 +1212,20 @@
         }
       }
     },
-    "/users": {
+    "/workspaces": {
       "get": {
         "tags": [
-          "users"
+          "workspaces"
         ],
-        "summary": "List users within the caller's administrative scope",
-        "operationId": "list_route_users_get",
+        "summary": "List the workspaces I belong to",
+        "operationId": "list_workspaces_workspaces_get",
         "responses": {
           "200": {
-            "description": "The user accounts visible within the caller's role and geography scope.",
+            "description": "The caller's workspaces with their country and active member count.",
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/UserResponse"
-                  },
-                  "type": "array",
-                  "title": "Response List Route Users Get"
+                  "$ref": "#/components/schemas/WorkspaceList"
                 }
               }
             }
@@ -1240,162 +1236,19 @@
             "bearerAuth": []
           }
         ],
-        "description": "Returns CHART users the authenticated caller is permitted to administer, constrained by role and geography assignments. The response is intended for user-management screens and does not grant access beyond the caller's existing scope."
+        "description": "One workspace per country. A platform admin sees every workspace on the installation; anyone else sees those they hold an active membership in. Each item carries the country, its place and the number of active members."
       },
-      "post": {
-        "tags": [
-          "users"
-        ],
-        "summary": "Create or invite a user within administrative scope",
-        "operationId": "create_route_users_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateUserInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "The invited user, their CHART access and whether the invitation was sent.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "description": "Creates the CHART user assignment requested by an authorized administrator after validating role and geography boundaries, with no password, and has Keycloak email the person an invitation to sign in with a code. The account stands even if the email fails; `invitation` says which, and `POST /users/{user_id}/invitation` sends it again."
-      }
-    },
-    "/users/{user_id}/invitation": {
-      "post": {
-        "tags": [
-          "users"
-        ],
-        "summary": "Email a person their CHART invitation again",
-        "operationId": "invitation_route_users__user_id__invitation_post",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "User Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The person and their CHART access, with invitation set to sent once Keycloak accepted the email.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "description": "Has Keycloak email the invitation again for an active account: a link that confirms the address and opens CHART's sign-in, where the person signs in with an emailed code. Administrators only. Answers 502 USER_INVITE_FAILED when the email could not be sent."
-      }
-    },
-    "/users/{user_id}/disable": {
-      "post": {
-        "tags": [
-          "users"
-        ],
-        "summary": "Disable a user within the caller's administrative scope",
-        "operationId": "disable_route_users__user_id__disable_post",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "User Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The disabled user record and its updated account state.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "description": "Disables the selected CHART account after confirming that the signed-in administrator may manage that user's role and geography. Disabled users remain auditable but can no longer use protected application workflows."
-      }
-    },
-    "/workspaces": {
       "post": {
         "tags": [
           "workspaces"
         ],
-        "summary": "Create a geography-scoped planning workspace",
-        "operationId": "create_route_workspaces_post",
+        "summary": "Create a country's workspace",
+        "operationId": "create_workspace_workspaces_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateWorkspaceInput"
+                "$ref": "#/components/schemas/WorkspaceCreate"
               }
             }
           },
@@ -1403,11 +1256,11 @@
         },
         "responses": {
           "201": {
-            "description": "The newly created planning workspace and its ownership metadata.",
+            "description": "The new workspace with its country and member count.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WorkspaceResponse"
+                  "$ref": "#/components/schemas/WorkspaceItem"
                 }
               }
             }
@@ -1428,16 +1281,16 @@
             "bearerAuth": []
           }
         ],
-        "description": "Creates a durable planning workspace owned by the authenticated user and bound to an authorized geography. The workspace becomes the container for saved planning choices and analytical results."
+        "description": "Creates the workspace for an installed country with the default roles (Workspace admin, Planning lead, Implementation officer, Data officer, Viewer) and the starting departments. Platform admins only (PLATFORM_ADMIN_REQUIRED); WORKSPACE_EXISTS when the country has one, COUNTRY_NOT_FOUND when it is not installed."
       }
     },
-    "/workspaces/{workspace_id}": {
+    "/workspaces/{workspace_id}/roles": {
       "get": {
         "tags": [
           "workspaces"
         ],
-        "summary": "Read an authorized planning workspace",
-        "operationId": "get_route_workspaces__workspace_id__get",
+        "summary": "List a workspace's roles and their capabilities",
+        "operationId": "list_roles_workspaces__workspace_id__roles_get",
         "security": [
           {
             "bearerAuth": []
@@ -1450,17 +1303,18 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 128,
               "title": "Workspace Id"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "The requested workspace when it is visible to the authenticated user.",
+            "description": "The modules and each role with its level per module.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WorkspaceResponse"
+                  "$ref": "#/components/schemas/RoleList"
                 }
               }
             }
@@ -1476,7 +1330,875 @@
             }
           }
         },
-        "description": "Returns a durable planning workspace only when the signed-in user has the required ownership, role, and geography access. Callers cannot use a known workspace identifier to cross authorization boundaries."
+        "description": "The workspace's roles with their level (read, write or manage) on each module, and the list of modules in order, for the Roles table and the role pickers. Role capabilities are read only in this version. Members and platform admins only; others get WORKSPACE_NOT_FOUND."
+      }
+    },
+    "/workspaces/{workspace_id}/resources": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "List data sources and VRA indicator groups",
+        "operationId": "list_resources_workspaces__workspace_id__resources_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every resource a department can own, by kind, key and name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceOptions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "The data sources (ERA5 and registered sources) and VRA indicator groups (catalogue categories) a department can be made to own. Ownership narrows writes: a data or VRA write to an owned resource needs one of its departments unless the person manages the module."
+      }
+    },
+    "/workspaces/{workspace_id}/members": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "List the members I can see",
+        "operationId": "list_members_workspaces__workspace_id__members_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The visible members with their grants, departments and status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Members whose grants overlap a place where the caller reads people (at, below or above their own grants), with each grant (role at a place), departments, status, last sign-in and whether the caller may change them (people manage over all their grants, never oneself)."
+      }
+    },
+    "/workspaces/{workspace_id}/members/{user_id}": {
+      "put": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Change a member's grants and departments",
+        "operationId": "update_member_workspaces__workspace_id__members__user_id__put",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The member as now stored, with their new grants and departments.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Replaces the member's grants and departments. Needs people manage over every current and new grant place, and no new role may exceed what the caller holds at that place (GRANT_EXCEEDS_YOUR_ACCESS). Grants must sit inside the workspace's country (GRANT_PLACE_INVALID). Takes effect on the member's next request; recorded as membership_changed."
+      }
+    },
+    "/workspaces/{workspace_id}/members/{user_id}/disable": {
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Disable a member in this workspace",
+        "operationId": "disable_member_workspaces__workspace_id__members__user_id__disable_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The member, now disabled in this workspace and granted nothing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Sets the membership to disabled so it grants nothing from the member's next request. When it was their last active membership their Keycloak sessions are ended too. Needs people manage over all their grants; never oneself (MEMBER_SELF_EDIT). Recorded as membership_disabled."
+      }
+    },
+    "/workspaces/{workspace_id}/members/{user_id}/enable": {
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Enable a disabled member again",
+        "operationId": "enable_member_workspaces__workspace_id__members__user_id__enable_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The member, active again in this workspace with their grants.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Restores a disabled membership with the grants and departments it had. Needs people manage over all their grants; never oneself. Recorded as membership_enabled. The member signs in again with an emailed code."
+      }
+    },
+    "/workspaces/{workspace_id}/invitations": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "List invitations to this workspace",
+        "operationId": "list_invitations_workspaces__workspace_id__invitations_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invitations the caller can see, with their grants and status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Pending, accepted, revoked and expired invitations (newest first, up to 200) whose grants overlap the caller's people places, with the grants and departments each gives, who sent it and when it expires. Pending invitations past their expiry are marked expired on read."
+      },
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Invite someone to a workspace by email",
+        "operationId": "invite_workspaces__workspace_id__invitations_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The invitation, its grants and departments, and whether the email went out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Invites an email with one or more grants and departments; new department names are added first (needs departments write). Each grant needs people write at its place and a role no higher than the caller's there. Someone already signed up elsewhere is given the access at once; otherwise a Keycloak account is made and the invitation emailed, accepted at first sign-in. INVITATION_PENDING or MEMBER_EXISTS when already invited or a member."
+      }
+    },
+    "/workspaces/{workspace_id}/invitations/{invitation_id}/resend": {
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Resend a pending or expired invitation",
+        "operationId": "resend_invitation_workspaces__workspace_id__invitations__invitation_id__resend_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 36,
+              "maxLength": 36,
+              "title": "Invitation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invitation with its new expiry and whether the email went out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Emails the invitation again and extends it by seven days. Needs people write over its grants. Accepted or revoked invitations are refused (INVITATION_NOT_PENDING). email_sent reports whether Keycloak accepted the email."
+      }
+    },
+    "/workspaces/{workspace_id}/invitations/{invitation_id}/revoke": {
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Revoke a pending invitation",
+        "operationId": "revoke_invitation_workspaces__workspace_id__invitations__invitation_id__revoke_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 36,
+              "maxLength": 36,
+              "title": "Invitation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invitation, now revoked so signing in with it grants nothing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Withdraws a pending invitation so signing in with it grants nothing. Needs people write over its grants; anything but a pending invitation is refused (INVITATION_NOT_PENDING). Recorded as invitation_revoked."
+      }
+    },
+    "/workspaces/{workspace_id}/departments": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "List a workspace's departments and mine",
+        "operationId": "list_departments_workspaces__workspace_id__departments_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The departments with members and ownership, and the caller's own.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "The workspace's departments sorted by name, archived ones included and flagged, with active member counts, the data sources and VRA indicator groups each owns, and the ids of the caller's own. Needs departments read anywhere in the workspace."
+      },
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Add a department to a workspace",
+        "operationId": "add_department_workspaces__workspace_id__departments_post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DepartmentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The department list with the new department included.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Adds a department members can then pick. Names are trimmed and must be 2 to 120 characters (DEPARTMENT_NAME_INVALID); a name the workspace has in any letter case is refused (DEPARTMENT_EXISTS). Needs departments write anywhere in the workspace."
+      }
+    },
+    "/workspaces/{workspace_id}/departments/mine": {
+      "put": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Set the departments I work in",
+        "operationId": "set_my_departments_workspaces__workspace_id__departments_mine_put",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyDepartments"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The department list with the caller's new selection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Replaces the caller's departments in the workspace with the ids given; archived, unknown or other workspaces' ids are refused (DEPARTMENT_UNKNOWN). Any active member may set their own."
+      }
+    },
+    "/workspaces/{workspace_id}/departments/{department_id}": {
+      "patch": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Rename or archive a department",
+        "operationId": "update_department_workspaces__workspace_id__departments__department_id__patch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "department_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Department Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DepartmentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The workspace's department list after the rename or archive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Renames a department or archives and restores it. Archiving hides it from pickers and removes it from what narrows writes, but keeps it on past records. Needs departments manage anywhere in the workspace."
+      },
+      "delete": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Delete a department nobody uses",
+        "operationId": "delete_department_workspaces__workspace_id__departments__department_id__delete",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "department_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Department Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The department list without the deleted department.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Deletes a department with no members, invitations or owned resources; one in use is refused (DEPARTMENT_IN_USE) and should be archived instead. Needs departments manage anywhere in the workspace."
+      }
+    },
+    "/workspaces/{workspace_id}/departments/{department_id}/ownership": {
+      "put": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Set the resources a department owns",
+        "operationId": "set_ownership_workspaces__workspace_id__departments__department_id__ownership_put",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "title": "Workspace Id"
+            }
+          },
+          {
+            "name": "department_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Department Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Ownership"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The workspace's department list showing the new ownership.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Replaces the data sources and VRA indicator groups the department owns. Writes to an owned resource then need one of its departments unless the person manages the module; unowned resources stay open to anyone with write. Workspace admins only (workspace manage)."
       }
     },
     "/risk/{geography_id}/monthly": {
@@ -1560,7 +2282,7 @@
           "risk"
         ],
         "summary": "Read administrative areas shaded by attributable fraction",
-        "description": "Returns every administrative area beneath the selected geography with its display geometry and, where one exists, the share of cases attributable to heat for the requested month. Requires a risk reader role and access to the exact geography path. Areas with no fitted model for the outcome, and areas whose month has not been computed, are returned with a null value and a missing_reason of no_model or no_prediction rather than being omitted - a map that drops uncovered areas reads as though those places carry no risk. Geometry is simplified for drawing only, by the disclosed tolerance in degrees; climate extraction always uses the unsimplified boundary. These are area-level values on administrative shapes, not a modelled grid, and must not be rendered as cells.",
+        "description": "Returns every administrative area beneath the selected geography with its display geometry and, where one exists, the share of cases attributable to heat for the requested month. Requires risk read at the exact geography path. Areas with no fitted model for the outcome, and areas whose month has not been computed, are returned with a null value and a missing_reason of no_model or no_prediction rather than being omitted - a map that drops uncovered areas reads as though those places carry no risk. Geometry is simplified for drawing only, by the disclosed tolerance in degrees; climate extraction always uses the unsimplified boundary. These are area-level values on administrative shapes, not a modelled grid, and must not be rendered as cells.",
         "operationId": "read_map_risk__geography_id__map_get",
         "security": [
           {
@@ -1882,7 +2604,7 @@
             }
           }
         },
-        "description": "Resolves sources for the exact geography and outcome, subject to risk-reader roles, geography scope and country model settings. Published handover projections retain their own release. Observed may use the existing calibrated Kenya outlook scorer or an exact active monthly model assignment. The observed source identifies its release and batch support; unavailable or disabled views include a reason. No district or constituency inherits an ancestor's observed model. The new handovers are not relabelled as calibrated. Missing advertised projection files return OUTLOOK_NOT_PUBLISHED."
+        "description": "Resolves sources for the exact geography and outcome, subject to risk read at the geography and the country's model settings. Published handover projections retain their own release. Observed may use the existing calibrated Kenya outlook scorer or an exact active monthly model assignment. The observed source identifies its release and batch support; unavailable or disabled views include a reason. No district or constituency inherits an ancestor's observed model. The new handovers are not relabelled as calibrated. Missing advertised projection files return OUTLOOK_NOT_PUBLISHED."
       }
     },
     "/heat-outlook/{geography_id}": {
@@ -1991,7 +2713,7 @@
             }
           }
         },
-        "description": "Returns the modelling team's published heat outlook for a configured geography: typical calendar months, period summaries, available selections, provenance and baseline notes. Installed October 2026 handovers cover Madhya Pradesh's state, divisions and districts and Kenya's country, counties and supplied constituencies. The outcome selects low birth weight (lbw) or under-five mortality (under_5_mortality); scenario, period and selector (the pregnancy window or age group) filter the publication. Supplied periods retain their coefficient confidence intervals; derived 5/10/20-year periods offer climate-model ranges, not confidence intervals, and omit unavailable temperature summaries. Requires a risk reader role and access to the geography path. No health model is evaluated on request. Installed handovers take precedence over legacy Kenya publications. Release-specific display rules return suppressed values as null with an explanatory message; country settings restrict offered selections."
+        "description": "Returns the modelling team's published heat outlook for a configured geography: typical calendar months, period summaries, available selections, provenance and baseline notes. Installed October 2026 handovers cover Madhya Pradesh's state, divisions and districts and Kenya's country, counties and supplied constituencies. The outcome selects low birth weight (lbw) or under-five mortality (under_5_mortality); scenario, period and selector (the pregnancy window or age group) filter the publication. Supplied periods retain their coefficient confidence intervals; derived 5/10/20-year periods offer climate-model ranges, not confidence intervals, and omit unavailable temperature summaries. Requires risk read at the geography path. No health model is evaluated on request. Installed handovers take precedence over legacy Kenya publications. Release-specific display rules return suppressed values as null with an explanatory message; country settings restrict offered selections."
       }
     },
     "/heat-outlook/{geography_id}/map": {
@@ -2111,7 +2833,7 @@
             }
           }
         },
-        "description": "Returns administrative areas in the selected geography frame with display geometry and the published annual-average attributable share for the chosen outcome, scenario, period and selector, in the same shape as the risk map so the dashboard draws it identically. Requires a risk reader role and access to the geography path, and filters returned areas to the caller's allowed paths. Coverage follows the installed geography hierarchy and publication, including India districts and Kenya constituencies. Areas whose share is suppressed by the display rules carry missing_reason no_excess; windows with no period summary carry not_reported; areas with no published file carry no_model. With reference=peak, each area is shaded by its highest-risk months' share instead: the three consecutive months with the highest heat share where available. With reference=season, each area is shaded by its mean heat share over its heat season as configured in Settings (its own calendar, an ancestor's, or the official season). No health model is evaluated on request."
+        "description": "Returns administrative areas in the selected geography frame with display geometry and the published annual-average attributable share for the chosen outcome, scenario, period and selector, in the same shape as the risk map so the dashboard draws it identically. Requires risk read at the geography path, and filters returned areas to the caller's allowed paths. Coverage follows the installed geography hierarchy and publication, including India districts and Kenya constituencies. Areas whose share is suppressed by the display rules carry missing_reason no_excess; windows with no period summary carry not_reported; areas with no published file carry no_model. With reference=peak, each area is shaded by its highest-risk months' share instead: the three consecutive months with the highest heat share where available. With reference=season, each area is shaded by its mean heat share over its heat season as configured in Settings (its own calendar, an ancestor's, or the official season). No health model is evaluated on request."
       }
     },
     "/heat-outlook/{geography_id}/observed": {
@@ -2203,7 +2925,7 @@
             }
           }
         },
-        "description": "Scores one observed month for a Kenyan county (geo-ke-<county>), or the mean over Kenya's counties (geo-ke), with the modelling team's DLNM models, using the Copernicus ERA5 temperatures CHART has ingested. ERA5 is first moved onto the scale the models were fitted on by a fixed offset per county and calendar month. Low birth weight reads the birth month and the eight before it; under-five scores each day of the month on that day and the three before it and averages them. month (YYYY-MM) defaults to the newest month with complete inputs; selector is the pregnancy window or the age group. Requires a risk reader role and access to the geography path. The guides' display rules apply, so suppressed values arrive as null with the message to show in their place. The legacy observed release is selected independently of a newer projection publication. India monthly models use /risk/{geography_id}/monthly instead; unsupported finer geographies never inherit a county's calibrated estimate."
+        "description": "Scores one observed month for a Kenyan county (geo-ke-<county>), or the mean over Kenya's counties (geo-ke), with the modelling team's DLNM models, using the Copernicus ERA5 temperatures CHART has ingested. ERA5 is first moved onto the scale the models were fitted on by a fixed offset per county and calendar month. Low birth weight reads the birth month and the eight before it; under-five scores each day of the month on that day and the three before it and averages them. month (YYYY-MM) defaults to the newest month with complete inputs; selector is the pregnancy window or the age group. Requires risk read at the geography path. The guides' display rules apply, so suppressed values arrive as null with the message to show in their place. The legacy observed release is selected independently of a newer projection publication. India monthly models use /risk/{geography_id}/monthly instead; unsupported finer geographies never inherit a county's calibrated estimate."
       }
     },
     "/heat-outlook/{geography_id}/observed/map": {
@@ -2212,7 +2934,7 @@
           "heat-outlook"
         ],
         "summary": "Read Kenyan counties shaded by an observed month's heat share",
-        "description": "Returns the counties of Kenya with their display geometry and each county's heat-attributable share for one observed month, scored as in the observed estimate. Requires a risk reader role and access to the geography path. Counties without complete ERA5 inputs carry missing_reason not_reported; suppressed shares carry no_excess. County requests retain the Kenya county frame even when their projection frame contains constituencies. Returned areas remain restricted to the caller's geography permissions.",
+        "description": "Returns the counties of Kenya with their display geometry and each county's heat-attributable share for one observed month, scored as in the observed estimate. Requires risk read at the geography path. Counties without complete ERA5 inputs carry missing_reason not_reported; suppressed shares carry no_excess. County requests retain the Kenya county frame even when their projection frame contains constituencies. Returned areas remain restricted to the caller's geography permissions.",
         "operationId": "read_observed_map_heat_outlook__geography_id__observed_map_get",
         "security": [
           {
@@ -2624,7 +3346,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "Returns every indicator in the VRA catalogue with its component (hazard, exposure, sensitivity or adaptive capacity), unit, direction relative to risk (+1 more is worse, -1 more is better), how values arrive (computed, upload, manual or pull) and whether it is scored (included), shown as context, or dropped. Requires a risk reader role."
+        "description": "Returns every indicator in the VRA catalogue with its component (hazard, exposure, sensitivity or adaptive capacity), unit, direction relative to risk (+1 more is worse, -1 more is better), how values arrive (computed, upload, manual or pull) and whether it is scored (included), shown as context, or dropped. Open to any reader."
       }
     },
     "/vra/{geography_id}/assessment": {
@@ -2672,7 +3394,7 @@
             }
           }
         },
-        "description": "Returns the latest VRA run for the child areas of the geography (framed as the dashboard map frames them: a leaf is framed on its siblings), with each area's risk, class, rank, component scores, coverage and driving indicators. Scores are 0-1 and relative within the frame; missing scores are null with a reason, never zero. run is null until an administrator runs an assessment. Requires a risk reader role and access to the geography path."
+        "description": "Returns the latest VRA run for the child areas of the geography (framed as the dashboard map frames them: a leaf is framed on its siblings), with each area's risk, class, rank, component scores, coverage and driving indicators. Scores are 0-1 and relative within the frame; missing scores are null with a reason, never zero. run is null until someone with vra write runs an assessment. Requires vra read at the geography path and its frame."
       }
     },
     "/vra/{geography_id}/map": {
@@ -2720,7 +3442,7 @@
             }
           }
         },
-        "description": "Returns the frame's child areas with display geometry in the risk map's shape, with value_percent set to the latest VRA risk score times 100. Areas scored without enough evidence carry missing_reason insufficient_data; areas no run has covered carry not_assessed. Requires a risk reader role and access to the geography path."
+        "description": "Returns the frame's child areas with display geometry in the risk map's shape, with value_percent set to the latest VRA risk score times 100. Areas scored without enough evidence carry missing_reason insufficient_data; areas no run has covered carry not_assessed. Requires vra read at the geography path and its frame."
       }
     },
     "/vra/{geography_id}/areas/{area_geography_id}": {
@@ -2777,7 +3499,7 @@
             }
           }
         },
-        "description": "Returns one child area of the frame with its assessment and, for every scored indicator in the catalogue, the raw value and vintage used, the normalised score, weight and contribution, the source and quality flags, and why it was excluded when it was (missing, no_data, too_few_areas, no_spread). Requires a risk reader role and access to the geography path."
+        "description": "Returns one child area of the frame with its assessment and, for every scored indicator in the catalogue, the raw value and vintage used, the normalised score, weight and contribution, the source and quality flags, and why it was excluded when it was (missing, no_data, too_few_areas, no_spread). Requires vra read at the geography path and its frame."
       }
     },
     "/vra/{geography_id}/coverage": {
@@ -2843,7 +3565,7 @@
             }
           }
         },
-        "description": "For administrators: how many of the frame's child areas hold a value for each catalogue indicator, the vintages held and when they were last updated, plus the most recent uploads with their row-level rejections. Requires the chart_admin role and access to the geography path."
+        "description": "How many of the frame's child areas hold a value for each catalogue indicator, the vintages held and when they were last updated, plus the most recent uploads with their row-level rejections. Requires vra write at the geography path and its frame."
       }
     },
     "/vra/{geography_id}/template.csv": {
@@ -2919,7 +3641,7 @@
             }
           }
         },
-        "description": "For administrators: a CSV with one blank row per child area and per indicator entered by upload or by hand, in the columns the upload accepts (area_code, area_name, indicator_code, value, vintage, source_name, source_url, notes). Requires the chart_admin role and access to the geography path."
+        "description": "A CSV with one blank row per child area and per indicator entered by upload or by hand, in the columns the upload accepts (area_code, area_name, indicator_code, value, vintage, source_name, source_url, notes). Requires vra write at the geography path and its frame."
       }
     },
     "/vra/{geography_id}/values": {
@@ -3029,7 +3751,7 @@
             }
           }
         },
-        "description": "For administrators: send the template columns as text/csv. Each row is checked (the area must be a child of the frame, the indicator must exist and be neither dropped nor computed, the value numeric and a percentage within 0-100, the vintage present); blank values are skipped. Valid rows are upserted on indicator, area and vintage. If no row is valid the upload is recorded as failed and nothing is written. Requires the chart_admin role and access to the geography."
+        "description": "Send the template columns as text/csv. Each row is checked (the area must be a child of the frame, the indicator must exist and be neither dropped nor computed, the value numeric and a percentage within 0-100, the vintage present); blank values are skipped. Valid rows are upserted on indicator, area and vintage. If no row is valid the upload is recorded as failed and nothing is written. Requires vra write at the geography; rows for an indicator group owned by other departments are rejected unless the uploader manages VRA."
       }
     },
     "/vra/{geography_id}/runs": {
@@ -3038,7 +3760,7 @@
           "vra"
         ],
         "summary": "Run the vulnerability assessment for a frame's child areas",
-        "description": "For administrators: recomputes the climate-derived hazard indicators from stored ERA5 months, scores every child area with method vra-v1 (5th-95th percentile min-max, equal weights, two-thirds coverage rule, geometric mean of hazard, exposure and vulnerability, quartile classes) and stores the run with its bounds and input and output hashes. Synchronous. Requires the chart_admin role and access to the geography path.",
+        "description": "Recomputes the climate-derived hazard indicators from stored ERA5 months, scores every child area with method vra-v1 (5th-95th percentile min-max, equal weights, two-thirds coverage rule, geometric mean of hazard, exposure and vulnerability, quartile classes) and stores the run with its bounds and input and output hashes. Synchronous. Requires vra write at the geography path and its frame.",
         "operationId": "create_run_vra__geography_id__runs_post",
         "security": [
           {
@@ -3177,7 +3899,7 @@
             }
           }
         },
-        "description": "Without parameters, lists the model settings of every country whose path the signed-in user can read, one item per outcome. With country (ISO code, e.g. KE) and outcome (e.g. lbw), returns that one item. Each item carries the options the published outlook tables and active model releases support, tagged by the view that uses them, and the effective settings: the stored ones, or the defaults when none are saved. Any signed-in user may read them; roles are not restricted yet."
+        "description": "Without parameters, lists the model settings of every country whose path the signed-in user can read, one item per outcome. With country (ISO code, e.g. KE) and outcome (e.g. lbw), returns that one item. Each item carries the options the published outlook tables and active model releases support, tagged by the view that uses them, and the effective settings: the stored ones, or the defaults when none are saved. Requires risk read at the country."
       }
     },
     "/model-settings/{country_code}/{outcome}": {
@@ -3247,7 +3969,7 @@
             }
           }
         },
-        "description": "Stores which pregnancy windows or age groups, scenarios and data modes a country offers for an outcome. Settings may only narrow what the tables and releases support: unknown codes are refused (MODEL_SETTINGS_OPTION_UNKNOWN), every view keeps at least one option (MODEL_SETTINGS_OPTION_REQUIRED) and each default must be switched on (MODEL_SETTINGS_DEFAULT_NOT_ENABLED). Requires access to the country path; any signed-in role may write for now. Every change records a model_settings_changed audit event with the values before and after."
+        "description": "Stores which pregnancy windows or age groups, scenarios and data modes a country offers for an outcome. Settings may only narrow what the tables and releases support: unknown codes are refused (MODEL_SETTINGS_OPTION_UNKNOWN), every view keeps at least one option (MODEL_SETTINGS_OPTION_REQUIRED) and each default must be switched on (MODEL_SETTINGS_DEFAULT_NOT_ENABLED). Requires risk manage over the country (CAPABILITY_NOT_ALLOWED). Every change records a model_settings_changed audit event with the values before and after."
       }
     },
     "/heat-seasons": {
@@ -3274,7 +3996,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "Every place the caller can read, parents before children, with the heat-season calendar in effect: twelve letters from January (b before, d during, a after, o outside the cycle). state says whether the place has its own calendar (custom), inherits an ancestor's (inherited, with inherited_from), uses the country's official season (official) or has none (unset). Requires a dashboard reader role."
+        "description": "Every place the caller can read, parents before children, with the heat-season calendar in effect: twelve letters from January (b before, d during, a after, o outside the cycle). state says whether the place has its own calendar (custom), inherits an ancestor's (inherited, with inherited_from), uses the country's official season (official) or has none (unset). Lists places where the caller reads heat seasons."
       }
     },
     "/heat-seasons/{geography_id}": {
@@ -3378,7 +4100,7 @@
             }
           }
         },
-        "description": "Stores twelve months for the place; its children inherit them unless they have their own. Read from the first preparation month the months must run before, during, after, then off, with at least one during month (HEAT_SEASON_INVALID). Administrators only (ROLE_NOT_ALLOWED). Records a heat_season_changed audit event."
+        "description": "Stores twelve months for the place; its children inherit them unless they have their own. Read from the first preparation month the months must run before, during, after, then off, with at least one during month (HEAT_SEASON_INVALID). Requires seasons manage at the place (CAPABILITY_NOT_ALLOWED). Records a heat_season_changed audit event."
       },
       "delete": {
         "tags": [
@@ -3427,6 +4149,108 @@
         "description": "Removes the place's own calendar; it then inherits its parent's or the official season. Administrators only. Records a heat_season_changed audit event when a calendar was removed."
       }
     },
+    "/access/check": {
+      "get": {
+        "tags": [
+          "access"
+        ],
+        "summary": "Check whether I may do one thing at a place",
+        "operationId": "check_access_access_check_get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "module",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "risk",
+                "data",
+                "vra",
+                "actions",
+                "plans",
+                "seasons",
+                "people",
+                "departments",
+                "workspace"
+              ],
+              "type": "string",
+              "title": "Module"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "read",
+                "write",
+                "manage"
+              ],
+              "type": "string",
+              "title": "Level"
+            }
+          },
+          {
+            "name": "place",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 512,
+              "title": "Place"
+            }
+          },
+          {
+            "name": "department",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether the capability is held, with the refusal code when not.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessCheck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Answers whether the signed-in person holds level (read, write or manage) on module at place, applying the same rule every protected route uses. department lists the owning departments of the action, data source or VRA indicator group being written: a write to an owned resource needs one of them unless the person manages the module. Refusals carry CAPABILITY_NOT_ALLOWED or ACCOUNT_DISABLED."
+      }
+    },
     "/saved-plans": {
       "get": {
         "tags": [
@@ -3451,7 +4275,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "Returns the caller's own saved plans, newest first, each with the dashboard choices that reopen it, the published estimate captured when it was saved and the deterministic risk_level/timing signals recommendations are keyed on. Plans for places no longer in the caller's geography scope are omitted. Requires a dashboard reader role."
+        "description": "Returns the caller's own saved plans, newest first, each with the dashboard choices that reopen it, the published estimate captured when it was saved and the deterministic risk_level/timing signals recommendations are keyed on. Plans for places where the caller no longer reads plans are omitted."
       },
       "post": {
         "tags": [
@@ -3674,7 +4498,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "Returns the chosen ranker and insight provider/model with every option and whether the server environment enables it (credentials are never stored or returned). Administrators only (chart_admin)."
+        "description": "Returns the chosen ranker and insight provider/model with every option and whether the server environment enables it (credentials are never stored or returned). Platform admins only."
       },
       "put": {
         "tags": [
@@ -3719,7 +4543,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "Stores the installation's ranker and insight provider/model. Refuses unknown options (RANKER_UNKNOWN, INSIGHT_PROVIDER_UNKNOWN), options the environment does not enable (RANKER_NOT_CONFIGURED, INSIGHT_PROVIDER_NOT_CONFIGURED) and a language model provider without a model (INSIGHT_MODEL_REQUIRED). Administrators only; every change records a recommendation_settings_changed audit event."
+        "description": "Stores the installation's ranker and insight provider/model. Refuses unknown options (RANKER_UNKNOWN, INSIGHT_PROVIDER_UNKNOWN), options the environment does not enable (RANKER_NOT_CONFIGURED, INSIGHT_PROVIDER_NOT_CONFIGURED) and a language model provider without a model (INSIGHT_MODEL_REQUIRED). Platform admins only; every change records a recommendation_settings_changed audit event."
       }
     },
     "/recommendation-settings/providers/{provider}/models": {
@@ -4298,7 +5122,7 @@
           "model-releases"
         ],
         "summary": "Re-verify and re-warm one release into the R runtime",
-        "description": "Finds the manifest whose id matches the URL parameter, re-parses its ModelReleaseSpec, and calls prepare_model_release to re-POST /models/load to the R runtime. Does not touch the database or reactivate the release. Requires the chart_admin role. Useful after an R container restart or after a manifest edit that swaps an artifact's SHA-256.",
+        "description": "Finds the manifest whose id matches the URL parameter, re-parses its ModelReleaseSpec, and calls prepare_model_release to re-POST /models/load to the R runtime. Does not touch the database or reactivate the release. Requires a platform admin. Useful after an R container restart or after a manifest edit that swaps an artifact's SHA-256.",
         "operationId": "reload_release_model_releases__release_id__reload_post",
         "security": [
           {
@@ -4346,7 +5170,7 @@
           "model-releases"
         ],
         "summary": "Clear the LBW inference circuit breaker in this API process",
-        "description": "The R adapter's circuit breaker opens after INFERENCE_LBW_CIRCUIT_FAILURES consecutive failures (default 5) and stays open for INFERENCE_LBW_CIRCUIT_SECONDS (default 30). The half-open probe closes it automatically once R recovers, but an operator investigating after an outage can call this endpoint to skip the wait instead of restarting the API container. Requires the chart_admin role. Only clears state in the calling process; other API replicas keep their own counter until reset individually or until their next half-open probe succeeds.",
+        "description": "The R adapter's circuit breaker opens after INFERENCE_LBW_CIRCUIT_FAILURES consecutive failures (default 5) and stays open for INFERENCE_LBW_CIRCUIT_SECONDS (default 30). The half-open probe closes it automatically once R recovers, but an operator investigating after an outage can call this endpoint to skip the wait instead of restarting the API container. Requires a platform admin. Only clears state in the calling process; other API replicas keep their own counter until reset individually or until their next half-open probe succeeds.",
         "operationId": "reset_inference_circuit_model_releases_circuit_reset_post",
         "responses": {
           "200": {
@@ -4611,6 +5435,30 @@
   },
   "components": {
     "schemas": {
+      "AccessCheck": {
+        "properties": {
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "allowed"
+        ],
+        "title": "AccessCheck"
+      },
       "ActionContent": {
         "properties": {
           "id": {
@@ -6569,92 +7417,6 @@
         ],
         "title": "CoverageResponse"
       },
-      "CreateUserInput": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 2,
-            "title": "Name"
-          },
-          "email": {
-            "type": "string",
-            "minLength": 3,
-            "title": "Email"
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phone"
-          },
-          "username": {
-            "type": "string",
-            "minLength": 2,
-            "title": "Username"
-          },
-          "roles": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Roles"
-          },
-          "geographyIds": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Geographyids"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "email",
-          "username",
-          "roles",
-          "geographyIds"
-        ],
-        "title": "CreateUserInput"
-      },
-      "CreateWorkspaceInput": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Name"
-          },
-          "geographyId": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Geographyid"
-          },
-          "planningCycle": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Planningcycle"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "geographyId"
-        ],
-        "title": "CreateWorkspaceInput"
-      },
       "CurrentObservationResponse": {
         "properties": {
           "admin_unit_id": {
@@ -6769,12 +7531,26 @@
             ],
             "title": "Email"
           },
-          "roles": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Roles"
+          "displayName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displayname"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "active"
+          },
+          "isPlatformAdmin": {
+            "type": "boolean",
+            "title": "Isplatformadmin",
+            "default": false
           },
           "geographyScopes": {
             "items": {
@@ -6804,16 +7580,163 @@
               }
             ],
             "title": "Geographylevel"
+          },
+          "workspaces": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceSummary"
+            },
+            "type": "array",
+            "title": "Workspaces"
           }
         },
         "type": "object",
         "required": [
           "userId",
-          "username",
-          "roles",
-          "geographyScopes"
+          "username"
         ],
-        "title": "CurrentUserContext"
+        "title": "CurrentUserContext",
+        "description": "The signed-in person: who Keycloak says they are, and what CHART's\ndatabase says they may do (``access``, never serialised)."
+      },
+      "DepartmentCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "DepartmentCreate"
+      },
+      "DepartmentItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "archived": {
+            "type": "boolean",
+            "title": "Archived"
+          },
+          "member_count": {
+            "type": "integer",
+            "title": "Member Count"
+          },
+          "owns": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            },
+            "type": "array",
+            "title": "Owns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "archived",
+          "member_count",
+          "owns"
+        ],
+        "title": "DepartmentItem"
+      },
+      "DepartmentList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DepartmentItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "mine": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Mine"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "mine"
+        ],
+        "title": "DepartmentList"
+      },
+      "DepartmentRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "DepartmentRef"
+      },
+      "DepartmentSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "DepartmentSummary"
+      },
+      "DepartmentUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "archived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived"
+          }
+        },
+        "type": "object",
+        "title": "DepartmentUpdate"
       },
       "Driver": {
         "properties": {
@@ -7362,6 +8285,105 @@
           "supportsPrediction"
         ],
         "title": "GeographyResponse"
+      },
+      "GrantInput": {
+        "properties": {
+          "role_id": {
+            "type": "integer",
+            "title": "Role Id"
+          },
+          "geography_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Geography Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role_id",
+          "geography_id"
+        ],
+        "title": "GrantInput"
+      },
+      "GrantItem": {
+        "properties": {
+          "role_id": {
+            "type": "integer",
+            "title": "Role Id"
+          },
+          "role_key": {
+            "type": "string",
+            "title": "Role Key"
+          },
+          "role_name": {
+            "type": "string",
+            "title": "Role Name"
+          },
+          "geography_id": {
+            "type": "string",
+            "title": "Geography Id"
+          },
+          "place_name": {
+            "type": "string",
+            "title": "Place Name"
+          },
+          "place_path": {
+            "type": "string",
+            "title": "Place Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role_id",
+          "role_key",
+          "role_name",
+          "geography_id",
+          "place_name",
+          "place_path"
+        ],
+        "title": "GrantItem"
+      },
+      "GrantSummary": {
+        "properties": {
+          "geographyId": {
+            "type": "string",
+            "title": "Geographyid"
+          },
+          "placePath": {
+            "type": "string",
+            "title": "Placepath"
+          },
+          "placeName": {
+            "type": "string",
+            "title": "Placename"
+          },
+          "roleKey": {
+            "type": "string",
+            "title": "Rolekey"
+          },
+          "roleName": {
+            "type": "string",
+            "title": "Rolename"
+          },
+          "capabilities": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Capabilities"
+          }
+        },
+        "type": "object",
+        "required": [
+          "geographyId",
+          "placePath",
+          "placeName",
+          "roleKey",
+          "roleName",
+          "capabilities"
+        ],
+        "title": "GrantSummary"
       },
       "HTTPValidationError": {
         "properties": {
@@ -8229,6 +9251,151 @@
         ],
         "title": "Insight"
       },
+      "InvitationCreate": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 3,
+            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "title": "Email"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/GrantInput"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Grants"
+          },
+          "department_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Department Ids"
+          },
+          "new_departments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "New Departments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "name",
+          "grants"
+        ],
+        "title": "InvitationCreate"
+      },
+      "InvitationItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "revoked",
+              "expired"
+            ],
+            "title": "Status"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/GrantItem"
+            },
+            "type": "array",
+            "title": "Grants"
+          },
+          "departments": {
+            "items": {
+              "$ref": "#/components/schemas/DepartmentRef"
+            },
+            "type": "array",
+            "title": "Departments"
+          },
+          "invited_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invited By"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "email_sent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Sent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "status",
+          "grants",
+          "departments",
+          "invited_by",
+          "expires_at",
+          "created_at"
+        ],
+        "title": "InvitationItem"
+      },
+      "InvitationList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "InvitationList"
+      },
       "LagWindowSpec": {
         "properties": {
           "months": {
@@ -8739,6 +9906,121 @@
         ],
         "title": "MapResponse",
         "description": "A choropleth of one metric over the areas beneath a geography.\n\nDeliberately not the grid in the design references: these are\nadministrative areas carrying an area-level value. Rendering cells from an\narea value would imply a spatial resolution the model does not have."
+      },
+      "MemberItem": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "disabled"
+            ],
+            "title": "Status"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/GrantItem"
+            },
+            "type": "array",
+            "title": "Grants"
+          },
+          "departments": {
+            "items": {
+              "$ref": "#/components/schemas/DepartmentRef"
+            },
+            "type": "array",
+            "title": "Departments"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "can_manage": {
+            "type": "boolean",
+            "title": "Can Manage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "display_name",
+          "email",
+          "status",
+          "grants",
+          "departments",
+          "last_seen_at",
+          "can_manage"
+        ],
+        "title": "MemberItem"
+      },
+      "MemberList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MemberItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "MemberList"
+      },
+      "MemberUpdate": {
+        "properties": {
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/GrantInput"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Grants"
+          },
+          "department_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Department Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "grants"
+        ],
+        "title": "MemberUpdate"
       },
       "ModelFileInfo": {
         "properties": {
@@ -9358,6 +10640,23 @@
         "title": "MonthlyTemperature",
         "description": "The month's maximum temperature, area-level, from ERA5.\n\nThe variable is maximum temperature; the monthly value is the mean of\nits daily values, which is what the model was fitted on and therefore\nwhat it consumes. The month's single hottest day is deliberately not\nused. The dashboard says \"maximum temperature\" rather than \"average\nmaximum temperature\", which reads as a contradiction - agreed on the\n17 Sep modelling call."
       },
+      "MyDepartments": {
+        "properties": {
+          "department_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Department Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "department_ids"
+        ],
+        "title": "MyDepartments"
+      },
       "ObservedCapability": {
         "properties": {
           "source": {
@@ -9894,6 +11193,23 @@
           "parts"
         ],
         "title": "OutlookPeriod"
+      },
+      "Ownership": {
+        "properties": {
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceRef"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Resources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "resources"
+        ],
+        "title": "Ownership"
       },
       "PeakSeason": {
         "properties": {
@@ -12243,6 +13559,133 @@
         ],
         "title": "ResourceListResponse"
       },
+      "ResourceOption": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "data_source",
+              "vra_indicator_group"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "key",
+          "name"
+        ],
+        "title": "ResourceOption"
+      },
+      "ResourceOptions": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceOption"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ResourceOptions"
+      },
+      "ResourceRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "data_source",
+              "vra_indicator_group"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "key"
+        ],
+        "title": "ResourceRef"
+      },
+      "RoleItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default"
+          },
+          "capabilities": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Capabilities"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "name",
+          "is_default",
+          "capabilities"
+        ],
+        "title": "RoleItem"
+      },
+      "RoleList": {
+        "properties": {
+          "modules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Modules"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RoleItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "modules",
+          "items"
+        ],
+        "title": "RoleList"
+      },
       "RunSummary": {
         "properties": {
           "id": {
@@ -12971,115 +14414,6 @@
         "title": "TrackSummary",
         "description": "One stop on the pathway, with how much of it the caller has watched."
       },
-      "UserGeographyScope": {
-        "properties": {
-          "geographyId": {
-            "type": "string",
-            "title": "Geographyid"
-          },
-          "path": {
-            "type": "string",
-            "title": "Path"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "levelLabel": {
-            "type": "string",
-            "title": "Levellabel"
-          }
-        },
-        "type": "object",
-        "required": [
-          "geographyId",
-          "path",
-          "name",
-          "levelLabel"
-        ],
-        "title": "UserGeographyScope"
-      },
-      "UserResponse": {
-        "properties": {
-          "userId": {
-            "type": "string",
-            "title": "Userid"
-          },
-          "username": {
-            "type": "string",
-            "title": "Username"
-          },
-          "email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Email"
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phone"
-          },
-          "displayName": {
-            "type": "string",
-            "title": "Displayname"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "roles": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Roles"
-          },
-          "geographyScopes": {
-            "items": {
-              "$ref": "#/components/schemas/UserGeographyScope"
-            },
-            "type": "array",
-            "title": "Geographyscopes"
-          },
-          "invitation": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "sent",
-                  "failed"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Invitation"
-          }
-        },
-        "type": "object",
-        "required": [
-          "userId",
-          "username",
-          "displayName",
-          "status",
-          "roles",
-          "geographyScopes"
-        ],
-        "title": "UserResponse"
-      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -13443,17 +14777,35 @@
         "title": "WhatIfResponse",
         "description": "Mirrors the R service /predict response. Fields the UI does not render\ntoday are still returned so the visuals can pull them in without another\nround-trip."
       },
-      "WorkspaceResponse": {
+      "WorkspaceCreate": {
+        "properties": {
+          "country_code": {
+            "type": "string",
+            "pattern": "^[A-Za-z]{2}$",
+            "title": "Country Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "country_code"
+        ],
+        "title": "WorkspaceCreate"
+      },
+      "WorkspaceItem": {
         "properties": {
           "id": {
             "type": "string",
             "title": "Id"
           },
+          "country_code": {
+            "type": "string",
+            "title": "Country Code"
+          },
           "name": {
             "type": "string",
             "title": "Name"
           },
-          "planningCycle": {
+          "geography_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -13462,13 +14814,9 @@
                 "type": "null"
               }
             ],
-            "title": "Planningcycle"
+            "title": "Geography Id"
           },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "geographyId": {
+          "place_path": {
             "anyOf": [
               {
                 "type": "string"
@@ -13477,53 +14825,78 @@
                 "type": "null"
               }
             ],
-            "title": "Geographyid"
+            "title": "Place Path"
           },
-          "createdByUserId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Createdbyuserid"
-          },
-          "ownerUserId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Owneruserid"
-          },
-          "memberRole": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Memberrole"
+          "member_count": {
+            "type": "integer",
+            "title": "Member Count"
           }
         },
         "type": "object",
         "required": [
           "id",
+          "country_code",
           "name",
-          "planningCycle",
-          "status",
-          "geographyId",
-          "createdByUserId",
-          "ownerUserId"
+          "geography_id",
+          "place_path",
+          "member_count"
         ],
-        "title": "WorkspaceResponse"
+        "title": "WorkspaceItem"
+      },
+      "WorkspaceList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "WorkspaceList"
+      },
+      "WorkspaceSummary": {
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "title": "Workspaceid"
+          },
+          "countryCode": {
+            "type": "string",
+            "title": "Countrycode"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/GrantSummary"
+            },
+            "type": "array",
+            "title": "Grants"
+          },
+          "departments": {
+            "items": {
+              "$ref": "#/components/schemas/DepartmentSummary"
+            },
+            "type": "array",
+            "title": "Departments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "workspaceId",
+          "countryCode",
+          "name",
+          "grants",
+          "departments"
+        ],
+        "title": "WorkspaceSummary"
       }
     },
     "securitySchemes": {

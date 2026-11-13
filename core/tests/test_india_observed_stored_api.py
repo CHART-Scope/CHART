@@ -20,8 +20,9 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from chart.api.app import app
-from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import require_current_user, require_reader
+
+from access_support import member
 from chart.heat_outlook import routes as outlook_routes
 from chart.model_settings import service as settings_service
 from chart.risk import routes as risk_routes
@@ -188,11 +189,8 @@ def client(factory, monkeypatch) -> Iterator[TestClient]:
             else "/india/madhya-pradesh/bhopal"
         ),
     )
-    app.dependency_overrides[require_current_user] = lambda: CurrentUserContext(
-        user_id="planner",
-        username="planner",
-        roles=["health_planning_lead"],
-        geography_scopes=["/india"],
+    app.dependency_overrides[require_current_user] = lambda: member(
+        "planner", "planning_lead", ["/india"]
     )
     app.dependency_overrides[require_reader] = app.dependency_overrides[
         require_current_user

@@ -10,8 +10,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from chart.api.app import app
-from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import require_current_user
+
+from access_support import member, platform_admin
 from chart.setup.schemas import (
     BootstrapAdminResponse,
     BootstrapSetupResponse,
@@ -29,11 +30,8 @@ def client() -> TestClient:
 
 @pytest.fixture
 def planning_user_client() -> Iterator[TestClient]:
-    app.dependency_overrides[require_current_user] = lambda: CurrentUserContext(
-        user_id="planner-1",
-        username="planner",
-        roles=["health_planning_lead"],
-        geography_scopes=["/india/madhya-pradesh"],
+    app.dependency_overrides[require_current_user] = lambda: member(
+        "planner-1", "planning_lead", ["/india/madhya-pradesh"]
     )
     try:
         yield TestClient(app)
@@ -43,12 +41,7 @@ def planning_user_client() -> Iterator[TestClient]:
 
 @pytest.fixture
 def admin_client() -> Iterator[TestClient]:
-    app.dependency_overrides[require_current_user] = lambda: CurrentUserContext(
-        user_id="admin-1",
-        username="admin",
-        roles=["chart_admin", "content_editor"],
-        geography_scopes=["/india/madhya-pradesh"],
-    )
+    app.dependency_overrides[require_current_user] = lambda: platform_admin("admin-1")
     try:
         yield TestClient(app)
     finally:
@@ -261,16 +254,18 @@ def test_setup_complete_rejects_unknown_sector(admin_client: TestClient) -> None
     assert response.json() == {"error": "SETUP_SECTOR_INVALID"}
 
 
-def test_users_require_keycloak(client: TestClient) -> None:
-    response = client.get("/users")
+def test_workspaces_require_keycloak(client: TestClient) -> None:
+    response = client.get("/workspaces")
     assert response.status_code == 401
     assert response.json() == {"error": "AUTH_TOKEN_REQUIRED"}
 
 
-def test_users_deny_non_admin(planning_user_client: TestClient) -> None:
-    response = planning_user_client.get("/users")
+def test_creating_a_workspace_denies_non_platform_admin(
+    planning_user_client: TestClient,
+) -> None:
+    response = planning_user_client.post("/workspaces", json={"country_code": "IN"})
     assert response.status_code == 403
-    assert response.json() == {"error": "USER_FORBIDDEN"}
+    assert response.json() == {"error": "PLATFORM_ADMIN_REQUIRED"}
 
 
 def test_model_sync_requires_authentication(client: TestClient) -> None:
@@ -328,7 +323,7 @@ def test_model_release_controls_deny_non_admin(
     ):
         response = planning_user_client.post(path)
     assert response.status_code == 403
-    assert response.json() == {"error": "ROLE_NOT_ALLOWED"}
+    assert response.json() == {"error": "PLATFORM_ADMIN_REQUIRED"}
     prepare.assert_not_called()
     reset.assert_not_called()
 

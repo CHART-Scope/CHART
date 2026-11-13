@@ -7,9 +7,12 @@ place loaded again.
 
 from __future__ import annotations
 
+import time
+
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
+from chart.access import principal as access
 from chart.api import read_cache
 
 
@@ -148,3 +151,37 @@ def test_data_version_is_trusted_for_five_minutes(monkeypatch) -> None:
     clock["now"] += 2
     assert read_cache.data_version() != first
     read_cache.clear()
+
+
+def test_a_signed_in_copy_ends_when_access_changes(monkeypatch) -> None:
+    """Access is read from the database and takes effect at once; a copy kept
+    for a person must not outlive a change to it (disabled, grant removed),
+    nor the few seconds another worker's access cache is trusted for."""
+    read_cache.clear()
+    monkeypatch.setenv("CHART_READ_CACHE", "1")
+    monkeypatch.setattr(read_cache, "data_version", lambda: "v1")
+    calls: list[str] = []
+    client = TestClient(_app(calls))
+    signed = {"Authorization": "Bearer planner"}
+
+    first = client.get("/heat-outlook/geo-ke/map", headers=signed)
+    assert client.get("/heat-outlook/geo-ke/map", headers=signed).headers[
+        "x-cache"
+    ] == ("hit")
+    client.get("/heat-outlook/geo-ke/map")
+
+    access.forget("planner")
+    after = client.get(
+        "/heat-outlook/geo-ke/map",
+        headers={**signed, "If-None-Match": first.headers["etag"]},
+    )
+    assert after.status_code == 200 and after.headers["x-cache"] == "miss"
+    assert calls == ["geo-ke", "geo-ke", "geo-ke"]
+    # Published reads for signed-out visitors are not anyone's access.
+    assert client.get("/heat-outlook/geo-ke/map").headers["x-cache"] == "hit"
+
+    # Another worker's change: seen once the access cache would expire.
+    clock = time.time() + access.CACHE_SECONDS
+    monkeypatch.setattr(access.time, "time", lambda: clock)
+    later = client.get("/heat-outlook/geo-ke/map", headers=signed)
+    assert later.headers["x-cache"] == "miss"

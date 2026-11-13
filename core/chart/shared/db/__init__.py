@@ -18,9 +18,6 @@ from .models import (
     PredictionRequestRecord,
     Provenance,
     SetupStateRecord,
-    UserGeographyScopeRecord,
-    UserRoleRecord,
-    WorkspaceMemberRecord,
     WorkspaceRecord,
 )
 from .session import dispose_engines, get_engine, get_session_factory
@@ -45,9 +42,6 @@ __all__ = [
     "PredictionRequestRecord",
     "Provenance",
     "SetupStateRecord",
-    "UserGeographyScopeRecord",
-    "UserRoleRecord",
-    "WorkspaceMemberRecord",
     "WorkspaceRecord",
     "dispose_engines",
     "get_engine",

@@ -4,6 +4,7 @@ import {
   FALLBACK_RESOURCES,
   FALLBACK_TRACKS,
 } from "../src/features/learning/data/fallback";
+import { type Who } from "./support/access";
 import { accessToken, installFakeApi, json, type FakeApi } from "./support/fakeApi";
 
 // Failure modes: the sidebar unmounting (and the page blanking) on every
@@ -78,14 +79,8 @@ async function shellWatch(page: Page): Promise<ShellWatch> {
   });
 }
 
-async function signInAs(
-  page: Page,
-  user: { roles: string[]; geographyScopes: string[] },
-): Promise<FakeApi> {
-  const api = await installFakeApi(page);
-  api.on(/^\/api\/chart\/auth\/me$/, (route) =>
-    json(route, { userId: "e2e-admin", username: "admin", ...user }),
-  );
+async function signInAs(page: Page, who: Who): Promise<FakeApi> {
+  const api = await installFakeApi(page, { who: { userId: "e2e-admin", ...who } });
   api.on(/^\/api\/chart\/learning\/resources$/, (route) =>
     json(route, { items: FALLBACK_RESOURCES, total: FALLBACK_RESOURCES.length }),
   );
@@ -95,7 +90,7 @@ async function signInAs(
   return api;
 }
 
-const admin = { roles: ["chart_admin"], geographyScopes: ["/india"] };
+const admin: Who = { platformAdmin: true, role: "workspace_admin", places: ["/india"] };
 
 // Evidence screenshots wait for the entrance animations to finish.
 async function settle(page: Page) {
@@ -219,12 +214,9 @@ test("signed-in Learning hub never shows the public Sign in header", async ({
 });
 
 test("route guards still apply inside the shared shell", async ({ page }) => {
-  // A planner without the admin role may use the Models tab (model options)
-  // but not model release management, which stays with administrators.
-  await signInAs(page, {
-    roles: ["health_planning_lead"],
-    geographyScopes: ["/india"],
-  });
+  // A planning lead reads the Models tab (model options) but not model
+  // release management, which stays with platform admins.
+  await signInAs(page, { role: "planning_lead", places: ["/india"] });
   await page.goto("/settings/models");
   await expect(page).toHaveURL(/\/settings\?tab=models$/);
   await expect(
@@ -235,8 +227,8 @@ test("route guards still apply inside the shared shell", async ({ page }) => {
   ).toHaveCount(0);
 });
 
-test("an account without a planning area gets the public map", async ({ page }) => {
-  await signInAs(page, { roles: ["health_planning_lead"], geographyScopes: [] });
+test("an account without any grant gets the public map", async ({ page }) => {
+  await signInAs(page, { role: null });
   await page.goto("/dashboard/geo-in-mp?outcome=lbw");
   await expect(page).toHaveURL(/\/explore(\?|$)/);
   await page.goto("/access-pending");

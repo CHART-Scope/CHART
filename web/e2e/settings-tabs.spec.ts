@@ -12,15 +12,22 @@ import { installKenya, type KenyaApi } from "./support/kenya";
 // shows is one it fetched by itself.
 
 const evidence = "../outputs/e2e/web/settings";
-const admin = { roles: ["chart_admin", "health_planning_lead"] };
+// A platform admin who is also Workspace admin for Kenya and India.
+const admin = {
+  who: { role: "workspace_admin" as const, platformAdmin: true },
+};
 const tabs = [
   "Workspace",
+  "People",
+  "Departments",
+  "Roles",
   "Models",
   "Heat seasons",
   "Data",
   "VRA",
   "Recommendations",
   "Jobs",
+  "Workspaces",
 ] as const;
 
 type Job = {
@@ -129,26 +136,6 @@ async function installAdmin(page: Page) {
       ],
     }),
   );
-  api.on(/^\/api\/admin\/users$/, (route) =>
-    json(route, [
-      {
-        userId: "u1",
-        username: "amina",
-        email: "amina@example.org",
-        displayName: "Amina Planner",
-        status: "active",
-        roles: ["health_planning_lead"],
-        geographyScopes: [
-          {
-            geographyId: "geo-ke",
-            path: "/kenya",
-            name: "Kenya",
-            levelLabel: "Country",
-          },
-        ],
-      },
-    ]),
-  );
   api.on(/^\/api\/chart\/model-releases$/, (route) =>
     json(route, {
       items: [
@@ -187,7 +174,7 @@ const climateTable = (page: Page) =>
 const tabList = (page: Page) =>
   page.getByRole("tablist", { name: "Settings sections" });
 const tab = (page: Page, name: string | RegExp) =>
-  tabList(page).getByRole("tab", { name });
+  tabList(page).getByRole("tab", { name, exact: typeof name === "string" });
 
 async function noSidewaysScroll(page: Page) {
   const overflow = await page.evaluate(
@@ -203,10 +190,14 @@ test("tabs are kept in the URL, survive a reload and work from the keyboard", as
   await page.goto("/settings");
   await expect(tabList(page).getByRole("tab")).toHaveText([...tabs]);
   await expect(tab(page, "Workspace")).toHaveAttribute("aria-selected", "true");
-  // Workspace is about where and with whom: the location and, for an admin,
-  // who has access. Model options moved to Models.
+  // Workspace is your location and your own access; people have their own
+  // tab. Model options moved to Models.
   await expect(page.getByText("Planning location")).toBeVisible();
-  await expect(page.getByText("Amina Planner")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "What you can do in CHART" }),
+  ).toBeVisible();
+  await expect(page.getByText("You are a platform admin")).toBeVisible();
+  await expect(page.getByText("Priya Sharma")).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "What the dashboard offers" }),
   ).toHaveCount(0);
@@ -249,9 +240,12 @@ test("tabs are kept in the URL, survive a reload and work from the keyboard", as
   await expect(page).toHaveURL(/\/settings\?tab=models$/);
   await expect(tab(page, "Models")).toHaveAttribute("aria-selected", "true");
 
-  // The reset is folded away at the foot of Workspace, never on show.
+  // People lists the members; the reset is folded away at the foot of
+  // Workspace, never on show.
+  await tab(page, "People").click();
+  await expect(page).toHaveURL(/\?tab=people$/);
+  await expect(page.getByText("Priya Sharma")).toBeVisible();
   await tab(page, "Workspace").click();
-  await expect(page.getByText("Amina Planner")).toBeVisible();
   const reset = page.getByRole("button", { name: "Reset installation" });
   await expect(reset).toBeHidden();
   await page.getByText("Danger zone").click();
@@ -262,18 +256,25 @@ test("tabs are kept in the URL, survive a reload and work from the keyboard", as
   await expect(page).toHaveURL(/\/settings$/);
 });
 
-test("a planner sees Workspace and Models only and cannot open an admin tab by URL", async ({
+test("a planning lead sees the tabs their role allows and cannot open others by URL", async ({
   page,
 }) => {
   const api = await installKenya(page, true, ["/kenya"], {
-    roles: ["health_planning_lead"],
+    who: { role: "planning_lead" },
   });
   await page.goto("/settings?tab=jobs");
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByText("Planning location")).toBeVisible();
-  await expect(tabList(page).getByRole("tab")).toHaveText(["Workspace", "Models"]);
-  // Managing people stays with administrators.
-  await expect(page.getByText("Amina Planner")).toHaveCount(0);
+  await expect(tabList(page).getByRole("tab")).toHaveText([
+    "Workspace",
+    "People",
+    "Departments",
+    "Models",
+  ]);
+  for (const denied of ["roles", "workspaces", "recommendations", "seasons"]) {
+    await page.goto(`/settings?tab=${denied}`);
+    await expect(page).toHaveURL(/\/settings$/);
+  }
   await tab(page, "Models").click();
   await expect(page.getByRole("group", { name: "Low birth weight" })).toBeVisible();
   for (const hidden of ["Running and recent work", "Observations held per country"])
@@ -284,7 +285,7 @@ test("a planner sees Workspace and Models only and cannot open an admin tab by U
   // Nothing administrative was even asked for.
   expect(
     api.requests.filter((r) =>
-      /ingestion-jobs|coverage|admin\/users|model-releases/.test(r),
+      /ingestion-jobs|coverage|model-releases|recommendation-settings/.test(r),
     ),
   ).toEqual([]);
   await page.screenshot({
@@ -425,7 +426,7 @@ test("every tab fits a phone and a desktop without sideways scrolling", async ({
     for (const name of tabs) {
       const key = name === "Heat seasons" ? "seasons" : name.toLowerCase();
       await page.goto(name === "Workspace" ? "/settings" : `/settings?tab=${key}`);
-      await expect(tab(page, new RegExp(`^${name}`))).toHaveAttribute(
+      await expect(tab(page, new RegExp(`^${name}( \\(\\d+\\))?$`))).toHaveAttribute(
         "aria-selected",
         "true",
       );

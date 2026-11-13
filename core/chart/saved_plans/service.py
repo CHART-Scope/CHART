@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from chart.heat_seasons.service import season_months
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import can_read_geography_path
+from chart.access.guards import can
 from chart.climate.heat_seasons import heat_season
 from chart.heat_outlook.observed import ObservedNotCalibrated, load_observed
 from chart.heat_outlook.service import (
@@ -62,8 +62,13 @@ def create_plan(
         if unit is None or not unit.path.startswith(frame.path.rstrip("/") + "/"):
             raise SavedPlanError("PLAN_AREA_INVALID", 422)
         place = unit
-    if not can_read_geography_path(user, place.path):
-        raise SavedPlanError("GEOGRAPHY_OUT_OF_SCOPE", 403)
+    if not can(user, "plans", "write", place.path):
+        code = (
+            "CAPABILITY_NOT_ALLOWED"
+            if can(user, "plans", "read", place.path)
+            else "GEOGRAPHY_OUT_OF_SCOPE"
+        )
+        raise SavedPlanError(code, 403)
     count = (
         session.scalar(select(func.count()).where(SavedPlan.user_id == user.user_id))
         or 0
@@ -115,7 +120,7 @@ def list_plans(session: Session, user: CurrentUserContext) -> list[SavedPlanResp
     return [
         plan_response(plan)
         for plan in plans
-        if can_read_geography_path(user, paths[plan.admin_unit_id or plan.geography_id])
+        if can(user, "plans", "read", paths[plan.admin_unit_id or plan.geography_id])
     ]
 
 
@@ -132,7 +137,7 @@ def readable_plan(
 
     plan = _owned(session, user, plan_id)
     place = session.get(AppGeography, plan.admin_unit_id or plan.geography_id)
-    if place is None or not can_read_geography_path(user, place.path):
+    if place is None or not can(user, "plans", "read", place.path):
         raise SavedPlanError("GEOGRAPHY_OUT_OF_SCOPE", 403)
     return plan
 

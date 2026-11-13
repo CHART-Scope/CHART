@@ -36,13 +36,13 @@ from chart.model_registry.routes import (
 )
 from chart.learning.routes import router as learning_router
 from chart.heat_seasons.routes import router as heat_seasons_router
+from chart.access.routes import router as access_router
 from chart.model_settings.routes import router as model_settings_router
 from chart.risk.routes import router as risk_router
 from chart.recommendations.routes import router as recommendations_router
 from chart.saved_plans.routes import router as saved_plans_router
 from chart.setup.routes import router as setup_router
 from chart.shared.db.session import dispose_engines, get_session_factory
-from chart.users.routes import router as users_router
 from chart.vra.routes import router as vra_router
 from chart.workspaces.routes import router as workspaces_router
 
@@ -130,7 +130,6 @@ app.include_router(geographies_router)
 app.include_router(climate_router)
 app.include_router(setup_router)
 app.include_router(actions_router)
-app.include_router(users_router)
 app.include_router(workspaces_router)
 app.include_router(risk_router)
 app.include_router(heat_outlook_router)
@@ -141,6 +140,7 @@ app.add_middleware(MapGeometryMiddleware)
 app.include_router(vra_router)
 app.include_router(model_settings_router)
 app.include_router(heat_seasons_router)
+app.include_router(access_router)
 app.include_router(saved_plans_router)
 app.include_router(recommendations_router)
 app.include_router(learning_router)

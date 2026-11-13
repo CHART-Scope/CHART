@@ -16,32 +16,8 @@
     "client": {
       "chart-core": [
         {
-          "name": "health_planning_lead",
-          "description": "Health planning lead at state, county, or equivalent geography"
-        },
-        {
-          "name": "cross_sector_planning_lead",
-          "description": "Cross-sector planning lead at state, county, or equivalent geography"
-        },
-        {
-          "name": "health_implementation_officer",
-          "description": "Health implementation officer at district, sub-county, or equivalent geography"
-        },
-        {
-          "name": "cross_sector_implementation_officer",
-          "description": "Cross-sector implementation officer at district, sub-county, or equivalent geography"
-        },
-        {
-          "name": "public_viewer",
-          "description": "Public visitor or partner"
-        },
-        {
           "name": "chart_admin",
-          "description": "CHART administrator"
-        },
-        {
-          "name": "content_editor",
-          "description": "Can manage CHART public content and solution repository records"
+          "description": "Makes the seeded administrator CHART's first platform admin while it has none. Every other permission lives in CHART's database (docs/access-control.md)."
         }
       ]
     }
@@ -63,19 +39,6 @@
         "post.logout.redirect.uris": "http://localhost:3100##http://localhost:3100/*##http://127.0.0.1:3100##http://127.0.0.1:3100/*"
       },
       "protocolMappers": [
-        {
-          "name": "groups",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-group-membership-mapper",
-          "consentRequired": false,
-          "config": {
-            "claim.name": "groups",
-            "full.path": "true",
-            "id.token.claim": "true",
-            "access.token.claim": "true",
-            "userinfo.token.claim": "true"
-          }
-        },
         {
           "name": "chart-core-audience",
           "protocol": "openid-connect",

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { meAs } from "./support/access";
 import { installFakeApi, json } from "./support/fakeApi";
 
 const callback = "/auth/callback?code=e2e-code&state=e2e-state";
@@ -113,18 +114,28 @@ test("the default admin, before setup gives it an area, lands on Settings → Wo
     json(route, { access_token: "unused" }, 200),
   );
   api.on(/^\/api\/chart\/auth\/me$/, (route) =>
-    json(route, {
-      userId: "admin-1",
-      username: "admin",
-      roles: ["chart_admin", "content_editor"],
-      geographyScopes: [],
-    }),
+    json(
+      route,
+      meAs({
+        userId: "admin-1",
+        username: "admin",
+        platformAdmin: true,
+        role: null,
+      }),
+    ),
   );
   api.on(/^\/api\/setup$/, (route) => json(route, { requiresOnboarding: false }));
 
   await page.goto(callback);
   await page.waitForURL(/\/settings$/);
-  await expect(page.getByRole("heading", { name: "People and access" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "What you can do in CHART" }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("tablist", { name: "Settings sections" })
+      .getByRole("tab", { name: "People" }),
+  ).toBeVisible();
 
   // "Set up CHART" asked for sign-in: the admin goes back to setup.
   await page.evaluate(() =>

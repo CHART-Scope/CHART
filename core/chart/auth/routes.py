@@ -4,12 +4,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
+from chart.access.guards import can_read_place
+
 from .schemas import AuthErrorResponse, CurrentUserContext, GeographyAccessResponse
-from .service import (
-    apply_active_geography,
-    can_read_geography_path,
-    require_current_user,
-)
+from .service import apply_active_geography, require_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -17,7 +15,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.get(
     "/me",
     response_model=CurrentUserContext,
-    summary="Resolve the current user role and geography context",
+    summary="Resolve the current user, their workspaces, grants and departments",
     responses={
         401: {"model": AuthErrorResponse, "description": "Keycloak token required."},
         403: {"model": AuthErrorResponse, "description": "Geography is out of scope."},
@@ -51,7 +49,7 @@ def get_geography_access(
 ) -> GeographyAccessResponse:
     if geography is None:
         raise HTTPException(status_code=400, detail="GEOGRAPHY_QUERY_REQUIRED")
-    if not can_read_geography_path(user, geography):
+    if not can_read_place(user, geography):
         raise HTTPException(status_code=403, detail="GEOGRAPHY_OUT_OF_SCOPE")
     normalized = "/" + "/".join(part for part in geography.split("/") if part)
     return GeographyAccessResponse.model_validate(

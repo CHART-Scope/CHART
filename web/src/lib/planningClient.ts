@@ -4,6 +4,8 @@ export type GeographyRecord = {
   id: string;
   name: string;
   path: string;
+  /** ISO code of the country the place is in (e.g. IN, KE). */
+  countryCode?: string;
   levelLabel: string;
   supportsPrediction?: boolean;
   parentId?: string | null;

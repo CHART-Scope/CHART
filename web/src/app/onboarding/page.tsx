@@ -52,10 +52,10 @@ function Onboarding({ session }: { session: AuthSession }) {
   const loadSetup = useCallback(async () => {
     setPageState({ phase: "loading", stage: "setup" });
     try {
-      if (!session.user.roles.includes("chart_admin")) {
+      if (!session.user.isPlatformAdmin) {
         setPageState({
           phase: "error",
-          message: "Only a CHART administrator can set up CHART. Sign in as admin.",
+          message: "Only a CHART platform admin can set up CHART. Sign in as admin.",
         });
         return;
       }
@@ -83,7 +83,7 @@ function Onboarding({ session }: { session: AuthSession }) {
             : "CHART installation setup is unavailable.",
       });
     }
-  }, [router, session.user.roles]);
+  }, [router, session.user.isPlatformAdmin]);
 
   useEffect(() => {
     void loadSetup();

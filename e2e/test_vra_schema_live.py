@@ -487,7 +487,7 @@ def test_unrecoverable_csv_quoting_rejects_whole_file_before_writing(
     assert sorted(item.value for item in stored_values(factory, areas)) == [23, 24]
 
 
-def test_leaf_reader_cannot_expand_vra_access_to_parent_or_siblings(
+def test_leaf_reader_reads_the_parent_frame_but_never_sibling_detail(
     client, admin_headers, tokens, vra_frame
 ):
     factory, areas = vra_frame
@@ -501,13 +501,21 @@ def test_leaf_reader_cannot_expand_vra_access_to_parent_or_siblings(
         "/india/state/madhya-pradesh/division/bhopal/district/bhopal"
     ]
     assert client.get("/vra/indicators", headers=headers).status_code == 200
-    for requested in (own, sibling, parent):
-        for suffix in ("assessment", "map", f"areas/{own}", f"areas/{sibling}"):
-            response = client.get(f"/vra/{requested}/{suffix}", headers=headers)
-            assert (response.status_code, response.json()["error"]) == (
-                403,
-                "GEOGRAPHY_OUT_OF_SCOPE",
-            ), response.text
+    # The division above reads as context (docs/access-control.md), showing
+    # only the planner's own district; a sibling is refused.
+    for requested in (own, parent):
+        response = client.get(f"/vra/{requested}/assessment", headers=headers)
+        assert response.status_code == 200, response.text
+        assert {area["geography_id"] for area in response.json()["areas"]} <= {own}
+    for suffix in ("assessment", "map"):
+        response = client.get(f"/vra/{sibling}/{suffix}", headers=headers)
+        assert (response.status_code, response.json()["error"]) == (
+            403,
+            "GEOGRAPHY_OUT_OF_SCOPE",
+        ), response.text
+    detail = client.get(f"/vra/{own}/areas/{sibling}", headers=headers)
+    assert detail.status_code in (403, 404), detail.text
+    # A planning lead reads VRA but never writes it.
     for method, suffix in (
         ("get", "template.csv"),
         ("get", "coverage"),
@@ -526,7 +534,7 @@ def test_leaf_reader_cannot_expand_vra_access_to_parent_or_siblings(
         )
         assert (response.status_code, response.json()["error"]) == (
             403,
-            "ROLE_NOT_ALLOWED",
+            "CAPABILITY_NOT_ALLOWED",
         )
     # The parent frame remains usable by a planner whose actual scope covers it.
     response = client.get(f"/vra/{own}/assessment", headers=tokens["india-planner"])
@@ -534,11 +542,9 @@ def test_leaf_reader_cannot_expand_vra_access_to_parent_or_siblings(
     assert response.json()["geography_id"] == parent
     assert len(response.json()["areas"]) > 1
     assert {own, sibling} <= {area["geography_id"] for area in response.json()["areas"]}
-    # Country administrators retain their explicit country scope and may obtain
-    # the whole district comparison template through a leaf link.
-    assert client.get("/auth/me", headers=admin_headers).json()["geographyScopes"] == [
-        "/india"
-    ]
+    # The platform admin may obtain the whole district comparison template
+    # through a leaf link.
+    assert client.get("/auth/me", headers=admin_headers).json()["isPlatformAdmin"]
     template = client.get(f"/vra/{own}/template.csv", headers=admin_headers)
     assert template.status_code == 200, template.text
     assert len(
@@ -580,10 +586,11 @@ def test_vra_mutations_and_templates_enforce_role_and_geography_scope(
         ("post", "runs"),
         ("post", "values"),
     ):
+        # Kenya's planning lead reads VRA there but never writes it.
         response = client.request(
             method,
             f"/vra/geo-ke/{path}",
-            headers={**admin_headers, "Content-Type": "text/csv"},
+            headers={**tokens["kenya-planner"], "Content-Type": "text/csv"},
             content=text if path == "values" else None,
         )
         assert response.status_code == 403, response.text

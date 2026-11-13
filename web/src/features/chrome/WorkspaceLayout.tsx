@@ -18,12 +18,7 @@ import {
   type AuthSession,
 } from "@/lib/authClient";
 
-import {
-  activeNavForPath,
-  appNavForRoles,
-  isPublicPath,
-  redirectForPath,
-} from "./appNav";
+import { activeNavForPath, appNavFor, isPublicPath, redirectForPath } from "./appNav";
 import { RouteSkeleton } from "./PageSkeleton";
 
 /**
@@ -128,7 +123,7 @@ function ShellFrame({
 }) {
   return (
     <AppShell
-      nav={session ? appNavForRoles(session.user.roles) : []}
+      nav={session ? appNavFor(session.user) : []}
       activeNav={activeNavForPath(pathname) ?? ""}
       loading={!session}
       onSignOut={session ? signOutOfKeycloak : undefined}
@@ -140,7 +135,7 @@ function ShellFrame({
   );
 }
 
-/** Role and planning-area checks for the route, with a placeholder (inside
+/** Capability and planning-area checks for the route, with a placeholder (inside
  * the shell) while a denied user is redirected. */
 function RouteGuard({
   session,

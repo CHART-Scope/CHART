@@ -22,7 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import can_read_geography_path
+from chart.access.guards import can
 from chart.climate.heat_seasons import heat_season
 from chart.shared.db.models import (
     AppGeography,
@@ -33,7 +33,6 @@ from chart.shared.db.models import (
 
 from .schemas import HeatSeasonCalendar
 
-WRITER_ROLES = frozenset({"chart_admin"})
 AUDIT_EVENT_TYPE = "heat_season_changed"
 BEFORE_MONTHS = 4
 _CYCLE = re.compile(r"^b*d+a*o*$")
@@ -90,7 +89,7 @@ def list_calendars(
     return [
         _calendar(place, by_id, saved)
         for place in places
-        if can_read_geography_path(user, place.path)
+        if can(user, "seasons", "read", place.path)
     ]
 
 
@@ -239,7 +238,7 @@ def _readable(
     place = session.get(AppGeography, geography_id)
     if place is None:
         raise HeatSeasonError("HEAT_SEASON_GEOGRAPHY_NOT_FOUND", 404)
-    if not can_read_geography_path(user, place.path):
+    if not can(user, "seasons", "read", place.path):
         raise HeatSeasonError("GEOGRAPHY_NOT_ALLOWED", 403)
     return place
 
@@ -248,8 +247,8 @@ def _writable(
     session: Session, user: CurrentUserContext, geography_id: str
 ) -> AppGeography:
     place = _readable(session, user, geography_id)
-    if not WRITER_ROLES.intersection(user.roles):
-        raise HeatSeasonError("ROLE_NOT_ALLOWED", 403)
+    if not can(user, "seasons", "manage", place.path):
+        raise HeatSeasonError("CAPABILITY_NOT_ALLOWED", 403)
     # The audit row and updated_by need the user; a first-time caller has none.
     if session.get(AppUser, user.user_id) is None:
         session.add(

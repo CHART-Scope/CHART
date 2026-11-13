@@ -7,8 +7,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from chart.api.app import app
-from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import require_current_user
+
+from access_support import member
 from chart.climate.schemas import (
     HeatSeasonOptionResponse,
     PlaceListResponse,
@@ -28,11 +29,8 @@ def client() -> TestClient:
 
 @pytest.fixture
 def authenticated_client() -> Iterator[TestClient]:
-    app.dependency_overrides[require_current_user] = lambda: CurrentUserContext(
-        user_id="test-user",
-        username="test-user",
-        roles=["health_planning_lead"],
-        geography_scopes=["/india/madhya-pradesh"],
+    app.dependency_overrides[require_current_user] = lambda: member(
+        "test-user", "planning_lead", ["/india/madhya-pradesh"]
     )
     try:
         yield TestClient(app)
@@ -170,11 +168,8 @@ def test_planning_options_return_relative_heat_season(
 
 
 def test_planning_options_deny_out_of_scope_place(client: TestClient) -> None:
-    app.dependency_overrides[require_current_user] = lambda: CurrentUserContext(
-        user_id="test-user",
-        username="test-user",
-        roles=["health_planning_lead"],
-        geography_scopes=["/kenya/kajiado"],
+    app.dependency_overrides[require_current_user] = lambda: member(
+        "test-user", "planning_lead", ["/kenya/kajiado"]
     )
     try:
         with (
@@ -273,11 +268,8 @@ def test_long_term_prediction_passes_the_scenario_to_the_queue(
 
 
 def test_predict_denies_out_of_scope_place(client: TestClient) -> None:
-    app.dependency_overrides[require_current_user] = lambda: CurrentUserContext(
-        user_id="test-user",
-        username="test-user",
-        roles=["health_planning_lead"],
-        geography_scopes=["/kenya/kajiado"],
+    app.dependency_overrides[require_current_user] = lambda: member(
+        "test-user", "planning_lead", ["/kenya/kajiado"]
     )
     try:
         with (
@@ -302,11 +294,8 @@ def test_predict_denies_out_of_scope_place(client: TestClient) -> None:
 
 
 def test_predict_denies_non_planning_role(client: TestClient) -> None:
-    app.dependency_overrides[require_current_user] = lambda: CurrentUserContext(
-        user_id="test-user",
-        username="test-user",
-        roles=["public_viewer"],
-        geography_scopes=["/india/madhya-pradesh"],
+    app.dependency_overrides[require_current_user] = lambda: member(
+        "test-user", "viewer", ["/india/madhya-pradesh"]
     )
     try:
         with patch("chart.climate.routes.submit_prediction") as submit:
@@ -320,7 +309,7 @@ def test_predict_denies_non_planning_role(client: TestClient) -> None:
     finally:
         app.dependency_overrides.pop(require_current_user, None)
     assert response.status_code == 403
-    assert response.json() == {"error": "ROLE_NOT_ALLOWED"}
+    assert response.json() == {"error": "CAPABILITY_NOT_ALLOWED"}
     submit.assert_not_called()
 
 
@@ -374,11 +363,8 @@ def test_recent_requests_require_keycloak(client: TestClient) -> None:
 
 
 def test_recent_requests_deny_out_of_scope_place(client: TestClient) -> None:
-    app.dependency_overrides[require_current_user] = lambda: CurrentUserContext(
-        user_id="test-user",
-        username="test-user",
-        roles=["health_planning_lead"],
-        geography_scopes=["/kenya/kajiado"],
+    app.dependency_overrides[require_current_user] = lambda: member(
+        "test-user", "planning_lead", ["/kenya/kajiado"]
     )
 
     def _raise_out_of_scope(_user, _geo_id):

@@ -14,51 +14,7 @@ def _config() -> service.IdentityConfig:
     )
 
 
-def test_group_path_reads_children_from_the_parent_endpoint(monkeypatch) -> None:
-    calls: list[tuple[str, str]] = []
-
-    def request(_config, _token, method, path, **_kwargs):
-        calls.append((method, path))
-        if path == "/groups?briefRepresentation=false":
-            return [{"id": "india-id", "name": "india"}]
-        if path == "/groups/india-id/children?briefRepresentation=false":
-            return [{"id": "mp-id", "name": "madhya-pradesh"}]
-        raise AssertionError(f"Unexpected Keycloak request: {method} {path}")
-
-    monkeypatch.setattr(service, "_request", request)
-
-    group = service._ensure_group_path(_config(), "token", "/india/madhya-pradesh")
-
-    assert group == {"id": "mp-id", "name": "madhya-pradesh"}
-    assert calls == [
-        ("GET", "/groups?briefRepresentation=false"),
-        ("GET", "/groups/india-id/children?briefRepresentation=false"),
-    ]
-
-
-def test_group_path_recovers_when_another_request_creates_the_group(
-    monkeypatch,
-) -> None:
-    root_reads = 0
-
-    def request(_config, _token, method, path, **_kwargs):
-        nonlocal root_reads
-        if method == "GET" and path == "/groups?briefRepresentation=false":
-            root_reads += 1
-            return [] if root_reads == 1 else [{"id": "india-id", "name": "india"}]
-        if method == "POST" and path == "/groups":
-            raise service.IdentityError("USER_IDENTITY_GROUP_CONFLICT", 409)
-        raise AssertionError(f"Unexpected Keycloak request: {method} {path}")
-
-    monkeypatch.setattr(service, "_request", request)
-
-    group = service._ensure_group_path(_config(), "token", "/india")
-
-    assert group == {"id": "india-id", "name": "india"}
-    assert root_reads == 2
-
-
-def test_recover_admin_reenables_the_account_and_restores_roles(monkeypatch) -> None:
+def test_recover_admin_reenables_the_account(monkeypatch) -> None:
     calls: list[tuple[str, str, object]] = []
     config = _config()
 
@@ -68,11 +24,6 @@ def test_recover_admin_reenables_the_account_and_restores_roles(monkeypatch) -> 
         service,
         "_find_user",
         lambda _config, _token, _username, _email: {"id": "user-1"},
-    )
-    monkeypatch.setattr(
-        service,
-        "_add_client_roles",
-        lambda _config, _token, user_id, roles: calls.append(("ROLES", user_id, roles)),
     )
 
     def request(_config, _token, method, path, **kwargs):
@@ -97,7 +48,6 @@ def test_recover_admin_reenables_the_account_and_restores_roles(monkeypatch) -> 
                 "emailVerified": True,
             },
         ),
-        ("ROLES", "user-1", ["chart_admin", "content_editor"]),
     ]
 
 

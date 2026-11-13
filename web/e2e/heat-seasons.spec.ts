@@ -79,7 +79,9 @@ test("an administrator paints a county's months, saves them and can return to in
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  const api = await installKenya(page, true, ["/kenya"], { roles: ["chart_admin"] });
+  const api = await installKenya(page, true, ["/kenya"], {
+    who: { role: "workspace_admin" },
+  });
   const writes = serveSeasons(api);
   await page.goto("/settings?tab=seasons");
 
@@ -143,7 +145,9 @@ test("an administrator paints a county's months, saves them and can return to in
 test("places fold under their parents, expand all at once and can be searched", async ({
   page,
 }) => {
-  const api = await installKenya(page, true, ["/kenya"], { roles: ["chart_admin"] });
+  const api = await installKenya(page, true, ["/kenya"], {
+    who: { role: "workspace_admin" },
+  });
   serveSeasons(api);
   await page.goto("/settings?tab=seasons");
   const list = page.getByRole("list", { name: "Places" });
@@ -184,7 +188,9 @@ test("places fold under their parents, expand all at once and can be searched", 
 });
 
 test("a refused calendar says why and keeps the draft", async ({ page }) => {
-  const api = await installKenya(page, true, ["/kenya"], { roles: ["chart_admin"] });
+  const api = await installKenya(page, true, ["/kenya"], {
+    who: { role: "workspace_admin" },
+  });
   serveSeasons(api, "HEAT_SEASON_INVALID");
   await page.goto("/settings?tab=seasons");
   await page.getByRole("radio", { name: "Before" }).click();
@@ -204,7 +210,7 @@ test("a planning lead has no heat-season tab and cannot open it by URL", async (
   page,
 }) => {
   const api = await installKenya(page, true, ["/kenya"], {
-    roles: ["health_planning_lead"],
+    who: { role: "planning_lead" },
   });
   serveSeasons(api);
   await page.goto("/settings?tab=seasons");

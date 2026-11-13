@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { type Page } from "@playwright/test";
 
+import { meAs, type Who } from "./access";
 import {
   catalogEntry,
   geographies,
@@ -139,7 +140,9 @@ export type KenyaApi = FakeApi & {
 };
 
 export type KenyaOptions = {
-  roles?: string[];
+  /** Who is signed in; their places are `geographyScopes`. A planning lead
+   * by default. */
+  who?: Who;
   /** HTTP status the observed endpoints answer with instead of a body. */
   observedStatus?: number;
   /** Saved settings to start from, per outcome; the defaults otherwise. */
@@ -174,12 +177,10 @@ export async function installKenya(
   });
 
   api.on(/^\/api\/chart\/auth\/me$/, (route) =>
-    json(route, {
-      userId: "e2e-user",
-      username: "planner",
-      roles: options.roles ?? ["health_planning_lead"],
-      geographyScopes,
-    }),
+    json(
+      route,
+      meAs({ role: "planning_lead", ...options.who, places: geographyScopes }),
+    ),
   );
   api.on(/^\/api\/chart\/geographies$/, (route) =>
     json(route, [...geographies, ...kenya]),

@@ -10,7 +10,6 @@ import {
   ClimateDataCard,
   GeographyContextCard,
   SettingsSkeleton,
-  UserManagement,
 } from "@/features/planning";
 import { ResetInstallationCard } from "@/features/planning/ResetInstallationCard";
 import { HeatSeasonsCard } from "@/features/settings/HeatSeasonsCard";
@@ -18,20 +17,54 @@ import { JobsCard } from "@/features/settings/JobsCard";
 import { ModelReleasesCard } from "@/features/settings/ModelReleasesCard";
 import { ModelSettingsCard } from "@/features/settings/ModelSettingsCard";
 import { RecommendationSettingsCard } from "@/features/settings/RecommendationSettingsCard";
+import { DepartmentsCard } from "@/features/settings/DepartmentsCard";
+import { MyAccessCard } from "@/features/settings/MyAccessCard";
+import { PeopleCard } from "@/features/settings/PeopleCard";
+import { RolesCard } from "@/features/settings/RolesCard";
+import {
+  useWorkspaceChoice,
+  WorkspacePicker,
+} from "@/features/settings/WorkspaceChoice";
+import { WorkspacesCard } from "@/features/settings/WorkspacesCard";
 import { VraIndicatorsCard } from "@/features/vulnerability";
+import { can, type AccessHolder } from "@/lib/access";
 import { isLive, useBackgroundJobs } from "@/lib/backgroundJobs";
 
 import styles from "./page.module.css";
 
 type Tab =
-  "workspace" | "models" | "seasons" | "data" | "vra" | "recommendations" | "jobs";
+  | "workspace"
+  | "people"
+  | "departments"
+  | "roles"
+  | "models"
+  | "seasons"
+  | "data"
+  | "vra"
+  | "recommendations"
+  | "jobs"
+  | "workspaces";
 
-/** Every signed-in planner: where they plan, and what the models offer. */
-const PLANNER_TABS: Tab[] = ["workspace", "models"];
-/** Installation tabs, administrators only. */
-const ADMIN_TABS: Tab[] = ["seasons", "data", "vra", "recommendations", "jobs"];
+/** Each tab asks for its own capability (docs/access-control.md). */
+const TABS: { tab: Tab; allowed: (user: AccessHolder) => boolean }[] = [
+  { tab: "workspace", allowed: () => true },
+  { tab: "people", allowed: (user) => can(user, "people", "read") },
+  { tab: "departments", allowed: (user) => can(user, "departments", "read") },
+  { tab: "roles", allowed: (user) => can(user, "workspace", "manage") },
+  { tab: "models", allowed: () => true },
+  { tab: "seasons", allowed: (user) => can(user, "seasons", "manage") },
+  { tab: "data", allowed: (user) => can(user, "data", "write") },
+  { tab: "vra", allowed: (user) => can(user, "vra", "write") },
+  { tab: "recommendations", allowed: (user) => user.isPlatformAdmin },
+  { tab: "jobs", allowed: (user) => can(user, "data", "write") },
+  { tab: "workspaces", allowed: (user) => user.isPlatformAdmin },
+];
 const LABELS: Record<Tab, string> = {
   workspace: "Workspace",
+  people: "People",
+  departments: "Departments",
+  roles: "Roles",
+  workspaces: "Workspaces",
   models: "Models",
   seasons: "Heat seasons",
   data: "Data",
@@ -41,14 +74,15 @@ const LABELS: Record<Tab, string> = {
 };
 
 /**
- * Settings, one tab at a time. Workspace is about where and with whom you
- * plan: the planning location, and for administrators the people with
- * access (with the reset folded away at its foot). Models
- * holds every model option and, for administrators, the installed releases.
- * Administrators also get Heat seasons, climate Data, the vulnerability
- * assessment (VRA), Recommendations and background Jobs. The tab lives in
- * `?tab=`, so it can be linked to and survives a reload; a tab the user may
- * not open falls back to Workspace.
+ * Settings, one tab at a time, each shown to those whose capabilities let
+ * them use it. Workspace is your planning location and your own access (with
+ * the installation reset folded away for platform admins). People, Departments
+ * and Roles run the country's workspace; Workspaces lists every country for
+ * platform admins. Models holds the model options (and, for platform admins,
+ * the installed releases); Heat seasons, Data, VRA, Recommendations and Jobs
+ * are for those who manage them. The tab lives in `?tab=`, so it can be linked
+ * to and survives a reload; a tab the user may not open falls back to
+ * Workspace.
  */
 export default function SettingsPage() {
   return (
@@ -63,8 +97,12 @@ function Settings() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const requested = searchParams.get("tab");
-  const isAdmin = session.user.roles.includes("chart_admin");
-  const allowed: Tab[] = isAdmin ? [...PLANNER_TABS, ...ADMIN_TABS] : PLANNER_TABS;
+  const user = session.user;
+  const allowed: Tab[] = TABS.filter((item) => item.allowed(user)).map(
+    (item) => item.tab,
+  );
+  const choice = useWorkspaceChoice(user.activeGeographyId);
+  const workspace = choice.workspace;
   const tab = allowed.find((item) => item === requested) ?? "workspace";
 
   // The tab is client state mirrored into the URL: the native History API
@@ -81,7 +119,8 @@ function Settings() {
       window.history.replaceState(null, "", pathname);
   }, [pathname, requested, tab]);
 
-  const liveJobs = useBackgroundJobs(isAdmin).jobs?.filter(isLive).length ?? 0;
+  const liveJobs =
+    useBackgroundJobs(allowed.includes("jobs")).jobs?.filter(isLive).length ?? 0;
   const items: TabItem<Tab>[] = allowed.map((value) => ({
     value,
     label: value === "jobs" && liveJobs > 0 ? `Jobs (${liveJobs})` : LABELS[value],
@@ -96,24 +135,31 @@ function Settings() {
     workspace: (
       <>
         <GeographyContextCard
-          geographyScopes={session.user.geographyScopes}
-          activeGeographyId={session.user.activeGeographyId}
+          geographyScopes={user.geographyScopes}
+          activeGeographyId={user.activeGeographyId}
         />
-        {isAdmin ? (
-          <>
-            <UserManagement accessToken={session.accessToken} />
-            <ResetInstallationCard accessToken={session.accessToken} />
-          </>
+        <MyAccessCard user={user} />
+        {user.isPlatformAdmin ? (
+          <ResetInstallationCard accessToken={session.accessToken} />
         ) : null}
       </>
     ),
+    people: workspace ? <PeopleCard user={user} workspace={workspace} /> : null,
+    departments: workspace ? (
+      <DepartmentsCard user={user} workspace={workspace} />
+    ) : null,
+    roles: workspace ? <RolesCard workspace={workspace} /> : null,
+    workspaces: <WorkspacesCard choice={choice} />,
     models: (
       <>
         <ModelSettingsCard
           accessToken={session.accessToken}
-          activeGeographyId={session.user.activeGeographyId}
+          activeGeographyId={user.activeGeographyId}
+          canEdit={(countryPath) => can(user, "risk", "manage", countryPath)}
         />
-        {isAdmin ? <ModelReleasesCard accessToken={session.accessToken} /> : null}
+        {user.isPlatformAdmin ? (
+          <ModelReleasesCard accessToken={session.accessToken} />
+        ) : null}
       </>
     ),
     seasons: <HeatSeasonsCard canEdit />,
@@ -121,8 +167,8 @@ function Settings() {
     vra: (
       <VraIndicatorsCard
         accessToken={session.accessToken}
-        geographyScopes={session.user.geographyScopes}
-        activeGeographyId={session.user.activeGeographyId}
+        geographyScopes={user.geographyScopes}
+        activeGeographyId={user.activeGeographyId}
         initialFrame={searchParams.get("vra_frame")}
       />
     ),
@@ -142,12 +188,11 @@ function Settings() {
       <PageHeader
         kicker="Settings"
         title="Shape how CHART plans with you"
-        lede={
-          isAdmin
-            ? "Where you plan, who has access and which model options the dashboard offers, plus this installation's heat seasons, data, vulnerability assessment and background jobs."
-            : "Choose where you plan and which model options the dashboard offers."
-        }
+        lede="Who plans together and what each person may do, your departments, and which model options the dashboard offers."
       />
+      {["people", "departments", "roles"].includes(tab) ? (
+        <WorkspacePicker choice={choice} />
+      ) : null}
       {items.length > 1 ? (
         <Tabs items={items} value={tab} ariaLabel="Settings sections" onChange={show}>
           <div className={styles.panel}>{panel}</div>

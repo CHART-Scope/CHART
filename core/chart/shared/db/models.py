@@ -124,6 +124,10 @@ class AppUser(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Installation-wide administrator (docs/access-control.md).
+    is_platform_admin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -135,52 +139,6 @@ class AppUser(Base):
         Index("users_username_unique", "username", unique=True),
         Index("users_email_unique", "email", unique=True),
         Index("users_status_idx", "status"),
-    )
-
-
-class UserRoleRecord(Base):
-    __tablename__ = "user_roles"
-
-    user_id: Mapped[str] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
-    role: Mapped[str] = mapped_column(String(64), primary_key=True)
-    source: Mapped[str] = mapped_column(String(64), nullable=False, default="keycloak")
-    synced_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-    __table_args__ = (Index("user_roles_role_idx", "role"),)
-
-
-class UserGeographyScopeRecord(Base):
-    __tablename__ = "user_geography_scopes"
-
-    id: Mapped[str] = mapped_column(String(128), primary_key=True)
-    user_id: Mapped[str] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    geography_id: Mapped[str] = mapped_column(
-        ForeignKey("geographies.id", ondelete="CASCADE"), nullable=False
-    )
-    source: Mapped[str] = mapped_column(String(64), nullable=False, default="keycloak")
-    external_group_path: Mapped[str | None] = mapped_column(String(512))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-    __table_args__ = (
-        Index(
-            "user_geography_scopes_user_geo_source_unique",
-            "user_id",
-            "geography_id",
-            "source",
-            unique=True,
-        ),
-        Index("user_geography_scopes_user_idx", "user_id"),
     )
 
 
@@ -227,15 +185,15 @@ class WorkspaceRecord(Base):
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
     name: Mapped[str] = mapped_column(String(256), nullable=False)
+    # One workspace per country; null only on rows from before migration 035
+    # that no country claimed.
+    country_code: Mapped[str | None] = mapped_column(String(8))
     planning_cycle: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
     geography_id: Mapped[str | None] = mapped_column(
         ForeignKey("geographies.id", ondelete="SET NULL")
     )
     created_by_user_id: Mapped[str | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL")
-    )
-    owner_user_id: Mapped[str | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -247,33 +205,7 @@ class WorkspaceRecord(Base):
 
     __table_args__ = (
         Index("workspaces_geography_idx", "geography_id"),
-        Index("workspaces_owner_user_idx", "owner_user_id"),
-    )
-
-
-class WorkspaceMemberRecord(Base):
-    __tablename__ = "workspace_members"
-
-    id: Mapped[str] = mapped_column(String(128), primary_key=True)
-    workspace_id: Mapped[str] = mapped_column(
-        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
-    )
-    user_id: Mapped[str] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    role: Mapped[str] = mapped_column(String(32), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-    __table_args__ = (
-        Index(
-            "workspace_members_workspace_user_unique",
-            "workspace_id",
-            "user_id",
-            unique=True,
-        ),
-        Index("workspace_members_user_idx", "user_id"),
+        Index("workspaces_country_unique", "country_code", unique=True),
     )
 
 
@@ -1334,7 +1266,7 @@ class LearningProgressRecord(Base):
 class LearningPreferenceRecord(Base):
     """What a user told us they care about, for ranking the catalogue.
 
-    Distinct from ``user_roles``: a Keycloak role governs what someone may
+    Distinct from access: a role granted at a place governs what someone may
     do, whereas ``audience_id`` is a self-declared "this is the job I am
     doing" used only to order recommendations. One row per user.
     """
@@ -1661,4 +1593,235 @@ class HeatSeasonSetting(Base):
         # Portable for the SQLite test stores; migration 033 checks the
         # letters too on PostgreSQL, and the service validates the cycle.
         CheckConstraint("length(months) = 12", name="ck_heat_season_months"),
+    )
+
+
+class Department(Base):
+    """A department taking part in planning in a workspace (Health, Water, …).
+
+    Rows, never an enum: a workspace starts with a seeded list and its
+    members add, rename and archive their own (docs/access-control.md).
+    """
+
+    __tablename__ = "department"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    country_code: Mapped[str] = mapped_column(String(8), nullable=False)
+    workspace_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("workspaces.id", ondelete="CASCADE")
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("department_country_name_unique", "country_code", "name", unique=True),
+    )
+
+
+class AccessRole(Base):
+    """A named bundle of capability levels in a workspace (Planning lead, …)."""
+
+    __tablename__ = "access_role"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
+    )
+    key: Mapped[str] = mapped_column(String(64), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("access_role_workspace_key_unique", "workspace_id", "key", unique=True),
+    )
+
+
+class AccessRoleCapability(Base):
+    """A role's level (read, write or manage) on one module."""
+
+    __tablename__ = "access_role_capability"
+
+    role_id: Mapped[int] = mapped_column(
+        ForeignKey("access_role.id", ondelete="CASCADE"), primary_key=True
+    )
+    module: Mapped[str] = mapped_column(String(32), primary_key=True)
+    level: Mapped[str] = mapped_column(String(16), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "level IN ('read', 'write', 'manage')", name="ck_access_role_level"
+        ),
+    )
+
+
+class Membership(Base):
+    """A person's standing in a workspace: their grants and departments."""
+
+    __tablename__ = "membership"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    invited_by_user_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "membership_user_workspace_unique", "user_id", "workspace_id", unique=True
+        ),
+        CheckConstraint(
+            "status IN ('active', 'disabled')", name="ck_membership_status"
+        ),
+    )
+
+
+class MembershipGrant(Base):
+    """A role at a place: covers the geography and everything below it."""
+
+    __tablename__ = "membership_grant"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    membership_id: Mapped[int] = mapped_column(
+        ForeignKey("membership.id", ondelete="CASCADE"), nullable=False
+    )
+    role_id: Mapped[int] = mapped_column(
+        # Checked at commit (migration 035).
+        ForeignKey("access_role.id", deferrable=True, initially="DEFERRED"),
+        nullable=False,
+    )
+    geography_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("geographies.id", ondelete="CASCADE"), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "membership_grant_place_unique",
+            "membership_id",
+            "geography_id",
+            unique=True,
+        ),
+    )
+
+
+class MembershipDepartment(Base):
+    """The departments a member works in, within their workspace."""
+
+    __tablename__ = "membership_department"
+
+    membership_id: Mapped[int] = mapped_column(
+        ForeignKey("membership.id", ondelete="CASCADE"), primary_key=True
+    )
+    department_id: Mapped[int] = mapped_column(
+        ForeignKey("department.id", ondelete="CASCADE"), primary_key=True
+    )
+
+
+class DepartmentOwnership(Base):
+    """A data source or VRA indicator group a department owns for writes."""
+
+    __tablename__ = "department_ownership"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    department_id: Mapped[int] = mapped_column(
+        ForeignKey("department.id", ondelete="CASCADE"), nullable=False
+    )
+    resource_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    resource_key: Mapped[str] = mapped_column(String(128), nullable=False)
+
+    __table_args__ = (
+        Index(
+            "department_ownership_unique",
+            "department_id",
+            "resource_kind",
+            "resource_key",
+            unique=True,
+        ),
+        Index("department_ownership_resource_idx", "resource_kind", "resource_key"),
+        CheckConstraint(
+            "resource_kind IN ('data_source', 'vra_indicator_group')",
+            name="ck_department_ownership_kind",
+        ),
+    )
+
+
+class Invitation(Base):
+    """An invitation to join a workspace with the grants and departments set."""
+
+    __tablename__ = "invitation"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
+    )
+    email: Mapped[str] = mapped_column(String(256), nullable=False)
+    #: The name the inviter typed, for the account a resend may recreate.
+    name: Mapped[str | None] = mapped_column(String(256))
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    invited_by_user_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    user_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("invitation_workspace_email_idx", "workspace_id", "email"),
+        CheckConstraint(
+            "status IN ('pending', 'accepted', 'revoked', 'expired')",
+            name="ck_invitation_status",
+        ),
+    )
+
+
+class InvitationGrant(Base):
+    """A role at a place that an invitation gives once accepted."""
+
+    __tablename__ = "invitation_grant"
+
+    invitation_id: Mapped[str] = mapped_column(
+        ForeignKey("invitation.id", ondelete="CASCADE"), primary_key=True
+    )
+    geography_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("geographies.id", ondelete="CASCADE"), primary_key=True
+    )
+    role_id: Mapped[int] = mapped_column(
+        ForeignKey("access_role.id", ondelete="CASCADE"), nullable=False
+    )
+
+
+class InvitationDepartment(Base):
+    """A department an invitation places the person in once accepted."""
+
+    __tablename__ = "invitation_department"
+
+    invitation_id: Mapped[str] = mapped_column(
+        ForeignKey("invitation.id", ondelete="CASCADE"), primary_key=True
+    )
+    department_id: Mapped[int] = mapped_column(
+        ForeignKey("department.id", ondelete="CASCADE"), primary_key=True
     )

@@ -125,7 +125,7 @@ test("a Settings tab opened before comes back without reloading", async ({ page 
   const picker = page.getByRole("heading", { name: "What the dashboard offers" });
   await expect(picker).toBeVisible();
 
-  await tablist.getByRole("tab", { name: "Workspace" }).click();
+  await tablist.getByRole("tab", { name: "Workspace", exact: true }).click();
   await expect(page.getByText("Planning location")).toBeVisible();
   await expect(picker).toBeHidden();
   await tablist.getByRole("tab", { name: "Models" }).click();
@@ -140,7 +140,10 @@ test("a Settings tab opened before comes back without reloading", async ({ page 
 test("saving model settings makes the kept dashboard read its views again", async ({
   page,
 }) => {
-  const api = await installKenya(page);
+  // Kenya's Workspace admin: model settings are changed with risk manage.
+  const api = await installKenya(page, true, ["/kenya"], {
+    who: { role: "workspace_admin" },
+  });
   await page.goto("/dashboard/geo-ke?admin_unit=geo-ke-kajiado&outcome=lbw");
   const outlook = page.getByTestId("heat-outlook");
   await expect(outlook.getByTestId("outlook-estimate")).toContainText("Kajiado");

@@ -22,6 +22,8 @@ from sqlalchemy.pool import StaticPool
 from chart.api.app import app
 from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import require_current_user, require_reader
+
+from access_support import member, nobody
 from chart.heat_outlook import routes as outlook_routes
 from chart.risk import routes as risk_routes
 from chart.heat_outlook import service as outlook_service
@@ -189,14 +191,14 @@ def _u5_tables(directory: Path) -> None:
     )
 
 
-def _user(**overrides) -> CurrentUserContext:
-    fields = dict(
-        user_id="planner",
-        username="planner",
-        roles=["health_planning_lead"],
-        geography_scopes=["/kenya"],
-    )
-    return CurrentUserContext(**(fields | overrides))
+def _user(
+    geography_scopes: list[str] | None = None,
+    role: str | None = "planning_lead",
+    user_id: str = "planner",
+) -> CurrentUserContext:
+    if role is None:
+        return nobody(user_id)
+    return member(user_id, role, geography_scopes or ["/kenya"])
 
 
 @pytest.fixture
@@ -251,18 +253,35 @@ def settings_db(monkeypatch):
     return factory
 
 
-def enable_every_window(client: TestClient) -> None:
-    """Turn the trimesters on, as a user would on the settings page."""
+def _as_settings_admin(put):
+    """Change model settings as the workspace's admin (risk manage), then
+    carry on as the planner."""
 
-    response = client.put(
-        "/model-settings/KE/lbw",
-        json={
-            "selectors": ["P", "T1", "T2", "T3"],
-            "default_selector": "P",
-            "scenarios": ["ssp585"],
-            "default_scenario": "ssp585",
-            "data_modes": ["projection"],
-        },
+    previous = app.dependency_overrides.get(require_current_user)
+    app.dependency_overrides[require_current_user] = lambda: _user(
+        user_id="admin", role="workspace_admin"
+    )
+    try:
+        return put()
+    finally:
+        if previous is not None:
+            app.dependency_overrides[require_current_user] = previous
+
+
+def enable_every_window(client: TestClient) -> None:
+    """Turn the trimesters on, as an admin would on the settings page."""
+
+    response = _as_settings_admin(
+        lambda: client.put(
+            "/model-settings/KE/lbw",
+            json={
+                "selectors": ["P", "T1", "T2", "T3"],
+                "default_selector": "P",
+                "scenarios": ["ssp585"],
+                "default_scenario": "ssp585",
+                "data_modes": ["projection"],
+            },
+        )
     )
     assert response.status_code == 200, response.text
 
@@ -360,7 +379,7 @@ def test_peak_heat_season_follows_the_configured_calendar(
     # An administrator sets Kenya's season to Jul-Oct; Kajiado inherits it.
     monkeypatch.setattr(heat_season_routes, "get_session_factory", lambda: settings_db)
     app.dependency_overrides[require_current_user] = lambda: _user(
-        user_id="admin", username="admin", roles=["chart_admin"]
+        user_id="admin", role="workspace_admin"
     )
     saved = client.put("/heat-seasons/geo-ke", json={"months": "oobbbbddddaa"})
     assert saved.status_code == 200, saved.text
@@ -426,15 +445,17 @@ def test_peak_season_map_and_suppressed_window(client, monkeypatch) -> None:
 
 def test_projection_view_can_be_switched_off(client, monkeypatch) -> None:
     monkeypatch.setattr(outlook_service, "_calibrated", lambda: True)
-    response = client.put(
-        "/model-settings/KE/lbw",
-        json={
-            "selectors": ["P"],
-            "default_selector": "P",
-            "scenarios": ["ssp585"],
-            "default_scenario": "ssp585",
-            "data_modes": ["observed"],
-        },
+    response = _as_settings_admin(
+        lambda: client.put(
+            "/model-settings/KE/lbw",
+            json={
+                "selectors": ["P"],
+                "default_selector": "P",
+                "scenarios": ["ssp585"],
+                "default_scenario": "ssp585",
+                "data_modes": ["observed"],
+            },
+        )
     )
     assert response.status_code == 200, response.text
 
@@ -524,9 +545,7 @@ def test_denies_other_geographies_and_roles(client) -> None:
         require_current_user
     ]
     assert client.get(f"/heat-outlook/{KAJIADO}?outcome=lbw").status_code == 403
-    app.dependency_overrides[require_current_user] = lambda: _user(
-        roles=["unknown_role"]
-    )
+    app.dependency_overrides[require_current_user] = lambda: _user(role=None)
     app.dependency_overrides[require_reader] = app.dependency_overrides[
         require_current_user
     ]
@@ -599,9 +618,7 @@ def test_map_denies_other_geographies_and_roles(client) -> None:
         require_current_user
     ]
     assert client.get("/heat-outlook/geo-ke/map?outcome=lbw").status_code == 403
-    app.dependency_overrides[require_current_user] = lambda: _user(
-        roles=["unknown_role"]
-    )
+    app.dependency_overrides[require_current_user] = lambda: _user(role=None)
     app.dependency_overrides[require_reader] = app.dependency_overrides[
         require_current_user
     ]

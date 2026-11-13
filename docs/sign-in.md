@@ -5,9 +5,9 @@ emails them a six-character code, and the code signs them in. The one
 exception is the default administrator, `admin`, which has a password and
 must change it at its first sign-in
 ([installation setup](installation-setup.md)). Anyone can use
-[Explore](explore.md) without an account; signing in is for people an
-administrator has added (the first administrator is created by the
-[installation wizard](installation-setup.md)).
+[Explore](explore.md) without an account; signing in is for people someone
+has invited. Keycloak only proves who someone is: what they may do lives in
+CHART's database ([access control](access-control.md)).
 
 ## How it works
 
@@ -128,33 +128,40 @@ the code arrives within a minute and is not in spam.
 
 ## Inviting people
 
-An administrator invites people in **Settings → Workspace**: full name, email
-address, role and planning area (a country or its first level, such as a
-state or county; an area covers everything inside it).
+Anyone with people write in a workspace invites in **Settings → People**: full
+name, email, one or more grants (a role at a place; a grant covers the place
+and everything below it), and departments, adding a missing department on the
+way if they may. Nobody can grant a role higher than their own at a place.
 
-1. CHART creates the account, with no password (`POST /users`).
+1. CHART records the invitation (`POST /workspaces/{id}/invitations`) and
+   makes a Keycloak account with no password if there is none.
 2. Keycloak emails **You are invited to CHART** through the email settings
-   above. The link works for 7 days.
+   above. The invitation lasts 7 days.
 3. The link opens **Accept your CHART invitation**; accepting confirms the
    address and offers **Go to CHART login**.
-4. They sign in with their email address and a code, and land on their
-   area's dashboard.
+4. They sign in with their email address and a code. That first sign-in
+   accepts the invitation, and they land on their place's dashboard.
 
-If the email could not be sent, the account still exists and Settings says
-so. **Send invitation again** beside a person emails a fresh link
-(`POST /users/{id}/invitation`). An address that already has an account is
-refused. The emails use CHART's layout and wording: the `chart` email theme
-in `infra/keycloak/themes/chart/email/`.
+Someone who already uses CHART (in another workspace) gets the access at once,
+with no email. If the email could not be sent, the invitation still stands and
+Settings says so; **Resend** emails it again and extends it, and **Revoke**
+withdraws a pending one. Someone who signs in without an invitation holds
+nothing. The emails use CHART's layout and wording: the `chart` email theme in
+`infra/keycloak/themes/chart/email/`.
 
-## Administrators
+## Changing access
 
-- Disabling a person (`POST /users/{id}/disable`) stops their codes.
+- People manage changes a member's grants and departments (**Edit access**),
+  or disables them in the workspace. Both apply on the member's next request;
+  disabling their last membership also ends their Keycloak sessions.
 - The Keycloak administration console (`/identity/admin`) is for operators,
   not everyday work. Its sign-in, headed **CHART admin**, also uses CHART's look; the user is `admin`
   and the password is `KEYCLOAK_ADMIN_PASSWORD` from `.env.prod`. That is
   Keycloak's own administrator, a different account from CHART's `admin`.
-- If the only administrator is locked out, re-enable them from an operator
-  shell; they then sign in with a code as usual:
+  Roles and groups set there are ignored.
+- If the only platform admin is locked out, re-enable them from an operator
+  shell. This also restores their platform-admin flag in CHART's database.
+  They then sign in with a code as usual:
 
   ```bash
   chart-admin-recover --username <name> --email <address> --confirm <name>

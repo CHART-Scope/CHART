@@ -9,7 +9,8 @@ from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import require_any_role, require_current_user
+from chart.access.guards import require_platform_admin
+from chart.auth.service import require_current_user
 from chart.model_registry.runtime import prepare_model_release
 from chart.model_registry.schemas import ModelReleaseSpec
 from chart.model_registry.service import ModelRegistryError, release_base_uri
@@ -448,10 +449,10 @@ def reload_release(
 
     Useful after the R container restarts, or after a manifest edit that
     swaps the SHA-256 of an existing artifact. Does not touch the database.
-    Requires the chart_admin role.
+    Requires a platform admin.
     """
 
-    require_any_role(user, {"chart_admin"})
+    require_platform_admin(user)
 
     matched_path = None
     for config in deployed_configs():
@@ -487,10 +488,10 @@ def reset_inference_circuit(
     operator investigating after an outage can call this endpoint to
     skip the wait entirely instead of restarting the API container.
     Only clears state in this process; other API replicas would need
-    their own reset. Requires the chart_admin role.
+    their own reset. Requires a platform admin.
     """
 
-    require_any_role(user, {"chart_admin"})
+    require_platform_admin(user)
     from chart.inference.providers.lbw_r import reset_circuit
 
     reset_circuit()

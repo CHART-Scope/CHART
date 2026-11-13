@@ -1,17 +1,21 @@
 from .service import (
     IdentityError,
-    add_to_groups,
     delete_user,
     disable_user,
+    enable_user,
+    ensure_account,
+    find_account,
     send_invitation,
-    upsert_user,
+    sign_out,
 )
 
 __all__ = [
     "IdentityError",
-    "add_to_groups",
     "delete_user",
     "disable_user",
+    "enable_user",
+    "ensure_account",
+    "find_account",
     "send_invitation",
-    "upsert_user",
+    "sign_out",
 ]

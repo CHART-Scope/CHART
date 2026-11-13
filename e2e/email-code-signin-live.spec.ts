@@ -29,6 +29,20 @@ async function adminHeaders(request: APIRequestContext) {
   return { authorization: `Bearer ${(await response.json()).access_token}` };
 }
 
+/** Kenya's workspace and its role ids, as the platform admin reads them. */
+async function kenya(request: APIRequestContext, headers: Record<string, string>) {
+  const workspaces = await (await request.get(`${api}/workspaces`, { headers })).json();
+  const workspace = workspaces.items.find(
+    (item: { country_code: string }) => item.country_code === "KE",
+  );
+  const roles = await (
+    await request.get(`${api}/workspaces/${workspace.id}/roles`, { headers })
+  ).json();
+  const roleId = (key: string) =>
+    roles.items.find((role: { key: string }) => role.key === key).id;
+  return { id: workspace.id as string, roleId };
+}
+
 test("a wrong code is refused and the emailed code signs the planner in", async ({
   page,
 }) => {
@@ -57,47 +71,51 @@ test("a code typed by hand in lowercase, with spaces, signs the planner in", asy
   await page.waitForURL(/\/dashboard\/geo-ke/);
 });
 
-test("an account an administrator adds has no password, signs in by email and stops when disabled", async ({
+test("an invited address has no password, signs in by email, and holds nothing once disabled", async ({
   browser,
   request,
 }) => {
   const headers = await adminHeaders(request);
   const email = `added-planner-${Date.now()}@example.invalid`;
-  const created = await request.post(`${api}/users`, {
+  const workspace = await kenya(request, headers);
+  const invited = await request.post(`${api}/workspaces/${workspace.id}/invitations`, {
     headers,
     data: {
       name: "Added Planner",
       email,
-      username: email,
-      roles: ["health_planning_lead"],
-      geographyIds: ["geo-ke-kajiado"],
+      grants: [
+        { role_id: workspace.roleId("planning_lead"), geography_id: "geo-ke-kajiado" },
+      ],
+      department_ids: [],
+      new_departments: [],
     },
   });
-  expect(created.ok(), await created.text()).toBe(true);
-  const { userId } = await created.json();
+  expect(invited.status(), await invited.text()).toBe(201);
+  expect((await invited.json()).status).toBe("pending");
 
+  // The first sign-in accepts the invitation: Kajiado's dashboard.
   const first = await browser.newPage();
   await signInWithEmailCode(first, email);
+  await first.waitForURL(/\/dashboard\/geo-ke/);
   await first.close();
+  const members = await (
+    await request.get(`${api}/workspaces/${workspace.id}/members`, { headers })
+  ).json();
+  const member = members.items.find((item: { email: string }) => item.email === email);
+  expect(
+    member.grants.map((grant: { place_name: string }) => grant.place_name),
+  ).toEqual(["Kajiado"]);
 
-  const disabled = await request.post(`${api}/users/${userId}/disable`, { headers });
-  expect(disabled.ok()).toBe(true);
-  const people = await request.get(`${api}/users`, { headers });
-  const person = (await people.json()).find(
-    (item: { userId: string }) => item.userId === userId,
+  const disabled = await request.post(
+    `${api}/workspaces/${workspace.id}/members/${member.user_id}/disable`,
+    { headers },
   );
-  expect(person.status).toBe("disabled");
+  expect((await disabled.json()).status).toBe("disabled");
 
+  // Their sessions ended; signing in again opens nothing but the public map.
   const second = await browser.newPage();
-  const sent = await inboxCount(second, email);
-  await second.goto("/auth/signin");
-  await second.getByLabel("Email address").fill(email);
-  await second.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(
-    second.getByText("This account is turned off. Ask your CHART administrator."),
-  ).toBeVisible();
-  await second.waitForTimeout(3_000);
-  expect(await inboxCount(second, email)).toBe(sent);
+  await signInWithEmailCode(second, email);
+  await second.waitForURL(/\/explore/);
   await second.close();
 });
 
@@ -144,7 +162,7 @@ test("on a phone the sign-in screens fit, say where the code went and let you st
   await page.close();
 });
 
-test("an administrator invites someone, who accepts from the email and lands on their dashboard", async ({
+test("a workspace admin invites someone, who accepts from the email and lands on their dashboard", async ({
   browser,
   request,
 }) => {
@@ -152,35 +170,43 @@ test("an administrator invites someone, who accepts from the email and lands on 
   const email = `invited-${Date.now()}@example.invalid`;
   const admin = await browser.newPage();
   await signInWithEmailCode(admin, "typography-admin");
-  await admin.goto("/settings?tab=users");
-  const form = admin.getByRole("form", { name: "Invite a person" });
+  await admin.goto("/settings?tab=people");
+  await admin.getByRole("combobox", { name: "Workspace" }).click();
+  await admin.getByRole("option", { name: "Kenya", exact: true }).click();
+  await admin.getByRole("button", { name: "Invite someone" }).click();
+  const form = admin.getByRole("dialog");
   await form.getByLabel("Full name").fill("Invited Planner");
-  await form.getByLabel("Email address").fill(email);
-  await form.getByRole("combobox", { name: "Planning area" }).click();
-  await admin.getByRole("option", { name: /^Kajiado · / }).click();
+  await form.getByLabel("Email").fill(email);
+  const grant = form.getByRole("group", { name: "Grant 1" });
+  await grant.getByRole("combobox", { name: "Role", exact: true }).click();
+  await admin.getByRole("option", { name: /^Planning lead/ }).click();
+  await grant.getByRole("combobox", { name: "Place", exact: true }).click();
+  await admin.getByRole("option", { name: /^Kajiado/ }).click();
   await form.getByRole("button", { name: "Send invitation" }).click();
   await expect(admin.getByRole("status")).toHaveText(`Invitation sent to ${email}.`);
   await admin.screenshot({ path: `${evidence}/people-invited.png`, fullPage: true });
 
-  // Persisted: the account exists, active, with the chosen role and area.
-  const people = await request.get(`${api}/users`, {
-    headers: await adminHeaders(request),
-  });
-  const person = (await people.json()).find(
-    (item: { email?: string }) => item.email === email,
-  );
-  expect(person).toMatchObject({ status: "active", roles: ["health_planning_lead"] });
-  expect(person.geographyScopes.map((scope: { name: string }) => scope.name)).toEqual([
-    "Kajiado",
-  ]);
+  // Persisted: a pending invitation for Kajiado.
+  const headers = await adminHeaders(request);
+  const workspace = await kenya(request, headers);
+  const listed = await (
+    await request.get(`${api}/workspaces/${workspace.id}/invitations`, { headers })
+  ).json();
+  const pending = listed.items.find((item: { email: string }) => item.email === email);
+  expect(pending.status).toBe("pending");
+  expect(
+    pending.grants.map((grant: { place_name: string }) => grant.place_name),
+  ).toEqual(["Kajiado"]);
 
   const invitation = await newestEmail(admin, email);
   expect(invitation.Subject).toBe("You are invited to CHART");
   const link = invitation.Text.match(/https?:\/\/\S+/)![0];
 
-  // "Send invitation again" emails a second, working invitation.
+  // Resend emails a second, working invitation.
   await admin
-    .getByRole("button", { name: `Send invitation again to ${email}` })
+    .getByRole("list", { name: "Invitations" })
+    .getByRole("listitem", { name: email })
+    .getByRole("button", { name: "Resend" })
     .click();
   await expect(admin.getByRole("status")).toHaveText(
     `Invitation sent again to ${email}.`,
@@ -215,7 +241,7 @@ test("the Keycloak administration sign-in carries CHART's look", async ({ page }
   await page.screenshot({ path: `${evidence}/keycloak-admin-sign-in.png` });
 });
 
-test("a new installation's admin signs in with admin/admin, must choose a password, then can invite", async ({
+test("the seeded admin signs in with admin/admin, must choose a password, and gains nothing once a platform admin exists", async ({
   browser,
 }) => {
   const page = await browser.newPage();
@@ -229,11 +255,13 @@ test("a new installation's admin signs in with admin/admin, must choose a passwo
   await page.getByLabel("New Password").fill("e2e-admin-chosen-password");
   await page.getByLabel("Confirm password").fill("e2e-admin-chosen-password");
   await page.getByRole("button", { name: "Submit" }).click();
-  // No planning area before setup: the admin manages people.
-  await page.waitForURL(/\/settings\?tab=users/);
-  await expect(page.getByRole("form", { name: "Invite a person" })).toBeVisible();
+  // Keycloak's chart_admin only bootstraps the first platform admin; this
+  // installation has one, so the seeded account opens the public map only.
+  await page.waitForURL(/\/explore/);
+  await page.goto("/settings?tab=people");
+  await page.waitForURL(/\/explore/);
   await page.screenshot({
-    path: `${evidence}/default-admin-people.png`,
+    path: `${evidence}/seeded-admin-no-access.png`,
     fullPage: true,
   });
   await page.close();

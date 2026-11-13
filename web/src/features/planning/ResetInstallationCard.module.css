@@ -1,0 +1,66 @@
+/* Settings > Workspace: resetting the installation, folded away. */
+
+.error {
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+}
+
+.error {
+  color: var(--color-maroon);
+  background: var(--color-maroon-tint);
+}
+
+.danger {
+  margin-top: var(--space-6);
+}
+
+.danger summary {
+  width: fit-content;
+  cursor: pointer;
+  font-size: var(--fs-caption);
+  color: var(--color-text-muted);
+}
+
+.dangerZone {
+  margin-top: var(--space-3);
+  padding: 12px;
+  border: 1px solid #d84545;
+  border-radius: 12px;
+  background: #fff5f5;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dangerZone strong {
+  font-family: var(--font-display);
+  display: block;
+  color: #7a1c1c;
+  margin-bottom: 4px;
+}
+
+.dangerZone p {
+  color: #7a1c1c;
+  margin: 0;
+  font-size: var(--fs-caption);
+  max-width: 60ch;
+}
+
+.dangerConfirm {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dangerConfirm code {
+  background: var(--color-maroon-tint);
+  color: var(--color-maroon);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}

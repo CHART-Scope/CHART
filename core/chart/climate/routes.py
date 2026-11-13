@@ -14,12 +14,10 @@ from chart.shared.db.models import AppGeography
 from chart.shared.db.session import get_session_factory
 from chart.shared.outcomes import DEFAULT_OUTCOME
 
+from chart.access.guards import can, require_capability, require_somewhere
+from chart.access.resources import country_path, owning_departments
 from chart.auth.schemas import CurrentUserContext
-from chart.auth.service import (
-    require_any_role,
-    require_current_user,
-    require_geography_access,
-)
+from chart.auth.service import require_current_user
 
 from .requests import (
     get_prediction_request,
@@ -59,15 +57,8 @@ from .what_if import score_what_if
 
 router = APIRouter(prefix="/climate", tags=["climate"])
 
-prediction_roles = frozenset(
-    {
-        "chart_admin",
-        "health_planning_lead",
-        "cross_sector_planning_lead",
-        "health_implementation_officer",
-        "cross_sector_implementation_officer",
-    }
-)
+#: The data source climate pulls write, for department ownership.
+CLIMATE_SOURCE = "era5"
 
 
 @router.get(
@@ -222,8 +213,8 @@ def get_prediction_request_status(
 
 
 def _require_place_access(user: CurrentUserContext, geography_id: str) -> None:
-    require_any_role(user, prediction_roles)
-    require_geography_access(user, get_place_path(geography_id))
+    require_somewhere(user, "risk", "write")
+    require_capability(user, "risk", "write", get_place_path(geography_id))
 
 
 def _require_geography_only_access(user: CurrentUserContext, geography_id: str) -> None:
@@ -232,17 +223,16 @@ def _require_geography_only_access(user: CurrentUserContext, geography_id: str) 
     ``get_place_path`` walks AppGeography -> admin_unit -> active model
     release and raises 409 CLIMATE_NOT_CONFIGURED_FOR_PLACE if any link
     is missing. Read-only listings do not need any of that; they just
-    need the caller to have a role and a matching geography scope.
+    need the caller to read risk there.
     """
 
-    require_any_role(user, prediction_roles)
     with get_session_factory()() as session:
         path = session.scalar(
             select(AppGeography.path).where(AppGeography.id == geography_id)
         )
     if path is None:
         raise ClimateServiceError("GEOGRAPHY_NOT_FOUND", 404)
-    require_geography_access(user, path)
+    require_capability(user, "risk", "read", path)
 
 
 class IngestionJobRequest(BaseModel):
@@ -264,10 +254,14 @@ class IngestionJobRequest(BaseModel):
 def read_coverage(
     user: Annotated[CurrentUserContext, Depends(require_current_user)],
 ) -> list[CountryCoverage]:
-    """Per country and per area: how many months of observations are held."""
-    require_any_role(user, {"chart_admin"})
+    """Per country and per area: how many months of observations are held,
+    for the countries where the caller reads data."""
     with get_session_factory()() as session:
-        return load_coverage(session)
+        return [
+            country
+            for country in load_coverage(session)
+            if _reads_data(session, user, country.country_code)
+        ]
 
 
 @router.post(
@@ -286,9 +280,20 @@ def create_ingestion_job(
     times out after fifteen seconds. A country already pulling hands back the
     job in flight rather than starting a second download of the same grid.
     """
-    require_any_role(user, {"chart_admin"})
     months = _requested_months(request.months)
     with get_session_factory()() as session:
+        path = country_path(session, request.country_code)
+        if path is None:
+            raise HTTPException(status_code=404, detail="COUNTRY_NOT_FOUND")
+        require_capability(
+            user,
+            "data",
+            "write",
+            path,
+            owning_departments(
+                session, "data_source", CLIMATE_SOURCE, request.country_code
+            ),
+        )
         job, _created = create_job(
             session,
             country_code=request.country_code.upper(),
@@ -311,13 +316,21 @@ def read_ingestion_jobs(
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
 ) -> list[IngestionJobView]:
     """Newest first, so a caller can poll the one it just created."""
-    require_any_role(user, {"chart_admin"})
     with get_session_factory()() as session:
-        return list_jobs(
-            session,
-            country_code=country_code.upper() if country_code else None,
-            limit=limit,
-        )
+        return [
+            job
+            for job in list_jobs(
+                session,
+                country_code=country_code.upper() if country_code else None,
+                limit=limit,
+            )
+            if _reads_data(session, user, job.country_code)
+        ]
+
+
+def _reads_data(session, user: CurrentUserContext, country_code: str) -> bool:
+    path = country_path(session, country_code)
+    return path is not None and can(user, "data", "read", path)
 
 
 def _requested_months(raw: list[str]) -> list[date]:

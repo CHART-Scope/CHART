@@ -15,6 +15,8 @@ from sqlalchemy.pool import StaticPool
 
 from chart.api.app import app
 from chart.auth.schemas import CurrentUserContext
+
+from access_support import member, nobody
 from chart.auth.service import require_current_user
 from chart.risk import routes as risk_routes
 from chart.risk.precision import precision_for_ci
@@ -239,15 +241,12 @@ def _health_impact(
     )
 
 
-def _override_user(**overrides) -> CurrentUserContext:
-    defaults = dict(
-        user_id="test-user",
-        username="test-user",
-        roles=["health_planning_lead"],
-        geography_scopes=[PLACE_PATH],
-    )
-    defaults.update(overrides)
-    return CurrentUserContext(**defaults)
+def _override_user(
+    geography_scopes: list[str] | None = None, role: str | None = "planning_lead"
+) -> CurrentUserContext:
+    if role is None:
+        return nobody("test-user")
+    return member("test-user", role, geography_scopes or [PLACE_PATH])
 
 
 @pytest.fixture
@@ -501,7 +500,7 @@ def test_monthly_rejects_unauthenticated_client():
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"roles": ["unknown_role"]},
+        {"role": None},
         {"geography_scopes": ["/kenya/kajiado"]},
     ],
 )

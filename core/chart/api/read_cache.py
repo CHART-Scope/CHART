@@ -5,7 +5,9 @@ are pure functions of stored data, yet each request rebuilt them - map
 geometry included - every time. This middleware:
 
 - keys each GET by path, query and caller (the Authorization header, or
-  "public"), because reads are scoped to the caller's geographies;
+  "public"), because reads are scoped to the caller's geographies, and for a
+  signed-in caller by the access mark too, so a disabled or narrowed person
+  is never served what their old access let them read;
 - tags it with the **data version**: the newest climate run, stored
   prediction, active model, forecast and population files, and the deployed
   code. Anything that could change a response changes the version;
@@ -28,6 +30,8 @@ from sqlalchemy import func, select
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
+
+from chart.access.principal import access_mark
 
 CACHED_PREFIXES = ("/heat-outlook/", "/vra/", "/geographies")
 #: Never cached: per-user or administrative reads.
@@ -113,8 +117,9 @@ class ReadCacheMiddleware(BaseHTTPMiddleware):
         if not version:
             return await call_next(request)
         caller = request.headers.get("authorization") or "public"
+        mark = "" if caller == "public" else access_mark()
         key = hashlib.sha256(
-            f"{request.url.path}?{request.url.query}|{caller}".encode()
+            f"{request.url.path}?{request.url.query}|{caller}|{mark}".encode()
         ).hexdigest()
         etag = f'W/"{hashlib.sha256(f"{key}|{version}".encode()).hexdigest()[:24]}"'
         headers = {

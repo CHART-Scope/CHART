@@ -10,7 +10,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from chart.auth.schemas import CurrentUserContext
+from access_support import platform_admin
 from chart.climate.service import list_locations
 from chart.model_registry.schemas import ModelReleaseSpec
 from chart.model_registry.service import (
@@ -36,7 +36,9 @@ from chart.shared.db.models import (
     ModelAreaMapping,
     ModelRelease,
     SetupStateRecord,
-    UserGeographyScopeRecord,
+    AccessRole,
+    AppUser,
+    MembershipGrant,
 )
 
 
@@ -397,13 +399,7 @@ def test_kenya_onboarding_warms_and_activates_kajiado(monkeypatch) -> None:
             ],
         }
     )
-    user = CurrentUserContext(
-        user_id="kenya-admin",
-        username="kenya-admin",
-        email="kenya-admin@example.org",
-        roles=["chart_admin"],
-        geography_scopes=["/kenya/kajiado"],
-    )
+    user = platform_admin("kenya-admin")
 
     with patch("chart.setup.service.prepare_model_release") as warm:
         status = complete(
@@ -423,8 +419,14 @@ def test_kenya_onboarding_warms_and_activates_kajiado(monkeypatch) -> None:
         "under5-mortality-mp-0.1.0-review",
     ]
     with factory() as session:
-        scopes = list(session.scalars(select(UserGeographyScopeRecord)))
-        assert [scope.geography_id for scope in scopes] == ["geo-ke"]
+        # The admin running setup is Kenya's Workspace admin over the country.
+        grants = session.execute(
+            select(MembershipGrant.geography_id, AccessRole.key).join(
+                AccessRole, AccessRole.id == MembershipGrant.role_id
+            )
+        ).all()
+        assert grants == [("geo-ke", "workspace_admin")]
+        assert session.get(AppUser, "kenya-admin").is_platform_admin is True
         admin_unit = session.scalar(
             select(AdminUnit).where(AdminUnit.code == "kajiado")
         )
@@ -525,12 +527,7 @@ def test_kenya_onboarding_fails_instead_of_activating_an_unwarmed_model(
             ],
         }
     )
-    user = CurrentUserContext(
-        user_id="kenya-admin",
-        username="kenya-admin",
-        roles=["chart_admin"],
-        geography_scopes=["/kenya/kajiado"],
-    )
+    user = platform_admin("kenya-admin")
 
     with (
         patch(
