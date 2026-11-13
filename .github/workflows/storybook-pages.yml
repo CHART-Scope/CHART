@@ -1,41 +1,30 @@
 name: Project Pages
 
 on:
+  # Only what the published site shows: the stories and their shared UI, and
+  # the docs. A feature-only change (dashboard logic, say) does not redeploy;
+  # its story refreshes with the next story or shared-component change.
   pull_request:
-    paths:
+    paths: &site-paths
       - ".github/workflows/storybook-pages.yml"
-      - ".prettierignore"
-      - ".prettierrc.json"
-      - "Makefile"
-      - "docs/**"
-      - "mkdocs.yml"
       - "package.json"
       - "package-lock.json"
-      - "scripts/check_docs_links.py"
-      - "web/.storybook/**"
       - "web/package.json"
-      - "web/public/**"
-      - "web/src/**"
       - "web/tsconfig.json"
+      - "web/.storybook/**"
+      - "web/public/**"
+      - "web/src/**/*.stories.*"
+      - "web/src/foundations/**"
+      - "web/src/components/**"
+      - "web/src/styles/**"
+      - "docs/**"
+      - "mkdocs.yml"
+      - "scripts/check_docs_links.py"
   push:
     branches:
       - main
       - dev
-    paths:
-      - ".github/workflows/storybook-pages.yml"
-      - ".prettierignore"
-      - ".prettierrc.json"
-      - "Makefile"
-      - "docs/**"
-      - "mkdocs.yml"
-      - "package.json"
-      - "package-lock.json"
-      - "scripts/check_docs_links.py"
-      - "web/.storybook/**"
-      - "web/package.json"
-      - "web/public/**"
-      - "web/src/**"
-      - "web/tsconfig.json"
+    paths: *site-paths
   workflow_dispatch:
 
 concurrency:
@@ -48,7 +37,7 @@ permissions:
 jobs:
   build:
     name: Build project site
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -98,7 +87,7 @@ jobs:
     name: Deploy project site
     if: github.event_name != 'pull_request'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write
