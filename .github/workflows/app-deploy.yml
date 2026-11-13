@@ -99,6 +99,8 @@ jobs:
           python -m alembic check
 
       - name: Test Python application and pipelines
+        env:
+          CHART_E2E_POSTGRES_ADMIN_URL: postgresql+psycopg://chart:chart@127.0.0.1:5432/postgres
         run: python -m pytest core/tests orchestration/tests pipelines/era5_heat/tests pipelines/seasonal_c3s/tests pipelines/isimip_projection/tests pipelines/boundaries/tests -q
 
       - name: Validate Dagster and OpenAPI contracts
