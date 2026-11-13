@@ -15,7 +15,7 @@ from contextlib import nullcontext
 import pytest
 from fastapi.testclient import TestClient
 
-from access_support import member
+from access_support import member, platform_admin
 from chart.api.app import app
 from chart.auth.service import require_current_user
 from chart.risk import routes as risk_routes
@@ -50,10 +50,17 @@ def test_the_state_map_shows_a_division_officer_only_their_division(sign_in) -> 
     assert [area["code"] for area in response.json()["areas"]] == ["bhopal"]
 
 
-def test_a_state_member_still_sees_every_division(sign_in) -> None:
-    lead = sign_in("planning_lead", "/india/madhya-pradesh")
-    codes = {area["code"] for area in lead.get(MAP).json()["areas"]}
-    assert codes == {"bhopal", "rewa", "indore"}
+def test_admins_and_state_members_still_see_every_division(sign_in) -> None:
+    everyone = {"bhopal", "rewa", "indore"}
+    for role, place in (
+        ("planning_lead", "/india/madhya-pradesh"),
+        ("workspace_admin", "/india"),
+    ):
+        client = sign_in(role, place)
+        assert {area["code"] for area in client.get(MAP).json()["areas"]} == everyone
+    app.dependency_overrides[require_current_user] = lambda: platform_admin()
+    admin = TestClient(app)
+    assert {area["code"] for area in admin.get(MAP).json()["areas"]} == everyone
 
 
 @pytest.mark.parametrize("view", ["short-term", "long-term", "current-observation"])
