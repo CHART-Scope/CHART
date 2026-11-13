@@ -9,7 +9,7 @@ import "../styles/globals.css";
 
 export const metadata: Metadata = {
   icons: { icon: "/chart-mark.svg" },
-  title: "CHART — Climate & health adaptation and resilience Toolkit",
+  title: "CHART | Climate & health adaptation and resilience Toolkit",
   description: "CHART planning workspace for traceable climate and health predictions.",
 };
 
