@@ -48,7 +48,7 @@ permissions:
 jobs:
   build:
     name: Build project site
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -98,7 +98,7 @@ jobs:
     name: Deploy project site
     if: github.event_name != 'pull_request'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write
