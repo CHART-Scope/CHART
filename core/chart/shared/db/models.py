@@ -1703,7 +1703,9 @@ class MembershipGrant(Base):
         ForeignKey("membership.id", ondelete="CASCADE"), nullable=False
     )
     role_id: Mapped[int] = mapped_column(
-        ForeignKey("access_role.id", ondelete="RESTRICT"), nullable=False
+        # Checked at commit (migration 035).
+        ForeignKey("access_role.id", deferrable=True, initially="DEFERRED"),
+        nullable=False,
     )
     geography_id: Mapped[str] = mapped_column(
         String(128), ForeignKey("geographies.id", ondelete="CASCADE"), nullable=False
@@ -1770,6 +1772,8 @@ class Invitation(Base):
         String(128), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
     )
     email: Mapped[str] = mapped_column(String(256), nullable=False)
+    #: The name the inviter typed, for the account a resend may recreate.
+    name: Mapped[str | None] = mapped_column(String(256))
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
     invited_by_user_id: Mapped[str | None] = mapped_column(
         String(128), ForeignKey("users.id", ondelete="SET NULL")

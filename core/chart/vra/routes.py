@@ -18,7 +18,7 @@ from chart.auth.schemas import CurrentUserContext
 from chart.access.guards import can, require_capability
 from chart.auth.service import require_current_user, require_reader
 from chart.risk.routes import _resolve_place_path
-from chart.shared.db.models import AppGeography, DepartmentOwnership
+from chart.shared.db.models import AppGeography, Department, DepartmentOwnership
 from chart.risk.schemas import MapResponse
 from chart.risk.service import NoAdminUnitForGeography, resolve_map_frame
 from chart.shared.db.session import get_session_factory
@@ -82,11 +82,18 @@ def _indicator_writer(user: CurrentUserContext, geography_id: str):
     """Whether the uploader may write an indicator's group at the place."""
     place = _resolve_place_path(geography_id)
     with get_session_factory()() as session:
+        country = session.scalar(
+            select(AppGeography.country_code).where(AppGeography.id == geography_id)
+        )
+        # Only this country's departments: ownership is per workspace.
         owners: dict[str, set[int]] = {}
         for key, department in session.execute(
-            select(
-                DepartmentOwnership.resource_key, DepartmentOwnership.department_id
-            ).where(DepartmentOwnership.resource_kind == "vra_indicator_group")
+            select(DepartmentOwnership.resource_key, DepartmentOwnership.department_id)
+            .join(Department, Department.id == DepartmentOwnership.department_id)
+            .where(
+                DepartmentOwnership.resource_kind == "vra_indicator_group",
+                Department.country_code == country,
+            )
         ):
             owners.setdefault(key, set()).add(department)
     return lambda indicator: can(

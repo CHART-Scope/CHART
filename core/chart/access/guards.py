@@ -12,6 +12,7 @@ from chart.auth.schemas import CurrentUserContext
 
 from .capabilities import MODULES, RANK
 from .principal import Grant, Principal, WorkspaceAccess, authorize, level_at
+from .principal import covers as _covers
 from .principal import readable as _readable
 
 # Signed-out visitors on an open installation (CHART_PUBLIC_READ) read
@@ -113,6 +114,10 @@ def can(
     return authorize(principal_of(user), module, level, place, departments)
 
 
+def covers(user: CurrentUserContext, module: str, place: str) -> bool:
+    return _covers(principal_of(user), module, place)
+
+
 def can_read_place(user: CurrentUserContext, place: str) -> bool:
     return _readable(principal_of(user), place)
 
@@ -171,6 +176,7 @@ __all__ = [
     "PUBLIC_VISITOR",
     "can",
     "can_read_place",
+    "covers",
     "context_for",
     "principal_of",
     "require_capability",

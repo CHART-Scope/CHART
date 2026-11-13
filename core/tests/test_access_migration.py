@@ -108,9 +108,11 @@ def _seed(connection) -> None:
     run(
         "INSERT INTO user_roles (user_id, role, source) VALUES ('admin', 'content_editor', 'admin')"
     )
+    # Setup kept the deepest place it was given, here the state.
     run(
         "INSERT INTO workspaces (id, name, status, geography_id, owner_user_id)"
-        " VALUES ('workspace-in-default', 'India planning', 'active', 'geo-in', 'admin')"
+        " VALUES ('workspace-in-default', 'India planning', 'active', 'geo-in-mp',"
+        " 'admin')"
     )
     for name in ("Health", "Water"):
         run("INSERT INTO department (country_code, name) VALUES ('IN', :n)", n=name)
@@ -145,9 +147,10 @@ def test_migration_035_moves_roles_areas_and_departments_into_workspace_grants(
 
     with engine.connect() as connection:
         q = lambda sql: connection.execute(sa.text(sql)).all()  # noqa: E731
-        # The setup workspace is claimed for India; no second one is made.
-        assert q("SELECT id, country_code FROM workspaces") == [
-            ("workspace-in-default", "IN")
+        # The setup workspace is claimed for India, widened to the country so
+        # it covers the admins' country grants; no second one is made.
+        assert q("SELECT id, country_code, geography_id FROM workspaces") == [
+            ("workspace-in-default", "IN", "geo-in")
         ]
         assert sorted(r[0] for r in q("SELECT key FROM access_role")) == [
             "data_officer",
@@ -199,6 +202,21 @@ def test_migration_035_moves_roles_areas_and_departments_into_workspace_grants(
         columns = {c["name"] for c in sa.inspect(connection).get_columns("workspaces")}
         assert "owner_user_id" not in columns
         assert _holdings(connection)["priya"] == [("planning_lead", "geo-in-mp")]
+
+    # Reset installation deletes workspaces first; their roles and grants must
+    # go with them in one statement, whatever order the cascades run in.
+    with engine.connect() as connection:
+        with connection.begin() as transaction:
+            connection.execute(sa.text("DELETE FROM workspaces"))
+            # Run the commit-time checks now, then roll back.
+            connection.execute(sa.text("SET CONSTRAINTS ALL IMMEDIATE"))
+            assert (
+                connection.execute(
+                    sa.text("SELECT count(*) FROM membership_grant")
+                ).scalar()
+                == 0
+            )
+            transaction.rollback()
 
     command.downgrade(config, "034_department")
     with engine.connect() as connection:

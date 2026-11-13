@@ -230,6 +230,7 @@ def invite(
         id=str(uuid.uuid4()),
         workspace_id=workspace.id,
         email=email,
+        name=request.name.strip(),
         status="pending",
         invited_by_user_id=user.user_id,
         expires_at=now + timedelta(days=INVITATION_DAYS),
@@ -273,7 +274,7 @@ def resend_invitation(
     invitation.status = "pending"
     session.commit()
     item = _invitation(session, invitation)
-    item.email_sent = _send(invitation.email, invitation.email)
+    item.email_sent = _send(invitation.name or invitation.email, invitation.email)
     return item
 
 

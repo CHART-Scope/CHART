@@ -27,7 +27,8 @@ type Props = { user: AccessHolder; workspace: Workspace };
 
 /**
  * Settings > Departments: rows the workspace manages, never a fixed list.
- * Everyone picks their own; departments write adds one; departments manage
+ * Anyone may leave a department; joining one takes people write, because
+ * departments narrow who may write; departments write adds one; departments manage
  * renames, archives and deletes; a Workspace admin sets the data sources and
  * VRA indicator groups each owns, which narrows who may write them.
  */
@@ -48,6 +49,8 @@ export function DepartmentsCard({ user, workspace }: Props) {
   const canAdd = level === "write" || level === "manage";
   const canManage = level === "manage";
   const canOwn = levelInWorkspace(user, workspace.id, "workspace") === "manage";
+  const people = levelInWorkspace(user, workspace.id, "people");
+  const canJoin = people === "write" || people === "manage";
   const isMember = user.isPlatformAdmin
     ? user.workspaces.some((item) => item.workspaceId === workspace.id)
     : true;
@@ -124,13 +127,19 @@ export function DepartmentsCard({ user, workspace }: Props) {
                 type="button"
                 className={styles.chip}
                 aria-pressed={mine.includes(item.id)}
-                disabled={busy}
+                disabled={busy || (!canJoin && !mine.includes(item.id))}
                 onClick={() => toggle(item.id)}
               >
                 {item.name}
               </button>
             ))}
           </div>
+          {canJoin ? null : (
+            <p className={styles.note}>
+              A workspace admin or planning lead adds you to a department. You can leave
+              one here.
+            </p>
+          )}
         </>
       ) : null}
 

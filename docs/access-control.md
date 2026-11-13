@@ -66,7 +66,10 @@ User (Keycloak sub, email, status)
   by module.
 - **Context above your places**: every member can **read** the places above
   their grants (a district officer sees their state's and country's figures),
-  with the read levels of their role. Writes stay inside their grants.
+  with the read levels of their role. Writes stay inside their grants. Context
+  is the place's own figures, not the areas beside one's own: a map of the
+  state shows a district officer only the areas they read, and an area picked
+  beneath the state must be readable itself.
 - **Departments**: per-workspace rows (Health, Water, …) that people belong
   to. They are both an attribute (who does this work) and a scope for actions
   (see below).
@@ -178,7 +181,8 @@ signs them out in Keycloak.
   then loads the **principal** from the database by `sub`: user status,
   platform flag, and memberships with their roles, places and departments.
   This is cached for about 30 seconds per user and cleared when that user's
-  access changes.
+  access changes. Kept copies of signed-in reads (`chart.api.read_cache`) are
+  keyed by the same access, so they end with it.
 - The token no longer needs `groups` or CHART client roles. The `groups`
   mapper and the `chart-core` roles are removed after migration.
 - A request names its workspace (the active country, as the
@@ -215,7 +219,7 @@ signs them out in Keycloak.
 | Tab | Who sees it | What it does |
 | --- | --- | --- |
 | People | `people:read` | Members with their grants and departments. Invite, resend, revoke (`write`); change grants and departments, disable (`manage`) |
-| Departments | `departments:read` | List with member counts and the data sources and VRA indicators each owns. Add (`write`); rename, archive, delete (`manage`). Each person ticks their own departments |
+| Departments | `departments:read` | List with member counts and the data sources and VRA indicators each owns. Add (`write`); rename, archive, delete (`manage`). Anyone may leave a department; joining one takes `people:write` (departments narrow writes) |
 | Roles | Workspace admin | The capability table for each role, read only. Nobody edits role capabilities in this version |
 | Workspaces | platform admin | Countries on this installation; create one; switch |
 
@@ -239,8 +243,10 @@ New or changed tables (one migration, with a backfill from `user_roles`,
   `archived_at`.
 - `membership_department` (`membership_id`, `department_id`).
 - `department_ownership` (`department_id`, `resource_kind` = `data_source` |
-  `vra_indicator_group`, `resource_key`).
-- `invitation`, as above, with its grants in `invitation_grant`.
+  `vra_indicator_group`, `resource_key`). Ownership is per workspace: Kenya's
+  Health owning ERA5 narrows Kenya's pulls, not India's.
+- `invitation`, as above, with the name the inviter typed and its grants in
+  `invitation_grant`.
 - After the switch, drop `user_roles`, `user_geography_scopes`,
   `user_department` and `workspace_members`.
 

@@ -185,10 +185,13 @@ def upgrade() -> None:
             sa.ForeignKey("membership.id", ondelete="CASCADE"),
             nullable=False,
         ),
+        # Deferred: a role in use still cannot be deleted on its own, but the
+        # check waits for the commit, so deleting a workspace can cascade to
+        # its roles and its members' grants in whichever order Postgres runs.
         sa.Column(
             "role_id",
             sa.Integer(),
-            sa.ForeignKey("access_role.id", ondelete="RESTRICT"),
+            sa.ForeignKey("access_role.id", deferrable=True, initially="DEFERRED"),
             nullable=False,
         ),
         sa.Column(
@@ -256,6 +259,8 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("email", sa.String(length=256), nullable=False),
+        # The name the inviter typed, for the account a resend may recreate.
+        sa.Column("name", sa.String(length=256)),
         sa.Column("status", sa.String(length=16), nullable=False),
         _user_fk("invited_by_user_id", "SET NULL"),
         _user_fk("user_id", "SET NULL"),
@@ -334,7 +339,9 @@ def _backfill(bind) -> None:
     ) & set(countries)
 
     # One workspace per country: a country's existing (setup) workspace is
-    # claimed first, otherwise one is created.
+    # claimed first, otherwise one is created. Setup kept the deepest place it
+    # was given; a workspace covers its whole country, so it is widened (the
+    # admins' grants below sit at the country).
     workspace_of: dict[str, str] = {}
     for row in q(
         "SELECT w.id, g.country_code FROM workspaces w"
@@ -343,8 +350,10 @@ def _backfill(bind) -> None:
         if row.country_code in countries and row.country_code not in workspace_of:
             workspace_of[row.country_code] = row.id
             q(
-                "UPDATE workspaces SET country_code = :code WHERE id = :id",
+                "UPDATE workspaces SET country_code = :code, geography_id = :geo"
+                " WHERE id = :id",
                 code=row.country_code,
+                geo=countries[row.country_code].id,
                 id=row.id,
             )
     for code in sorted(wanted - set(workspace_of)):

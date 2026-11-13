@@ -290,7 +290,9 @@ def create_ingestion_job(
             "data",
             "write",
             path,
-            owning_departments(session, "data_source", CLIMATE_SOURCE),
+            owning_departments(
+                session, "data_source", CLIMATE_SOURCE, request.country_code
+            ),
         )
         job, _created = create_job(
             session,

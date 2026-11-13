@@ -216,6 +216,12 @@ test("a viewer reads people and departments but changes nothing", async ({ page 
   await expect(page.getByRole("list", { name: "Departments" })).toBeVisible();
   await expect(page.getByRole("form", { name: "Add a department" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Archive" })).toHaveCount(0);
+  // Departments narrow writes, so a viewer cannot add themselves to one.
+  const mine = page.getByRole("group", { name: "My departments" });
+  await expect(mine.getByRole("button", { name: "Water" })).toBeDisabled();
+  await expect(
+    page.getByText("A workspace admin or planning lead adds you to a department."),
+  ).toBeVisible();
   // Roles and Workspaces are not theirs to see, even by URL.
   await page.goto("/settings?tab=roles");
   await expect(page).toHaveURL(/\/settings$/);

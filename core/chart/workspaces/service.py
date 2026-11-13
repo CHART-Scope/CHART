@@ -196,7 +196,7 @@ def audit(
         AuditEventRecord(
             user_id=user.user_id,
             session_id="server",
-            flush_id=f"{event_type}-{uuid.uuid4()}",
+            flush_id=f"workspace-{uuid.uuid4()}",
             client_seq=0,
             event_type=event_type,
             occurred_at=datetime.now(UTC),

@@ -98,6 +98,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   GRANT_PLACE_DUPLICATE: "Each place can have one role only.",
   GRANT_ROLE_INVALID: "That role is not part of this workspace. Reload.",
   DEPARTMENT_EXISTS: "That department is already on the list.",
+  DEPARTMENT_JOIN_NOT_ALLOWED:
+    "A workspace admin or planning lead adds people to departments.",
   DEPARTMENT_NAME_INVALID: "Give the department a name of 2 to 120 characters.",
   DEPARTMENT_UNKNOWN: "One of those departments is no longer available. Reload.",
   DEPARTMENT_IN_USE:

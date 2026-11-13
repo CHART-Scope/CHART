@@ -178,7 +178,7 @@ e2e-core:
 .PHONY: e2e-access
 e2e-access:
 	mkdir -p outputs/e2e/access
-	$(VENV_PYTHON) -m pytest core/tests/test_access_api.py core/tests/test_workspaces_api.py core/tests/test_auth_api.py core/tests/test_access_migration.py -q --junitxml=outputs/e2e/access/junit.xml
+	$(VENV_PYTHON) -m pytest core/tests/test_access_api.py core/tests/test_workspaces_api.py core/tests/test_auth_api.py core/tests/test_access_migration.py core/tests/test_risk_context_reads.py -q --junitxml=outputs/e2e/access/junit.xml
 
 e2e-orchestration:
 	mkdir -p outputs/e2e/orchestration

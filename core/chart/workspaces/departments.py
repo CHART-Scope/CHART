@@ -1,6 +1,7 @@
 """A workspace's departments: rows its members manage, never an enum.
 
-Every member reads the list and picks their own. ``departments:write``
+Every member reads the list and may leave a department; joining one takes
+``people:write``, as departments narrow writes. ``departments:write``
 adds one; ``departments:manage`` renames, archives and deletes. A Workspace
 admin (``workspace:manage``) sets which data sources and VRA indicator
 groups each department owns, which narrows writes there
@@ -15,6 +16,7 @@ from typing import cast
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from chart.access.capabilities import RANK
 from chart.access.principal import forget
 from chart.auth.schemas import CurrentUserContext
 from chart.shared.db.models import (
@@ -34,7 +36,13 @@ from .schemas import (
     ResourceKind,
     ResourceRef,
 )
-from .service import WorkspaceError, audit, need_workspace_level, workspace_for
+from .service import (
+    WorkspaceError,
+    audit,
+    need_workspace_level,
+    workspace_for,
+    workspace_level,
+)
 
 
 def list_departments(
@@ -216,6 +224,17 @@ def set_my_departments(
     wanted = set(department_ids)
     if not wanted <= available:
         raise WorkspaceError("DEPARTMENT_UNKNOWN", 422)
+    # Departments narrow writes, so joining one is a grant: it needs what
+    # adding someone to it needs (people:write). Leaving is always allowed.
+    held = set(
+        session.scalars(
+            select(MembershipDepartment.department_id).where(
+                MembershipDepartment.membership_id == membership.id
+            )
+        )
+    )
+    if wanted - held and not _may_assign_departments(user, workspace.id):
+        raise WorkspaceError("DEPARTMENT_JOIN_NOT_ALLOWED", 403)
     session.execute(
         delete(MembershipDepartment).where(
             MembershipDepartment.membership_id == membership.id
@@ -228,6 +247,11 @@ def set_my_departments(
     session.commit()
     forget(user.user_id)
     return list_departments(session, user, workspace.id)
+
+
+def _may_assign_departments(user: CurrentUserContext, workspace_id: str) -> bool:
+    held = workspace_level(user, workspace_id, "people")
+    return held is not None and RANK[held] >= RANK["write"]
 
 
 def set_ownership(

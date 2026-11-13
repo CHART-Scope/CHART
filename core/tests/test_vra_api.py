@@ -94,6 +94,7 @@ def _seed_places(session, postgres: bool) -> None:
         for country, level, label in (
             ("IN", "state", "State"),
             ("IN", "geo_level_1", "Division"),
+            ("IN", "district", "District"),
             ("KE", "country", "Country"),
             ("KE", "geo_level_1", "County"),
         )

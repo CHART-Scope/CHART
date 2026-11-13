@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from chart.shared.db.models import (
@@ -40,6 +41,18 @@ class SignIn:
 
 
 def link_sign_in(session: Session, sign_in: SignIn) -> None:
+    """Link the sign-in. The web app's first page sends several requests at
+    once, each linking the same new person: one wins, and the others, finding
+    its rows on insert, read what it committed instead of failing."""
+
+    try:
+        _link(session, sign_in)
+    except IntegrityError:
+        session.rollback()
+        logger.info("access: %s was linked by a concurrent request", sign_in.user_id)
+
+
+def _link(session: Session, sign_in: SignIn) -> None:
     now = datetime.now(UTC)
     email = (sign_in.email or "").strip().lower() or None
     pending = _pending(session, email, now) if email and sign_in.email_verified else []

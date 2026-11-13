@@ -76,6 +76,9 @@ class AccessDenied(PermissionError):
 
 _cache: dict[str, tuple[float, Principal]] = {}
 _lock = Lock()
+# Bumped whenever cached access is dropped, so caches of what access let
+# someone read (chart.api.read_cache) are dropped with it.
+_generation = 0
 
 
 def load_principal(
@@ -105,11 +108,21 @@ def load_principal(
 def forget(user_id: str | None = None) -> None:
     """Drop cached access: call after changing someone's grants or status."""
 
+    global _generation
     with _lock:
+        _generation += 1
         if user_id is None:
             _cache.clear()
         else:
             _cache.pop(user_id, None)
+
+
+def access_mark() -> str:
+    """Changes when anyone's access changes here, and at least every
+    ``CACHE_SECONDS`` so another worker's change is seen as soon as its
+    access cache would be."""
+
+    return f"{_generation}:{int(time.time() // CACHE_SECONDS)}"
 
 
 def level_at(principal: Principal, module: str, place: str) -> str | None:
@@ -135,6 +148,22 @@ def level_at(principal: Principal, module: str, place: str) -> str | None:
             elif _covers(target, grant.path):
                 best = higher(best, "read")
     return best
+
+
+def covers(principal: Principal, module: str, place: str) -> bool:
+    """Whether a grant on the module covers the place itself, not only as
+    context above it: what the areas beneath a place may be shown for."""
+
+    if not principal.active:
+        return False
+    if principal.is_platform_admin:
+        return True
+    target = normalize(place)
+    return any(
+        module in grant.levels and _covers(grant.path, target)
+        for workspace in principal.workspaces
+        for grant in workspace.grants
+    )
 
 
 def readable(principal: Principal, place: str) -> bool:

@@ -11,6 +11,7 @@ sign-in, the grant and department rules, and the audit trail.
 from __future__ import annotations
 
 import os
+import threading
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -18,6 +19,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from chart.access import principal as access
+from chart.access import signin as signin_module
 from chart.access.signin import SignIn
 from chart.api.app import app
 from chart.auth import service as auth_service
@@ -130,8 +132,10 @@ def world(tmp_path, monkeypatch):
     )
     emails: list[str] = []
     signed_out: list[str] = []
+    accounts: list[tuple[str, str]] = []
 
     def ensure_account(*, name: str, email: str, operation_id=None) -> IdentityUser:
+        accounts.append((name, email))
         return IdentityUser(
             user_id=email.split("@")[0], username=email, email=email, created=True
         )
@@ -141,7 +145,12 @@ def world(tmp_path, monkeypatch):
         people, "send_invitation", lambda user_id: emails.append(user_id)
     )
     monkeypatch.setattr(people, "sign_out", lambda user_id: signed_out.append(user_id))
-    yield {"factory": make, "emails": emails, "signed_out": signed_out}
+    yield {
+        "factory": make,
+        "emails": emails,
+        "signed_out": signed_out,
+        "accounts": accounts,
+    }
     access.forget()
 
 
@@ -442,6 +451,9 @@ def test_revoked_and_expired_invitations_grant_nothing_until_resent(india) -> No
     resent = root.post(f"/workspaces/{india['id']}/invitations/{late['id']}/resend")
     assert resent.json()["status"] == "pending"
     assert resent.json()["email_sent"] is True
+    # The account a resend makes (or remakes) carries the name the inviter
+    # typed, not the email address.
+    assert india["accounts"][-1] == ("Kofi", "kofi@example.org")
     assert len(_me("kofi")["workspaces"]) == 1
 
 
@@ -499,13 +511,20 @@ def test_departments_are_rows_members_add_rename_archive_and_delete(india) -> No
         f"{path}/mine", json={"department_ids": [water]}
     ).json() == {"error": "DEPARTMENT_UNKNOWN"}
     assert client_for("root").delete(f"{path}/{hydrology}").status_code == 200
-    # Each member picks their own.
+    # Departments narrow writes, so joining one takes people:write: a viewer
+    # cannot add themselves, a planning lead can, and anyone may leave.
     health = india["departments"]["Health"]
-    mine = client_for("ravi").put(f"{path}/mine", json={"department_ids": [health]})
+    assert client_for("ravi").put(
+        f"{path}/mine", json={"department_ids": [health]}
+    ).json() == {"error": "DEPARTMENT_JOIN_NOT_ALLOWED"}
+    assert _me("ravi")["workspaces"][0]["departments"] == []
+    mine = client_for("priya").put(f"{path}/mine", json={"department_ids": [health]})
     assert mine.json()["mine"] == [health]
-    assert [d["name"] for d in _me("ravi")["workspaces"][0]["departments"]] == [
+    assert [d["name"] for d in _me("priya")["workspaces"][0]["departments"]] == [
         "Health"
     ]
+    left = client_for("priya").put(f"{path}/mine", json={"department_ids": []})
+    assert left.json()["mine"] == []
 
 
 def test_department_ownership_narrows_writes_to_its_members(india) -> None:
@@ -532,6 +551,80 @@ def test_department_ownership_narrows_writes_to_its_members(india) -> None:
         "allowed": False,
         "code": "CAPABILITY_NOT_ALLOWED",
     }
+
+
+def test_a_departments_ownership_narrows_writes_in_its_own_country_only(
+    india,
+) -> None:
+    """Kenya's Health owning ERA5 does not stop India's data officers pulling
+    India's ERA5."""
+    _join(india, "ravi", "data_officer", "geo-in")
+    kenya = client_for("root").post("/workspaces", json={"country_code": "KE"}).json()
+    kenya_health = next(
+        item["id"]
+        for item in client_for("root")
+        .get(f"/workspaces/{kenya['id']}/departments")
+        .json()["items"]
+        if item["name"] == "Health"
+    )
+    owned = client_for("root").put(
+        f"/workspaces/{kenya['id']}/departments/{kenya_health}/ownership",
+        json={"resources": [{"kind": "data_source", "key": "era5"}]},
+    )
+    assert owned.status_code == 200, owned.text
+    pull = client_for("ravi").post(
+        "/climate/ingestion-jobs", json={"country_code": "IN"}
+    )
+    assert pull.status_code == 202, pull.text
+    # In India, an India department's ownership still narrows the write.
+    india_health = india["departments"]["Health"]
+    client_for("root").put(
+        f"/workspaces/{india['id']}/departments/{india_health}/ownership",
+        json={"resources": [{"kind": "data_source", "key": "era5"}]},
+    )
+    access.forget()
+    assert client_for("ravi").post(
+        "/climate/ingestion-jobs", json={"country_code": "IN"}
+    ).json() == {"error": "CAPABILITY_NOT_ALLOWED"}
+
+
+def test_concurrent_first_requests_from_an_invited_person_all_succeed(
+    india, monkeypatch
+) -> None:
+    """The web app's first page sends several requests at once; each links the
+    new person, and none may fail on the rows another request inserted."""
+    invited = _invite(
+        "root", india["id"], "ravi@example.org", [(india["roles"]["viewer"], "geo-in")]
+    )
+    assert invited.status_code == 201
+    # Hold both requests after their lookups, so both insert the same person.
+    barrier = threading.Barrier(2, timeout=10)
+    pending = signin_module._pending
+
+    def in_step(session, email, now):
+        found = pending(session, email, now)
+        barrier.wait()
+        return found
+
+    monkeypatch.setattr(signin_module, "_pending", in_step)
+    results: list[object] = []
+
+    def first_request() -> None:
+        try:
+            results.append(client_for("ravi").get("/auth/me").status_code)
+        except Exception as error:  # noqa: BLE001 - the regression is a raise
+            results.append(error)
+
+    threads = [threading.Thread(target=first_request) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert results == [200, 200]
+    monkeypatch.setattr(signin_module, "_pending", pending)
+    access.forget()
+    [workspace] = _me("ravi")["workspaces"]
+    assert [g["roleName"] for g in workspace["grants"]] == ["Viewer"]
 
 
 def test_another_countrys_members_cannot_reach_this_workspace(india) -> None:
