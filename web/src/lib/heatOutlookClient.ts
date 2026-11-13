@@ -266,9 +266,11 @@ export async function fetchClimateLayer(
   accessToken: string | null | undefined,
   layer: ClimateLayer,
   month?: string | null,
+  geometry = true,
 ): Promise<ClimateLayerMap> {
   const params = new URLSearchParams({ layer });
   if (month) params.set("month", month);
+  mapGeometryParam(params, geometry);
   const response = await authFetch(
     `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/climate?${params}`,
     { accessToken, cache: "default" },
@@ -302,9 +304,11 @@ export type PopulationMap = MapResponse & {
 export async function fetchPopulation(
   geographyId: string,
   measure: PopulationMeasure,
+  geometry = true,
 ): Promise<PopulationMap> {
+  const params = mapGeometryParam(new URLSearchParams({ measure }), geometry);
   const response = await authFetch(
-    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/population?measure=${measure}`,
+    `/api/chart/heat-outlook/${encodeURIComponent(geographyId)}/population?${params}`,
     { auth: false, cache: "default" },
   );
   if (!response.ok) throw new Error("Population could not load.");

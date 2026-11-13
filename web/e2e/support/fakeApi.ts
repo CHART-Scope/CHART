@@ -157,16 +157,12 @@ export function json(route: Route, body: unknown, status = 200) {
   });
 }
 
-/** Any map asked for `geometry=false` comes back without outlines, as the
+/** Any read asked for `geometry=false` comes back without outlines, as the
  * API's map middleware answers it. */
 function valuesOnly(route: Route, body: unknown) {
   const url = new URL(route.request().url());
   const map = body as { areas?: { geometry?: unknown }[] } | null;
-  if (
-    !url.pathname.endsWith("/map") ||
-    url.searchParams.get("geometry") !== "false" ||
-    !Array.isArray(map?.areas)
-  )
+  if (url.searchParams.get("geometry") !== "false" || !Array.isArray(map?.areas))
     return body;
   return { ...map, areas: map.areas.map((area) => ({ ...area, geometry: null })) };
 }

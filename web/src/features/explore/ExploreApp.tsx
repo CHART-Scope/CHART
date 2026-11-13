@@ -27,6 +27,7 @@ import {
 } from "@/lib/heatOutlookClient";
 import { type Action, listActions } from "@/lib/actionsClient";
 import { listGeographies } from "@/lib/planningClient";
+import { loadWithOutlines } from "@/lib/mapOutlines";
 import { fetchVraMap } from "@/lib/vraClient";
 
 import { ActionsDrawer, isHeatAction } from "./ActionsDrawer";
@@ -255,18 +256,24 @@ const outlookRead = (
   );
 const climateRead = (geo: string, layer: ClimateLayer, month?: string | null) =>
   cached(`climate|${geo}|${layer}|${month ?? ""}`, () =>
-    fetchClimateLayer(geo, null, layer, month),
+    loadWithOutlines(geo, (geometry) =>
+      fetchClimateLayer(geo, null, layer, month, geometry),
+    ),
   );
 
 const forecastMapRead = (geo: string, outcome: string, month?: string | null) =>
   cached(`forecast-map|${geo}|${outcome}|${month ?? ""}`, () =>
-    fetchForecastMap(geo, outcome, month),
+    loadWithOutlines(geo, (geometry) =>
+      fetchForecastMap(geo, outcome, month, undefined, geometry),
+    ),
   );
 const forecastRead = (geo: string, outcome: string) =>
   cached(`forecast|${geo}|${outcome}`, () => fetchForecast(geo, outcome));
 
 const populationRead = (geo: string, measure: PopulationMeasure) =>
-  cached(`population|${geo}|${measure}`, () => fetchPopulation(geo, measure));
+  cached(`population|${geo}|${measure}`, () =>
+    loadWithOutlines(geo, (geometry) => fetchPopulation(geo, measure, geometry)),
+  );
 
 /** The first of the frame and its children that has the read. */
 async function firstAvailable<T>(ids: string[], read: (id: string) => Promise<T>) {
@@ -409,7 +416,11 @@ export function ExploreApp() {
   useEffect(() => {
     if (!state.vra) return;
     let cancelled = false;
-    cached(`vra|${state.frame}`, () => fetchVraMap(state.frame, null))
+    cached(`vra|${state.frame}`, () =>
+      loadWithOutlines(state.frame, (geometry) =>
+        fetchVraMap(state.frame, null, { geometry }),
+      ),
+    )
       .then((data) => !cancelled && setVraOverlay({ key: state.frame, data }))
       .catch(() => !cancelled && setVraOverlay({ key: state.frame, data: null }));
     return () => {
@@ -583,17 +594,27 @@ export function ExploreApp() {
       return {
         key: `outlook-map|${geo}|${outcome}|${period}|${scenario ?? ""}`,
         load: () =>
-          fetchHeatOutlookMap(geo, null, {
-            outcome,
-            period,
-            scenario: scenario ?? undefined,
-          }),
+          loadWithOutlines(geo, (geometry) =>
+            fetchHeatOutlookMap(
+              geo,
+              null,
+              { outcome, period, scenario: scenario ?? undefined },
+              geometry,
+            ),
+          ),
       };
     }
     return {
       key: `observed-map|${geo}|${outcome}|${observedMonth ?? ""}`,
       load: () =>
-        fetchObservedRiskMap(geo, null, { outcome, month: observedMonth ?? undefined }),
+        loadWithOutlines(geo, (geometry) =>
+          fetchObservedRiskMap(
+            geo,
+            null,
+            { outcome, month: observedMonth ?? undefined },
+            geometry,
+          ),
+        ),
     };
   })();
   const mapKey = mapRead?.key ?? null;

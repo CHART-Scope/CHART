@@ -895,3 +895,42 @@ test("Explore fits a phone screen", async ({ page }) => {
     fullPage: true,
   });
 });
+
+test("after the first map, Explore asks only for values and keeps the outlines", async ({
+  page,
+}) => {
+  const { api } = await openExplore(page, "frame=geo-ke&outcome=lbw");
+  const maps = () =>
+    api.requests.filter((request) =>
+      /^GET \/api\/chart\/heat-outlook\/geo-ke\/(observed\/map|map|climate|forecast\/map)\?/.test(
+        request,
+      ),
+    );
+  await expect(page.getByTestId("explore-estimate")).toContainText("Aug 2026");
+  // Population is not served for this fixture, so its read keeps no outlines;
+  // the observed map is the first to bring them.
+  await expect.poll(() => maps().length).toBeGreaterThan(0);
+  // The first map of the country carries its outlines.
+  expect(maps()[0]).not.toContain("geometry=false");
+
+  await page.getByRole("tab", { name: "Projections" }).click();
+  await expect
+    .poll(() =>
+      maps().some((request) => /\/geo-ke\/map\?.*geometry=false/.test(request)),
+    )
+    .toBe(true);
+
+  // Drawn from the kept outlines: the county under the pointer still answers.
+  await page.getByRole("combobox").fill("Kajiado");
+  await page.getByRole("combobox").press("Enter");
+  const map = page.getByTestId("explore-map");
+  const box = (await map.boundingBox())!;
+  await page.waitForTimeout(800);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.getByTestId("explore-hover")).toContainText("Kajiado");
+  await page.screenshot({ path: "../outputs/e2e/web/explore-values-only.png" });
+  // Only the first read of the frame brought outlines.
+  expect(maps().filter((request) => !request.includes("geometry=false"))).toHaveLength(
+    1,
+  );
+});

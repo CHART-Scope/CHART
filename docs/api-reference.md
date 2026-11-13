@@ -42,13 +42,13 @@ make climate-api
 - `422` means a path, query, or request-body value did not satisfy the published
   schema. Endpoint-specific authorization, availability, and conflict responses
   remain listed under each operation.
-- Every map read (any `GET` path ending in `/map`) accepts `geometry=false`.
-  The answer is the same areas, values, reasons and bounds with every
-  `geometry` null, and the boundaries are neither simplified nor sent. A
-  frame's outlines do not change between months, views or settings, so the
-  dashboard keeps them from the first map and asks every later one for values
-  only. The flag is read by `chart/api/map_geometry.py` for all map routes, so
-  it is not repeated in each operation below.
+- Every read that returns map areas (the `/map`, `/climate` and `/population`
+  reads) accepts `geometry=false`. The answer is the same areas, values,
+  reasons and bounds with every `geometry` null, and the boundaries are neither
+  simplified nor sent. A frame's outlines do not change between months, views,
+  layers or settings, so the dashboard and Explore keep them from the first map
+  and ask every later one for values only. `chart/api/map_geometry.py` reads
+  the flag for every route, so it is not repeated in each operation below.
 - Public hazard and solution routes do not require sign-in. They read the
   configured public repository service and fall back to the bundled snapshot.
 
