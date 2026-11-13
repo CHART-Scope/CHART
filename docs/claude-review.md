@@ -28,6 +28,13 @@ the web and Python jobs pass.
 Both jobs skip until `AWS_CLAUDE_ROLE_ARN` is set, so the workflow stays green
 before setup.
 
+!!! note "Cost"
+    Claude review is a paid service. Every review and every `@claude` reply
+    calls Claude through Amazon Bedrock in Scope Impact's AWS account, and the
+    usage is billed there; there is no separate Anthropic subscription. A fork
+    or independent deployment of CHART does not inherit it: without its own
+    AWS account, role and GitHub App, the jobs simply skip.
+
 ### Setup
 
 1. **Bedrock model access.** In the AWS console, under Amazon Bedrock → Model
