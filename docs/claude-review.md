@@ -14,6 +14,15 @@
 A push to `dev` then publishes the images to GHCR and deploys them to EC2 once
 the web and Python jobs pass.
 
+## Project Pages
+
+`.github/workflows/storybook-pages.yml` builds Storybook and these docs into
+one GitHub Pages site, and deploys it from `dev` and `main`. It runs only when
+the site's content changes: story files, `web/src/components`,
+`web/src/styles`, `web/src/foundations`, `web/.storybook`, `web/public`,
+`docs/`, `mkdocs.yml` and dependency versions. A feature-only change does not
+redeploy it; that feature's story refreshes with the next site change.
+
 ## Claude review
 
 `.github/workflows/claude.yml` runs Claude Code on Amazon Bedrock:
