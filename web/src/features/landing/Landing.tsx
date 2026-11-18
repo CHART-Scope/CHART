@@ -118,11 +118,7 @@ export function Landing({
 
   useEffect(() => {
     const reason = takeSignedOutReason();
-    if (reason === "idle") {
-      setSignedOutNotice(
-        "You were signed out after 30 minutes without activity. Sign in to continue.",
-      );
-    } else if (reason === "other_tab") {
+    if (reason === "other_tab") {
       setSignedOutNotice("You signed out of CHART in another tab.");
     }
   }, []);
