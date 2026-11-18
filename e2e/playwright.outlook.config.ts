@@ -12,6 +12,7 @@ export default defineConfig({
     "vra-values-live.spec.ts",
     "typography-live.spec.ts",
     "saved-plans-live.spec.ts",
+    "configure-plan-live.spec.ts",
     "email-code-signin-live.spec.ts",
   ],
   workers: 1,

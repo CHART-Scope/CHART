@@ -2,6 +2,7 @@
 
 import os
 import uuid
+from datetime import date, timedelta
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -223,3 +224,63 @@ def test_removing_a_plan_is_persisted_and_repeatable(client, tokens, created):
     # A retried delete reports the plan as gone rather than failing differently.
     repeated = client.delete(f"/saved-plans/{plan['id']}", headers=headers)
     assert repeated.status_code == 404
+
+
+def test_a_wizard_draft_persists_each_step(client, tokens, created):
+    """The Configure plan wizard's draft, through migration 037's columns."""
+
+    headers = tokens["kenya-planner"]
+    start, end = date.today(), date.today() + timedelta(days=180)
+    response = save(
+        client,
+        tokens,
+        created,
+        status="draft",
+        start_date=start.isoformat(),
+        end_date=end.isoformat(),
+    )
+    assert response.status_code == 201, response.text
+    plan = response.json()
+    assert (plan["status"], plan["outcomes"]) == ("draft", ["lbw"])
+
+    step = client.patch(
+        f"/saved-plans/{plan['id']}",
+        json={"outcomes": ["lbw", "under_5_mortality"], "hazard": "extreme_heat"},
+        headers=headers,
+    )
+    assert step.status_code == 200, step.text
+    engine = create_engine(os.environ["DATABASE_URL"])
+    with engine.connect() as connection:
+        row = (
+            connection.execute(
+                text(
+                    "SELECT status, start_date, end_date, hazard, outcomes "
+                    "FROM saved_plan WHERE id = :id"
+                ),
+                {"id": plan["id"]},
+            )
+            .mappings()
+            .one()
+        )
+    assert row["status"] == "draft"
+    assert (row["start_date"], row["end_date"]) == (start, end)
+    assert row["hazard"] == "extreme_heat"
+    assert row["outcomes"] == ["lbw", "under_5_mortality"]
+
+    # Refused steps leave the row as it was; another user's PATCH sees nothing.
+    too_long = client.patch(
+        f"/saved-plans/{plan['id']}",
+        json={"end_date": (start + timedelta(days=800)).isoformat()},
+        headers=headers,
+    )
+    assert too_long.status_code == 422
+    assert too_long.json()["error"] == "PLAN_TIMELINE_TOO_LONG"
+    foreign = client.patch(
+        f"/saved-plans/{plan['id']}",
+        json={"name": "Taken"},
+        headers=tokens["india-planner"],
+    )
+    assert foreign.status_code == 404
+    assert (
+        client.get(f"/saved-plans/{plan['id']}", headers=headers).json() == step.json()
+    )

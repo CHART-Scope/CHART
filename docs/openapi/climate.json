@@ -4320,7 +4320,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "Stores a named plan for a geography (and optional sub-area within it), outcome and observed or projected selection. The API resolves the selection and captures the estimate through the same outlook service as the dashboard; a view with no published estimate is saved with figure.status unavailable and a reason. Refuses places outside the caller's scope (GEOGRAPHY_OUT_OF_SCOPE), a sub-area outside its frame (PLAN_AREA_INVALID), a selection the publication does not contain (OUTLOOK_SELECTION_INVALID) and more than 100 plans per user (SAVED_PLAN_LIMIT)."
+        "description": "Stores a named plan for a geography (and optional sub-area within it), outcome and observed or projected selection. The API resolves the selection and captures the estimate through the same outlook service as the dashboard; a view with no published estimate is saved with figure.status unavailable and a reason. Refuses places outside the caller's scope (GEOGRAPHY_OUT_OF_SCOPE), a sub-area outside its frame (PLAN_AREA_INVALID), a selection the publication does not contain (OUTLOOK_SELECTION_INVALID) and more than 100 plans per user (SAVED_PLAN_LIMIT). The Configure plan wizard sends status draft with the plan's start and end dates, checked as in PATCH."
       }
     },
     "/saved-plans/{plan_id}": {
@@ -4371,6 +4371,64 @@
           }
         },
         "description": "Returns one of the caller's plans. Another user's plan is reported as SAVED_PLAN_NOT_FOUND; a plan whose place has left the caller's scope is refused with GEOGRAPHY_OUT_OF_SCOPE."
+      },
+      "patch": {
+        "tags": [
+          "saved-plans"
+        ],
+        "summary": "Change one of the caller's plans from the Configure plan wizard",
+        "operationId": "update_saved_plan_saved_plans__plan_id__patch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 36,
+              "maxLength": 36,
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedPlanUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The plan with the step's changes saved, as GET /saved-plans/{plan_id} returns it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedPlanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Applies one wizard step to one of the caller's plans: its name, its start and end dates, its hazard or its health outcomes; fields left out keep their values. Needs plans write at the plan's place. Refuses a timeline that is incomplete or ends before it starts (PLAN_TIMELINE_INVALID), starts before today (PLAN_START_IN_PAST) or runs 24 months or more (PLAN_TIMELINE_TOO_LONG), a hazard no model covers (PLAN_HAZARD_UNAVAILABLE) and an unknown outcome (PLAN_OUTCOME_INVALID). Ownership and scope follow GET /saved-plans/{plan_id}."
       },
       "delete": {
         "tags": [
@@ -13775,17 +13833,54 @@
             "title": "Outcome"
           },
           "choices": {
-            "$ref": "#/components/schemas/PlanChoices"
+            "$ref": "#/components/schemas/PlanChoices",
+            "default": {
+              "view": "projection",
+              "reference": "annual"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "saved"
+            ],
+            "title": "Status",
+            "default": "saved"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
           }
         },
         "type": "object",
         "required": [
           "name",
           "geography_id",
-          "outcome",
-          "choices"
+          "outcome"
         ],
-        "title": "SavedPlanCreate"
+        "title": "SavedPlanCreate",
+        "description": "A dashboard view to save, or the first step of the Configure plan wizard.\n\nThe wizard sends ``status: draft`` with the plan's dates; the dashboard\nview it was opened from is captured as for any saved view (a projection\nwhen no choices are sent)."
       },
       "SavedPlanList": {
         "properties": {
@@ -13813,6 +13908,14 @@
             "type": "string",
             "title": "Name"
           },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "saved"
+            ],
+            "title": "Status"
+          },
           "geography_id": {
             "type": "string",
             "title": "Geography Id"
@@ -13832,6 +13935,41 @@
             "type": "string",
             "title": "Outcome"
           },
+          "hazard": {
+            "type": "string",
+            "title": "Hazard"
+          },
+          "outcomes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Outcomes"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
           "choices": {
             "$ref": "#/components/schemas/PlanChoices"
           },
@@ -13845,21 +13983,104 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
           }
         },
         "type": "object",
         "required": [
           "id",
           "name",
+          "status",
           "geography_id",
           "admin_unit_id",
           "outcome",
+          "hazard",
+          "outcomes",
+          "start_date",
+          "end_date",
           "choices",
           "figure",
           "signals",
-          "created_at"
+          "created_at",
+          "updated_at"
         ],
         "title": "SavedPlanResponse"
+      },
+      "SavedPlanUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "hazard": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9_]{1,64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hazard"
+          },
+          "outcomes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 8,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcomes"
+          }
+        },
+        "type": "object",
+        "title": "SavedPlanUpdate",
+        "description": "A wizard step's changes; fields left out keep their saved values."
       },
       "SectorOption": {
         "properties": {

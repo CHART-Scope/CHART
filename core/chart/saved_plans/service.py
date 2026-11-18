@@ -1,15 +1,18 @@
-"""Save, list and remove the dashboard views a user plans from.
+"""Save, configure, list and remove the plans a user makes.
 
-A plan stores the selections that reopen its view and the estimate the
-published model gave for them at save time, read through the same outlook
-service as the dashboard so the two always agree.
+A plan stores the selections that reopen its dashboard view and the estimate
+the published model gave for them at save time, read through the same outlook
+service as the dashboard so the two always agree. The Configure plan wizard
+then sets, step by step, the dates it runs between and the hazard and health
+outcomes it addresses.
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import date
-from typing import Any, Literal
+from calendar import monthrange
+from datetime import date, timedelta
+from typing import Any, Literal, cast
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -20,6 +23,7 @@ from chart.access.guards import can
 from chart.climate.heat_seasons import heat_season
 from chart.heat_outlook.observed import ObservedNotCalibrated, load_observed
 from chart.heat_outlook.service import (
+    OUTCOMES,
     OutlookNotAvailable,
     OutlookSelectionInvalid,
     ViewTurnedOff,
@@ -33,13 +37,19 @@ from .schemas import (
     PlanChoices,
     PlanFigure,
     PlanSignals,
+    PlanStatus,
     SavedPlanCreate,
     SavedPlanResponse,
+    SavedPlanUpdate,
 )
 
 RiskLevel = Literal["elevated", "possible", "not_detected", "unknown"]
 PlanTiming = Literal["before", "during", "after"]
 MAX_PLANS_PER_USER = 100
+# A plan runs for at most 24 months.
+MAX_PLAN_MONTHS = 24
+# Hazards a published model covers; the wizard lists the others as coming soon.
+PLAN_HAZARDS = ("extreme_heat",)
 
 
 class SavedPlanError(ValueError):
@@ -62,13 +72,8 @@ def create_plan(
         if unit is None or not unit.path.startswith(frame.path.rstrip("/") + "/"):
             raise SavedPlanError("PLAN_AREA_INVALID", 422)
         place = unit
-    if not can(user, "plans", "write", place.path):
-        code = (
-            "CAPABILITY_NOT_ALLOWED"
-            if can(user, "plans", "read", place.path)
-            else "GEOGRAPHY_OUT_OF_SCOPE"
-        )
-        raise SavedPlanError(code, 403)
+    _require_write(user, place)
+    _check_timeline(request.start_date, request.end_date)
     count = (
         session.scalar(select(func.count()).where(SavedPlan.user_id == user.user_id))
         or 0
@@ -93,11 +98,81 @@ def create_plan(
         outcome=request.outcome,
         choices=choices.model_dump(),
         figure=figure.model_dump(),
+        status=request.status,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        hazard=PLAN_HAZARDS[0],
+        outcomes=[request.outcome],
     )
     session.add(record)
     session.commit()
     session.refresh(record)
     return plan_response(record)
+
+
+def update_plan(
+    session: Session,
+    user: CurrentUserContext,
+    plan_id: str,
+    request: SavedPlanUpdate,
+) -> SavedPlanResponse:
+    """Apply one wizard step's changes to the user's own plan."""
+
+    plan = readable_plan(session, user, plan_id)
+    place = session.get(AppGeography, plan.admin_unit_id or plan.geography_id)
+    # readable_plan has already refused a plan whose place is gone.
+    assert place is not None
+    _require_write(user, place)
+    changes = request.model_dump(exclude_unset=True)
+    if "start_date" in changes or "end_date" in changes:
+        start = changes.get("start_date", plan.start_date)
+        end = changes.get("end_date", plan.end_date)
+        _check_timeline(start, end)
+        plan.start_date, plan.end_date = start, end
+    if "hazard" in changes and changes["hazard"] not in PLAN_HAZARDS:
+        raise SavedPlanError("PLAN_HAZARD_UNAVAILABLE", 422)
+    if "outcomes" in changes:
+        outcomes = list(dict.fromkeys(changes["outcomes"]))
+        if any(outcome not in OUTCOMES for outcome in outcomes):
+            raise SavedPlanError("PLAN_OUTCOME_INVALID", 422)
+        plan.outcomes = outcomes
+    plan.name = changes.get("name", plan.name)
+    plan.hazard = changes.get("hazard", plan.hazard)
+    session.commit()
+    session.refresh(plan)
+    return plan_response(plan)
+
+
+def _require_write(user: CurrentUserContext, place: AppGeography) -> None:
+    if not can(user, "plans", "write", place.path):
+        code = (
+            "CAPABILITY_NOT_ALLOWED"
+            if can(user, "plans", "read", place.path)
+            else "GEOGRAPHY_OUT_OF_SCOPE"
+        )
+        raise SavedPlanError(code, 403)
+
+
+def _check_timeline(start: date | None, end: date | None) -> None:
+    """Both dates or neither; from today, ending on or after the start and
+    within 24 months of it. "Today" allows a day either side, so a browser
+    ahead of or behind the server's clock can still start a plan today."""
+
+    if start is None and end is None:
+        return
+    if start is None or end is None or end < start:
+        raise SavedPlanError("PLAN_TIMELINE_INVALID", 422)
+    if start < date.today() - timedelta(days=1):
+        raise SavedPlanError("PLAN_START_IN_PAST", 422)
+    if end >= _add_months(start, MAX_PLAN_MONTHS):
+        raise SavedPlanError("PLAN_TIMELINE_TOO_LONG", 422)
+
+
+def _add_months(day: date, months: int) -> date:
+    index = day.month - 1 + months
+    year, month = day.year + index // 12, index % 12 + 1
+    # 31 January + 1 month is the last day of February.
+    return date(year, month, min(day.day, monthrange(year, month)[1]))
 
 
 def list_plans(session: Session, user: CurrentUserContext) -> list[SavedPlanResponse]:
@@ -310,13 +385,19 @@ def plan_response(plan: SavedPlan) -> SavedPlanResponse:
     return SavedPlanResponse(
         id=plan.id,
         name=plan.name,
+        status=cast(PlanStatus, plan.status),
         geography_id=plan.geography_id,
         admin_unit_id=plan.admin_unit_id,
         outcome=plan.outcome,
+        hazard=plan.hazard,
+        outcomes=plan.outcomes,
+        start_date=plan.start_date,
+        end_date=plan.end_date,
         choices=choices,
         figure=figure,
         signals=signals(choices, figure),
         created_at=plan.created_at,
+        updated_at=plan.updated_at,
     )
 
 

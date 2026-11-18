@@ -70,3 +70,60 @@
   color: rgba(255, 255, 255, 0.28);
   margin-top: 2px;
 }
+
+/* Tabs: numbered steps in a row over a hairline, the current one underlined. */
+.tabs {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.tabs .item {
+  width: auto;
+  align-items: center;
+  padding: 0 0 var(--space-3);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+}
+.tabs .item:not(:last-child)::after {
+  content: none;
+}
+.tabs .item.active {
+  border-bottom-color: var(--color-nexus);
+}
+.tabs .item:disabled {
+  cursor: not-allowed;
+}
+.tabs .item:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.tabs .dot {
+  width: var(--control-tag);
+  height: var(--control-tag);
+  border: 1.5px solid var(--color-text-hint);
+  color: var(--color-text-secondary);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+}
+.tabs .dot.active {
+  background: var(--color-nexus);
+  border-color: var(--color-nexus);
+  color: var(--color-white);
+}
+.tabs .dot.done {
+  background: var(--color-white);
+  border-color: var(--color-nexus);
+  color: var(--color-nexus);
+}
+.tabs .title {
+  font-family: var(--font-display);
+  font-size: var(--fs-h2);
+  color: var(--color-text-secondary);
+}
+.tabs .title.active {
+  color: var(--color-text);
+}
+.tabs .title.done {
+  color: var(--color-text-secondary);
+}

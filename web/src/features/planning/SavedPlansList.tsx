@@ -8,6 +8,7 @@ import { Icon } from "@/components/Icon";
 import { SectionTitle } from "@/components/PageHeader";
 import { riskLabels, timingSeason } from "@/features/actions";
 import { dashboardHref } from "@/features/dashboard/dashboardNavigation";
+import { configurePlanHref } from "@/features/planConfigure/configurePlanHref";
 import type { SavedPlan } from "@/lib/savedPlansClient";
 
 import styles from "./SavedPlansList.module.css";
@@ -82,6 +83,18 @@ function PlanRow({
   const actionsQuery = new URLSearchParams({ outcome: plan.outcome, plan: plan.id });
   if (plan.admin_unit_id) actionsQuery.set("admin_unit", plan.admin_unit_id);
   const actionsHref = `/dashboard/${encodeURIComponent(plan.geography_id)}/actions?${actionsQuery}`;
+  // A draft reopens the wizard on its hazards and outcomes, the step after
+  // the one that started it.
+  const draftHref =
+    plan.status === "draft"
+      ? configurePlanHref({
+          geographyId: plan.geography_id,
+          adminUnit: plan.admin_unit_id,
+          outcome: plan.outcome,
+          planId: plan.id,
+          step: "outcomes",
+        })
+      : null;
 
   async function remove() {
     setRemoval("removing");
@@ -104,6 +117,11 @@ function PlanRow({
             : (figure.reason ?? "No estimate was captured for this plan.")}
         </p>
         <div className={styles.chips}>
+          {draftHref ? (
+            <span className={styles.chip} data-status="draft">
+              Draft
+            </span>
+          ) : null}
           <span className={styles.chip} data-risk={plan.signals.risk_level}>
             {riskLabels[plan.signals.risk_level]}
           </span>
@@ -117,7 +135,18 @@ function PlanRow({
         ) : null}
       </div>
       <div className={styles.actions}>
-        <Link href={actionsHref} className={buttonClassName({ size: "sm" })}>
+        {draftHref ? (
+          <Link href={draftHref} className={buttonClassName({ size: "sm" })}>
+            Continue configuring
+          </Link>
+        ) : null}
+        <Link
+          href={actionsHref}
+          className={buttonClassName({
+            size: "sm",
+            variant: draftHref ? "secondary" : "primary",
+          })}
+        >
           Recommendations
         </Link>
         <Link

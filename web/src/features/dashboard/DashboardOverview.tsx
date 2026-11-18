@@ -23,6 +23,7 @@ import { type GeographyRecord } from "@/lib/planningClient";
 import { type OutlookChoices } from "@/features/dashboard/HeatOutlookPanel";
 import { resolveMonthlyRiskMonth } from "@/features/dashboard/HeatLbwLinkPanel";
 import { SavePlanDialog } from "@/features/dashboard/SavePlanDialog";
+import { configurePlanHref } from "@/features/planConfigure/configurePlanHref";
 import { type SavedPlanInput } from "@/lib/savedPlansClient";
 import {
   dashboardHref,
@@ -429,7 +430,12 @@ function Dashboard({
         adminUnit={adminUnit ?? null}
         outcome={outcome}
         catalog={catalog}
-        configureHref={actionsHref(geographyId, displayedAdminUnit, outcome)}
+        configureHref={configurePlanHref({
+          geographyId,
+          adminUnit: displayedAdminUnit,
+          outcome,
+          planId: null,
+        })}
         onNavigate={({
           geographyId: nextGeo,
           adminUnit: nextAdmin,
@@ -551,13 +557,6 @@ function Dashboard({
       <SavePlanDialog draft={planDraft} onClose={() => setPlanDraft(null)} />
     </main>
   );
-}
-
-/** The recommended actions page (09a) for the place and outcome shown. */
-function actionsHref(geographyId: string, adminUnit: string | null, outcome: string) {
-  const query = new URLSearchParams({ outcome });
-  if (adminUnit) query.set("admin_unit", adminUnit);
-  return `/dashboard/${encodeURIComponent(geographyId)}/actions?${query}`;
 }
 
 function humanizeCode(value: string): string {

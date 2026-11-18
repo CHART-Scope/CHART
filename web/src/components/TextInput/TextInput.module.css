@@ -13,10 +13,11 @@
 }
 .input {
   width: 100%;
-  padding: 9px 12px;
+  height: var(--control-input);
+  padding: 0 var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  font-size: var(--fs-body);
+  font-size: var(--fs-body-lg);
   background: var(--color-white);
   color: var(--color-charcoal);
   font-family: var(--font-body);
@@ -29,4 +30,9 @@
 .input:read-only {
   background: var(--color-white);
   color: var(--color-charcoal);
+}
+@media (max-width: 640px) {
+  .input {
+    font-size: var(--fs-input-phone);
+  }
 }

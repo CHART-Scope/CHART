@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from chart.heat_outlook.schemas import Ratio
 
 Code = Field(default=None, max_length=32, pattern=r"^[A-Za-z0-9_.-]+$")
+OutcomeCode = Field(pattern=r"^[a-z0-9_]{1,64}$")
+PlanStatus = Literal["draft", "saved"]
 
 
 class PlanChoices(BaseModel):
@@ -24,20 +26,57 @@ class PlanChoices(BaseModel):
     reference: Literal["annual", "season", "peak"] = "annual"
 
 
+def _plan_name(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = " ".join(value.split())
+    if not value:
+        raise ValueError("A plan needs a name.")
+    return value
+
+
 class SavedPlanCreate(BaseModel):
+    """A dashboard view to save, or the first step of the Configure plan wizard.
+
+    The wizard sends ``status: draft`` with the plan's dates; the dashboard
+    view it was opened from is captured as for any saved view (a projection
+    when no choices are sent).
+    """
+
     name: str = Field(min_length=1, max_length=120)
     geography_id: str = Field(min_length=1, max_length=128)
     admin_unit_id: str | None = Field(default=None, max_length=128)
-    outcome: str = Field(pattern=r"^[a-z0-9_]{1,64}$")
-    choices: PlanChoices
+    outcome: str = OutcomeCode
+    choices: PlanChoices = PlanChoices(view="projection")
+    status: PlanStatus = "saved"
+    start_date: date | None = None
+    end_date: date | None = None
 
-    @field_validator("name")
-    @classmethod
-    def _named(cls, value: str) -> str:
-        value = " ".join(value.split())
-        if not value:
-            raise ValueError("A plan needs a name.")
-        return value
+    _named = field_validator("name")(_plan_name)
+
+
+class SavedPlanUpdate(BaseModel):
+    """A wizard step's changes; fields left out keep their saved values."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    start_date: date | None = None
+    end_date: date | None = None
+    hazard: str | None = Field(default=None, pattern=r"^[a-z0-9_]{1,64}$")
+    outcomes: list[str] | None = Field(default=None, min_length=1, max_length=8)
+
+    _named = field_validator("name")(_plan_name)
+
+    @model_validator(mode="after")
+    def _changes_something(self) -> "SavedPlanUpdate":
+        if not self.model_fields_set:
+            raise ValueError("Send at least one field to change.")
+        # Only the dates can be cleared, and only together (checked on save).
+        if any(
+            getattr(self, field) is None
+            for field in self.model_fields_set - {"start_date", "end_date"}
+        ):
+            raise ValueError("Only the timeline can be cleared.")
+        return self
 
 
 class PlanFigure(BaseModel):
@@ -75,13 +114,19 @@ class PlanSignals(BaseModel):
 class SavedPlanResponse(BaseModel):
     id: str
     name: str
+    status: PlanStatus
     geography_id: str
     admin_unit_id: str | None
     outcome: str
+    hazard: str
+    outcomes: list[str]
+    start_date: date | None
+    end_date: date | None
     choices: PlanChoices
     figure: PlanFigure
     signals: PlanSignals
     created_at: datetime
+    updated_at: datetime
 
 
 class SavedPlanList(BaseModel):

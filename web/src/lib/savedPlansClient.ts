@@ -35,16 +35,26 @@ export type PlanFigure = {
 export type RiskLevel = "elevated" | "possible" | "not_detected" | "unknown";
 export type PlanTiming = "before" | "during" | "after";
 
+export type PlanStatus = "draft" | "saved";
+
 export type SavedPlan = {
   id: string;
   name: string;
+  /** A Configure plan wizard plan is a draft until it is saved. */
+  status: PlanStatus;
   geography_id: string;
   admin_unit_id: string | null;
   outcome: string;
+  hazard: string;
+  outcomes: string[];
+  /** ISO dates (YYYY-MM-DD) the plan runs between; null for a saved view. */
+  start_date: string | null;
+  end_date: string | null;
   choices: PlanChoices;
   figure: PlanFigure;
   signals: { risk_level: RiskLevel; timing: PlanTiming };
   created_at: string;
+  updated_at: string;
 };
 
 export type SavedPlanInput = {
@@ -52,7 +62,19 @@ export type SavedPlanInput = {
   geography_id: string;
   admin_unit_id: string | null;
   outcome: string;
-  choices: PlanChoices;
+  choices?: PlanChoices;
+  status?: PlanStatus;
+  start_date?: string;
+  end_date?: string;
+};
+
+/** One wizard step's changes; fields left out keep their saved values. */
+export type SavedPlanChanges = {
+  name?: string;
+  start_date?: string;
+  end_date?: string;
+  hazard?: string;
+  outcomes?: string[];
 };
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -63,6 +85,13 @@ const ERROR_MESSAGES: Record<string, string> = {
     "The published model does not offer this selection. Change it and try again.",
   SAVED_PLAN_LIMIT: "You have 100 saved plans. Remove one to save another.",
   SAVED_PLAN_NOT_FOUND: "This plan no longer exists.",
+  CAPABILITY_NOT_ALLOWED: "Your role can read plans here but not change them.",
+  PLAN_TIMELINE_INVALID: "Choose an end date on or after the start date.",
+  PLAN_START_IN_PAST: "A plan starts today or later. Choose a later start date.",
+  PLAN_TIMELINE_TOO_LONG:
+    "A plan can cover up to 24 months. Choose an earlier end date.",
+  PLAN_HAZARD_UNAVAILABLE: "No model covers this climate hazard yet.",
+  PLAN_OUTCOME_INVALID: "Choose health outcomes that CHART models.",
 };
 
 async function failure(response: Response, fallback: string): Promise<Error> {
@@ -102,6 +131,22 @@ export async function createSavedPlan(input: SavedPlanInput): Promise<SavedPlan>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+  if (!response.ok) throw await failure(response, "The plan could not be saved.");
+  return (await response.json()) as SavedPlan;
+}
+
+export async function updateSavedPlan(
+  planId: string,
+  changes: SavedPlanChanges,
+): Promise<SavedPlan> {
+  const response = await authFetch(
+    `/api/chart/saved-plans/${encodeURIComponent(planId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(changes),
+    },
+  );
   if (!response.ok) throw await failure(response, "The plan could not be saved.");
   return (await response.json()) as SavedPlan;
 }

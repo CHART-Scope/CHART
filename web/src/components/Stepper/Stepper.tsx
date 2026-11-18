@@ -10,11 +10,29 @@ type Props = {
   steps: Step[];
   currentIndex: number;
   onStepClick?: (index: number) => void;
+  /** `rail`: the vertical list on charcoal (onboarding). `tabs`: a row of
+   * numbered tabs on a light page (Configure plan). */
+  variant?: "rail" | "tabs";
+  /** Steps after this index are shown but cannot be opened yet. */
+  lastOpenIndex?: number;
+  "aria-label"?: string;
 };
 
-export function Stepper({ steps, currentIndex, onStepClick }: Props) {
+export function Stepper({
+  steps,
+  currentIndex,
+  onStepClick,
+  variant = "rail",
+  lastOpenIndex = steps.length - 1,
+  "aria-label": label,
+}: Props) {
   return (
-    <nav className={styles.nav}>
+    <nav
+      className={[styles.nav, variant === "tabs" ? styles.tabs : ""]
+        .filter(Boolean)
+        .join(" ")}
+      aria-label={label}
+    >
       {steps.map((step, i) => {
         const isActive = i === currentIndex;
         const isDone = i < currentIndex;
@@ -23,7 +41,11 @@ export function Stepper({ steps, currentIndex, onStepClick }: Props) {
           <button
             key={step.id}
             type="button"
-            className={styles.item}
+            className={[styles.item, state ? styles[state] : ""]
+              .filter(Boolean)
+              .join(" ")}
+            aria-current={isActive ? "step" : undefined}
+            disabled={i > lastOpenIndex}
             onClick={() => onStepClick?.(i)}
           >
             <div
