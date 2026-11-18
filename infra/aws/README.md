@@ -94,8 +94,9 @@ CHART_ADMIN_INITIAL_PASSWORD=a-long-random-first-password
 ```
 
 `CHART_ADMIN_INITIAL_PASSWORD` is the first password of the default `admin`
-account, changed at its first sign-in. Without it the account starts on
-`admin`, which a public server should never do.
+account, changed at its first sign-in. The deploy that creates the account
+stops if it is unset or `admin` on any host but `localhost`; an existing
+`admin` is never touched.
 
 Save it, then copy that same file to the sandbox:
 

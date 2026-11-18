@@ -4,7 +4,7 @@
 
 | Who | Where | Username | Password |
 | --- | --- | --- | --- |
-| CHART's administrator | CHART, e.g. `https://chartforclimateaction.org` | `admin` | First `CHART_ADMIN_INITIAL_PASSWORD` (or `admin` if it was not set); you choose your own at the first sign-in |
+| CHART's administrator | CHART, e.g. `https://chartforclimateaction.org` | `admin` | First `CHART_ADMIN_INITIAL_PASSWORD` (`admin` only on a local installation); you choose your own at the first sign-in |
 | Everyone else | CHART | their email address | none: a 6-character code by email |
 | Keycloak's operator account | `https://<domain>/identity/admin` | `admin` | `KEYCLOAK_ADMIN_PASSWORD` from `.env.prod` |
 
@@ -15,7 +15,8 @@ only for operating Keycloak and is not needed to set CHART up.
 `infra/keycloak/sync-realm.js` creates CHART's `admin` once (local
 `make identity-sync` and every deploy) and never changes it afterwards.
 **Set `CHART_ADMIN_INITIAL_PASSWORD` in `.env.prod` before the first deploy
-of a public server**, so it never starts on `admin`.
+of a public server**: the realm sync refuses to create `admin` with no
+password or `admin` on any host but `localhost`.
 
 ## First run
 
