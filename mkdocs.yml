@@ -67,6 +67,7 @@ nav:
   - Installation setup: installation-setup.md
   - Sign-in and email: sign-in.md
   - Users and capabilities (design): access-control.md
+  - Secrets and permissions (in progress): secrets-and-permissions.md
   - Architecture:
       - Observed climate data: observed-climate.md
   - Infrastructure:

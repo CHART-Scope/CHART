@@ -63,6 +63,7 @@ flowchart LR
 | [Installation setup](installation-setup.md) | Complete the first-run onboarding wizard, reset an installation, or recover from a stuck bootstrap |
 | [Sign-in and email](sign-in.md) | How people sign in with emailed codes, and the SMTP settings (SES, Resend, Mailpit) that deliver them |
 | [Users and capabilities (design)](access-control.md) | Agreed design: workspaces, roles as capability bundles, editable departments, invitations and one authorisation check |
+| [Secrets and permissions (in progress)](secrets-and-permissions.md) | Where credentials live, and the move to private buckets, SSM Parameter Store and least-privilege roles |
 | [Python core overview](python-core.md) | Build FastAPI modules |
 | [Modeling](modeling.md) | Understand the LBW model, inputs, outputs, and limitations |
 | [Climate API](climate-api.md) | Understand preview and prediction parameters |

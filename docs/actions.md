@@ -226,6 +226,54 @@ published beside it under `v2/`, so existing installs keep working.
 
 **Rolling back:** copy an archive file over `v1/actions.json`.
 
+## Making the repository private (in progress)
+
+Only CHART's API reads the feed; the browser asks `/api/chart/actions`. So
+the bucket can stop being public with no change for planners:
+
+- The API reads `CHART_ACTIONS_URL=s3://chart-actions-repository/v1/actions.json`
+  with the EC2 instance role instead of a public URL.
+- Images are stored as keys beside the feed (`images/<name>`); the API
+  answers each one as a link signed for an hour, so they too stay private.
+- The publisher compares with the live feed through its own role
+  (`s3:GetObject` on `v1/actions.json`), not the public URL.
+
+A self-hosted install keeps working with any public URL, a `file://` URL or
+the bundled copy.
+
+**Rollout, in this order** (each step keeps the feed working):
+
+1. Give the instance role read access to the feed and its images:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [{
+       "Effect": "Allow",
+       "Action": "s3:GetObject",
+       "Resource": "arn:aws:s3:::chart-actions-repository/v1/*"
+     }]
+   }
+   ```
+
+2. Add `s3:GetObject` on `arn:aws:s3:::chart-actions-repository/v1/actions.json`
+   to the publisher's `publish.json` (step 4 below).
+3. Deploy this change, then set `CHART_ACTIONS_URL` to the `s3://` URL in
+   `.env.prod` and redeploy. Check `/api/chart/actions` answers
+   `"source": "feed"`.
+4. Run **Publish actions** once, so the live feed carries relative image
+   keys.
+5. Delete the public bucket policy and block public access entirely:
+
+   ```bash
+   aws s3api delete-bucket-policy --bucket chart-actions-repository
+   aws s3api put-public-access-block --bucket chart-actions-repository \
+     --public-access-block-configuration \
+     BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+   ```
+
+Until step 5, steps 2 and 3 below describe the public set-up still in use.
+
 ## One-time setup
 
 Replace `<ACCOUNT_ID>` below with the AWS account number (top right of the
