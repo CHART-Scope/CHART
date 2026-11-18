@@ -22,7 +22,7 @@ for (const width of [1440, 390]) {
     );
     await page.goto("/");
     await expect(page).toHaveTitle(
-      "CHART — Climate & health adaptation and resilience Toolkit",
+      "CHART | Climate & health adaptation and resilience Toolkit",
     );
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("CHART");
     await expect(

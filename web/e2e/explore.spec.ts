@@ -238,6 +238,7 @@ test("ERA5-Land temperature and heatwave days are context layers by month", asyn
   // A shared link keeps its month (old links with "layer" too).
   await page.goto("/explore?frame=geo-ke&outcome=lbw&layer=tmax&month=2026-08");
   await expect(legend).toContainText("Aug 2026 · Copernicus ERA5-Land");
+  await expect(page).toHaveTitle("Explore | CHART");
 
   await legend.getByRole("button", { name: "See info" }).click();
   await expect(legend).toContainText("Context only");
@@ -789,6 +790,7 @@ test("a click outside the covered places offers a way to bring CHART there", asy
 
 test("the support page ignores a malformed point", async ({ page }) => {
   await page.goto("/support?near=<script>");
+  await expect(page).toHaveTitle("Bring CHART to your area | CHART");
   await expect(
     page.getByRole("heading", { level: 1, name: "Bring CHART to your area" }),
   ).toBeVisible();
