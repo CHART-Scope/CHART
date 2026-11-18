@@ -9,6 +9,10 @@ type Props = {
   phases: string[];
   hazardLabel: string;
   outcomeLabels: string[];
+  /** The chosen districts' names, or null before they are ranked. */
+  districtNames: string[] | null;
+  /** How many actions are chosen, or null before they are ranked. */
+  actionCount: number | null;
   /** Opens a step from its Edit link, or null while it cannot be opened. */
   onEdit: ((step: number) => void) | null;
 };
@@ -21,6 +25,8 @@ export function PlanSummary({
   phases,
   hazardLabel,
   outcomeLabels,
+  districtNames,
+  actionCount,
   onEdit,
 }: Props) {
   const edit = (step: number, label: string) =>
@@ -77,12 +83,33 @@ export function PlanSummary({
         </ul>
       </section>
       <section className={styles.summaryRow} aria-label="Districts">
-        <h2 className={styles.eyebrow}>Districts</h2>
-        <p className={styles.summaryMuted}>None selected yet</p>
+        <h2 className={styles.eyebrow}>
+          Districts {districtNames ? edit(2, "districts") : null}
+        </h2>
+        {districtNames && districtNames.length > 0 ? (
+          <>
+            <p className={styles.summaryText}>{districtNames.length} selected</p>
+            <p className={styles.summaryMuted}>
+              {districtNames.length > 3
+                ? `${districtNames.slice(0, 3).join(", ")} +${districtNames.length - 3} more`
+                : districtNames.join(", ")}
+            </p>
+          </>
+        ) : (
+          <p className={styles.summaryMuted}>None selected yet</p>
+        )}
       </section>
       <section className={styles.summaryRow} aria-label="Actions">
-        <h2 className={styles.eyebrow}>Actions</h2>
-        <p className={styles.summaryMuted}>None chosen yet</p>
+        <h2 className={styles.eyebrow}>
+          Actions {actionCount !== null ? edit(3, "actions") : null}
+        </h2>
+        {actionCount ? (
+          <p className={styles.summaryText}>
+            {actionCount} {actionCount === 1 ? "action" : "actions"}
+          </p>
+        ) : (
+          <p className={styles.summaryMuted}>None chosen yet</p>
+        )}
       </section>
     </aside>
   );

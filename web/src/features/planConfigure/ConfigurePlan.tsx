@@ -11,7 +11,12 @@ import { DashboardHeader } from "@/features/dashboard/DashboardHeader";
 import { getHeatSeason } from "@/lib/heatSeasonsClient";
 import {
   createSavedPlan,
+  getPlanActions,
+  getPlanDistricts,
   getSavedPlan,
+  savePlanActions,
+  savePlanDistricts,
+  type PlanActionChoice,
   updateSavedPlan,
   type SavedPlan,
 } from "@/lib/savedPlansClient";
@@ -23,6 +28,8 @@ import {
   configurePlanHref,
   type ConfigurePlanQuery,
 } from "./configurePlanHref";
+import { ActionsStep } from "./ActionsStep";
+import { DistrictsStep } from "./DistrictsStep";
 import { OutcomesStep, type OutcomeOption } from "./OutcomesStep";
 import { phasesCovered } from "./PhaseBar";
 import { PlanSummary } from "./PlanSummary";
@@ -38,8 +45,8 @@ import {
 
 import styles from "./ConfigurePlan.module.css";
 
-/** Districts, actions and review come next; their tabs show but stay shut. */
-const LAST_BUILT_STEP = 1;
+/** Review & export comes next; its tab shows but stays shut. */
+const LAST_BUILT_STEP = 3;
 /** Canvas wording for the outcomes CHART models; the catalog's otherwise. */
 const OUTCOME_DESCRIPTIONS: Record<string, string> = {
   lbw: "Share of low-birth-weight cases attributable to maternal heat exposure.",
@@ -78,6 +85,48 @@ export function ConfigurePlan(query: ConfigurePlanQuery) {
     retry: false,
     staleTime: 5 * 60_000,
   });
+  // The districts ranked for the plan's first outcome, and the saved choice.
+  const districts = useQuery({
+    queryKey: ["plan-districts", planId],
+    queryFn: ({ signal }) => getPlanDistricts(planId!, signal),
+    enabled: planId !== null,
+    retry: false,
+  });
+  const [chosen, setChosen] = useState<{ key: number; ids: Set<string> } | null>(null);
+  const chosenIds =
+    chosen && chosen.key === districts.dataUpdatedAt
+      ? chosen.ids
+      : new Set(
+          (districts.data?.areas ?? [])
+            .filter((area) => area.selected)
+            .map((area) => area.geography_id),
+        );
+  // The repository's actions ranked for the plan, and the saved choice.
+  const actions = useQuery({
+    queryKey: ["plan-actions", planId],
+    queryFn: ({ signal }) => getPlanActions(planId!, signal),
+    enabled: planId !== null && stepIndex >= 2,
+    retry: false,
+  });
+  const [picked, setPicked] = useState<{
+    key: number;
+    items: Map<string, PlanActionChoice>;
+  } | null>(null);
+  const pickedItems =
+    picked && picked.key === actions.dataUpdatedAt
+      ? picked.items
+      : new Map(
+          (actions.data?.items ?? [])
+            .filter((item) => item.selected)
+            .map((item) => [
+              item.id,
+              {
+                action_id: item.id,
+                owner_department_id: item.owner_department_id,
+                due_date: item.due_date,
+              },
+            ]),
+        );
   const calendar = season.data?.months ?? FALLBACK_CALENDAR;
   const calendarReady = !season.isPending;
   const { geographies, error: geographiesError } = useGeographies();
@@ -172,9 +221,17 @@ export function ConfigurePlan(query: ConfigurePlanQuery) {
       ? !form.name.trim()
         ? "Give the plan a name."
         : windowProblem(form.window, today)
-      : form.outcomes.length === 0
-        ? "Choose at least one health outcome to continue."
-        : null;
+      : stepIndex === 1
+        ? form.outcomes.length === 0
+          ? "Choose at least one health outcome to continue."
+          : null
+        : stepIndex === 2
+          ? districts.data && chosenIds.size === 0
+            ? "Choose at least one district to continue."
+            : null
+          : actions.data && pickedItems.size === 0
+            ? "Choose at least one action to save the plan."
+            : null;
 
   async function save() {
     if (!form || problem || saving) return;
@@ -197,15 +254,27 @@ export function ConfigurePlan(query: ConfigurePlanQuery) {
               outcome: query.outcome,
               status: "draft",
             });
-      } else {
+      } else if (stepIndex === 1) {
         saved = await updateSavedPlan(planId!, {
           hazard,
           outcomes: form.outcomes,
         });
+        // The first outcome ranks the districts.
+        await queryClient.invalidateQueries({ queryKey: ["plan-districts", planId] });
+      } else if (stepIndex === 2) {
+        const result = await savePlanDistricts(planId!, [...chosenIds]);
+        queryClient.setQueryData(["plan-districts", planId], result);
+        // The actions name the plan's suggested districts.
+        await queryClient.invalidateQueries({ queryKey: ["plan-actions", planId] });
+        saved = plan.data!;
+      } else {
+        const result = await savePlanActions(planId!, [...pickedItems.values()]);
+        queryClient.setQueryData(["plan-actions", planId], result);
+        saved = await updateSavedPlan(planId!, { status: "saved" });
       }
       queryClient.setQueryData(["saved-plan", saved.id], saved);
       await queryClient.invalidateQueries({ queryKey: ["saved-plans"] });
-      if (stepIndex === 0) go(1, saved.id);
+      if (stepIndex < LAST_BUILT_STEP) go(stepIndex + 1, saved.id);
       else router.push("/plan");
     } catch (failure) {
       setError((failure as Error).message);
@@ -224,6 +293,15 @@ export function ConfigurePlan(query: ConfigurePlanQuery) {
   const outcomeLabels = (form?.outcomes ?? [])
     .map((code) => outcomeOptions.find((option) => option.code === code)?.label)
     .filter((label): label is string => Boolean(label));
+  const districtNames = (districts.data?.areas ?? [])
+    .filter((area) => chosenIds.has(area.geography_id))
+    .map((area) => area.name);
+  const stepError =
+    stepIndex === 2 && districts.error instanceof Error
+      ? districts.error.message
+      : stepIndex === 3 && actions.error instanceof Error
+        ? actions.error.message
+        : null;
 
   return (
     <main className={styles.page}>
@@ -276,6 +354,38 @@ export function ConfigurePlan(query: ConfigurePlanQuery) {
                 seasonLabel={seasonLabel(calendar)}
                 today={isoDay(today)}
               />
+            ) : stepIndex === 2 ? (
+              districts.data ? (
+                <DistrictsStep
+                  placeId={geographyId}
+                  placeName={placeName}
+                  outcomeLabel={
+                    outcomeOptions.find(
+                      (option) => option.code === districts.data.outcome,
+                    )?.label ?? districts.data.outcome
+                  }
+                  districts={districts.data}
+                  selected={chosenIds}
+                  onChange={(ids) => setChosen({ key: districts.dataUpdatedAt, ids })}
+                />
+              ) : stepError ? null : (
+                <p role="status" className={styles.lede}>
+                  Ranking the districts…
+                </p>
+              )
+            ) : stepIndex === 3 ? (
+              actions.data ? (
+                <ActionsStep
+                  actions={actions.data}
+                  chosen={pickedItems}
+                  onChange={(items) => setPicked({ key: actions.dataUpdatedAt, items })}
+                  window={windowProblem(form.window, today) ? null : form.window}
+                />
+              ) : stepError ? null : (
+                <p role="status" className={styles.lede}>
+                  Ranking the actions…
+                </p>
+              )
             ) : (
               <OutcomesStep
                 hazardLabel={hazardLabel}
@@ -292,7 +402,12 @@ export function ConfigurePlan(query: ConfigurePlanQuery) {
                 }
               />
             )}
-            {stepIndex === 0 && problem ? (
+            {stepError ? (
+              <p role="alert" className={styles.problem}>
+                {stepError}
+              </p>
+            ) : null}
+            {stepIndex !== 1 && problem ? (
               <p role="alert" className={styles.problem}>
                 {problem}
               </p>
@@ -318,16 +433,25 @@ export function ConfigurePlan(query: ConfigurePlanQuery) {
               )}
               <Button
                 size="lg"
-                disabled={Boolean(problem) || saving}
+                disabled={
+                  Boolean(problem) ||
+                  saving ||
+                  (stepIndex === 2 && !districts.data) ||
+                  (stepIndex === 3 && !actions.data)
+                }
                 onClick={() => void save()}
               >
-                {saving ? "Saving…" : stepIndex === 0 ? "Next" : "Save draft"}
+                {saving
+                  ? "Saving…"
+                  : stepIndex === LAST_BUILT_STEP
+                    ? "Save plan"
+                    : "Next"}
               </Button>
             </div>
             {stepIndex === LAST_BUILT_STEP ? (
               <p className={styles.note}>
-                Districts, actions and the report come next. Your draft is kept in the
-                Planning center.
+                The report and its export come next. Until you save the plan, your draft
+                is kept in the Planning center.
               </p>
             ) : null}
           </div>
@@ -338,6 +462,8 @@ export function ConfigurePlan(query: ConfigurePlanQuery) {
             phases={phasesCovered(months)}
             hazardLabel={hazardLabel}
             outcomeLabels={outcomeLabels}
+            districtNames={districts.data ? districtNames : null}
+            actionCount={actions.data ? pickedItems.size : null}
             onEdit={planId ? (step) => go(step) : null}
           />
         </div>

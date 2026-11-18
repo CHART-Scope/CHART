@@ -1039,8 +1039,8 @@ OPERATION_DOCUMENTATION: dict[
         summary="Change one of the caller's plans from the Configure plan wizard",
         description=(
             "Applies one wizard step to one of the caller's plans: its name, its "
-            "start and end dates, its hazard or its health outcomes; fields left "
-            "out keep their values. Needs plans write at the plan's place. "
+            "start and end dates, its hazard or its health outcomes, or status "
+            "saved to finish a draft; fields left out keep their values. Needs plans write at the plan's place. "
             "Refuses a timeline that is incomplete or ends before it starts "
             "(PLAN_TIMELINE_INVALID), starts before today (PLAN_START_IN_PAST) or "
             "runs 24 months or more (PLAN_TIMELINE_TOO_LONG), a hazard no model "
@@ -1050,6 +1050,68 @@ OPERATION_DOCUMENTATION: dict[
         ),
         success_responses={
             "200": "The plan with the step's changes saved, as GET /saved-plans/{plan_id} returns it."
+        },
+    ),
+    ("get", "/saved-plans/{plan_id}/districts"): OperationDocumentation(
+        summary="Rank the districts beneath one of the caller's plans",
+        description=(
+            "Step 3 of the Configure plan wizard. Ranks every district the caller "
+            "reads beneath the plan's place by its attributable share for the "
+            "plan's first outcome: the published outlook's annual average where "
+            "it covers the place (source projection), else the observed risk "
+            "map's latest month (source observed, with month). Districts at or "
+            "above 5% are suggested. Until the plan's districts are saved, the "
+            "suggested ones are selected. Ownership and scope follow GET "
+            "/saved-plans/{plan_id}; PLAN_DISTRICTS_UNAVAILABLE when the place "
+            "has no mapped districts."
+        ),
+        success_responses={
+            "200": "Every readable district ranked highest share first, with the suggested and selected ones marked."
+        },
+    ),
+    ("put", "/saved-plans/{plan_id}/districts"): OperationDocumentation(
+        summary="Save the districts one of the caller's plans focuses on",
+        description=(
+            "Replaces the plan's districts with the ones sent, keeping each one's "
+            "rank, share and source from the ranking GET returns so the plan's "
+            "report shows the figures it was made with. Needs plans write at the "
+            "plan's place and at least one district; a district outside the "
+            "ranking is refused with PLAN_DISTRICT_INVALID and nothing is saved."
+        ),
+        success_responses={
+            "200": "The ranking with the saved districts selected, as GET /saved-plans/{plan_id}/districts returns it."
+        },
+    ),
+    ("get", "/saved-plans/{plan_id}/actions"): OperationDocumentation(
+        summary="Rank the action repository's actions for one of the caller's plans",
+        description=(
+            "Step 4 of the Configure plan wizard. Ranks the published actions for "
+            "the plan's hazard in its country by the recommendation rules read "
+            "against the plan: 4 when one of an action's seasons falls inside the "
+            "plan's dates on the place's heat-season calendar (recommended), 3 "
+            "when it targets one of the plan's outcomes, and unless heat risk is "
+            "clearly raised 2 for low or no cost and 1 for medium; ties keep the "
+            "repository's order. Lists the owners to choose from (the country's "
+            "active departments) and the plan's suggested districts. Until the "
+            "plan's actions are saved the recommended ones are selected."
+        ),
+        success_responses={
+            "200": "The plan's heat actions ranked with their reasons, the selected ones marked, and the departments that may own them."
+        },
+    ),
+    ("put", "/saved-plans/{plan_id}/actions"): OperationDocumentation(
+        summary="Save the actions one of the caller's plans includes",
+        description=(
+            "Replaces the plan's actions with the ones sent, each with an optional "
+            "owner department and due date, keeping the action's title, seasons, "
+            "cost and rank as the feed had them. Needs plans write and at least "
+            "one action. Refuses an action outside the ranking "
+            "(PLAN_ACTION_INVALID), an owner that is not one of the country's "
+            "active departments (PLAN_ACTION_OWNER_INVALID) and a due date "
+            "outside the plan's dates (PLAN_ACTION_DUE_INVALID); nothing is saved."
+        ),
+        success_responses={
+            "200": "The ranking with the saved actions selected and their owners and due dates, as GET returns it."
         },
     ),
     ("delete", "/saved-plans/{plan_id}"): OperationDocumentation(

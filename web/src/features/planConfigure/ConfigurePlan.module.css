@@ -305,3 +305,158 @@
   font-weight: 500;
   color: var(--color-text);
 }
+
+/* Districts: tools above a ranked list and the map, side by side. */
+.districtTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+.search {
+  width: 260px;
+  height: var(--control-input);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: var(--fs-body-lg);
+}
+.search:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-nexus);
+  font-family: var(--font-body);
+  font-size: var(--fs-body-lg);
+  font-weight: 500;
+  cursor: pointer;
+}
+.linkButton:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.count {
+  margin-left: auto;
+  font-size: var(--fs-body-lg);
+  color: var(--color-text-secondary);
+}
+.districtLayout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .districtLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.districtList {
+  max-height: var(--list-scroll-max);
+  overflow-y: auto;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+}
+.districtGroup {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.districtGroupTitle {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-sentence);
+  font-family: var(--font-display);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  letter-spacing: var(--ls-hero);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.districtRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-hairline);
+  cursor: pointer;
+}
+.districtRow .choiceInput {
+  margin: 0;
+}
+.districtRow:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+.bandDot {
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-pill);
+  flex: none;
+}
+.districtName {
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
+  font-weight: 500;
+}
+.districtShare {
+  margin-left: auto;
+  font-size: var(--fs-body-lg);
+  color: var(--color-text-secondary);
+}
+.districtMap {
+  min-width: 0;
+}
+
+/* Actions: a card per repository action; owner and due once ticked. */
+.actionGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.actionGroup legend {
+  margin-bottom: var(--space-3);
+}
+.actionCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+}
+.actionCard[data-checked] {
+  border-color: var(--color-nexus);
+  background: var(--color-nexus-tint);
+}
+.actionHead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  cursor: pointer;
+}
+.actionHead:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.actionFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+@media (max-width: 640px) {
+  .actionFields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

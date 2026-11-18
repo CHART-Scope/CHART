@@ -119,10 +119,7 @@ def update_plan(
     """Apply one wizard step's changes to the user's own plan."""
 
     plan = readable_plan(session, user, plan_id)
-    place = session.get(AppGeography, plan.admin_unit_id or plan.geography_id)
-    # readable_plan has already refused a plan whose place is gone.
-    assert place is not None
-    _require_write(user, place)
+    require_plan_write(session, user, plan)
     changes = request.model_dump(exclude_unset=True)
     if "start_date" in changes or "end_date" in changes:
         start = changes.get("start_date", plan.start_date)
@@ -136,11 +133,24 @@ def update_plan(
         if any(outcome not in OUTCOMES for outcome in outcomes):
             raise SavedPlanError("PLAN_OUTCOME_INVALID", 422)
         plan.outcomes = outcomes
+    if "status" in changes:
+        plan.status = changes["status"]
     plan.name = changes.get("name", plan.name)
     plan.hazard = changes.get("hazard", plan.hazard)
     session.commit()
     session.refresh(plan)
     return plan_response(plan)
+
+
+def require_plan_write(
+    session: Session, user: CurrentUserContext, plan: SavedPlan
+) -> None:
+    """Changing a readable plan also needs plans write at its place."""
+
+    place = session.get(AppGeography, plan.admin_unit_id or plan.geography_id)
+    # readable_plan has already refused a plan whose place is gone.
+    assert place is not None
+    _require_write(user, place)
 
 
 def _require_write(user: CurrentUserContext, place: AppGeography) -> None:

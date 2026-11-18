@@ -171,7 +171,7 @@ e2e: e2e-orchestration e2e-core e2e-access e2e-web e2e-era5 e2e-outlook
 # drives the Configure plan wizard's draft through PATCH /saved-plans.
 e2e-core:
 	mkdir -p outputs/e2e/core
-	$(VENV_PYTHON) -m pytest core/tests/test_kenya_observed_api.py core/tests/test_heat_outlook_api.py core/tests/test_prediction_requests.py core/tests/test_vra_api.py core/tests/test_india_observed_stored_api.py core/tests/test_seasonal_forecast_api.py core/tests/test_heat_seasons_api.py core/tests/test_plan_configuration_api.py core/tests/test_read_cache.py core/tests/test_map_values_only.py e2e/test_core_package_data.py -q --junitxml=outputs/e2e/core/junit.xml
+	$(VENV_PYTHON) -m pytest core/tests/test_kenya_observed_api.py core/tests/test_heat_outlook_api.py core/tests/test_prediction_requests.py core/tests/test_vra_api.py core/tests/test_india_observed_stored_api.py core/tests/test_seasonal_forecast_api.py core/tests/test_heat_seasons_api.py core/tests/test_plan_configuration_api.py core/tests/test_plan_districts_api.py core/tests/test_plan_actions_api.py core/tests/test_read_cache.py core/tests/test_map_values_only.py e2e/test_core_package_data.py -q --junitxml=outputs/e2e/core/junit.xml
 
 # Access read from CHART's database: the rules, workspaces, people,
 # invitations and departments over HTTP, and migrations 035-036

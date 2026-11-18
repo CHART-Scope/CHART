@@ -23,6 +23,7 @@ from chart.actions.schemas import ActionContent
 from chart.auth.schemas import CurrentUserContext
 from chart.model_registry.routes import outcome_label
 from chart.model_settings.service import _ensure_user
+from chart.saved_plans.actions import COST_SCORE, HAZARD_TAGS, OUTCOME_TAGS
 from chart.saved_plans.service import plan_response, readable_plan
 from chart.saved_plans.schemas import SavedPlanResponse
 from chart.shared.db.models import AppGeography, AuditEventRecord, RecommendationSetting
@@ -54,10 +55,7 @@ RISK_LABELS = {
     "not_detected": "no raised heat risk detected",
     "unknown": "no estimate captured",
 }
-HEAT_HAZARD = "Extreme heat"
-# Plan outcome code -> the feed's "Health outcome" value for it.
-OUTCOME_TAGS = {"lbw": "Low birth weight", "under_5_mortality": "Under-5 mortality"}
-COST_SCORE = {"No additional cost": 2, "Low": 2, "Medium": 1}
+HEAT_HAZARD = HAZARD_TAGS["extreme_heat"]
 SYSTEM_PROMPT = (
     "You help district health and cross-sector planners act on climate and "
     "health evidence. Write two or three short sentences in plain language: "

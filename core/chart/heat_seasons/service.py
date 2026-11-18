@@ -191,8 +191,8 @@ def _calendar(
     return calendar(official, "official", season.source_name if season else None)
 
 
-def season_months(session: Session, geography_id: str) -> list[int] | None:
-    """The place's heat-season months in season order (Dec, Jan, ...).
+def calendar_months(session: Session, geography_id: str) -> str | None:
+    """The place's calendar, twelve letters from January (b, d, a, o).
 
     From its own calendar, else its nearest ancestor's, else the country's
     official season; None when none is set. No access check: callers have
@@ -209,7 +209,13 @@ def season_months(session: Session, geography_id: str) -> list[int] | None:
             select(HeatSeasonSetting).where(HeatSeasonSetting.geography_id.in_(by_id))
         )
     }
-    months = _calendar(place, by_id, saved).months
+    return _calendar(place, by_id, saved).months
+
+
+def season_months(session: Session, geography_id: str) -> list[int] | None:
+    """The place's heat-season months in season order (Dec, Jan, ...)."""
+
+    months = calendar_months(session, geography_id)
     if not months or "d" not in months:
         return None
     # The calendar holds one unbroken season; start at its first month.

@@ -83,16 +83,17 @@ function PlanRow({
   const actionsQuery = new URLSearchParams({ outcome: plan.outcome, plan: plan.id });
   if (plan.admin_unit_id) actionsQuery.set("admin_unit", plan.admin_unit_id);
   const actionsHref = `/dashboard/${encodeURIComponent(plan.geography_id)}/actions?${actionsQuery}`;
-  // A draft reopens the wizard on its hazards and outcomes, the step after
-  // the one that started it.
-  const draftHref =
-    plan.status === "draft"
+  // A plan made in the wizard (it has dates) reopens there: a draft on its
+  // hazards and outcomes, the step after the one that started it.
+  const draft = plan.status === "draft";
+  const wizardHref =
+    draft || plan.start_date
       ? configurePlanHref({
           geographyId: plan.geography_id,
           adminUnit: plan.admin_unit_id,
           outcome: plan.outcome,
           planId: plan.id,
-          step: "outcomes",
+          step: draft ? "outcomes" : "timeline",
         })
       : null;
 
@@ -117,7 +118,7 @@ function PlanRow({
             : (figure.reason ?? "No estimate was captured for this plan.")}
         </p>
         <div className={styles.chips}>
-          {draftHref ? (
+          {draft ? (
             <span className={styles.chip} data-status="draft">
               Draft
             </span>
@@ -135,16 +136,16 @@ function PlanRow({
         ) : null}
       </div>
       <div className={styles.actions}>
-        {draftHref ? (
-          <Link href={draftHref} className={buttonClassName({ size: "sm" })}>
-            Continue configuring
+        {wizardHref ? (
+          <Link href={wizardHref} className={buttonClassName({ size: "sm" })}>
+            {draft ? "Continue configuring" : "Edit plan"}
           </Link>
         ) : null}
         <Link
           href={actionsHref}
           className={buttonClassName({
             size: "sm",
-            variant: draftHref ? "secondary" : "primary",
+            variant: wizardHref ? "secondary" : "primary",
           })}
         >
           Recommendations
