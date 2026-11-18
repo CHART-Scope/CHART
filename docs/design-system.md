@@ -69,6 +69,10 @@ Button variants: `primary` (nexus), `secondary` (nexus outline on white),
   gutter so their left edges line up.
 - Landing sections are `--space-22` (88px) apart; workspace sections
   `--space-16` (64px).
+- Below 900px the public header is two rows: the wordmark with the buttons,
+  then the links in one sideways-scrolling line. Landing sections drop to
+  `--space-12` (48px) apart, the hero to 32px above and 48px below, and the
+  partner logos sit two to a row.
 
 ## When the sign-in styles change
 
