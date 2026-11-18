@@ -581,7 +581,90 @@
   animation: enter 0.35s var(--ease-out-soft) both;
 }
 
+/* ---- Phones and small tablets ---- */
+
 @media (max-width: 900px) {
+  /* The header is two rows: the wordmark and the buttons, then the links in
+     one line that scrolls sideways and bleeds to the window edge, so the cut
+     off last link shows there is more. */
+  .nav {
+    padding-top: var(--space-3);
+    padding-bottom: var(--space-2);
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .navLinks {
+    order: 1;
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    gap: var(--space-6);
+    margin: 0 calc(-1 * var(--gutter));
+    padding: 0 var(--gutter);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .navLinks::-webkit-scrollbar {
+    display: none;
+  }
+
+  .navLinks a {
+    flex-shrink: 0;
+  }
+
+  .hero {
+    padding: var(--space-8) var(--gutter) var(--space-12);
+    gap: var(--space-8);
+  }
+
+  .laptop {
+    padding: 0 var(--space-3);
+  }
+
+  .base {
+    margin: 0 calc(-1 * var(--space-3));
+  }
+
+  .inner {
+    padding: var(--space-12) var(--gutter);
+  }
+
+  .wide,
+  .intro {
+    margin-bottom: var(--space-8);
+  }
+
+  .steps {
+    gap: var(--space-8);
+  }
+
+  .strip {
+    margin-top: var(--space-8);
+    padding: var(--space-5) var(--space-6);
+  }
+
+  .quotes figure {
+    padding: var(--space-6);
+  }
+
+  .logos {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
+  }
+
+  .logos a {
+    height: 80px;
+  }
+
+  .footerTop {
+    padding-top: var(--space-8);
+    gap: var(--space-8);
+  }
+
+  .footerBottom {
+    margin-top: var(--space-8);
+  }
+
   .publicContent {
     padding: var(--space-4);
   }
