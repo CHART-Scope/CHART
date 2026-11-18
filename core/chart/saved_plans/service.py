@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from calendar import monthrange
 from datetime import date, timedelta
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -37,6 +37,7 @@ from .schemas import (
     PlanChoices,
     PlanFigure,
     PlanSignals,
+    PlanStatus,
     SavedPlanCreate,
     SavedPlanResponse,
     SavedPlanUpdate,
@@ -118,9 +119,10 @@ def update_plan(
     """Apply one wizard step's changes to the user's own plan."""
 
     plan = readable_plan(session, user, plan_id)
-    _require_write(
-        user, session.get(AppGeography, plan.admin_unit_id or plan.geography_id)
-    )
+    place = session.get(AppGeography, plan.admin_unit_id or plan.geography_id)
+    # readable_plan has already refused a plan whose place is gone.
+    assert place is not None
+    _require_write(user, place)
     changes = request.model_dump(exclude_unset=True)
     if "start_date" in changes or "end_date" in changes:
         start = changes.get("start_date", plan.start_date)
@@ -383,7 +385,7 @@ def plan_response(plan: SavedPlan) -> SavedPlanResponse:
     return SavedPlanResponse(
         id=plan.id,
         name=plan.name,
-        status=plan.status,
+        status=cast(PlanStatus, plan.status),
         geography_id=plan.geography_id,
         admin_unit_id=plan.admin_unit_id,
         outcome=plan.outcome,
