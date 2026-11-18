@@ -4,6 +4,8 @@ import { isSecureRequest } from "./httpRequest";
 
 export const refreshTokenCookieName = "chart.auth.refresh";
 export const idTokenCookieName = "chart.auth.id";
+/** The cookies' lifetime when Keycloak names none: its 30-day session. */
+const SESSION_FALLBACK_SECONDS = 30 * 24 * 60 * 60;
 
 export type KeycloakTokenResponse = {
   access_token?: string;
@@ -37,13 +39,13 @@ export function setSessionCookies(
   if (tokens.refresh_token) {
     response.cookies.set(refreshTokenCookieName, tokens.refresh_token, {
       ...options,
-      maxAge: positiveSeconds(tokens.refresh_expires_in, 8 * 60 * 60),
+      maxAge: positiveSeconds(tokens.refresh_expires_in, SESSION_FALLBACK_SECONDS),
     });
   }
   if (tokens.id_token) {
     response.cookies.set(idTokenCookieName, tokens.id_token, {
       ...options,
-      maxAge: positiveSeconds(tokens.refresh_expires_in, 8 * 60 * 60),
+      maxAge: positiveSeconds(tokens.refresh_expires_in, SESSION_FALLBACK_SECONDS),
     });
   }
 }

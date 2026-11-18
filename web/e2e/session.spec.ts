@@ -15,7 +15,7 @@ import {
 
 /**
  * The browser session: token rotation, 401 recovery, an unavailable identity
- * provider, the idle timeout and sign-out across tabs. Every request still
+ * provider, staying signed in while idle, and sign-out across tabs. Every request still
  * goes through the real Next build; only Keycloak and the Python API are
  * answered at the network boundary.
  */
@@ -285,44 +285,47 @@ test("a refresh token that has expired sends the user to sign in", async ({ page
   expect(tokens.calls).toBe(2);
 });
 
-test("thirty minutes without activity signs the user out", async ({ page }) => {
+test("a signed-in planner left alone for a day is still signed in", async ({
+  page,
+}) => {
+  // No idle sign-out: Keycloak's 30-day session decides, and the refresh
+  // token keeps the access token current while the tab sits untouched.
   await page.clock.install({ time: new Date("2026-09-25T12:00:00Z") });
   const api = await installFakeApi(page);
   api.on(/^\/api\/setup$/, (route) => json(route, { requiresOnboarding: false }));
-  const audit: {
-    token: string;
-    events: { event_type: string; payload?: unknown }[];
-  }[] = [];
-  api.on(/^\/api\/chart\/audit\/events$/, (route) => {
-    audit.push({ token: bearerOf(route), ...route.request().postDataJSON() });
-    return json(route, { accepted: 1 }, 200);
-  });
+  const tokens = rotateTokens(page, api, { lifetimeSeconds: 300 });
   const signouts = await fakeSignOutRedirect(page);
+  // A stale idle mark from the old timeout must not sign anyone out.
+  await page.addInitScript(() =>
+    window.localStorage.setItem("chart.auth.lastActivity", "1"),
+  );
 
   await page.goto("/plan");
   await expect(page.getByText("in Madhya Pradesh.")).toBeVisible();
+  await expect.poll(() => tokens.issued.length).toBe(1);
 
-  // Twenty-nine minutes is not enough, and activity restarts the count.
-  await page.clock.fastForward("29:00");
-  await page.keyboard.press("Shift");
-  await page.clock.fastForward("29:00");
+  // Thirty-five minutes without touching anything, past the old 30-minute
+  // limit: five-minute tokens keep rotating.
+  for (let step = 1; step <= 7; step += 1) {
+    await page.clock.fastForward("05:00");
+    await expect.poll(() => tokens.issued.length).toBe(step + 1);
+  }
   expect(signouts).toEqual([]);
-  expect(page.url()).toContain("/plan");
+  await expect(page.getByRole("dialog", { name: "Still there?" })).toHaveCount(0);
 
-  await page.clock.fastForward("02:00");
-  await page.waitForURL((url) => url.pathname === "/");
-  expect(signouts).toEqual(["?returnTo=%2F"]);
-  await expect(page.getByRole("status").filter({ hasText: "30 minutes" })).toHaveText(
-    "You were signed out after 30 minutes without activity. Sign in to continue.",
-  );
-  // The sign-out was recorded and sent with the user's own token before the
-  // session was dropped.
-  const signout = audit
-    .flatMap((batch) => batch.events.map((event) => ({ ...event, token: batch.token })))
-    .find((event) => event.event_type === "signout");
-  expect(signout?.payload).toEqual({ reason: "idle" });
-  expect(signout?.token).not.toBe("");
-  await page.screenshot({ path: `${evidence}/idle-signout.png` });
+  // A whole day later (a laptop lid closed overnight), the expired token is
+  // renewed on the next tick and renewal carries on.
+  await page.clock.fastForward("24:00:00");
+  await expect.poll(() => tokens.issued.length).toBe(9);
+  await page.clock.fastForward("05:00");
+  await expect.poll(() => tokens.issued.length).toBe(10);
+  expect(signouts).toEqual([]);
+  expect(new URL(page.url()).pathname).toBe("/plan");
+  await expect(page.getByText("in Madhya Pradesh.")).toBeVisible();
+  expect(
+    await page.evaluate(() => window.localStorage.getItem("chart.auth.lastActivity")),
+  ).toBeNull();
+  await page.screenshot({ path: `${evidence}/signed-in-after-a-day.png` });
 });
 
 test("signing out in one tab signs out the other", async ({ context }) => {
@@ -446,8 +449,8 @@ test("pulling model updates sends the administrator's token through the proxy", 
 test("reading for two hours, moving only the pointer, keeps the session", async ({
   page,
 }) => {
-  // The production failure: every sign-out was "idle" while the user was
-  // reading. Pointer movement now counts, and the token keeps rotating.
+  // The production failure: people were signed out while reading. The token
+  // keeps rotating and nothing signs them out.
   await page.clock.install({ time: new Date("2026-09-25T12:00:00Z") });
   const api = await installFakeApi(page);
   api.on(/^\/api\/setup$/, (route) => json(route, { requiresOnboarding: false }));
@@ -471,31 +474,4 @@ test("reading for two hours, moving only the pointer, keeps the session", async 
   await expect(page.getByText("in Madhya Pradesh.")).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Still there?" })).toHaveCount(0);
   await page.screenshot({ path: `${evidence}/two-hours-reading.png` });
-});
-
-test("an idle warning offers to stay signed in before the sign-out", async ({
-  page,
-}) => {
-  await page.clock.install({ time: new Date("2026-09-25T12:00:00Z") });
-  const api = await installFakeApi(page);
-  api.on(/^\/api\/setup$/, (route) => json(route, { requiresOnboarding: false }));
-  const signouts = await fakeSignOutRedirect(page);
-
-  await page.goto("/plan");
-  await expect(page.getByText("in Madhya Pradesh.")).toBeVisible();
-  const warning = page.getByRole("dialog", { name: "Still there?" });
-
-  await page.clock.fastForward("27:00");
-  await expect(warning).toHaveCount(0);
-  await page.clock.fastForward("01:30");
-  await expect(warning).toBeVisible();
-  await expect(warning.getByRole("timer")).toHaveText("Signing out in 1:30");
-  await page.screenshot({ path: `${evidence}/idle-warning.png` });
-
-  await warning.getByRole("button", { name: "Stay signed in" }).click();
-  await expect(warning).toHaveCount(0);
-  await page.clock.fastForward("27:00");
-  expect(signouts).toEqual([]);
-  expect(new URL(page.url()).pathname).toBe("/plan");
-  await expect(warning).toHaveCount(0);
 });

@@ -27,6 +27,8 @@ const codeBranch = "chart email code code";
 // account happens to hold.
 const passwordSignInRole = "chart-password-sign-in";
 const defaultAdmin = "admin";
+const SESSION_SECONDS = 30 * 24 * 60 * 60;
+
 const signInRealmSettings = {
   // Invitations and sign-in codes use CHART's email layout and wording.
   emailTheme: "chart",
@@ -34,6 +36,12 @@ const signInRealmSettings = {
   duplicateEmailsAllowed: false,
   registrationAllowed: false,
   resetPasswordAllowed: false,
+  // Signed-in people stay signed in: the session, and so the refresh token,
+  // lasts 30 days whether or not they are active, and CHART has no idle
+  // sign-out of its own (web/src/lib/authClient.ts). Keycloak's defaults
+  // (30 minutes idle, 10 hours in all) signed people out mid-week.
+  ssoSessionIdleTimeout: SESSION_SECONDS,
+  ssoSessionMaxLifespan: SESSION_SECONDS,
 };
 
 async function main() {
@@ -895,6 +903,7 @@ if (require.main === module) {
 
 module.exports = {
   buildRealmSettings,
+  signInRealmSettings,
   syncClientSettings,
   buildScopeGoogleIdentityProvider,
   buildWebClientSettings,

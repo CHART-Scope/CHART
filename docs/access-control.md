@@ -79,40 +79,40 @@ User (Keycloak sub, email, status)
 A capability is a **module** plus a **level**. Each level includes the ones
 below it: `read` < `write` < `manage`.
 
-| Module | read | write | manage |
-| --- | --- | --- | --- |
-| `risk` | dashboards, outlooks, projections | run predictions and what-if | model settings, releases |
-| `data` | data coverage | upload data and start pulls for **your departments' sources** | any source, ingestion jobs |
-| `vra` | VRA results | upload values and run assessments for **your departments' indicators** | any indicator, templates, frames |
-| `actions` | action repository and status | start, update and comment on actions for **your departments** | assign actions to any department or person |
-| `plans` | saved plans you can see | save and remove your plans | others' plans |
-| `seasons` | heat-season calendars | — | edit calendars |
-| `people` | workspace members | invite within your places | change roles, places and departments; disable |
-| `departments` | department list | add a department | rename, archive |
-| `workspace` | — | — | workspace settings |
+| Module        | read                              | write                                                                  | manage                                        |
+| ------------- | --------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------- |
+| `risk`        | dashboards, outlooks, projections | run predictions and what-if                                            | model settings, releases                      |
+| `data`        | data coverage                     | upload data and start pulls for **your departments' sources**          | any source, ingestion jobs                    |
+| `vra`         | VRA results                       | upload values and run assessments for **your departments' indicators** | any indicator, templates, frames              |
+| `actions`     | action repository and status      | start, update and comment on actions for **your departments**          | assign actions to any department or person    |
+| `plans`       | saved plans you can see           | save and remove your plans                                             | others' plans                                 |
+| `seasons`     | heat-season calendars             | —                                                                      | edit calendars                                |
+| `people`      | workspace members                 | invite within your places                                              | change roles, places and departments; disable |
+| `departments` | department list                   | add a department                                                       | rename, archive                               |
+| `workspace`   | —                                 | —                                                                      | workspace settings                            |
 
 New modules (for example hydrology or resilience assessments) add a row in
 code. The default roles below then get a level for it in a migration.
 
 ### Default roles (seeded per workspace, editable later)
 
-| Role | risk | data | vra | actions | plans | seasons | people | departments | workspace |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Workspace admin | manage | manage | manage | manage | manage | manage | manage | manage | manage |
-| Planning lead | write | read | read | manage | write | read | write | write | — |
-| Implementation officer | read | read | read | write | write | read | read | read | — |
-| Data officer | read | write | write | read | read | read | read | read | — |
-| Viewer | read | read | read | read | read | read | read | read | — |
+| Role                   | risk   | data   | vra    | actions | plans  | seasons | people | departments | workspace |
+| ---------------------- | ------ | ------ | ------ | ------- | ------ | ------- | ------ | ----------- | --------- |
+| Workspace admin        | manage | manage | manage | manage  | manage | manage  | manage | manage      | manage    |
+| Planning lead          | write  | read   | read   | manage  | write  | read    | write  | write       | —         |
+| Implementation officer | read   | read   | read   | write   | write  | read    | read   | read        | —         |
+| Data officer           | read   | write  | write  | read    | read   | read    | read   | read        | —         |
+| Viewer                 | read   | read   | read   | read    | read   | read    | read   | read        | —         |
 
 How today's roles map across:
 
-| Today | Becomes |
-| --- | --- |
-| `chart_admin` | platform admin, plus Workspace admin in their country |
-| `health_planning_lead`, `cross_sector_planning_lead` | Planning lead, with department Health or their sector |
-| `health_implementation_officer`, `cross_sector_implementation_officer` | Implementation officer, with department as above |
-| `content_editor` | dropped (never checked). Action content is curated in Airtable |
-| `public_viewer` | Viewer |
+| Today                                                                  | Becomes                                                        |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `chart_admin`                                                          | platform admin, plus Workspace admin in their country          |
+| `health_planning_lead`, `cross_sector_planning_lead`                   | Planning lead, with department Health or their sector          |
+| `health_implementation_officer`, `cross_sector_implementation_officer` | Implementation officer, with department as above               |
+| `content_editor`                                                       | dropped (never checked). Action content is curated in Airtable |
+| `public_viewer`                                                        | Viewer                                                         |
 
 Signed-out visitors (with `CHART_PUBLIC_READ`) keep a built-in principal that
 has `read` on `risk` and `actions` only.
@@ -195,7 +195,7 @@ signs them out in Keycloak.
   can switch to. The web works out the level at the place on screen with
   the same rule. The web app shows and hides by capability
   (`can("people", "write")`), never by role name.
-- Sign-in, the session and the 30-minute idle timeout are unchanged.
+- Sign-in and the session are unchanged.
 
 ## Seeding and local setup
 
@@ -216,12 +216,12 @@ signs them out in Keycloak.
 
 ## Settings screens
 
-| Tab | Who sees it | What it does |
-| --- | --- | --- |
-| People | `people:read` | Members with their grants and departments. Invite, resend, revoke (`write`); change grants and departments, disable (`manage`) |
+| Tab         | Who sees it        | What it does                                                                                                                                                                                                              |
+| ----------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| People      | `people:read`      | Members with their grants and departments. Invite, resend, revoke (`write`); change grants and departments, disable (`manage`)                                                                                            |
 | Departments | `departments:read` | List with member counts and the data sources and VRA indicators each owns. Add (`write`); rename, archive, delete (`manage`). Anyone may leave a department; joining one takes `people:write` (departments narrow writes) |
-| Roles | Workspace admin | The capability table for each role, read only. Nobody edits role capabilities in this version |
-| Workspaces | platform admin | Countries on this installation; create one; switch |
+| Roles       | Workspace admin    | The capability table for each role, read only. Nobody edits role capabilities in this version                                                                                                                             |
+| Workspaces  | platform admin     | Countries on this installation; create one; switch                                                                                                                                                                        |
 
 The current Workspace tab's departments and members cards move into People
 and Departments. User management stops listing every country's users.
@@ -272,6 +272,7 @@ New or changed tables (one migration, with a backfill from `user_roles`,
    of the person's places (administrators got Workspace admin over their
    country and the platform-admin flag), moved departments in, and put health
    leads and officers in Health.
+
 3. **Done.** Every route checks capabilities. `GET /auth/me` returns the
    person's grants and departments; `GET /access/check` answers one question
    (with owning departments). Where a route's place is a frame, VRA and outlook

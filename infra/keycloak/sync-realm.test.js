@@ -7,6 +7,7 @@ const {
   buildScopeGoogleIdentityProvider,
   buildWebClientSettings,
   normalizePublicOrigin,
+  signInRealmSettings,
 } = require("./sync-realm.js");
 
 const realmSeed = {
@@ -28,6 +29,13 @@ test("realm sync uses the deployment SSL mode", () => {
     "external",
   );
   assert.equal(buildRealmSettings(realmSeed).sslRequired, "external");
+});
+
+test("realm sync keeps a signed-in session for 30 days, active or not", () => {
+  // CHART has no idle sign-out; Keycloak's session decides, so its defaults
+  // (30 minutes idle, 10 hours in all) must not apply.
+  assert.equal(signInRealmSettings.ssoSessionIdleTimeout, 30 * 24 * 60 * 60);
+  assert.equal(signInRealmSettings.ssoSessionMaxLifespan, 30 * 24 * 60 * 60);
 });
 
 test("realm sync rejects an invalid SSL mode", () => {

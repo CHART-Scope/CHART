@@ -55,6 +55,17 @@ seconds), and the sync script into `chart-keycloak-config`. To upgrade
 Keycloak, change `KEYCLOAK_VERSION` there and replace the jar with the
 release built for that version.
 
+## How long you stay signed in
+
+Once signed in, you stay signed in for up to 30 days, whether or not you use
+CHART in that time: there is no sign-out after inactivity. The browser keeps
+the refresh token in an httpOnly cookie and renews the short-lived access
+token in the background, including when a tab wakes from sleep. You are asked
+to sign in again after 30 days, after signing out (which ends every tab), or
+when an administrator disables your access. The 30 days are Keycloak's session
+idle and maximum lifetimes, applied to the realm on every deploy by
+`infra/keycloak/sync-realm.js`.
+
 ## Email settings
 
 Any SMTP service works; changing provider only changes these settings. In
