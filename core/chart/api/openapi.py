@@ -1017,7 +1017,8 @@ OPERATION_DOCUMENTATION: dict[
             "caller's scope (GEOGRAPHY_OUT_OF_SCOPE), a sub-area outside its frame "
             "(PLAN_AREA_INVALID), a selection the publication does not contain "
             "(OUTLOOK_SELECTION_INVALID) and more than 100 plans per user "
-            "(SAVED_PLAN_LIMIT)."
+            "(SAVED_PLAN_LIMIT). The Configure plan wizard sends status draft "
+            "with the plan's start and end dates, checked as in PATCH."
         ),
         success_responses={
             "201": "The new saved plan with the published figure and risk reading captured for it."
@@ -1032,6 +1033,23 @@ OPERATION_DOCUMENTATION: dict[
         ),
         success_responses={
             "200": "The requested saved plan with its captured figure, choices and risk reading."
+        },
+    ),
+    ("patch", "/saved-plans/{plan_id}"): OperationDocumentation(
+        summary="Change one of the caller's plans from the Configure plan wizard",
+        description=(
+            "Applies one wizard step to one of the caller's plans: its name, its "
+            "start and end dates, its hazard or its health outcomes; fields left "
+            "out keep their values. Needs plans write at the plan's place. "
+            "Refuses a timeline that is incomplete or ends before it starts "
+            "(PLAN_TIMELINE_INVALID), starts before today (PLAN_START_IN_PAST) or "
+            "runs 24 months or more (PLAN_TIMELINE_TOO_LONG), a hazard no model "
+            "covers (PLAN_HAZARD_UNAVAILABLE) and an unknown outcome "
+            "(PLAN_OUTCOME_INVALID). Ownership and scope follow GET "
+            "/saved-plans/{plan_id}."
+        ),
+        success_responses={
+            "200": "The plan with the step's changes saved, as GET /saved-plans/{plan_id} returns it."
         },
     ),
     ("delete", "/saved-plans/{plan_id}"): OperationDocumentation(

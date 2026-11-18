@@ -41,7 +41,7 @@ type Props = {
   /** Only the place selectors: for pages that share the dashboard's place
    * but not its models (the vulnerability assessment). */
   placeOnly?: boolean;
-  /** Ends the bar with "Configure plan", opening the recommended actions. */
+  /** Ends the bar with "Configure plan", opening the plan wizard. */
   configureHref?: string;
   /** Fires when the user picks a different family, area, sub-area,
    * hazard, or outcome. Dashboard `router.push` uses this to navigate

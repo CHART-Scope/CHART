@@ -1514,6 +1514,10 @@ class SavedPlan(Base):
     by the API at save time. ``figure`` is the estimate the published model
     gave for them then, so a plan keeps the modelling it was made from even
     after a newer release replaces it. Plans are private to their owner.
+
+    The Configure plan wizard fills in the rest step by step: a ``draft``
+    until it is saved, the dates it runs between and the hazard and health
+    outcomes it addresses.
     """
 
     __tablename__ = "saved_plan"
@@ -1536,11 +1540,31 @@ class SavedPlan(Base):
     # written for; reused until any of them changes, so a page view does not
     # call the language model again.
     insight: Mapped[dict | None] = mapped_column(_JSON)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="saved", server_default="saved"
+    )
+    start_date: Mapped[date | None] = mapped_column(Date)
+    end_date: Mapped[date | None] = mapped_column(Date)
+    hazard: Mapped[str] = mapped_column(String(64), nullable=False)
+    outcomes: Mapped[list] = mapped_column(_JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
 
-    __table_args__ = (Index("ix_saved_plan_user", "user_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_saved_plan_user", "user_id", "created_at"),
+        CheckConstraint("status IN ('draft', 'saved')", name="ck_saved_plan_status"),
+        CheckConstraint(
+            "(start_date IS NULL) = (end_date IS NULL) AND end_date >= start_date",
+            name="ck_saved_plan_timeline",
+        ),
+    )
 
 
 class RecommendationSetting(Base):

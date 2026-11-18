@@ -1,0 +1,307 @@
+/* Configure plan (canvas frames 10-14), from tokens.css: a step card and the
+   plan summary beside it, the step tabs above. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-title);
+  font-weight: 600;
+}
+.lede {
+  margin: 0;
+  max-width: 840px;
+  font-size: var(--fs-lede);
+  line-height: var(--lh-lede);
+  color: var(--color-text-secondary);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--aside-width);
+  gap: var(--space-8);
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-8);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+}
+.cardTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-title-card);
+  font-weight: 600;
+}
+.cardLede {
+  margin: calc(-1 * var(--space-3)) 0 0;
+  max-width: 760px;
+  font-size: var(--fs-body-lg);
+  line-height: var(--lh-loose);
+  color: var(--color-text-secondary);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.dates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+@media (max-width: 640px) {
+  .dates {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.eyebrow,
+.eyebrowMuted {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  letter-spacing: var(--ls-hero);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.eyebrowMuted {
+  color: var(--color-text-hint);
+}
+
+/* The month bar: one cell per month, coloured by heat-season phase. */
+.phaseBar {
+  display: flex;
+  gap: var(--space-1);
+  margin: calc(-1 * var(--space-3)) 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+.phaseMonth {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: var(--space-16);
+  border-radius: var(--radius-xs);
+  color: var(--color-white);
+  font-family: var(--font-display);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+}
+.phaseMonth span {
+  font-size: var(--fs-micro);
+}
+.before {
+  background: var(--color-phase-before);
+}
+.during {
+  background: var(--color-phase-during);
+}
+.after {
+  background: var(--color-phase-after);
+}
+.outside {
+  background: var(--surface-muted);
+  color: var(--color-text-secondary);
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-body-lg);
+  color: var(--color-text-secondary);
+}
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.swatch {
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-xs);
+}
+
+/* Option cards: a checkbox or radio with a title and a line beneath. */
+.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.choices legend {
+  grid-column: 1 / -1;
+  margin-bottom: var(--space-3);
+  float: left;
+  width: 100%;
+}
+.choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-4);
+  row-gap: var(--space-1);
+  align-items: start;
+  padding: var(--space-4) var(--space-5);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  cursor: pointer;
+}
+.choice[data-checked] {
+  border-color: var(--color-nexus);
+  background: var(--color-nexus-tint);
+}
+.choice[data-soon] {
+  background: var(--surface-sentence);
+  cursor: not-allowed;
+}
+.choice:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.choiceInput {
+  grid-row: span 2;
+  width: var(--space-5);
+  height: var(--space-5);
+  margin: 2px 0 0;
+  accent-color: var(--color-nexus);
+}
+.choiceTitle {
+  font-family: var(--font-display);
+  font-size: var(--fs-h2);
+  font-weight: 500;
+  color: var(--color-text);
+}
+.choice[data-soon] .choiceTitle {
+  color: var(--color-text-secondary);
+}
+.choiceSub {
+  font-size: var(--fs-body-lg);
+  line-height: var(--lh-body);
+  color: var(--color-text-secondary);
+}
+
+.problem {
+  margin: 0;
+  font-size: var(--fs-body-lg);
+  color: var(--color-sem-low);
+}
+.note {
+  margin: 0;
+  font-size: var(--fs-body-lg);
+  color: var(--color-text-secondary);
+}
+.nav {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+/* The plan summary beside every step. */
+.summary {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-6) var(--space-7) var(--space-2);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+}
+.summaryFirst,
+.summaryRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+}
+.summaryRow {
+  border-top: 1px solid var(--border-divider);
+}
+.summaryText,
+.summaryMuted {
+  margin: 0;
+  font-size: var(--fs-lede);
+  overflow-wrap: anywhere;
+}
+.summaryMuted {
+  font-size: var(--fs-body-lg);
+  color: var(--color-text-secondary);
+}
+.edit {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-nexus);
+  font-family: var(--font-body);
+  font-size: var(--fs-body-lg);
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+.edit:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-tag);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  font-size: var(--fs-body-lg);
+  font-weight: 500;
+  color: var(--color-text);
+}

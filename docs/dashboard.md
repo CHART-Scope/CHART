@@ -14,7 +14,7 @@ month in `forecast_month`. Projected choices also retain `scenario`, `period`,
 
 The filter bar labels every dropdown (place levels, **Climate hazard**,
 **Health domain**, **Health outcome**) and ends with **Configure plan**, which
-opens the recommended actions for the same place and outcome. Domains no model
+opens the plan wizard (below) for the same place and outcome. Domains no model
 covers yet are listed as "coming soon" and cannot be picked.
 
 ```
@@ -212,6 +212,35 @@ with `?plan=<id>` ranks the repository's actions for the plan:
 The insight beside them is a template unless an administrator chose a
 language model; see [Recommendations and AI](recommendations.md). The figure
 and the ranking never depend on it.
+
+## Configure plan
+
+**Configure plan** opens a five-step wizard at
+`/dashboard/<geo>/configure?outcome=…&admin_unit=…&plan=<id>&step=<step>`:
+Timeline, Hazards & outcomes, Districts, Actions, and Review & export. The
+first two are built; the other three show in the step tabs but cannot be
+opened yet.
+
+1. **Timeline.** The plan's name and the dates it runs between. Quick select
+   picks the next planning cycle (today to the end of the review months after
+   the next heat season), the heat season only, or the next 6 or 12 months,
+   from the place's calendar in Settings > Heat seasons (the official season
+   until one is set). A bar colours each month by its phase. A plan starts
+   today or later and ends within 24 months of its start; the API checks the
+   same rules and allows a day's difference for the browser's clock. **Next**
+   saves the plan as a **draft**: a saved plan with `status: draft`, the
+   dashboard's projection captured as for any saved view.
+2. **Hazards & outcomes.** The hazard the models cover for the outcome
+   (extreme heat) and its health domain, with the roadmap's hazards and
+   domains listed as coming soon, and the health outcomes to address (at
+   least one). **Save draft** stores them and returns to the Planning center,
+   where the draft is marked **Draft** and **Continue configuring** reopens
+   it.
+
+Each step is saved with `PATCH /saved-plans/{id}`; the step and the draft
+live in the URL, so a reload or Back returns to the same step. Plans saved
+from the dashboard before the wizard are kept as saved, with no dates, under
+extreme heat and their own outcome (migration `037_plan_configuration`).
 
 ## Planning center
 

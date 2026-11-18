@@ -1,6 +1,7 @@
 """HTTP endpoints for saved plans.
 
-Anyone with plans write at a place may save a view of it. Plans are private:
+Anyone with plans write at a place may save a view of it, or start a plan in
+the Configure plan wizard and change it step by step. Plans are private:
 a user only ever sees, opens or removes their own, and a plan for a place they
 can no longer read plans at is hidden from the list and refused when opened.
 """
@@ -16,7 +17,12 @@ from chart.auth.service import require_current_user
 from chart.shared.db.session import get_session_factory
 
 from . import service
-from .schemas import SavedPlanCreate, SavedPlanList, SavedPlanResponse
+from .schemas import (
+    SavedPlanCreate,
+    SavedPlanList,
+    SavedPlanResponse,
+    SavedPlanUpdate,
+)
 
 router = APIRouter(prefix="/saved-plans", tags=["saved-plans"])
 
@@ -52,6 +58,17 @@ def create_saved_plan(request: SavedPlanCreate, user: CurrentUser) -> SavedPlanR
 )
 def read_saved_plan(plan_id: PlanId, user: CurrentUser) -> SavedPlanResponse:
     return _call(user, service.get_plan, plan_id)
+
+
+@router.patch(
+    "/{plan_id}",
+    response_model=SavedPlanResponse,
+    summary="Change a plan's name, dates, hazard or outcomes",
+)
+def update_saved_plan(
+    plan_id: PlanId, request: SavedPlanUpdate, user: CurrentUser
+) -> SavedPlanResponse:
+    return _call(user, service.update_plan, plan_id, request)
 
 
 @router.delete("/{plan_id}", status_code=204, summary="Remove a saved plan")

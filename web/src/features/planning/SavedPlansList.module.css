@@ -72,6 +72,11 @@
   background: var(--color-amber-tint);
 }
 
+.chip[data-status="draft"] {
+  background: var(--color-nexus-tint);
+  color: var(--color-nexus);
+}
+
 .meta {
   color: var(--color-text-muted);
   font-size: var(--fs-caption);

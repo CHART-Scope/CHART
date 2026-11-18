@@ -235,7 +235,7 @@ test("projected: time horizon, emission scenario cards and reference period", as
   expect(api.unhandled).toEqual([]);
 });
 
-test("filter bar: labelled dropdowns, health domain, and Configure plan opens the actions", async ({
+test("filter bar: labelled dropdowns, health domain, Configure plan opens the wizard", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -278,11 +278,18 @@ test("filter bar: labelled dropdowns, health domain, and Configure plan opens th
   await expect(page.getByRole("region", { name: "After heat season" })).toBeVisible();
   await expect(actions.getByRole("button").first()).toContainText("Not started");
 
+  // Configure plan opens the plan wizard (canvas frame 10) on the place shown.
   await bar.getByRole("link", { name: "Configure plan" }).click();
-  await page.waitForURL(/\/dashboard\/geo-ke\/actions\?/);
+  await page.waitForURL(/\/dashboard\/geo-ke\/configure\?/);
   const url = new URL(page.url());
   expect(url.searchParams.get("outcome")).toBe("lbw");
   expect(url.searchParams.get("admin_unit")).toBe("geo-ke-kajiado");
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Timeline of focus" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Plan name")).toHaveValue(/^Kajiado heat-health plan/);
+
+  await page.goto("/dashboard/geo-ke/actions?outcome=lbw&admin_unit=geo-ke-kajiado");
   const view = page.getByRole("group", { name: "View" });
   await expect(view.getByRole("button", { name: "List" })).toHaveAttribute(
     "aria-pressed",
