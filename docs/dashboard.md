@@ -199,13 +199,13 @@ Saved plans are listed on the **Planning center**, where each reopens its dashbo
 view or its recommendations. The [action repository](actions.md) page opened
 with `?plan=<id>` ranks the repository's actions for the plan:
 
-- The API reads the figure as a **risk level**: *clearly raised* when the
-  ratio's 95% CI lies above 1, *possibly raised* when only the central estimate
-  does (or a share is reported without a ratio), *not detected* otherwise, and
-  *unknown* without a figure.
-- **Timing**: a projection plans ahead (*before the heat season*); an observed
-  month inside the official season is *during*, up to two months after it
-  *after*, otherwise *before*.
+- The API reads the figure as a **risk level**: _clearly raised_ when the
+  ratio's 95% CI lies above 1, _possibly raised_ when only the central estimate
+  does (or a share is reported without a ratio), _not detected_ otherwise, and
+  _unknown_ without a figure.
+- **Timing**: a projection plans ahead (_before the heat season_); an observed
+  month inside the official season is _during_, up to two months after it
+  _after_, otherwise _before_.
 - The API ranks the actions (rules by default, or a self-hosted classifier)
   and shows the top three with the reasons they rank.
 
@@ -218,7 +218,7 @@ and the ranking never depend on it.
 **Configure plan** opens a five-step wizard at
 `/dashboard/<geo>/configure?outcome=…&admin_unit=…&plan=<id>&step=<step>`:
 Timeline, Hazards & outcomes, Districts, Actions, and Review & export. The
-first two are built; the other three show in the step tabs but cannot be
+first four are built; Review & export shows in the step tabs but cannot be
 opened yet.
 
 1. **Timeline.** The plan's name and the dates it runs between. Quick select
@@ -233,11 +233,40 @@ opened yet.
 2. **Hazards & outcomes.** The hazard the models cover for the outcome
    (extreme heat) and its health domain, with the roadmap's hazards and
    domains listed as coming soon, and the health outcomes to address (at
-   least one). **Save draft** stores them and returns to the Planning center,
-   where the draft is marked **Draft** and **Continue configuring** reopens
-   it.
+   least one).
+3. **Districts.** The areas beneath the plan's place (districts, divisions or
+   counties) beneath the place the dashboard framed, ranked by the
+   attributable share for the plan's first outcome,
+   from the same map the action repository's priority areas read: the
+   published outlook's annual average where it covers the place, else the
+   observed risk map's latest results. Areas at 5% or more are pre-ticked as
+   **Suggested to prioritise**, with the area the dashboard was showing when
+   **Configure plan** was pressed; areas without an estimate are listed last
+   and never suggested. Choose on the list or the map (search, Suggested, Select
+   all, Clear; at least one). **Save draft** stores the choice with each
+   area's rank, share and source (`plan_district`, migration
+   `038_plan_district`), so the report shows the figures the plan was made
+   with.
+4. **Actions.** The action repository's actions for the plan's hazard in its
+   country, ranked by the [recommendation](recommendations.md) rules read
+   against the plan: an action whose season falls inside the plan's dates (on
+   the place's heat-season calendar) scores 4 and is pre-ticked as
+   **Recommended for this plan**, one that targets an outcome the plan
+   addresses 3, and unless heat risk is clearly raised a cheaper one 2 or 1.
+   Each card shows its reasons and the plan's suggested districts. A ticked
+   action gets an owner (one of the country's departments) and a due date
+   inside the plan's dates. **Save plan** stores them (`plan_action`,
+   migration `039_plan_action`, with the action's title, seasons and cost as
+   the repository had them) and marks the plan saved.
 
-Each step is saved with `PATCH /saved-plans/{id}`; the step and the draft
+Until it is saved the plan is a **Draft** in the Planning center, and
+**Continue configuring** reopens it; a saved plan made in the wizard has
+**Edit plan**.
+
+Steps 1 and 2 are saved with `PATCH /saved-plans/{id}`, step 3 with
+`PUT /saved-plans/{id}/districts` and step 4 with
+`PUT /saved-plans/{id}/actions` then `PATCH` `status: saved` (each `GET`
+returns the ranking); the step and the draft
 live in the URL, so a reload or Back returns to the same step. Plans saved
 from the dashboard before the wizard are kept as saved, with no dates, under
 extreme heat and their own outcome (migration `037_plan_configuration`).

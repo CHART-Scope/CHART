@@ -16,8 +16,12 @@ from chart.auth.schemas import CurrentUserContext
 from chart.auth.service import require_current_user
 from chart.shared.db.session import get_session_factory
 
-from . import service
+from . import actions, districts, service
 from .schemas import (
+    PlanActions,
+    PlanActionsUpdate,
+    PlanDistricts,
+    PlanDistrictsUpdate,
     SavedPlanCreate,
     SavedPlanList,
     SavedPlanResponse,
@@ -69,6 +73,46 @@ def update_saved_plan(
     plan_id: PlanId, request: SavedPlanUpdate, user: CurrentUser
 ) -> SavedPlanResponse:
     return _call(user, service.update_plan, plan_id, request)
+
+
+@router.get(
+    "/{plan_id}/districts",
+    response_model=PlanDistricts,
+    summary="Rank the districts beneath a plan's place",
+)
+def read_plan_districts(plan_id: PlanId, user: CurrentUser) -> PlanDistricts:
+    return _call(user, districts.read_districts, plan_id)
+
+
+@router.put(
+    "/{plan_id}/districts",
+    response_model=PlanDistricts,
+    summary="Choose the districts a plan focuses on",
+)
+def save_plan_districts(
+    plan_id: PlanId, request: PlanDistrictsUpdate, user: CurrentUser
+) -> PlanDistricts:
+    return _call(user, districts.save_districts, plan_id, request)
+
+
+@router.get(
+    "/{plan_id}/actions",
+    response_model=PlanActions,
+    summary="Rank the repository's actions for a plan",
+)
+def read_plan_actions(plan_id: PlanId, user: CurrentUser) -> PlanActions:
+    return _call(user, actions.read_actions, plan_id)
+
+
+@router.put(
+    "/{plan_id}/actions",
+    response_model=PlanActions,
+    summary="Choose the actions a plan includes",
+)
+def save_plan_actions(
+    plan_id: PlanId, request: PlanActionsUpdate, user: CurrentUser
+) -> PlanActions:
+    return _call(user, actions.save_actions, plan_id, request)
 
 
 @router.delete("/{plan_id}", status_code=204, summary="Remove a saved plan")

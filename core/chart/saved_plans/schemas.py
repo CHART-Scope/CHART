@@ -63,6 +63,8 @@ class SavedPlanUpdate(BaseModel):
     end_date: date | None = None
     hazard: str | None = Field(default=None, pattern=r"^[a-z0-9_]{1,64}$")
     outcomes: list[str] | None = Field(default=None, min_length=1, max_length=8)
+    #: Saving a draft (the wizard's last step) makes it a saved plan.
+    status: Literal["saved"] | None = None
 
     _named = field_validator("name")(_plan_name)
 
@@ -131,3 +133,98 @@ class SavedPlanResponse(BaseModel):
 
 class SavedPlanList(BaseModel):
     items: list[SavedPlanResponse]
+
+
+class PlanDistrictArea(BaseModel):
+    """One district beneath the plan's place, ranked by its attributable share."""
+
+    geography_id: str
+    name: str
+    level: str
+    value_percent: float | None
+    #: Why there is no share, as the map says it ("no_model", ...).
+    missing_reason: str | None
+    #: 1 for the highest share; None without a share.
+    rank: int | None
+    #: At or above the elevated band (5%), as the action repository's
+    #: priority areas.
+    suggested: bool
+    selected: bool
+
+
+class PlanDistricts(BaseModel):
+    """Step 3 of the Configure plan wizard: the ranking and the plan's choice.
+
+    ``source``: ``projection`` when the published outlook covers the place
+    (each district's annual-average share), else ``observed`` (the risk map's
+    latest result for each district; ``month`` when the map names one). Until
+    the plan's districts are saved (``saved: false``), the suggested ones are
+    selected, with the district the plan was opened on from the dashboard.
+    """
+
+    plan_id: str
+    outcome: str
+    source: Literal["projection", "observed"]
+    month: str | None
+    saved: bool
+    areas: list[PlanDistrictArea]
+
+
+class PlanDistrictsUpdate(BaseModel):
+    geography_ids: list[str] = Field(min_length=1, max_length=1000)
+
+
+class PlanActionItem(BaseModel):
+    """One heat action from the action repository, ranked for the plan."""
+
+    id: str
+    title: str
+    summary: str
+    seasons: list[Literal["before", "during", "after"]]
+    #: The departments the repository names for it, as written there.
+    departments: list[str]
+    cost_level: str | None
+    #: Why it ranks where it does, in the rules' order.
+    reasons: list[str]
+    rank: int
+    #: Its season falls inside the plan's dates.
+    recommended: bool
+    selected: bool
+    owner_department_id: int | None
+    due_date: date | None
+
+
+class PlanDepartment(BaseModel):
+    id: int
+    name: str
+
+
+class PlanActions(BaseModel):
+    """Step 4 of the Configure plan wizard: actions ranked for the plan.
+
+    Ranked by the recommendation rules: an action whose season falls inside
+    the plan's dates (on the place's heat-season calendar) scores 4, one that
+    targets an outcome the plan addresses 3, and unless heat risk is clearly
+    raised a cheaper one 2 (low or no cost) or 1 (medium); ties keep the
+    repository's order. Until the plan's actions are saved (``saved:
+    false``), the recommended ones are selected.
+    """
+
+    plan_id: str
+    phases: list[Literal["before", "during", "after"]]
+    saved: bool
+    items: list[PlanActionItem]
+    #: Owners to choose from: the active departments of the plan's country.
+    departments: list[PlanDepartment]
+    #: The plan's chosen districts that were suggested (5% or more).
+    priority_districts: list[str]
+
+
+class PlanActionChoice(BaseModel):
+    action_id: str = Field(min_length=1, max_length=64)
+    owner_department_id: int | None = None
+    due_date: date | None = None
+
+
+class PlanActionsUpdate(BaseModel):
+    items: list[PlanActionChoice] = Field(min_length=1, max_length=200)

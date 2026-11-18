@@ -177,6 +177,8 @@
   --content-max: 1592px;
   /* The summary column beside a form (Configure plan). */
   --aside-width: 380px;
+  /* The tallest a scrolling list in a card grows (Configure plan's districts). */
+  --list-scroll-max: 620px;
 
   /* --- Focus --- */
   --focus-ring: 2px solid var(--color-nexus);

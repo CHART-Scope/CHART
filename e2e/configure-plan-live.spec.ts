@@ -42,13 +42,42 @@ test("a planner starts a plan in the wizard and finds the draft in the Planning 
     path: `${evidence}/configure-plan-outcomes.png`,
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Save draft" }).click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page).toHaveURL(/step=districts/);
+
+  // Step 3: Kajiado's areas ranked from the published map; keep one and save.
+  // (Whether any reach the 5% suggestion line depends on the publication.)
+  const first = page.getByRole("main").getByRole("checkbox").first();
+  await expect(first).toBeVisible();
+  await page.getByRole("button", { name: "Clear" }).click();
+  await first.check();
+  await page.screenshot({
+    path: `${evidence}/configure-plan-districts.png`,
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page).toHaveURL(/step=actions/);
+
+  // Step 4: Kenya's heat actions from the published feed, ranked; keep the
+  // first, give it an owner, and save the plan.
+  const action = page.getByRole("main").getByRole("checkbox").first();
+  await expect(action).toBeVisible();
+  if (!(await action.isChecked())) await action.check();
+  await page.screenshot({
+    path: `${evidence}/configure-plan-actions.png`,
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Save plan" }).click();
   await expect(page).toHaveURL(/\/plan$/);
 
   await page.reload();
   const row = page.getByRole("listitem", { name });
-  await expect(row).toContainText("Draft");
-  await row.getByRole("link", { name: "Continue configuring" }).click();
+  await expect(row).not.toContainText("Draft");
+  await row.getByRole("link", { name: "Edit plan" }).click();
+  await page
+    .getByRole("navigation", { name: "Plan steps" })
+    .getByRole("button", { name: /Hazards/ })
+    .click();
   await expect(
     page.getByRole("group", { name: "Health outcomes" }).getByRole("checkbox", {
       name: /Under-five mortality/,
@@ -60,6 +89,13 @@ test("a planner starts a plan in the wizard and finds the draft in the Planning 
     .click();
   await expect(page.getByLabel("Start date")).toHaveValue(start);
   await expect(page.getByLabel("End date")).toHaveValue(end);
+  await page
+    .getByRole("navigation", { name: "Plan steps" })
+    .getByRole("button", { name: /Districts/ })
+    .click();
+  await expect(page.getByRole("status").filter({ hasText: "selected" })).toHaveText(
+    /^1 of \d+ selected$/,
+  );
 
   await page.goto("/plan");
   const again = page.getByRole("listitem", { name });

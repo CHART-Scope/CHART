@@ -284,3 +284,55 @@ def test_a_wizard_draft_persists_each_step(client, tokens, created):
     assert (
         client.get(f"/saved-plans/{plan['id']}", headers=headers).json() == step.json()
     )
+
+
+def test_a_plans_districts_come_from_the_published_map(client, tokens, created):
+    """Step 3 against the published Kenya outlook and PostGIS boundaries."""
+
+    headers = tokens["kenya-planner"]
+    plan = save(
+        client,
+        tokens,
+        created,
+        admin_unit_id=None,
+        status="draft",
+        start_date=date.today().isoformat(),
+        end_date=(date.today() + timedelta(days=180)).isoformat(),
+    ).json()
+    url = f"/saved-plans/{plan['id']}/districts"
+    ranking = client.get(url, headers=headers)
+    assert ranking.status_code == 200, ranking.text
+    body = ranking.json()
+    assert body["source"] == "projection"
+    outlook = client.get(
+        f"/heat-outlook/{FRAME}/map", params={"outcome": "lbw"}, headers=headers
+    ).json()
+    shares = {area["geography_id"]: area["value_percent"] for area in outlook["areas"]}
+    # The same values as the dashboard's map, highest first.
+    assert {a["geography_id"]: a["value_percent"] for a in body["areas"]} == shares
+    ranked = [a["value_percent"] for a in body["areas"] if a["rank"] is not None]
+    assert ranked == sorted(ranked, reverse=True)
+    assert all(a["suggested"] == (a["value_percent"] or 0) >= 5 for a in body["areas"])
+
+    chosen = [body["areas"][0]["geography_id"], COUNTY]
+    saved = client.put(url, json={"geography_ids": chosen}, headers=headers)
+    assert saved.status_code == 200, saved.text
+    engine = create_engine(os.environ["DATABASE_URL"])
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text(
+                "SELECT geography_id, value_percent, source FROM plan_district "
+                "WHERE plan_id = :id ORDER BY geography_id"
+            ),
+            {"id": plan["id"]},
+        ).all()
+    assert sorted(chosen) == [row.geography_id for row in rows]
+    assert all(row.source == "projection" for row in rows)
+    assert {row.geography_id: row.value_percent for row in rows} == {
+        g: shares[g] for g in chosen
+    }
+    refused = client.put(
+        url, json={"geography_ids": ["geo-in-madhya-pradesh"]}, headers=headers
+    )
+    assert refused.status_code == 422
+    assert refused.json()["error"] == "PLAN_DISTRICT_INVALID"

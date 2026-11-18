@@ -21,6 +21,94 @@ function installPlans(api: FakeApi) {
   const writes: { method: string; body: Record<string, unknown> }[] = [];
   // The next write is refused with this error, as the API would.
   const refusal: { next: { error: string; status: number } | null } = { next: null };
+  // Districts ranked from the observed map fakeApi.ts draws (mapFor): Bhopal
+  // at 12%, Gwalior without an estimate.
+  const chosenDistricts = new Map<string, string[]>();
+  // Two heat actions for India from the repository, ranked for the plan.
+  const chosenActions = new Map<string, Record<string, unknown>[]>();
+  api.on(/^\/api\/chart\/saved-plans\/[^/]+\/actions$/, async (route, url) => {
+    const id = url.pathname.split("/")[4];
+    if (route.request().method() === "PUT") {
+      const body = route.request().postDataJSON() as {
+        items: Record<string, unknown>[];
+      };
+      writes.push({ method: "PUT actions", body });
+      chosenActions.set(id, body.items);
+    }
+    const saved = chosenActions.get(id);
+    const item = (
+      actionId: string,
+      title: string,
+      seasons: string[],
+      reasons: string[],
+      rank: number,
+      recommended: boolean,
+    ) => {
+      const choice = saved?.find((entry) => entry.action_id === actionId);
+      return {
+        id: actionId,
+        title,
+        summary: `${title}.`,
+        seasons,
+        departments: ["Health"],
+        cost_level: "Low",
+        reasons,
+        rank,
+        recommended,
+        selected: saved ? Boolean(choice) : recommended,
+        owner_department_id: choice?.owner_department_id ?? null,
+        due_date: choice?.due_date ?? null,
+      };
+    };
+    return json(route, {
+      plan_id: id,
+      phases: ["before", "during"],
+      saved: Boolean(saved),
+      items: [
+        item(
+          "rec-counsel",
+          "Counsel pregnant women",
+          ["before", "during"],
+          ["Fits before the heat season, inside the plan's dates.", "Low cost."],
+          1,
+          true,
+        ),
+        item("rec-review", "Review the season", ["after"], ["Low cost."], 2, false),
+      ],
+      departments: [
+        { id: 1, name: "Health" },
+        { id: 2, name: "Labour" },
+      ],
+      priority_districts: ["Bhopal Division"],
+    });
+  });
+  api.on(/^\/api\/chart\/saved-plans\/[^/]+\/districts$/, async (route, url) => {
+    const id = url.pathname.split("/")[4];
+    if (route.request().method() === "PUT") {
+      const body = route.request().postDataJSON() as { geography_ids: string[] };
+      writes.push({ method: "PUT districts", body });
+      chosenDistricts.set(id, body.geography_ids);
+    }
+    const saved = chosenDistricts.get(id);
+    const area = (code: string, percent: number | null, rank: number | null) => ({
+      geography_id: `geo-in-mp-${code}`,
+      name: `${code[0].toUpperCase()}${code.slice(1)} Division`,
+      level: "division",
+      value_percent: percent,
+      missing_reason: percent === null ? "no_prediction" : null,
+      rank,
+      suggested: percent !== null && percent >= 5,
+      selected: saved ? saved.includes(`geo-in-mp-${code}`) : percent !== null,
+    });
+    return json(route, {
+      plan_id: id,
+      outcome: "under_five_mortality",
+      source: "observed",
+      month: null,
+      saved: Boolean(saved),
+      areas: [area("bhopal", 12, 1), area("gwalior", null, null)],
+    });
+  });
   api.on(/^\/api\/chart\/heat-seasons\/geo-in-mp$/, (route) =>
     json(route, {
       geography_id: PLACE,
@@ -231,8 +319,7 @@ test("a planner starts a draft with its timeline, then saves its outcomes", asyn
   await expect(page.getByRole("main").getByRole("alert")).toHaveText(
     "Choose at least one health outcome to continue.",
   );
-  const saveDraft = page.getByRole("button", { name: "Save draft" });
-  await expect(saveDraft).toBeDisabled();
+  await expect(next).toBeDisabled();
   await u5.check();
   await lbw.check();
   const outcomesSummary = page
@@ -257,34 +344,160 @@ test("a planner starts a draft with its timeline, then saves its outcomes", asyn
   await page.getByRole("button", { name: "Edit hazard and outcomes" }).click();
   await expect(page).toHaveURL(/step=outcomes/);
 
-  await saveDraft.click();
-  await expect(page).toHaveURL(/\/plan$/);
+  await next.click();
+  await expect(page).toHaveURL(/step=districts/);
   expect(writes.at(-1)).toEqual({
     method: "PATCH",
     // The fixture catalog names the hazard "heat" (fakeApi.ts).
     body: { hazard: "heat", outcomes: ["under_five_mortality", "lbw"] },
   });
-  const plan = plans.get("00000000-0000-4000-8000-000000000001")!;
-  expect(plan.status).toBe("draft");
+
+  // Step 3: ranked by share, the suggested division pre-ticked.
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Divisions of focus" }),
+  ).toBeVisible();
+  const suggested = page.getByRole("group", { name: "Suggested to prioritise (1)" });
+  const other = page.getByRole("group", { name: "Other divisions (1)" });
+  const bhopal = suggested.getByRole("checkbox", { name: /Bhopal Division/ });
+  const gwalior = other.getByRole("checkbox", { name: /Gwalior Division/ });
+  await expect(bhopal).toBeChecked();
+  await expect(gwalior).not.toBeChecked();
+  await expect(suggested).toContainText("12.0%");
+  await expect(other).toContainText("No estimate");
+  const count = page
+    .getByRole("main")
+    .getByRole("status")
+    .filter({ hasText: "selected" });
+  await expect(count).toHaveText("1 of 2 selected");
+  const districtsSummary = page
+    .getByRole("complementary", { name: "Plan summary" })
+    .getByRole("region", { name: "Districts" });
+  await expect(districtsSummary).toContainText("1 selected");
+  await expect(districtsSummary).toContainText("Bhopal Division");
+
+  await page.getByRole("button", { name: "Clear" }).click();
+  await expect(count).toHaveText("0 of 2 selected");
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+    "Choose at least one district to continue.",
+  );
+  await expect(next).toBeDisabled();
+  await page.getByRole("button", { name: "Select all" }).click();
+  await expect(count).toHaveText("2 of 2 selected");
+  await page.getByRole("button", { name: "Suggested (1)" }).click();
+  await expect(gwalior).not.toBeChecked();
+  // The map and the list share one selection: clicking Gwalior on the map ticks it.
+  const mapGwalior = page
+    .locator("svg path[aria-pressed]")
+    .filter({ has: page.locator("xpath=self::*[contains(@aria-label, 'Gwalior')]") });
+  await expect(page.locator("svg path[aria-pressed]")).toHaveCount(2);
+  await mapGwalior.click();
+  await expect(gwalior).toBeChecked();
+  await expect(mapGwalior).toHaveAttribute("aria-pressed", "true");
+  await page.getByLabel("Search divisions").fill("bho");
+  await expect(other.getByRole("checkbox")).toHaveCount(0);
+  await page.getByLabel("Search divisions").fill("");
+  await expect(gwalior).toHaveCSS("accent-color", "rgb(56, 62, 233)");
+  await page.screenshot({
+    path: "../outputs/e2e/web/configure-plan-districts.png",
+    fullPage: true,
+  });
+
+  await next.click();
+  await expect(page).toHaveURL(/step=actions/);
+  expect(writes.at(-1)).toEqual({
+    method: "PUT districts",
+    body: { geography_ids: ["geo-in-mp-bhopal", "geo-in-mp-gwalior"] },
+  });
 
   // The Planning center lists the draft and reopens it on step 2.
-  const row = page.getByRole("listitem", { name: "MP heat plan" });
-  await expect(row).toContainText("Draft");
-  await row.getByRole("link", { name: "Continue configuring" }).click();
+  await page.goto("/plan");
+  const draftRow = page.getByRole("listitem", { name: "MP heat plan" });
+  await expect(draftRow).toContainText("Draft");
+  await draftRow.getByRole("link", { name: "Continue configuring" }).click();
   await expect(page).toHaveURL(/configure\?.*step=outcomes/);
   await expect(
     page.getByRole("group", { name: "Health outcomes" }).getByRole("checkbox", {
       name: /Under-five mortality/,
     }),
   ).toBeChecked();
-  await page.reload();
-  await expect(page.getByLabel("Plan name")).toHaveCount(0);
-  await page
-    .getByRole("navigation", { name: "Plan steps" })
-    .getByRole("button", { name: /Timeline/ })
-    .click();
+  await steps.getByRole("button", { name: /Districts/ }).click();
+  await expect(page.getByRole("checkbox", { name: /Gwalior Division/ })).toBeChecked();
+  await steps.getByRole("button", { name: /Actions/ }).click();
+
+  // Step 4: the repository's heat actions ranked for the plan; the one in
+  // the plan window is pre-ticked, with the plan's suggested districts.
+  const recommended = page.getByRole("group", {
+    name: "Recommended for this plan (1)",
+  });
+  const counsel = recommended.getByRole("checkbox", { name: "Counsel pregnant women" });
+  const review = page
+    .getByRole("group", { name: "Other actions (1)" })
+    .getByRole("checkbox", { name: "Review the season" });
+  await expect(counsel).toBeChecked();
+  await expect(review).not.toBeChecked();
+  await expect(recommended).toContainText("Fits before the heat season");
+  await expect(recommended).toContainText(
+    "Priority districts in your selection: Bhopal Division",
+  );
+  await page.getByRole("combobox", { name: "Owner of Counsel pregnant women" }).click();
+  await page.getByRole("option", { name: "Labour" }).click();
+  await page.getByLabel("Due date of Counsel pregnant women").fill("2027-01-15");
+  await counsel.uncheck();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText(
+    "Choose at least one action to save the plan.",
+  );
+  const savePlan = page.getByRole("button", { name: "Save plan" });
+  await expect(savePlan).toBeDisabled();
+  await counsel.check();
+  await page.getByRole("combobox", { name: "Owner of Counsel pregnant women" }).click();
+  await page.getByRole("option", { name: "Health" }).click();
+  await page.getByLabel("Due date of Counsel pregnant women").fill("2027-01-15");
+  await review.check();
+  const actionsSummary = page
+    .getByRole("complementary", { name: "Plan summary" })
+    .getByRole("region", { name: "Actions" });
+  await expect(actionsSummary).toContainText("2 actions");
+  await expect(recommended.locator("[data-checked]")).toHaveCSS(
+    "border-color",
+    "rgb(56, 62, 233)",
+  );
+  await page.screenshot({
+    path: "../outputs/e2e/web/configure-plan-actions.png",
+    fullPage: true,
+  });
+
+  await savePlan.click();
+  await expect(page).toHaveURL(/\/plan$/);
+  expect(writes.slice(-2)).toEqual([
+    {
+      method: "PUT actions",
+      body: {
+        items: [
+          { action_id: "rec-counsel", owner_department_id: 1, due_date: "2027-01-15" },
+          { action_id: "rec-review", owner_department_id: null, due_date: null },
+        ],
+      },
+    },
+    { method: "PATCH", body: { status: "saved" } },
+  ]);
+  const plan = plans.get("00000000-0000-4000-8000-000000000001")!;
+  expect(plan.status).toBe("saved");
+
+  // A saved plan is no longer a draft and reopens in the wizard to edit.
+  const row = page.getByRole("listitem", { name: "MP heat plan" });
+  await expect(row).not.toContainText("Draft");
+  await row.getByRole("link", { name: "Edit plan" }).click();
   await expect(page.getByLabel("Plan name")).toHaveValue("MP heat plan");
   await expect(page.getByLabel("Start date")).toHaveValue("2026-11-09");
+  await page.reload();
+  await page
+    .getByRole("navigation", { name: "Plan steps" })
+    .getByRole("button", { name: /Actions/ })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Owner of Counsel pregnant women" }),
+  ).toContainText("Health");
+  await expect(page.getByRole("checkbox", { name: "Review the season" })).toBeChecked();
   expect(api.unhandled).toEqual([]);
 });
 

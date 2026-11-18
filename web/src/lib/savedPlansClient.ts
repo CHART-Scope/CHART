@@ -75,6 +75,8 @@ export type SavedPlanChanges = {
   end_date?: string;
   hazard?: string;
   outcomes?: string[];
+  /** The wizard's last step finishes a draft. */
+  status?: "saved";
 };
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -92,6 +94,13 @@ const ERROR_MESSAGES: Record<string, string> = {
     "A plan can cover up to 24 months. Choose an earlier end date.",
   PLAN_HAZARD_UNAVAILABLE: "No model covers this climate hazard yet.",
   PLAN_OUTCOME_INVALID: "Choose health outcomes that CHART models.",
+  PLAN_DISTRICT_INVALID:
+    "A chosen district is not part of this place. Reload and try again.",
+  PLAN_DISTRICTS_UNAVAILABLE: "No districts are mapped for this place yet.",
+  PLAN_ACTION_INVALID:
+    "An action is no longer in the repository. Reload and try again.",
+  PLAN_ACTION_OWNER_INVALID: "Choose an owner from this country's departments.",
+  PLAN_ACTION_DUE_INVALID: "Choose a due date within the plan's dates.",
 };
 
 async function failure(response: Response, fallback: string): Promise<Error> {
@@ -157,4 +166,120 @@ export async function deleteSavedPlan(planId: string): Promise<void> {
     { method: "DELETE" },
   );
   if (!response.ok) throw await failure(response, "The plan could not be removed.");
+}
+
+/** One district beneath the plan's place (Configure plan, step 3). */
+export type PlanDistrictArea = {
+  geography_id: string;
+  name: string;
+  level: string;
+  value_percent: number | null;
+  missing_reason: string | null;
+  /** 1 for the highest share; null without a share. */
+  rank: number | null;
+  /** At or above the elevated band (5%), as the action repository's priority areas. */
+  suggested: boolean;
+  selected: boolean;
+};
+
+export type PlanDistricts = {
+  plan_id: string;
+  outcome: string;
+  /** The published outlook's annual average, else the observed risk map. */
+  source: "projection" | "observed";
+  month: string | null;
+  /** False until the plan's districts are saved; the suggested ones are selected. */
+  saved: boolean;
+  areas: PlanDistrictArea[];
+};
+
+export async function getPlanDistricts(
+  planId: string,
+  signal?: AbortSignal,
+): Promise<PlanDistricts> {
+  const response = await authFetch(
+    `/api/chart/saved-plans/${encodeURIComponent(planId)}/districts`,
+    { cache: "no-store", signal },
+  );
+  if (!response.ok) throw await failure(response, "The districts could not load.");
+  return (await response.json()) as PlanDistricts;
+}
+
+export async function savePlanDistricts(
+  planId: string,
+  geographyIds: string[],
+): Promise<PlanDistricts> {
+  const response = await authFetch(
+    `/api/chart/saved-plans/${encodeURIComponent(planId)}/districts`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ geography_ids: geographyIds }),
+    },
+  );
+  if (!response.ok) throw await failure(response, "The districts could not be saved.");
+  return (await response.json()) as PlanDistricts;
+}
+
+export type PlanPhase = "before" | "during" | "after";
+
+/** One repository action ranked for a plan (Configure plan, step 4). */
+export type PlanActionItem = {
+  id: string;
+  title: string;
+  summary: string;
+  seasons: PlanPhase[];
+  departments: string[];
+  cost_level: string | null;
+  /** Why it ranks where it does. */
+  reasons: string[];
+  rank: number;
+  /** Its season falls inside the plan's dates. */
+  recommended: boolean;
+  selected: boolean;
+  owner_department_id: number | null;
+  due_date: string | null;
+};
+
+export type PlanActions = {
+  plan_id: string;
+  phases: PlanPhase[];
+  saved: boolean;
+  items: PlanActionItem[];
+  departments: { id: number; name: string }[];
+  priority_districts: string[];
+};
+
+export type PlanActionChoice = {
+  action_id: string;
+  owner_department_id: number | null;
+  due_date: string | null;
+};
+
+export async function getPlanActions(
+  planId: string,
+  signal?: AbortSignal,
+): Promise<PlanActions> {
+  const response = await authFetch(
+    `/api/chart/saved-plans/${encodeURIComponent(planId)}/actions`,
+    { cache: "no-store", signal },
+  );
+  if (!response.ok) throw await failure(response, "The actions could not load.");
+  return (await response.json()) as PlanActions;
+}
+
+export async function savePlanActions(
+  planId: string,
+  items: PlanActionChoice[],
+): Promise<PlanActions> {
+  const response = await authFetch(
+    `/api/chart/saved-plans/${encodeURIComponent(planId)}/actions`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    },
+  );
+  if (!response.ok) throw await failure(response, "The actions could not be saved.");
+  return (await response.json()) as PlanActions;
 }

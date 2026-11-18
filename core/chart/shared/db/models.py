@@ -1567,6 +1567,64 @@ class SavedPlan(Base):
     )
 
 
+class PlanDistrict(Base):
+    """A district a plan focuses on, chosen in the Configure plan wizard.
+
+    ``rank``, ``value_percent`` and ``source`` are the ranking the planner
+    chose from (the published outlook, else the observed risk map), kept so
+    the plan's report shows the figures it was made with.
+    """
+
+    __tablename__ = "plan_district"
+
+    plan_id: Mapped[str] = mapped_column(
+        ForeignKey("saved_plan.id", ondelete="CASCADE"), primary_key=True
+    )
+    geography_id: Mapped[str] = mapped_column(
+        ForeignKey("geographies.id", ondelete="CASCADE"), primary_key=True
+    )
+    rank: Mapped[int | None] = mapped_column(Integer)
+    value_percent: Mapped[float | None] = mapped_column(Float)
+    suggested: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    source: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "source IN ('projection', 'observed')", name="ck_plan_district_source"
+        ),
+    )
+
+
+class PlanAction(Base):
+    """An action a plan includes (Configure plan, step 4).
+
+    ``action_id`` is the action feed's id; the title, seasons and cost are
+    copied in, since the feed changes after the plan is made. The owner is a
+    department of the plan's country.
+    """
+
+    __tablename__ = "plan_action"
+
+    plan_id: Mapped[str] = mapped_column(
+        ForeignKey("saved_plan.id", ondelete="CASCADE"), primary_key=True
+    )
+    action_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    seasons: Mapped[list] = mapped_column(_JSON, nullable=False)
+    cost_level: Mapped[str | None] = mapped_column(String(64))
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    owner_department_id: Mapped[int | None] = mapped_column(
+        ForeignKey("department.id", ondelete="SET NULL")
+    )
+    due_date: Mapped[date | None] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class RecommendationSetting(Base):
     """How the installation ranks actions and writes the insight beside them.
 

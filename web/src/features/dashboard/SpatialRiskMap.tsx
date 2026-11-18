@@ -45,6 +45,11 @@ type Props = {
   outcome?: string;
   /** Highlighted area, as an AppGeography id. */
   selectedGeographyId?: string | null;
+  /**
+   * Several highlighted areas (Configure plan's districts): each toggles with
+   * `onSelect` and reports aria-pressed; the others are not dimmed.
+   */
+  selectedGeographyIds?: ReadonlySet<string>;
   onSelect?: (geographyId: string) => void;
   /** Whether this user may queue a run for an area that has none. */
   canPrepare?: boolean;
@@ -203,6 +208,7 @@ export function SpatialRiskMap({
   month,
   outcome,
   selectedGeographyId,
+  selectedGeographyIds,
   onSelect,
   canPrepare = false,
   source,
@@ -547,9 +553,11 @@ export function SpatialRiskMap({
                 </pattern>
               </defs>
               {shapes.map((shape) => {
-                const selected =
-                  selectedGeographyId != null &&
-                  shape.area.geography_id === selectedGeographyId;
+                const selected = selectedGeographyIds
+                  ? shape.area.geography_id != null &&
+                    selectedGeographyIds.has(shape.area.geography_id)
+                  : selectedGeographyId != null &&
+                    shape.area.geography_id === selectedGeographyId;
                 return (
                   <path
                     key={shape.area.admin_unit_id}
@@ -558,8 +566,15 @@ export function SpatialRiskMap({
                     className={styles.area}
                     data-selected={selected || undefined}
                     data-context-dim={
-                      selectedGeographyId !== geographyId && !selected
+                      !selectedGeographyIds &&
+                      selectedGeographyId !== geographyId &&
+                      !selected
                         ? true
+                        : undefined
+                    }
+                    aria-pressed={
+                      selectedGeographyIds && onSelect && shape.area.geography_id
+                        ? selected
                         : undefined
                     }
                     data-muted={
