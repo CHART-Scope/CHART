@@ -3,6 +3,7 @@ const test = require("node:test");
 
 const {
   buildRealmSettings,
+  initialAdminPassword,
   syncClientSettings,
   buildScopeGoogleIdentityProvider,
   buildWebClientSettings,
@@ -36,6 +37,35 @@ test("realm sync keeps a signed-in session for 30 days, active or not", () => {
   // (30 minutes idle, 10 hours in all) must not apply.
   assert.equal(signInRealmSettings.ssoSessionIdleTimeout, 30 * 24 * 60 * 60);
   assert.equal(signInRealmSettings.ssoSessionMaxLifespan, 30 * 24 * 60 * 60);
+});
+
+test("the first administrator's password must be set on a reachable host", () => {
+  assert.throws(
+    () =>
+      initialAdminPassword({ CHART_WEB_ORIGIN: "https://chartforclimateaction.org" }),
+    /Set CHART_ADMIN_INITIAL_PASSWORD/,
+  );
+  assert.throws(
+    () =>
+      initialAdminPassword({
+        CHART_WEB_ORIGIN: "https://chartforclimateaction.org",
+        CHART_ADMIN_INITIAL_PASSWORD: "admin",
+      }),
+    /other than 'admin'/,
+  );
+  assert.equal(
+    initialAdminPassword({
+      CHART_WEB_ORIGIN: "https://chartforclimateaction.org",
+      CHART_ADMIN_INITIAL_PASSWORD: " a-strong-one ",
+    }),
+    "a-strong-one",
+  );
+  // A laptop or the e2e suite keeps the documented local default.
+  assert.equal(initialAdminPassword({}), "admin");
+  assert.equal(
+    initialAdminPassword({ CHART_WEB_ORIGIN: "http://127.0.0.1:3100" }),
+    "admin",
+  );
 });
 
 test("realm sync rejects an invalid SSL mode", () => {

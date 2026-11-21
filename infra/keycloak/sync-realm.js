@@ -309,8 +309,10 @@ async function ensureEmailCodeSignIn(token, codeSettings) {
 }
 
 // Every installation starts with one administrator, `admin`, whose first
-// password (CHART_ADMIN_INITIAL_PASSWORD, default "admin") must be changed at
-// the first sign-in. It runs setup and invites everyone else. Created once:
+// password (CHART_ADMIN_INITIAL_PASSWORD) must be changed at the first
+// sign-in. On a reachable host it must be set: whoever signs in first with a
+// guessable password becomes the administrator. Only a local installation
+// may fall back to "admin". It runs setup and invites everyone else. Created once:
 // an existing `admin` is never touched, so its password stays its own.
 async function ensureDefaultAdmin(token, env) {
   const realmUrl = `${keycloakUrl}/admin/realms/${targetRealm}`;
@@ -354,7 +356,7 @@ async function ensureDefaultAdmin(token, env) {
       credentials: [
         {
           type: "password",
-          value: env.CHART_ADMIN_INITIAL_PASSWORD || "admin",
+          value: initialAdminPassword(env),
           temporary: true,
         },
       ],
@@ -762,6 +764,19 @@ function buildScopeGoogleIdentityProvider(env) {
   };
 }
 
+/** The new `admin` account's first password; refused on a public host. */
+function initialAdminPassword(env) {
+  const configured = env.CHART_ADMIN_INITIAL_PASSWORD?.trim();
+  if (configured && configured !== "admin") return configured;
+  const origin = env.CHART_WEB_ORIGIN?.trim();
+  const host = origin ? new URL(normalizePublicOrigin(origin)).hostname : "localhost";
+  if (["localhost", "127.0.0.1", "::1"].includes(host)) return configured || "admin";
+  throw new Error(
+    "Set CHART_ADMIN_INITIAL_PASSWORD to a strong password other than 'admin': " +
+      `CHART creates its first administrator on ${host}, which others can reach.`,
+  );
+}
+
 function googleIdentityProviderEnabled(configuredOrigin) {
   if (!configuredOrigin) return true;
   const origin = new URL(normalizePublicOrigin(configuredOrigin));
@@ -903,6 +918,7 @@ if (require.main === module) {
 
 module.exports = {
   buildRealmSettings,
+  initialAdminPassword,
   signInRealmSettings,
   syncClientSettings,
   buildScopeGoogleIdentityProvider,

@@ -119,7 +119,7 @@ It needs, once (see [one-time setup](#one-time-setup)):
 
 | Where | Name | What |
 | --- | --- | --- |
-| Repository secret | `AIRTABLE_TOKEN` | Airtable personal access token: scope `data.records:read`, access to the actions base only |
+| `actions-publish` environment secret | `AIRTABLE_TOKEN` | Airtable personal access token: scope `data.records:read`, access to the actions base only |
 | Repository variable | `AWS_ACTIONS_PUBLISH_ROLE_ARN` | IAM role the workflow assumes to write `s3://chart-actions-repository/v1/*` |
 
 ### From a laptop
@@ -307,7 +307,9 @@ Connect**, URL `https://token.actions.githubusercontent.com`, audience
 
 ### 4. Create the role the workflow uses
 
-Trust policy: only workflows in this repository may assume the role.
+Trust policy: only a job in this repository's `actions-publish` environment
+may assume the role, and that environment only deploys from `main` (step 5),
+so a workflow on any other branch, a pull request or a tag cannot publish.
 Save it as `trust.json`:
 
 ```json
@@ -318,8 +320,10 @@ Save it as `trust.json`:
     "Principal": {"Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"},
     "Action": "sts:AssumeRoleWithWebIdentity",
     "Condition": {
-      "StringEquals": {"token.actions.githubusercontent.com:aud": "sts.amazonaws.com"},
-      "StringLike": {"token.actions.githubusercontent.com:sub": "repo:CHART-Scope/CHART:*"}
+      "StringEquals": {
+        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+        "token.actions.githubusercontent.com:sub": "repo:CHART-Scope/CHART:environment:actions-publish"
+      }
     }
   }]
 }
@@ -354,11 +358,23 @@ policy to match `trust.json`.
 
 ### 5. Configure GitHub
 
+Create the `actions-publish` environment, allow only `main` to deploy from
+it, and keep the Airtable token there rather than as a repository secret:
+
 ```bash
-gh secret set AIRTABLE_TOKEN --repo CHART-Scope/CHART          # paste the token when asked
+gh api -X PUT repos/CHART-Scope/CHART/environments/actions-publish \
+  -F 'deployment_branch_policy[protected_branches]=false' \
+  -F 'deployment_branch_policy[custom_branch_policies]=true'
+gh api -X POST repos/CHART-Scope/CHART/environments/actions-publish/deployment-branch-policies \
+  -f name=main -f type=branch
+gh secret set AIRTABLE_TOKEN --repo CHART-Scope/CHART --env actions-publish   # paste the token
+gh secret delete AIRTABLE_TOKEN --repo CHART-Scope/CHART                     # the old repo-wide copy
 gh variable set AWS_ACTIONS_PUBLISH_ROLE_ARN --repo CHART-Scope/CHART \
   --body arn:aws:iam::<ACCOUNT_ID>:role/chart-actions-publisher
 ```
+
+The scheduled and Airtable-triggered runs use `main`'s publisher; a change
+to `core/chart/actions` publishes once it is released to `main`.
 
 ### 6. Publish and check
 
