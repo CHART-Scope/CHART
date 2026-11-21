@@ -71,6 +71,7 @@ nav:
       - Observed climate data: observed-climate.md
   - Infrastructure:
       - AWS sandbox deployment: aws-sandbox.md
+      - CI and Claude review: claude-review.md
   - Python core:
       - Overview: python-core.md
       - Add a geography and model: add-geography-and-model.md
