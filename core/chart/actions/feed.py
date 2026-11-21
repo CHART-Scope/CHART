@@ -1,9 +1,14 @@
-"""Read the public action feed, keep the last good copy, resolve it per country.
+"""Read the action feed, keep the last good copy, resolve it per country.
 
 ``CHART_ACTIONS_URL`` names the feed; it defaults to the CHART project's public
 file so a fresh checkout shows real actions with no account or key. Set it to
 another URL to serve your own actions, or to an empty string to use only the
-copy bundled with the package (``actions.json``). A feed that cannot be read
+copy bundled with the package (``actions.json``).
+
+An ``s3://bucket/key`` URL reads a private bucket with the server's AWS
+credentials (the EC2 instance role; boto3, the ``bedrock`` extra). Its images
+are stored as keys beside the feed (``images/<name>``) and each is served as
+a link signed for an hour, so the bucket never needs to be public. A feed that cannot be read
 or fails validation never replaces the last good copy; before any good read,
 the bundled copy is served.
 """
@@ -15,6 +20,7 @@ import logging
 import os
 import threading
 import time
+import urllib.parse
 import urllib.request
 from functools import lru_cache
 from pathlib import Path
@@ -28,6 +34,8 @@ DEFAULT_FEED_URL = (
 )
 BUNDLED_PATH = Path(__file__).with_name("actions.json")
 MAX_BYTES = 5 * 1024 * 1024
+#: How long a signed image link from a private bucket stays valid.
+IMAGE_LINK_SECONDS = 3600
 
 logger = logging.getLogger(__name__)
 _lock = threading.Lock()
@@ -62,15 +70,26 @@ def load_feed() -> tuple[ActionFeed, FeedSource]:
 
 def list_actions(country: str | None) -> ActionList:
     feed, source = load_feed()
+    items = [
+        resolve(action, country)
+        for action in feed.actions
+        if country is None or not action.countries or country in action.countries
+    ]
+    url = os.getenv("CHART_ACTIONS_URL", DEFAULT_FEED_URL).strip()
+    if source == "feed":
+        items = [
+            (
+                _signed_images(item, url)
+                if url.startswith("s3://")
+                else _absolute_images(item, url)
+            )
+            for item in items
+        ]
     return ActionList(
         country=country,
         source=source,
         published_at=feed.published_at,
-        items=[
-            resolve(action, country)
-            for action in feed.actions
-            if country is None or not action.countries or country in action.countries
-        ],
+        items=items,
     )
 
 
@@ -87,6 +106,16 @@ def resolve(action: FeedAction, country: str | None) -> ActionContent:
 
 
 def _fetch(url: str) -> ActionFeed:
+    if url.startswith("s3://"):
+        bucket, key = _s3_location(url)
+        body = (
+            _s3()
+            .get_object(Bucket=bucket, Key=key, Range=f"bytes=0-{MAX_BYTES}")["Body"]
+            .read()
+        )
+        if len(body) > MAX_BYTES:
+            raise ValueError("action feed is larger than 5 MB")
+        return ActionFeed.model_validate(json.loads(body))
     request = urllib.request.Request(url, headers={"User-Agent": "CHART"})
     timeout = float(os.getenv("CHART_ACTIONS_TIMEOUT_SECONDS", "5"))
     with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -99,3 +128,57 @@ def _fetch(url: str) -> ActionFeed:
 @lru_cache(maxsize=1)
 def _bundled() -> ActionFeed:
     return ActionFeed.model_validate_json(BUNDLED_PATH.read_bytes())
+
+
+def _signed_images(action: ActionContent, feed_url: str) -> ActionContent:
+    """Relative image keys (``images/x.png``) as links signed for an hour."""
+
+    if not any("://" not in image.url for image in action.images):
+        return action
+    bucket, key = _s3_location(feed_url)
+    folder = key.rsplit("/", 1)[0] + "/" if "/" in key else ""
+    images = [
+        (
+            image
+            if "://" in image.url
+            else image.model_copy(
+                update={
+                    "url": _s3().generate_presigned_url(
+                        "get_object",
+                        Params={"Bucket": bucket, "Key": folder + image.url},
+                        ExpiresIn=IMAGE_LINK_SECONDS,
+                    )
+                }
+            )
+        )
+        for image in action.images
+    ]
+    return action.model_copy(update={"images": images})
+
+
+def _absolute_images(action: ActionContent, feed_url: str) -> ActionContent:
+    """Relative image keys read from a public or file URL, beside the feed."""
+
+    if all("://" in image.url for image in action.images):
+        return action
+    images = [
+        image.model_copy(update={"url": urllib.parse.urljoin(feed_url, image.url)})
+        for image in action.images
+    ]
+    return action.model_copy(update={"images": images})
+
+
+def _s3_location(url: str) -> tuple[str, str]:
+    bucket, _, key = url.removeprefix("s3://").partition("/")
+    if not bucket or not key:
+        raise ValueError(f"not an s3://bucket/key URL: {url}")
+    return bucket, key
+
+
+@lru_cache(maxsize=1)
+def _s3():
+    # boto3 is the core image's `bedrock` extra; a checkout without it can
+    # still read public and file URLs.
+    import boto3
+
+    return boto3.client("s3")

@@ -135,8 +135,12 @@ def parse_references(text: str | None) -> list[dict]:
     return references
 
 
-def copy_images(feed: dict, out: Path, public_url: str) -> None:
-    """Download each Airtable attachment and point the feed at its public copy."""
+def copy_images(feed: dict, out: Path) -> None:
+    """Download each Airtable attachment and point the feed at its copy.
+
+    The link is relative to the feed (``images/<name>``): the API signs it for
+    the browser, so the bucket need not be public (feed.py).
+    """
 
     for action in feed["actions"]:
         copies = []
@@ -151,7 +155,7 @@ def copy_images(feed: dict, out: Path, public_url: str) -> None:
                 target.write_bytes(response.read())
             copies.append(
                 {
-                    "url": f"{public_url}/images/{name}",
+                    "url": f"images/{name}",
                     "filename": attachment.get("filename") or name,
                 }
             )
@@ -207,13 +211,29 @@ def upload(out: Path, bucket: str, prefix: str, stamp: str) -> None:
     )
 
 
-def live_actions(url: str) -> list[dict] | None:
-    """The actions in the published feed, or None when there is none yet."""
+def live_actions(bucket: str, prefix: str) -> list[dict] | None:
+    """The actions in the published feed, or None when there is none yet.
+
+    Read with the publisher's AWS role (s3:GetObject on the feed), since the
+    bucket is private.
+    """
 
     try:
-        with urllib.request.urlopen(url, timeout=30) as response:
-            return json.load(response)["actions"]
-    except (OSError, ValueError, KeyError):
+        result = subprocess.run(
+            [
+                "aws",
+                "s3",
+                "cp",
+                "--only-show-errors",
+                f"s3://{bucket}/{prefix}/actions.json",
+                "-",
+            ],
+            check=True,
+            capture_output=True,
+            timeout=60,
+        )
+        return json.loads(result.stdout)["actions"]
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError):
         return None
 
 
@@ -240,7 +260,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     api_url = os.environ.get("AIRTABLE_API_URL", "https://api.airtable.com").rstrip("/")
     base_id = os.environ.get("AIRTABLE_BASE_ID", DEFAULT_BASE_ID)
-    public_url = f"https://{args.bucket}.s3.{args.region}.amazonaws.com/{args.prefix}"
+    location = f"s3://{args.bucket}/{args.prefix}"
 
     feed = build_feed(fetch_records(api_url, base_id, token))
     if not feed["actions"] and not args.allow_empty:
@@ -249,19 +269,19 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
     args.out.mkdir(parents=True, exist_ok=True)
-    copy_images(feed, args.out, public_url)
+    copy_images(feed, args.out)
     ActionFeed.model_validate(feed)
     (args.out / "actions.json").write_text(
         json.dumps(feed, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     print(f"Wrote {len(feed['actions'])} published actions to {args.out}")
     if args.upload:
-        if feed["actions"] == live_actions(f"{public_url}/actions.json"):
+        if feed["actions"] == live_actions(args.bucket, args.prefix):
             print("No change since the live feed; nothing uploaded.")
             return 0
         stamp = feed["published_at"].replace(":", "").replace("+0000", "Z")
         upload(args.out, args.bucket, args.prefix, stamp)
-        print(f"Uploaded to {public_url}/actions.json")
+        print(f"Uploaded to {location}/actions.json")
     return 0
 
 
